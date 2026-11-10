@@ -109,6 +109,10 @@ export interface LeadContact {
   /** Blocked in Lead View (mig 20261102270000): kept, never answered, out of the Inbox's list but under Blocked. */
   blockedAt?: string | null
   blockedBy?: string
+  /** The customer's outlet (mig 20261110200000): CS's pick, else the ad's; null = none. */
+  outletId?: string | null
+  /** Where it comes from: 'cs' set in the customer panel, 'ad' the ad's, '' none. */
+  outletBy?: 'cs' | 'ad' | ''
 }
 
 export type LeadLanguage = 'Mandarin' | 'English' | 'Malay' | 'Other'

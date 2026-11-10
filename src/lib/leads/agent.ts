@@ -5,6 +5,7 @@
 
 import type { KnowledgeCard } from './ai'
 import { forBrand, isLive, type LeadInfo } from './info'
+import { DEFAULT_LEARN, learnOf, type FileQuestion, type LearnSettings, type MemoryLine, type MemorySuggestion } from './agent-memory'
 
 export const TONES: ReadonlyArray<[string, string]> = [
   ['Professional', 'Polite and precise. No emoji.'], ['Friendly', 'Warm and casual, like a helpful shop assistant.'],
@@ -66,6 +67,15 @@ export interface AgentSettings {
   /** Memory › Settings, as drawn (learning itself is not built). */
   autoLearn: boolean
   learnOthers: boolean
+  /** v3 § 5 (2026-11-10): How it replies › How to reach the goal — free text the AI reads before every reply. */
+  howGoal: string
+  /** v3 § 5: Hand to a person › Also hand over when… */
+  handNote: string
+  /** v3 § 5: Memory › Collected › LEARNING DIRECTION. */
+  dirMore: string[]
+  dirLess: string[]
+  /** v3 § 5: Memory › How it learns (lib/leads/agent-memory.ts). */
+  learn: LearnSettings
 }
 
 export const DEFAULT_SETTINGS: AgentSettings = {
@@ -73,6 +83,7 @@ export const DEFAULT_SETTINGS: AgentSettings = {
   habits: [], sellNote: '', avoid: ['No stock promises'], avoidNote: '', blocked: [], length: 'Short',
   phone: { on: true, afterOn: true, after: 2, ask: 'May I have your mobile number? Our salesperson will WhatsApp you the details.', wordsOn: false, words: [], wordsAsk: '' },
   unsure: true, upset: true, maxOn: false, maxReplies: 6, infoOff: [], autoLearn: true, learnOthers: false,
+  howGoal: '', handNote: '', dirMore: [], dirLess: [], learn: DEFAULT_LEARN,
 }
 
 const str = (v: unknown, max: number, fallback: string) => (typeof v === 'string' ? v.slice(0, max) : fallback)
@@ -103,6 +114,8 @@ export function settingsOf(raw: unknown, soulGoal = ''): AgentSettings {
     },
     unsure: bool(r.unsure, d.unsure), upset: bool(r.upset, d.upset), maxOn: bool(r.maxOn, false), maxReplies: num(r.maxReplies, 1, 999, d.maxReplies),
     infoOff: list(r.infoOff, 300), autoLearn: bool(r.autoLearn, d.autoLearn), learnOthers: bool(r.learnOthers, d.learnOthers),
+    howGoal: str(r.howGoal, 4000, ''), handNote: str(r.handNote, 2000, ''), dirMore: list(r.dirMore, 30), dirLess: list(r.dirLess, 30),
+    learn: learnOf(r.learn),
   }
 }
 
@@ -153,6 +166,11 @@ export interface AgentMore {
   sources?: AgentSource[]
   /** Since mig 20261102140000. */
   knowledge?: KnowledgePick[]
+  /** Since mig 20261110230000 (v3 § 5): Memory's lines, Knowledge's questions, From goal results' suggestions. */
+  memory?: MemoryLine[]
+  fileQs?: FileQuestion[]
+  suggestions?: MemorySuggestion[]
+  asked?: Record<string, string[]>
 }
 
 /** The Data Center's categories (the handoff's six); CS may type others. */
@@ -217,7 +235,7 @@ export function settingsPrompt(s: AgentSettings): string {
   } else {
     lines.push('# The mobile number\nDo not ask for it.')
   }
-  const limits = [s.unsure ? 'when you are unsure of the answer' : '', s.upset ? 'when the customer is upset or complains' : '', s.maxOn ? `after ${s.maxReplies} of your replies in one conversation` : ''].filter(Boolean)
+  const limits = [s.unsure ? 'when you are unsure of the answer' : '', s.upset ? 'when the customer is upset or complains' : '', s.maxOn ? `after ${s.maxReplies} of your replies in one conversation` : '', s.handNote.trim()].filter(Boolean)
   if (limits.length) lines.push(`# When to hand to a person (set handoff to true)\n${limits.map(l => `- ${l}`).join('\n')}`)
   return lines.join('\n\n')
 }

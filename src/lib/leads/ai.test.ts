@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adoptionRate, conversationPrompt, DEFAULT_GOAL, inDate, outcomeOf, readDraft, systemPrompt, turnsOf, type KnowledgeCard, type Persona } from './ai'
+import { adoptionRate, conversationPrompt, DEFAULT_GOAL, inDate, outcomeOf, readDraft, systemPrompt, withParagraphs, turnsOf, type KnowledgeCard, type Persona } from './ai'
 
 const persona = (over: Partial<Persona> = {}): Persona => ({
   brandId: 'b1', brandName: '2990s', agentName: '', personality: '', tone: 'warm', goal: '', dos: '', donts: '', examples: '',
@@ -81,5 +81,39 @@ describe('dates, outcomes, adoption', () => {
   it('adoption is the share used of those decided', () => {
     expect(adoptionRate({ sent: 2, edited: 1, dismissed: 1 })).toBe(75)
     expect(adoptionRate({ sent: 0, edited: 0, dismissed: 0 })).toBeNull()
+  })
+})
+
+// Lead View v3 handoff § 2: paragraphs are separated by a blank line.
+describe('paragraphs', () => {
+  it('asks the model for a blank line between paragraphs', () => {
+    const p = systemPrompt(persona({}), [], '2026-11-10')
+    expect(p).toContain('one to three small paragraphs separated by a blank line, no markdown')
+  })
+
+  it('cuts one block of three or more sentences into at most three paragraphs', () => {
+    expect(withParagraphs('Hi Jason! The 4-seater is 2.4 m long. Would you like to see it at our showroom?'))
+      .toBe('Hi Jason!\n\nThe 4-seater is 2.4 m long.\n\nWould you like to see it at our showroom?')
+    expect(withParagraphs('One. Two. Three. Four. Five.')).toBe('One. Two.\n\nThree. Four.\n\nFive.')
+  })
+
+  it('keeps emoji and quotes with their sentence, and decimals and prices whole', () => {
+    expect(withParagraphs('Thanks! 😊 It is RM 1.5k off. See you “soon.” Bye.'))
+      .toBe('Thanks! 😊 It is RM 1.5k off.\n\nSee you “soon.”\n\nBye.')
+  })
+
+  it('splits Chinese at 。！？ with no space', () => {
+    expect(withParagraphs('你好！这款沙发有三个尺寸。请问您想来门市看看吗？'))
+      .toBe('你好！\n\n这款沙发有三个尺寸。\n\n请问您想来门市看看吗？')
+  })
+
+  it('leaves a reply with its own line breaks, or of one or two sentences, as written', () => {
+    expect(withParagraphs('Hi!\nThe sofa is 2 m. Come by.')).toBe('Hi!\nThe sofa is 2 m. Come by.')
+    expect(withParagraphs('Hi! Come by our showroom.')).toBe('Hi! Come by our showroom.')
+  })
+
+  it('reading the answer applies it', () => {
+    const d = readDraft(JSON.stringify({ reply: 'A. B. C.', usedCardIds: [], handoff: false, note: '' }), [])
+    expect(d?.reply).toBe('A.\n\nB.\n\nC.')
   })
 })

@@ -1,0 +1,29 @@
+/* The All outlets filter (Lead View v3 § 3; the prototype's Reply rules lines 562–565, Leads 254–257). */
+
+.wrap { position: relative; flex: none; }
+.wrap[data-size='sm'] { justify-self: start; margin-left: -8px; }
+.btn {
+  cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: none; border-radius: 8px;
+  background: transparent; font-family: inherit; font-size: 14px; line-height: normal; color: rgb(var(--lv-fg-2));
+}
+.wrap[data-size='sm'] .btn { height: 28px; padding: 0 8px; border-radius: 7px; font-size: 12px; }
+.wrap[data-size='sm'] .btn:hover { background: rgb(var(--lv-page)); }
+.btn[data-on], .wrap[data-size='sm'] .btn[data-on] { background: rgb(var(--lv-sel)); color: rgb(var(--lv-fg)); }
+.pin { color: rgb(var(--lv-fg-3)); }
+.chev { color: rgb(var(--lv-fg-4)); }
+.catch { position: fixed; inset: 0; z-index: 40; }
+.menu {
+  position: absolute; left: 0; top: 40px; z-index: 41; width: 240px; display: flex; flex-direction: column; padding: 5px; border-radius: 11px;
+  background: rgb(var(--lv-surface)); border: 1px solid rgb(var(--lv-line)); box-shadow: var(--lv-shadow-pop); box-sizing: border-box;
+  max-height: calc(100vh - 160px); overflow-y: auto;
+}
+.wrap[data-size='sm'] .menu { top: 38px; }
+.head { padding: 8px 10px 4px; font-size: 11px; letter-spacing: 0.08em; color: rgb(var(--lv-fg-4)); }
+.item {
+  flex: none; cursor: pointer; display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border: none; border-radius: 7px;
+  background: transparent; font-family: inherit; font-size: 13px; font-weight: 400; line-height: normal; color: rgb(var(--lv-fg)); text-align: left;
+}
+.item[aria-checked='true'] { background: rgb(var(--lv-page)); font-weight: 600; }
+.item:hover { background: rgb(var(--lv-surface-sel)); }
+.label { flex: 1; }
+.n { font-size: 12px; color: rgb(var(--lv-fg-4)); }

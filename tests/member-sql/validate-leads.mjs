@@ -1987,4 +1987,312 @@ await db.exec(`
   check((await q(`select has_function_privilege('authenticated', 'public.lead_my_brands()', 'execute') a`))[0].a, false, 'lead_my_brands: only the functions’')
 }
 
+
+// Outlets (mig 20261110200000, Lead View v3 § 3): a brand's outlets, an ad's outlet, a customer's follows the ad unless CS sets it.
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await db.exec(await f('20261110200000_lead_outlets.sql'))
+  await db.exec(await f('20261110200000_lead_outlets.sql'))
+  await db.exec(await f('20261110200100_lead_outlets_guards.sql'))
+  await db.exec(await f('20261110200100_lead_outlets_guards.sql'))
+  for (const [fn, page] of [['lead_save_outlets', "ARRAY['/leads/settings']"], ['lead_set_ad_outlet', "ARRAY['/leads/rules', '/leads/settings']"], ['lead_set_contact_outlet', "ARRAY['/leads']"]]) {
+    const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+    check(src.includes(`PERFORM public.tab_write_guard(${page}`), true, `${fn} asks its page`)
+  }
+  await as(CS_USER, ['leads.view'])
+  const outs = (await q('select public.lead_outlets() j'))[0].j
+  check(outs.map(o => o.name), ['2990s Kelana Jaya', '2990s Petaling Jaya', 'PWCC Penang', 'Carress Taman Maluri', 'Carress Johor', 'Carress Penang'], 'seeded once, by brand, in order')
+  const [kj, pj, pwcc] = outs
+  await refuses('select public.lead_save_outlets($1, $2::jsonb)', [kj.brandId, '[]'], /Lead View · Manage/, 'saving outlets needs Manage')
+  await refuses('select public.lead_set_ad_outlet($1, $2)', ['9000000009', kj.id], /Lead View · Manage/, 'an ad’s outlet needs Manage')
+
+  // A customer from 9000000009: no outlet until the ad has one; then the ad's; CS's pick wins; auto follows the ad again.
+  const cid = (await q('select id from public.lead_contacts order by created_at limit 1'))[0].id
+  await q('update public.lead_contacts set ad_id = $2 where id = $1', [cid, '9000000009'])
+  const card = async () => { const j = (await q('select public.lead_contact_json(c) j from public.lead_contacts c where id = $1', [cid]))[0].j; return [j.outletId, j.outletBy] }
+  check(await card(), [null, ''], 'no outlet yet')
+  await as(CS_USER, ALL)
+  await q('select public.lead_set_ad_outlet($1, $2)', ['9000000009', pj.id])
+  check(await card(), [pj.id, 'ad'], 'follows the ad')
+  check((await q('select public.lead_ads() j'))[0].j.find(a => a.adId === '9000000009')?.outletId, pj.id, 'the ad list carries it')
+  check((await q('select public.lead_inbox() j'))[0].j.find(x => x.id === cid)?.outletId, pj.id, 'the Inbox carries it')
+  await q('select public.lead_set_contact_outlet($1, $2, $3)', [cid, 'outlet', pwcc.id])
+  await q('select public.lead_set_contact_outlet($1, $2, $3)', [cid, 'outlet', pwcc.id])
+  check(await card(), [pwcc.id, 'cs'], 'CS’s pick wins over the ad')
+  check((await q("select count(*)::int n from public.lead_events where contact_id = $1 and what like 'Outlet set to PWCC Penang by %'", [cid]))[0].n, 1, 'once on the timeline')
+  await q('select public.lead_set_contact_outlet($1, $2, null)', [cid, 'none'])
+  check(await card(), [null, 'cs'], 'No outlet, by CS')
+  await q('select public.lead_set_contact_outlet($1, $2, null)', [cid, 'auto'])
+  check(await card(), [pj.id, 'ad'], 'back to the ad’s')
+  await refuses('select public.lead_set_contact_outlet($1, $2, null)', [cid, 'x'], /An outlet, none/, 'a mode it does not know')
+
+  // Renamed, reordered, one removed: its ads and CS's picks let go.
+  await q('select public.lead_set_contact_outlet($1, $2, $3)', [cid, 'outlet', kj.id])
+  await refuses('select public.lead_save_outlets($1, $2::jsonb)', [kj.brandId, JSON.stringify([{ name: 'A' }, { name: 'a ' }])], /share a name/, 'two of the same name')
+  await refuses('select public.lead_save_outlets($1, $2::jsonb)', [kj.brandId, JSON.stringify([{ name: ' ' }])], /needs a name/, 'a blank name')
+  const saved = (await q('select public.lead_save_outlets($1, $2::jsonb) j', [kj.brandId, JSON.stringify([{ id: pwcc.id, name: 'PWCC Penang' }, { id: kj.id, name: '2990s KJ' }, { name: '2990s Puchong' }])]))[0].j
+  check(saved.filter(o => o.brandId === kj.brandId).map(o => o.name), ['PWCC Penang', '2990s KJ', '2990s Puchong'], 'renamed, reordered, added')
+  check(await card(), [kj.id, 'cs'], 'a kept outlet keeps its customers')
+  await q('select public.lead_save_outlets($1, $2::jsonb)', [kj.brandId, JSON.stringify([{ id: pwcc.id, name: 'PWCC Penang' }])])
+  check(await card(), [null, ''], 'removed: CS’s pick let go, and its ad no longer has an outlet (9000000009 was on Petaling Jaya)')
+  check((await q('select count(*)::int n from public.lead_ad_outlets where ad_id = $1', ['9000000009']))[0].n, 0, 'the ad mapping went with it')
+  await refuses('select public.lead_set_ad_outlet($1, $2)', ['9000000009', kj.id], /That outlet is gone/, 'a removed outlet cannot be picked')
+  await refuses('select public.lead_save_outlets($1, $2::jsonb)', [kj.brandId, JSON.stringify([{ id: outs[3].id, name: 'x' }])], /not this brand/, 'another brand’s outlet')
+  await q('select public.lead_set_ad_outlet($1, null)', ['9000000009'])
+  for (const sig of ['lead_outlets()', 'lead_save_outlets(uuid,jsonb)', 'lead_set_ad_outlet(text,uuid)', 'lead_set_contact_outlet(uuid,text,uuid)']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+}
+
+// Team (migs 20261110220000 / 220100 / 220200, Lead View v3 § 4): the ERP staff feed; Team gives Lead View through the
+// three permission readers (production's, from lead-team-production.sql, md5-checked); stopped is stopped; an Outlet
+// staff sees their outlets and the chats with none.
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  const md5 = async fn => (await q(`select md5(prosrc) m from pg_proc where proname = $1`, [fn]))[0].m
+  await db.exec(`
+    alter table public.users add column if not exists role text, add column if not exists is_active boolean not null default true;
+    alter table public.hr_staff_costs add column if not exists title_id uuid, add column if not exists email text,
+      add column if not exists employee_code text, add column if not exists resignation_date date;
+    create table public.permission_templates(id uuid primary key, base_role text);
+    create table public.titles(id uuid primary key, name text, template_id uuid);
+    create table public.permission_template_grants(template_id uuid, function_key text, action text, scope text);
+    create table public.user_permission_cells(user_id uuid, function_key text, action text, scope text);
+    create table public.user_permission_sensitive(user_id uuid, field text, granted boolean);
+    create table public.permission_template_sensitive(template_id uuid, field text);
+    create table public.permission_cell_keys(function_key text, action text, legacy_key text, min_scope text, gate text);
+    create table public.title_permissions(title_id uuid, permission_key text);
+    create table public.role_default_permissions(role text, permission_key text);
+    create table public.user_permissions(user_id uuid, permission_key text, granted boolean);
+    create table public.permission_key_actions(legacy_key text, function_key text, action text);
+    create table public.permission_template_tabs(template_id uuid, tab_id text, action text);
+    create table public.user_permission_tabs(user_id uuid, tab_id text, action text, granted boolean);
+    create table if not exists public.permission_tab_cells(tab_id text, action text, cell text);
+    insert into public.permission_tab_cells values
+      ('lead.inbox','view','leads.view'),('lead.inbox','create','leads.create'),('lead.inbox','edit','leads.edit'),
+      ('lead.leads','view','leads.view'),('lead.leads','edit','leads.edit'),('lead.insight','view','leads.view'),
+      ('lead.rules','view','leads.view'),('lead.rules','edit','leads.manage'),('lead.campaigns','view','leads.view'),
+      ('lead.campaigns','edit','leads.manage'),('lead.settings','view','leads.view'),('lead.settings','create','leads.create'),
+      ('lead.settings','edit','leads.manage'),('hr.people','view','team.view');
+    insert into public.permission_cell_keys values ('leads','view','leads','all',null),('team','view','team','all',null);
+    insert into public.permission_key_actions values ('leads','leads','view'),('leads','leads','create'),('leads','leads','edit'),('leads','leads','manage'),('team','team','view');
+  `)
+  await db.exec((await readFile(new URL('./lead-team-production.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+  check([await md5('current_actions'), await md5('current_permissions'), await md5('current_tabs')],
+    ['aae861a3bcdabf3e843ee794f647457f', 'b6122dcaf7ca957b67b17134569bb575', 'f4642c7adab521153f7d8a94242c3417'], 'the readers are production’s')
+  for (let i = 0; i < 2; i++) {
+    await db.exec(await f('20261110220000_erp_staff_feed.sql'))
+    await db.exec(await f('20261110220100_lead_team.sql'))
+    await db.exec(await f('20261110220200_lead_team_guards.sql'))
+  }
+  for (const fn of ['lead_team_save', 'lead_team_remove']) {
+    check((await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc.includes(`PERFORM public.tab_write_guard(ARRAY['/leads/settings'], ARRAY['leads.manage']);`), true, `${fn} asks Settings`)
+  }
+
+  // The ERP feed: whole list per company, stale refused, the missing deleted.
+  const ingest = b => q('select public.ingest_erp_staff($1::jsonb) r', [JSON.stringify(b)]).then(r => r[0].r)
+  const r1 = await ingest({ companyId: 1, snapshotAt: '2026-11-10T01:00:00Z', staff: [
+    { staffId: 'e1', code: 'S-0142', name: 'Daniel Chew', email: 'Daniel@2990s.my', job: 'Outlet manager', branch: 'Kelana Jaya', active: true },
+    { staffId: 'e2', code: 'S-0188', name: 'Sharon Lee', email: '', job: 'Sales', branch: 'Kelana Jaya', active: true },
+    { staffId: 'e3', name: 'Gone Soon', active: true }, { code: 'no id' }] })
+  check([r1.outcome, r1.staff, r1.unreadable], ['applied', 3, 1], 'three kept, one unreadable')
+  check((await ingest({ companyId: 1, snapshotAt: '2026-11-09T00:00:00Z', staff: [] })).outcome, 'stale', 'an older snapshot changes nothing')
+  check((await q(`select email from public.erp_staff where staff_id = 'e1'`))[0].email, 'daniel@2990s.my', 'emails kept lower-case')
+  await refuses(`select public.ingest_erp_staff('{"companyId":0,"staff":[]}'::jsonb)`, [], /companyId/, 'a company id is needed')
+
+  // People: Daniel (outlet staff, template without Lead View), Mei Ling the Lead Executive (no template), Sharon (no login).
+  const DAN = id(901), MEI = CS_USER, TPL = id(950), TT = id(951), TL = id(952)
+  await db.exec(`
+    insert into public.users (id, email, name, role, is_active) values ('${DAN}', 'dan@x', 'Daniel', 'staff', true) on conflict do nothing;
+    update public.users set role = 'staff' where id = '${MEI}';
+    insert into public.permission_templates values ('${TPL}', 'staff');
+    insert into public.titles values ('${TT}', 'Outlet manager', '${TPL}'), ('${TL}', 'Lead Executive', null);
+    insert into public.permission_template_grants values ('${TPL}', 'team', 'view', 'all'), ('${TPL}', 'leads', 'manage', 'all');
+    insert into public.permission_template_tabs values ('${TPL}', 'hr.people', 'view');
+    insert into public.hr_staff_costs (id, employee_name, user_id, status, title_id, email) values
+      ('${id(902)}', 'Daniel Chew', '${DAN}', 'active', '${TT}', 'daniel@2990s.my'),
+      ('${id(903)}', 'Sharon Lee', null, 'active', null, '');
+    update public.hr_staff_costs set title_id = '${TL}', email = 'mei@x' where user_id = '${MEI}';
+    insert into public.role_default_permissions values ('staff', 'team');
+  `)
+  const asUser = async u => db.exec(`select set_config('test.uid', '${u}', false)`)
+  const acts = async u => { await asUser(u); return (await q('select public.current_actions() a'))[0].a }
+  const keys = async u => { await asUser(u); return (await q('select public.current_permissions() p'))[0].p.sort() }
+  const tabs = async u => { await asUser(u); return (await q('select public.current_tabs() t'))[0].t }
+  check(await acts(DAN), { 'team.view': 'all', 'leads.manage': 'all' }, 'before the Team: the template’s cells')
+
+  // Directory: People with the ERP's job and branch (Daniel by email, Sharon by name); the ERP-only.
+  await as(CS_USER, ALL)
+  const dir = (await q('select public.lead_staff_directory() d'))[0].d
+  const dan = dir.people.find(p => p.name === 'Daniel Chew'), sharon = dir.people.find(p => p.name === 'Sharon Lee')
+  check([dan.erpJob, dan.branch, dan.hasLogin, dan.added], ['Outlet manager', 'Kelana Jaya', true, false], 'Daniel matched by email')
+  check([sharon.erpCode, sharon.hasLogin], ['S-0188', false], 'Sharon matched by name, no login yet')
+  check(dir.erpOnly.map(x => x.name), ['Gone Soon'], 'the ERP-only list')
+  await as(OTHER, ['leads.view'])
+  await refuses('select public.lead_staff_directory()', [], /Lead View · Manage/, 'the staff list needs Manage')
+
+  // Add Daniel as Outlet staff on Kelana Jaya, no reply; Mei Ling as Customer service.
+  await as(CS_USER, ALL)
+  const kj = (await q(`select id from public.lead_outlets where name = 'PWCC Penang'`))[0].id
+  await q('select public.lead_team_save($1, $2, $3, $4, $5::uuid[], null, null)', [id(902), 'outlet', false, true, [kj]])
+  const meiStaff = (await q(`select id from public.hr_staff_costs where user_id = $1`, [MEI]))[0].id
+  await q('select public.lead_team_save($1, $2, true, true, $3::uuid[], null, null)', [meiStaff, 'cs', []])
+  await refuses('select public.lead_team_save($1, $2, true, true, $3::uuid[], null, null)', [id(902), 'boss', []], /Admin, Customer service/, 'a role it does not know')
+  await refuses(`select public.lead_team_save($1, 'cs', true, true, '{}'::uuid[], '2026-12-01', '2026-11-01')`, [id(902)], /last day/, 'dates the wrong way round')
+
+  check(await acts(DAN), { 'team.view': 'all', 'leads.view': 'all' }, 'Outlet staff, no reply: Lead View · View only — the template’s Manage set aside')
+  check((await keys(DAN)).includes('leads'), true, 'the leads key')
+  const dt = await tabs(DAN)
+  const box = (t, a) => dt.boxes.find(b => b.tab === t && b.action === a)?.granted
+  check([dt.ticks, box('lead.inbox', 'view'), box('lead.inbox', 'create'), box('lead.insight', 'view'), box('lead.rules', 'view'), box('lead.settings', 'view')],
+    [['hr.people.view'], true, false, true, false, false], 'over a template: the Team’s lead boxes')
+  check(await acts(MEI), { 'team.view': 'all', 'leads.view': 'all', 'leads.create': 'all', 'leads.edit': 'all', 'leads.manage': 'all' }, 'Customer service: the Team’s four, beside the role’s keys')
+  const mt = await tabs(MEI)
+  check([mt.ticks, mt.boxes.find(b => b.tab === 'lead.settings' && b.action === 'view').granted, mt.boxes.find(b => b.tab === 'lead.campaigns' && b.action === 'edit').granted,
+    mt.boxes.find(b => b.tab === 'lead.rules' && b.action === 'edit').granted], [null, false, false, true], 'no template: boxes over the cells’ tabs; no Settings, Campaigns to view')
+
+  // Stopped: the ERP marks Daniel inactive → nothing of Lead View; back when it lists him active again.
+  await ingest({ companyId: 1, snapshotAt: '2026-11-10T02:00:00Z', staff: [
+    { staffId: 'e1', name: 'Daniel Chew', email: 'daniel@2990s.my', active: false }, { staffId: 'e2', name: 'Sharon Lee' }] })
+  check([await acts(DAN), (await keys(DAN)).includes('leads'), (await tabs(DAN)).boxes.filter(b => b.tab.startsWith('lead.')).some(b => b.granted)],
+    [{ 'team.view': 'all' }, false, false], 'inactive in the ERP: Lead View stopped')
+  check((await q(`select count(*)::int n from public.erp_staff where staff_id = 'e3'`))[0].n, 0, 'somebody the ERP no longer lists is gone')
+  await as(CS_USER, ALL)
+  check((await q('select public.lead_team() t'))[0].t.find(x => x.name === 'Daniel Chew').why, 'erp', 'the Team says why')
+  await ingest({ companyId: 1, snapshotAt: '2026-11-10T03:00:00Z', staff: [{ staffId: 'e1', name: 'Daniel Chew', email: 'daniel@2990s.my', active: true }] })
+  check((await acts(DAN))['leads.view'], 'all', 'active again: back by itself')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_team_save($1, 'outlet', false, true, $2::uuid[], '2026-01-01', '2026-01-31')`, [id(902), [kj]])
+  check(await acts(DAN), { 'team.view': 'all' }, 'past their last day: stopped')
+  await q(`select public.lead_team_save($1, 'outlet', true, false, $2::uuid[], null, null)`, [id(902), [kj]])
+  check(await acts(DAN), { 'team.view': 'all', 'leads.view': 'all', 'leads.create': 'all', 'leads.edit': 'all' }, 'may reply: create and edit')
+
+  // Scope: Daniel sees PWCC Penang's chats and those with no outlet, nothing else; everybody else sees all.
+  const all = (await q('select id from public.lead_contacts')).map(r => r.id)
+  const inPw = all[0], inOther = all[1]
+  const other = (await q(`select id from public.lead_outlets where name <> 'PWCC Penang' and deleted_at is null limit 1`))[0].id
+  await q(`update public.lead_contacts set outlet_by = 'cs', outlet_id = $2 where id = $1`, [inPw, kj])
+  await q(`update public.lead_contacts set outlet_by = 'cs', outlet_id = $2 where id = $1`, [inOther, other])
+  await asUser(DAN)
+  await db.exec(`select set_config('test.cells', 'leads.view', false)`)
+  const seen = (await q('select public.lead_inbox() j'))[0].j.map(x => x.id)
+  check([seen.includes(inPw), seen.includes(inOther), seen.length], [true, false, all.length - 1], 'the Inbox: their outlet and the chats with none')
+  check([(await q('select public.lead_thread($1) t', [inOther]))[0].t, (await q('select public.lead_thread($1) t', [inPw]))[0].t !== null], [null, true], 'another outlet’s chat cannot be opened')
+  check((await q('select public.lead_leads(null, null) j'))[0].j.some(x => x.id === inOther), false, 'nor listed on Leads')
+  check((await q(`select public.lead_list(current_date - 300, current_date + 2) j`))[0].j.some(x => x.id === inOther), false, 'nor in Insight’s list')
+  await asUser(CS_USER)
+  check((await q('select public.lead_inbox() j'))[0].j.length, all.length, 'Customer service sees every chat')
+
+  // Removed from the Team: as before the Team (the template's cells).
+  await as(CS_USER, ALL)
+  await q('select public.lead_team_remove($1)', [id(902)])
+  check(await acts(DAN), { 'team.view': 'all', 'leads.manage': 'all' }, 'off the Team: the template again')
+  check(await acts(OTHER), {}, 'somebody not on the Team and with no record: unchanged')
+  for (const sig of ['lead_team()', 'lead_staff_directory()', 'lead_team_save(uuid,text,boolean,boolean,uuid[],date,date)', 'lead_team_remove(uuid)']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+  for (const sig of ['lead_team_state(uuid)', 'lead_team_cells(uuid)', 'lead_team_boxes(uuid)', 'lead_my_outlets()', 'ingest_erp_staff(jsonb)']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: not the browser’s`)
+  }
+}
+
+// AI Agent memory (mig 20261110230000, Lead View v3 § 5): fixed / collected / goal / outlet lines, their figures,
+// the file questions, what customers asked, earlier chats by phone.
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await as(CS_USER, ALL)
+  await db.exec(await f('20261110230000_lead_ai_memory.sql'))
+  await db.exec(await f('20261110230000_lead_ai_memory.sql'))
+  for (const fn of ['lead_ai_more', 'lead_save_ai']) {
+    const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+    check(src.split('mig 20261110230000').length - 1, 1, `${fn}: swapped once, applying twice changes nothing`)
+  }
+  const more = async b => (await q('select public.lead_ai_more($1) m', [b]))[0].m
+  const base = await more(b2990)
+  check([Array.isArray(base.memory), Array.isArray(base.fileQs), Array.isArray(base.suggestions), typeof base.asked], [true, true, true, 'object'], 'lead_ai_more carries memory, questions, suggestions, asked')
+  const ai = { settings: base.settings, answers: base.answers.map(a => ({ id: a.id, question: a.question, answer: a.answer })), playbook: base.playbook }
+  const save = data => q('select public.lead_save_ai($1, $2::jsonb)', [b2990, JSON.stringify({ ...ai, ...data })])
+  const myOutlet = (await q('select id from public.lead_outlets where brand_id = $1 and deleted_at is null order by name limit 1', [b2990]))[0].id
+  const otherOutlet = (await q('select id from public.lead_outlets where brand_id <> $1 and deleted_at is null limit 1', [b2990]))[0].id
+
+  await save({ memory: [
+    { kind: 'fixed', body: 'Never offer a discount beyond the current promotion.' },
+    { kind: 'goal', body: 'Answer what they asked first.' },
+    { kind: 'goal', body: '   ' },
+    { kind: 'outlet', outletId: myOutlet, body: 'Free parking at the front.' },
+  ] })
+  let m = (await more(b2990)).memory
+  check(m.map(x => [x.kind, x.body, x.status, x.addedByName !== '']), [
+    ['fixed', 'Never offer a discount beyond the current promotion.', 'on', true],
+    ['goal', 'Answer what they asked first.', 'on', true],
+    ['outlet', 'Free parking at the front.', 'on', true]], 'fixed, goal and outlet lines kept; an empty line is not')
+  await refuses(`select public.lead_save_ai($1, $2::jsonb)`, [b2990, JSON.stringify({ ...ai, memory: [{ kind: 'collected', body: 'made up' }] })], /learning/, 'a collected lesson is not made on the page')
+  await refuses(`select public.lead_save_ai($1, $2::jsonb)`, [b2990, JSON.stringify({ ...ai, memory: [{ kind: 'outlet', outletId: otherOutlet, body: 'x' }] })], /this brand/, 'another brand’s outlet')
+  await save({})
+  check((await more(b2990)).memory.length, 3, 'a save without memory leaves it alone')
+
+  // A lesson the learning run collected: used, voted, made fixed.
+  const lesson = (await q(`insert into public.lead_ai_memory (brand_id, kind, body, status, source, cases) values ($1, 'collected', 'Ask how many seats first.', 'review', 'Its own chats', 12) returning id`, [b2990]))[0].id
+  m = (await more(b2990)).memory
+  await save({ memory: m.map(x => x.id === lesson ? { ...x, status: 'on', dir: 'up' } : x) })
+  let l = (await more(b2990)).memory.find(x => x.id === lesson)
+  check([l.status, l.dir, l.source, l.cases], ['on', 'up', 'Its own chats', 12], 'Use it, More like this')
+  await db.exec(`update public.lead_personas set settings = jsonb_set(coalesce(settings, '{}'), '{learn}', '{"forget":"30"}') where brand_id = '${b2990}'`)
+  await db.exec(`update public.lead_ai_memory set updated_at = now() - interval '40 days', last_used_at = null where id = '${lesson}'`)
+  check((await more(b2990)).memory.find(x => x.id === lesson).status, 'off', 'Forget unused lessons: unused for 30 days reads as off')
+  await db.exec(`update public.lead_personas set settings = settings - 'learn' where brand_id = '${b2990}'`)
+  m = (await more(b2990)).memory
+  await save({ memory: m.map(x => x.id === lesson ? { ...x, kind: 'fixed' } : x) })
+  l = (await more(b2990)).memory.find(x => x.id === lesson)
+  check([l.kind, l.status, l.dir], ['fixed', 'on', null], 'Make fixed')
+
+  // The figures: a draft sent that named a line counts its chat; reached once a phone came within 7 days.
+  const goalLine = m.find(x => x.kind === 'goal').id
+  const kim = (await q(`select public.lead_simulate($1, 'messenger', 'Kim', '', 'How much is the L-shape sofa?') c`, [b2990]))[0].c
+  const draft = (await q(`select public.lead_ai_log_draft($1, 'From RM2,990.', $2::jsonb, false, '', 'm') i`,
+    [kim, JSON.stringify([{ id: `mem-${goalLine}`, title: 'Answer what they asked first.' }, { id: 'file-00000000-0000-4000-8000-0000000f11e5', title: 'Price list' }])]))[0].i
+  let stat = () => more(b2990).then(x => x.memory.find(y => y.id === goalLine))
+  check([(await stat()).chats, (await stat()).reached], [0, 0], 'a draft not sent yet counts nothing')
+  await q(`select public.lead_ai_draft_kept($1, 'sent', '')`, [draft])
+  check([(await stat()).chats, (await stat()).reached], [0, 0], 'sent, but the 7 days are not over and no phone: not counted yet')
+  await db.exec(`update public.lead_contacts set phone = '0177770001', phone_state = 'confirmed', phone_at = now() where id = '${kim}'`)
+  check([(await stat()).chats, (await stat()).reached], [1, 1], 'a phone within 7 days: reached')
+  const lee = (await q(`select public.lead_simulate($1, 'messenger', 'Lee', '', 'hi') c`, [b2990]))[0].c
+  await q('select public.lead_ai_memory_used($1, $2::uuid[])', [lee, [goalLine]])
+  await db.exec(`update public.lead_ai_memory_uses set first_at = now() - interval '9 days' where contact_id = '${lee}'`)
+  check([(await stat()).chats, (await stat()).reached], [2, 1], 'the AI’s own answer counts; 7 days without the goal: counted, not reached')
+
+  // What customers asked when a file was used, and the questions' instructions.
+  check((await more(b2990)).asked['00000000-0000-4000-8000-0000000f11e5'], ['How much is the L-shape sofa?'], 'the customer’s question beside the file')
+  const ref = '00000000-0000-4000-8000-0000000f11e5'
+  await save({ fileQs: [
+    { kind: 'file', ref, question: 'How much is the L-shape sofa?', instruction: 'Give the starting price, then ask which room.' },
+    { kind: 'file', ref, question: 'Is it in stock?', instruction: '', custom: true },
+    { kind: 'file', ref, question: 'Any discount?', instruction: '' },
+  ] })
+  check((await more(b2990)).fileQs.map(x => [x.question, x.instruction, x.custom]), [
+    ['How much is the L-shape sofa?', 'Give the starting price, then ask which room.', false], ['Is it in stock?', '', true]], 'an instruction kept; a question somebody added kept; an asked one with none is not')
+  await refuses(`select public.lead_save_ai($1, $2::jsonb)`, [b2990, JSON.stringify({ ...ai, fileQs: [{ kind: 'file', ref, question: '' }] })], /its words/, 'a question needs its words')
+
+  // Suggestions are decided on the page.
+  const sg = (await q(`insert into public.lead_ai_suggestions (brand_id, kind, body, why, chats) values ($1, 'add', 'Mention 0% instalments.', 'Reached 54%', 63) returning id`, [b2990]))[0].id
+  check((await more(b2990)).suggestions.map(x => x.body), ['Mention 0% instalments.'], 'an open suggestion is listed')
+  await save({ suggestions: [{ id: sg, status: 'dismissed' }] })
+  check((await more(b2990)).suggestions.length, 0, 'dismissed, gone from the list')
+
+  // Earlier chats with this customer: the same phone elsewhere.
+  const mo = (await q(`select public.lead_simulate($1, 'instagram', 'Kim again', '', 'My number 017-777 0001') c`, [bCarress]))[0].c
+  const earlier = (await q('select public.lead_ai_earlier($1) e', [mo]))[0].e
+  check([earlier.length, earlier[0].messages.at(-1).body], [1, 'How much is the L-shape sofa?'], 'the other conversation with the same phone, its last messages')
+
+  check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name in ('lead_ai_memory','lead_ai_memory_uses','lead_ai_file_questions','lead_ai_suggestions') and grantee in ('anon','authenticated')`))[0].n, 0, 'no table grants')
+  for (const sig of ['lead_ai_memory_json(uuid)', 'lead_save_ai_memory(uuid,jsonb,text)', 'lead_ai_memory_from_draft()'])
+    check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: not the browser’s`)
+  for (const sig of ['lead_ai_memory_used(uuid,uuid[])', 'lead_ai_earlier(uuid)'])
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  await as(CS_USER, [])
+  await refuses('select public.lead_ai_earlier($1)', [mo], /Lead View · View/, 'earlier chats need Lead View')
+  await as(CS_USER, ALL)
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

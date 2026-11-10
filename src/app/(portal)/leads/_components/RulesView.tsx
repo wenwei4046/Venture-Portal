@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { LeadIcon } from '@/components/layout/lead-icons'
-import { saveReplyRules } from '@/lib/leads/actions'
+import { saveReplyRules, setAdOutlet } from '@/lib/leads/actions'
 import type { LeadAd } from '@/lib/leads/ads'
 import { adSlots, replyLabel, withAdSlots, type PageChannel, type RuleLogLine, type Slot } from '@/lib/leads/pages'
 import { extOf } from '@/lib/leads/template-map'
+import { outletCounts, outletName, outletsFor, passesOutlet, type LeadOutlet, type OutletFilter as Filter } from '@/lib/leads/outlets'
+import OutletFilter from './ui/OutletFilter'
 import { walkAnswer, walkFrom, type ReplyRules, type ReplyTemplate, type Walk } from '@/lib/leads/template'
 import RichText from './RichText'
-import Dropdown from './ui/Dropdown'
 import s from './rules.module.css'
 
 /**
@@ -22,12 +23,12 @@ import s from './rules.module.css'
  */
 
 type Sel = { kind: 'page'; brandId: string; channel: PageChannel } | { kind: 'ad'; adId: string }
-type Pick = { key: string; follow: boolean; x: number; y: number }
+type Pick = { key: string; follow: boolean; x: number; y: number; outlet?: boolean }
 const CH: Record<PageChannel, string> = { messenger: 'Messenger', instagram: 'Instagram' }
 let seq = 0
 const newId = () => `new-${Date.now().toString(36)}${seq++}`
 
-export default function RulesView({ rules, ready, rows, ads, brands, templates, log, canEdit }: {
+export default function RulesView({ rules, ready, rows, ads, brands, templates, log, canEdit, outlets = [] }: {
   rules: ReplyRules
   ready: boolean
   /** routeRows: each brand's receiving channels. */
@@ -37,6 +38,8 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
   templates: ReplyTemplate[]
   log: RuleLogLine[]
   canEdit: boolean
+  /** Every brand's outlets (v3 § 3; mig 20261110200000) — none before it. */
+  outlets?: LeadOutlet[]
 }) {
   const router = useRouter()
   const [d, setD] = useState<ReplyRules>(rules)
@@ -45,7 +48,10 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
   const [pagesOpen, setPagesOpen] = useState(true)
   const [adsOpen, setAdsOpen] = useState(true)
   const [adF, setAdF] = useState<'all' | 'none' | 'has'>('all')
-  const [adBrand, setAdBrand] = useState<string>('all')
+  // v3 § 3: the All outlets filter (above the outlet column) and each ad's outlet, kept here as it is saved.
+  const [adOut, setAdOut] = useState<Filter>('all')
+  const [outOf, setOutOf] = useState<Record<string, string | null>>(() => Object.fromEntries(ads.map(a => [a.adId, a.outletId ?? null])))
+  const [hover, setHover] = useState<string | null>(null)
   const [pick, setPick] = useState<Pick | null>(null)
   const [adding, setAdding] = useState(false)
   const [railOpen, setRailOpen] = useState(false)
@@ -80,10 +86,23 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
   }
   const setAd = (adId: string, w: Slot, a: Slot) => save({ ...d, ads: withAdSlots(d.ads, adId, w, a, newId) })
 
-  const open = (key: string, follow: boolean) => (e: React.MouseEvent<HTMLButtonElement>) => {
+  const open = (key: string, follow: boolean, outlet = false) => (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
     const r = e.currentTarget.getBoundingClientRect()
-    setPick({ key, follow, x: Math.min(r.left, window.innerWidth - 250), y: Math.min(r.bottom + 6, window.innerHeight - 320) })
+    setPick({ key, follow, outlet, x: Math.min(r.left, window.innerWidth - 250), y: Math.min(r.bottom + 6, window.innerHeight - 320) })
+  }
+  /** An ad's outlet, saved at once (lead_set_ad_outlet); the screen follows first and goes back on a refusal. */
+  const chooseOutlet = (adId: string, outletId: string | null) => {
+    setPick(null)
+    const before = outOf[adId] ?? null
+    if (before === outletId) return
+    setOutOf(m => ({ ...m, [adId]: outletId }))
+    setError('')
+    start(async () => {
+      const r = await setAdOutlet(adId, outletId)
+      if (!r.ok) { setError(r.reason); setOutOf(m => ({ ...m, [adId]: before })); return }
+      router.refresh()
+    })
   }
   const [newRule, setNewRule] = useState<{ ad: string; w: Slot; a: Slot }>({ ad: '', w: 'cs', a: templates[0]?.id ?? 'cs' })
   const current = (key: string): Slot => {
@@ -102,9 +121,9 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
     setAd(rest[0], rest[1] === 'w' ? v : slots.w, rest[1] === 'a' ? v : slots.a)
   }
 
-  // The brand picked above the ads (All brands, or one): the counts and the list follow it.
-  const inBrand = (a: LeadAd) => adBrand === 'all' || a.brandIds.includes(adBrand)
-  const counted = adList.filter(inBrand).map(a => ({ a, has: d.ads.some(r => r.adId === a.adId) }))
+  // The outlet picked above the outlet column (All outlets, one, or No outlet): the counts and the list follow it.
+  const counted = adList.filter(a => passesOutlet(adOut, outOf[a.adId])).map(a => ({ a, has: d.ads.some(r => r.adId === a.adId) }))
+  const aoCounts = outletCounts(adList, a => outOf[a.adId])
   const shown = counted.filter(x => adF === 'all' || (adF === 'has' ? x.has : !x.has))
   const free = adList.filter(a => !d.ads.some(r => r.adId === a.adId))
   const newAd = free.some(a => a.adId === newRule.ad) ? newRule.ad : (free[0]?.adId ?? '')
@@ -143,6 +162,7 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
               <span className={s.foldIcon}><LeadIcon name={pagesOpen ? 'chevron-down' : 'chevron-right'} size={16} /></span>
               <span className={s.title}>Pages</span>
             </button>
+            <span />
             {colHeads}
             <span />
           </div>
@@ -154,6 +174,7 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
                 return (
                   <div key={ch} className={s.pageRow} role="option" aria-selected={isSel(x)} tabIndex={0} onClick={() => pickSel(x)} onKeyDown={e => { if (e.key === 'Enter') pickSel(x) }}>
                     <span className={s.channel}><LeadIcon name={ch === 'instagram' ? 'instagram' : 'facebook'} size={15} />{CH[ch]}</span>
+                    <span />
                     {chip(pageReply(g.brandId, ch, 'work'), `page|${g.brandId}|${ch}|work`, false)}
                     {chip(pageReply(g.brandId, ch, 'after'), `page|${g.brandId}|${ch}|after`, false)}
                     <span />
@@ -180,12 +201,11 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
                   </button>
                 ))}
               </span>
-              <Dropdown value={adBrand} onChange={setAdBrand} icon="store"
-                options={[{ value: 'all', label: 'All brands', count: adList.length }, ...brands.map(b => ({ value: b.id, label: b.name, count: adList.filter(a => a.brandIds.includes(b.id)).length }))]} />
             </span>
+            <OutletFilter size="sm" outlets={outlets} brands={brands} value={adOut} onChange={setAdOut} counts={aoCounts} />
             {colHeads}
             <span className={s.addCell}>
-              {canEdit ? <button type="button" className={s.addRule} disabled={!free.length} title={free.length ? undefined : 'Every ad already has a rule'} onClick={() => { setNewRule({ ad: '', w: 'cs', a: templates[0]?.id ?? 'cs' }); setAdding(true) }}><LeadIcon name="plus" size={13} />Add rule</button> : null}
+              {canEdit ? <button type="button" className={s.addRule} disabled={!free.length} title={free.length ? undefined : 'Every ad already has a rule'} onClick={() => { setNewRule({ ad: '', w: 'cs', a: templates[0]?.id ?? 'cs' }); setAdding(true) }}><LeadIcon name="plus" size={13} />Add</button> : null}
             </span>
           </div>
           {adsOpen ? shown.map(({ a, has }) => {
@@ -193,7 +213,8 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
             const pg = adPage(a)
             const x: Sel = { kind: 'ad', adId: a.adId }
             return (
-              <div key={a.adId} className={s.adRow} role="option" aria-selected={isSel(x)} tabIndex={0} onClick={() => pickSel(x)} onKeyDown={e => { if (e.key === 'Enter') pickSel(x) }}>
+              <div key={a.adId} className={s.adRow} role="option" aria-selected={isSel(x)} tabIndex={0} onClick={() => pickSel(x)} onKeyDown={e => { if (e.key === 'Enter') pickSel(x) }}
+                onMouseEnter={() => setHover(a.adId)} onMouseLeave={() => setHover(h => (h === a.adId ? null : h))}>
                 <span className={s.adName}>
                   <span className={s.adTitle}>
                     <span className={s.adTitleText}>{adLabel(a)}</span>
@@ -206,9 +227,14 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
                   </span>
                   <span className={s.adMeta}>{adMeta(a)}</span>
                 </span>
+                <button type="button" className={s.outBtn} data-none={!outOf[a.adId] || undefined} disabled={!canEdit} onClick={open('ad|' + a.adId, false, true)} aria-haspopup="menu">
+                  <span className={s.outPin}><LeadIcon name="map-pin" size={15} /></span>
+                  <span className={s.outName}>{outletName(outlets, outOf[a.adId]) || 'Choose outlet'}</span>
+                  <LeadIcon name="chevron-down" size={13} className={s.outChev} />
+                </button>
                 {chip(slots.w, `ad|${a.adId}|w`, true, pageReply(pg.brandId, pg.channel, 'work'))}
                 {chip(slots.a, `ad|${a.adId}|a`, true, pageReply(pg.brandId, pg.channel, 'after'))}
-                {has && canEdit ? (
+                {has && canEdit && (hover === a.adId || isSel(x)) ? (
                   <button type="button" className={s.trash} title="Remove rule" aria-label="Remove rule" onClick={e => { e.stopPropagation(); setAd(a.adId, 'follow', 'follow') }}>
                     <LeadIcon name="trash-2" size={15} />
                   </button>
@@ -259,6 +285,24 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
           <div className={s.catcher} onClick={() => setPick(null)} aria-hidden="true" />
           <div className={s.picker} role="menu" style={{ left: pick.x, top: pick.y }}>
             {(() => {
+              if (pick.outlet) {
+                const adId = pick.key.split('|')[1]
+                const ad = adList.find(a => a.adId === adId)
+                const now = outOf[adId] ?? null
+                const brand = ad ? brandName(ad.brandIds[0] ?? '') : ''
+                const oi = (label: string, v: string | null) => (
+                  <button key={v ?? 'none'} type="button" role="menuitemradio" aria-checked={now === v} className={s.pickItem} onClick={() => chooseOutlet(adId, v)}>
+                    <span>{label}</span>{now === v ? <span className={s.pickCheck}><LeadIcon name="check" size={14} /></span> : null}
+                  </button>
+                )
+                return (
+                  <>
+                    <span className={s.pickHead}>{(brand + ' OUTLETS').trim().toUpperCase()}</span>
+                    {outletsFor(outlets, ad?.brandIds[0]).map(o => oi(o.name, o.id))}
+                    {oi('No outlet', null)}
+                  </>
+                )
+              }
               const cur = current(pick.key)
               const item = (label: string, v: Slot) => (
                 <button key={v} type="button" role="menuitemradio" aria-checked={cur === v} className={s.pickItem} onClick={() => choose(pick.key, v)}>
@@ -267,7 +311,7 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
               )
               return (
                 <>
-                  {pick.follow ? item('Follow page rule', 'follow') : null}
+                  {pick.follow ? item(pick.key.startsWith('ad|') ? 'Follow outlet or page' : 'Follow page rule', 'follow') : null}
                   {item('A person', 'cs')}
                   {item('AI Agent', 'ai')}
                   {templates.length ? <span className={s.pickHead}>TEMPLATES</span> : null}

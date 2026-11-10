@@ -19,6 +19,10 @@ import { setLeadUnread } from '@/lib/leads/unread-store'
 import PhotoEditor from './PhotoEditor'
 import ForwardDialog from './ForwardDialog'
 import RichText from './RichText'
+import { VoiceNote } from '@/components/member/crm/shared/voice-note'
+import { VOICE_OURS, VOICE_THEIRS } from './voice-palette'
+import { passesOutlet, type LeadOutlet, type OutletFilter } from '@/lib/leads/outlets'
+import { previewReplies, previewScope, previewSees, stopped, type TeamMember } from '@/lib/leads/team'
 import type { LeadBrand, LeadConfig, LeadContact, LeadLabel, LeadMessage, LeadThread } from '@/lib/leads/types'
 import { answeringNow, ruleReply, ruleSource, type RuleOf } from '@/lib/leads/rule-of'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
@@ -68,6 +72,8 @@ export default function InboxView({
   quick = [],
   labels = [],
   marked = [],
+  outlets = [],
+  team = null,
 }: {
   config: LeadConfig
   contacts: LeadContact[]
@@ -92,6 +98,10 @@ export default function InboxView({
   labels?: LeadLabel[]
   /** The chats this person marked unread to answer later (mig 20261028110000). */
   marked?: string[]
+  /** Every brand's outlets (v3 § 3): the Filters' Outlet chips and the customer's Outlet row. */
+  outlets?: LeadOutlet[]
+  /** Settings › Team (v3 § 4), for Preview as — Lead View · Manage only; null hides the eye. */
+  team?: TeamMember[] | null
 }) {
   const [brand, setBrand] = useState<string>('all')
   const [brandOpen, setBrandOpen] = useState(false)
@@ -102,11 +112,18 @@ export default function InboxView({
   const [unreadOnly, setUnreadOnly] = useState(false)
   // Blocked chats stay out of the list; this filter shows them alone (mig 20261102270000).
   const [blockedOnly, setBlockedOnly] = useState(false)
+  // One outlet's chats, or those with none (v3 § 3 — "Inbox 都要能按 outlet 筛选").
+  const [outlet, setOutlet] = useState<OutletFilter>('all')
   const [selected, setSelected] = useState<string | null>(initialThread?.contact.id ?? contacts[0]?.id ?? null)
   const [threads, setThreads] = useState<Record<string, LeadThread>>(initialThread ? { [initialThread.contact.id]: initialThread } : {})
   const [loading, startLoading] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [logOpen, setLogOpen] = useState(false)
+  // Preview as someone (README § 4): the list, counts and composer as that Team member would have them.
+  const [viewAs, setViewAs] = useState<string | null>(null)
+  const [vaMenu, setVaMenu] = useState(false)
+  const va = (team ?? []).find(m => m.staffId === viewAs) ?? null
+  const vaList = (team ?? []).filter(m => m.role !== 'admin')
   useEffect(() => { setQuery(initialQuery); if (initialQuery) setFilter('all') }, [initialQuery])
 
   // Read here since its last message (readThread marks it seen): its badge goes at once, before the list is read again.
@@ -120,9 +137,12 @@ export default function InboxView({
   const q = query.trim().toLowerCase()
   const qDigits = q.replace(/[\s-]/g, '')
   const labelsOf = (c: LeadContact) => threads[c.id]?.contact.labels ?? c.labels ?? []
+  const inScope = (c: LeadContact) => !va || previewSees(va, threads[c.id]?.contact.outletId ?? c.outletId)
   const found = contacts.filter(c => {
+    if (!inScope(c)) return false
     if (!!(threads[c.id]?.contact.blockedAt ?? c.blockedAt) !== blockedOnly) return false
     if (label && !labelsOf(c).some(l => l.id === label)) return false
+    if (!passesOutlet(outlet, threads[c.id]?.contact.outletId ?? c.outletId)) return false
     if (unreadOnly && !(c.unread ?? 0) && !marks.has(c.id)) return false
     if (!q) return true
     const hay = `${c.name} ${c.phone ?? ''} ${c.phone ? formatPhone(c.phone) : ''} ${c.lastText} ${adLabel(c)}`.toLowerCase()
@@ -139,6 +159,8 @@ export default function InboxView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- stateOf reads readAt, listed
   }, [searched, readAt, marks])
   const shown = searched.filter(c => filter === 'all' || stateOf(c) === filter || c.id === selected)
+  // Previewing: nothing they may see → the chat and customer columns are one empty state.
+  const vaEmpty = !!va && !contacts.some(inScope)
   // The rail's Inbox dot: anything unread, kept for the shell (lib/leads/unread-store).
   const anyUnread = contacts.some(c => c.id !== selected && (unreadOf(c) ?? 0) > 0)
   useEffect(() => { setLeadUnread(anyUnread) }, [anyUnread])
@@ -208,7 +230,7 @@ export default function InboxView({
   const contact = thread?.contact ?? contacts.find(c => c.id === selected) ?? null
   const brandOf = contact ? brands.get(contact.brandId) : undefined
   const brandLabel = brand === 'all' ? 'All brands' : brands.get(brand)?.name ?? 'All brands'
-  const filtering = !!q || unreadOnly || !!label || blockedOnly
+  const filtering = !!q || unreadOnly || !!label || blockedOnly || outlet !== 'all'
 
   return (
     <div className={s.grid}>
@@ -243,9 +265,47 @@ export default function InboxView({
                     <button key={l.id} type="button" className={s.filterChip} aria-pressed={label === l.id} onClick={() => setLabel(cur => (cur === l.id ? '' : l.id))}>{l.name}</button>
                   ))}
                 </div>
+                {outlets.length ? (
+                  <div className={s.filterChips} role="group" aria-label="Outlet">
+                    <span className={s.filterHead}>OUTLET</span>
+                    {outlets.map(o => (
+                      <button key={o.id} type="button" className={s.filterChip} aria-pressed={outlet === o.id} onClick={() => setOutlet(cur => (cur === o.id ? 'all' : o.id))}>{o.name}</button>
+                    ))}
+                    <button type="button" className={s.filterChip} aria-pressed={outlet === 'none'} onClick={() => setOutlet(cur => (cur === 'none' ? 'all' : 'none'))}>No outlet</button>
+                  </div>
+                ) : null}
               </Popover>
             </div>
+            {team && vaList.length ? (
+              <div className={s.filterWrap}>
+                <button type="button" className={`${s.filterBtn} ${s.vaBtn}`} title="Preview as someone" aria-label="Preview as someone" aria-expanded={vaMenu} onClick={() => setVaMenu(o => !o)}>
+                  <LeadIcon name="eye" size={15} />
+                </button>
+                <Popover open={vaMenu} onClose={() => setVaMenu(false)} style={{ top: 38, right: 0 }} className={s.vaPop} label="Preview as">
+                  <span className={s.vaHead}>PREVIEW AS</span>
+                  {vaList.map(m => (
+                    <button key={m.staffId} type="button" className={s.vaItem} aria-pressed={viewAs === m.staffId} onClick={() => {
+                      setViewAs(m.staffId)
+                      setVaMenu(false)
+                      const sees = (c: LeadContact) => previewSees(m, threads[c.id]?.contact.outletId ?? c.outletId)
+                      const cur = contacts.find(c => c.id === selected)
+                      if (!cur || !sees(cur)) { const first = contacts.find(sees); if (first) pick(first.id) }
+                    }}>
+                      <span className={s.vaName}>{m.name}</span>
+                      <span className={s.vaSub}>{stopped(m) ? 'Access stopped' : m.role === 'outlet' ? m.outlets.map(id => outlets.find(o => o.id === id)?.name).filter(Boolean).join(', ') || 'No outlet yet' : 'All outlets'}</span>
+                    </button>
+                  ))}
+                </Popover>
+              </div>
+            ) : null}
           </div>
+          {va ? (
+            <div className={s.vaBanner} role="status">
+              <LeadIcon name="eye" size={14} className={s.vaEye} />
+              <div className={s.vaText}><span className={s.vaTitle}>Viewing as {va.name}</span><span className={s.vaScope}>{previewScope(va, outlets)}</span></div>
+              <button type="button" className={s.vaExit} onClick={() => setViewAs(null)}>Exit</button>
+            </div>
+          ) : null}
           <div className={s.tabs} role="group" aria-label="Where they stand">
             {FILTERS.map(f => (
               <button key={f.id} type="button" className={s.tab} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -287,13 +347,21 @@ export default function InboxView({
         </div>
       </section>
 
+      {vaEmpty && va ? (
+        <section className={`${s.card} ${s.vaEmpty}`} aria-label="Preview">
+          <LeadIcon name={stopped(va) ? 'ban' : 'inbox'} size={22} className={s.vaEmptyIcon} />
+          <span className={s.vaEmptyTitle}>{stopped(va) ? 'Access stopped' : `No chats for ${va.name}`}</span>
+          <span className={s.vaEmptySub}>{va.why === 'erp' ? "Inactive in ERP, so they can't log in." : stopped(va) ? "Their access is stopped, so they can't log in." : 'Nothing in their outlets right now.'}</span>
+        </section>
+      ) : (<>
       {/* ── The chat ── */}
       <section className={s.card} aria-label="Chat">
         {contact ? (
           <Chat key={contact.id} contact={contact} thread={thread} brand={brandOf} csName={csName}
             canReply={canReply} canManage={canManage} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
             loading={loading && !thread} onSent={() => load(contact.id)}
-            others={contacts.filter(c => c.id !== contact.id)} brands={brands} onMarkUnread={() => markLater(contact.id)} canEdit={canEdit} />
+            others={contacts.filter(c => c.id !== contact.id)} brands={brands} onMarkUnread={() => markLater(contact.id)} canEdit={canEdit}
+            viewOnly={va && !previewReplies(va) ? va.name : null} />
         ) : (
           <div className={s.empty}>Pick a conversation</div>
         )}
@@ -304,9 +372,10 @@ export default function InboxView({
       <section className={s.card} aria-label="Customer">
         {contact ? (
           <CustomerPanel key={contact.id} contact={thread?.contact ?? contact} brand={brandOf} labels={labels} canManage={canManage}
-            canEdit={canEdit} csName={csName} onSaved={() => load(contact.id)} />
+            canEdit={canEdit} csName={csName} onSaved={() => load(contact.id)} outlets={outlets} />
         ) : null}
       </section>
+      </>)}
 
       {/* ── The rail: the history, as a slide-over ── */}
       <div className={s.rail}>
@@ -339,7 +408,7 @@ export default function InboxView({
   )
 }
 
-function Chat({ contact, thread, brand, csName, canReply, canManage, canEdit, aiOn, aiConnected, info, quick, today, loading, onSent, others, brands, onMarkUnread }: {
+function Chat({ contact, thread, brand, csName, canReply, canManage, canEdit, aiOn, aiConnected, info, quick, today, loading, onSent, others, brands, onMarkUnread, viewOnly = null }: {
   contact: LeadContact
   thread: LeadThread | null
   brand: LeadBrand | undefined
@@ -358,6 +427,8 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, canEdit, ai
   onMarkUnread: () => void
   /** Lead View · Edit: may block or unblock the customer. */
   canEdit: boolean
+  /** Previewing somebody who may not reply (README § 4): their name, and the composer is a locked pill. */
+  viewOnly?: string | null
 }) {
   const [text, setText] = useState('')
   const [editing, setEditing] = useState<File | null>(null)
@@ -634,7 +705,11 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, canEdit, ai
           onDone={note => { setForwarding(null); setNotice(note) }} />
       ) : null}
 
-      {canReply ? (
+      {viewOnly ? (
+        <div className={s.composeArea}>
+          <div className={s.vaLocked}><LeadIcon name="lock" size={16} /><span className={s.ellipsis}>View only. {viewOnly} can&apos;t reply to customers.</span></div>
+        </div>
+      ) : canReply ? (
         <div className={s.composeArea}>
           {notice ? <div className={s.replyBar} role="status" onClick={() => setNotice(null)}>{notice}</div> : null}
           {error ? <div className={s.error} role="alert">{error}</div> : null}
@@ -793,7 +868,11 @@ function MessageMedia({ m, link }: { m: LeadMessage; link: string | undefined })
   // eslint-disable-next-line @next/next/no-img-element
   if (kind === 'image') return <a href={link} target="_blank" rel="noopener noreferrer"><img className={s.media} src={link} alt={m.body} onError={() => setGone(true)} /></a>
   if (kind === 'video') return <video className={s.media} src={link} controls preload="metadata" onError={() => setGone(true)} />
-  if (kind === 'audio') return <audio className={s.mediaAudio} src={link} controls preload="metadata" onError={() => setGone(true)} />
+  // The CRM's voice note (handoff v3 § 1): one plays at a time (one-audio), Lead View's bubble and colours.
+  if (kind === 'audio') {
+    const out = m.direction !== 'in'
+    return <div className={s.voice}><VoiceNote src={link} palette={out ? VOICE_OURS : VOICE_THEIRS} onError={() => setGone(true)} /></div>
+  }
   return <a className={s.mediaFile} href={link} target="_blank" rel="noopener noreferrer"><LeadIcon name="paperclip" size={14} />{mediaFileName(m)}</a>
 }
 

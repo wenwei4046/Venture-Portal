@@ -139,6 +139,54 @@ export function knowledgeReads(picks: Array<{ kind: 'folder' | 'file' | 'link'; 
       const f = files.find(x => x.id === p.ref && x.kind === p.kind)
       if (f) put(f, p.paused, null)
     }
+    // v3 § 5 — the whole line: the files sitting right in each folder above the pick, up to its brand's folder.
+    if (p.kind !== 'link') for (const lv of readLine(p, files, folders).slice(0, -1)) for (const f of lv.files) put(f, p.paused, lv.place)
   }
   return [...out.values()]
+}
+
+/** One level of a pick's line: the brand's folder (or Shared), each folder down to the pick, and the pick itself. */
+export interface ReadLevel {
+  place: Place
+  name: string
+  /** What the AI reads here: the files right in this folder — at the pick, the file or everything in the folder. */
+  files: DataFile[]
+  /** Folders beside the line that are not read (none at the brand's level or at the pick). */
+  skipped: string[]
+}
+
+/**
+ * Lead View v3 § 5 › Knowledge › WHAT THE AI READS: picking a folder or file deep in the Data Center reads every file
+ * sitting right in each folder above it, then the pick (a folder: everything in it; a file: that file). Folders off the
+ * line are not read. Example: `2990s / Sofa / 3 seater / Pushback / Model A` reads Sofa's, 3 seater's, Pushback's and
+ * Model A's files — not 2 seater, Slide out or Model B.
+ */
+export function readLine(pick: { kind: 'folder' | 'file' | 'link'; ref: string }, files: DataFile[], folders: DataFolder[]): ReadLevel[] {
+  const byId = new Map(folders.map(d => [d.id, d]))
+  const file = pick.kind === 'file' ? files.find(f => f.id === pick.ref && f.kind === 'file') : undefined
+  const start = pick.kind === 'folder' ? byId.get(pick.ref) : undefined
+  if (pick.kind === 'link' || (!file && !start)) return []
+  const brandId = start ? start.brandId : file!.brandId
+  // The folders from the top down to the pick's folder (a file right in its brand's folder has none).
+  const chain: DataFolder[] = []
+  for (let d = start ?? (file!.folderId ? byId.get(file!.folderId) : undefined); d && chain.length < 50; d = d.parentId ? byId.get(d.parentId) : undefined) chain.unshift(d)
+  const direct = (folderId: string | null) => files.filter(f => f.kind === 'file' && (f.folderId ?? null) === folderId && (folderId !== null || f.brandId === brandId))
+  const under = (id: string): string[] => [id, ...folders.filter(d => d.parentId === id).flatMap(d => under(d.id))]
+  const kids = (parent: string | null) => folders.filter(d => (d.parentId ?? null) === parent && (parent !== null || d.brandId === brandId))
+  const levels: ReadLevel[] = [{ place: brandPlace(brandId), name: '', files: direct(null), skipped: [] }]
+  chain.forEach((d, i) => {
+    const next = chain[i + 1]
+    levels.push({ place: d.id, name: d.name, files: direct(d.id), skipped: next ? kids(d.id).filter(k => k.id !== next.id).map(k => k.name) : [] })
+  })
+  const last = levels[levels.length - 1]
+  if (file) {
+    // The pick is the file: its own level reads it alone (a file right in its brand's folder is the brand's level).
+    if (chain.length) last.files = [file]
+    else levels[0].files = [file]
+  } else if (start) {
+    const set = new Set(under(start.id))
+    last.files = files.filter(f => f.kind === 'file' && f.folderId && set.has(f.folderId))
+    last.skipped = []
+  }
+  return levels
 }

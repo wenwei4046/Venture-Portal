@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DataFile } from './agent'
-import { checkedLabel, dcState, dcTree, extOf, freeName, hostOf, knowledgeReads, linkDue, slug, type DataFolder } from './data-center'
+import { checkedLabel, dcState, dcTree, extOf, freeName, hostOf, knowledgeReads, linkDue, readLine, slug, type DataFolder } from './data-center'
 
 const file = (id: string, over: Partial<DataFile> = {}): DataFile => ({
   id, brandId: 'b1', category: '', kind: 'file', name: `${id}.pdf`, path: `files/x/${id}.pdf`, url: null, mime: 'application/pdf', sizeBytes: 1, ver: 1,
@@ -59,6 +59,28 @@ describe('knowledgeReads', () => {
   const files = [file('a', { folderId: 'raya' }), file('b', { folderId: 'pr' }), file('c', { folderId: 'cat' }), file('l', { kind: 'link' })]
   it('reads a folder’s files and its folders’, each once, a file picked on its own unpaused', () => {
     const r = knowledgeReads([{ kind: 'folder', ref: 'pr', paused: true }, { kind: 'file', ref: 'a', paused: false }, { kind: 'link', ref: 'l', paused: false }], files, folders)
-    expect(r.map(x => [x.file.id, x.paused]).sort()).toEqual([['a', false], ['b', true], ['l', false]])
+    // b sits in Promotions, right above a (v3 § 5: a pick reads the line above it), so a's pick reads it unpaused.
+    expect(r.map(x => [x.file.id, x.paused]).sort()).toEqual([['a', false], ['b', false], ['l', false]])
+  })
+})
+
+// Lead View v3 § 5: picking deep in the Data Center reads the whole line above the pick, never the folders beside it.
+describe('readLine', () => {
+  const tree = [folder('sofa', null, 'Sofa'), folder('s2', 'sofa', '2 seater'), folder('s3', 'sofa', '3 seater'), folder('push', 's3', 'Pushback'),
+    folder('slide', 's3', 'Slide out'), folder('ma', 'push', 'Model A'), folder('mb', 'push', 'Model B')]
+  const fs = [file('root'), file('care', { folderId: 'sofa' }), file('two', { folderId: 's2' }), file('size', { folderId: 's3' }), file('how', { folderId: 'push' }),
+    file('spec', { folderId: 'ma' }), file('price', { folderId: 'ma' }), file('bspec', { folderId: 'mb' }), file('other', { brandId: 'b2' })]
+  it('a folder: every level’s own files, then everything in it; the folders beside the line are named, not read', () => {
+    const line = readLine({ kind: 'folder', ref: 'ma' }, fs, tree)
+    expect(line.map(l => [l.name, l.files.map(f => f.id), l.skipped])).toEqual([
+      ['', ['root'], []], ['Sofa', ['care'], ['2 seater']], ['3 seater', ['size'], ['Slide out']], ['Pushback', ['how'], ['Model B']], ['Model A', ['spec', 'price'], []]])
+  })
+  it('a file: its folder’s level reads that file alone', () => {
+    expect(readLine({ kind: 'file', ref: 'spec' }, fs, tree).at(-1)!.files.map(f => f.id)).toEqual(['spec'])
+    expect(readLine({ kind: 'file', ref: 'root' }, fs, tree).map(l => l.files.map(f => f.id))).toEqual([['root']])
+  })
+  it('knowledgeReads takes the line too, never another branch or brand', () => {
+    const r = knowledgeReads([{ kind: 'folder', ref: 'ma', paused: false }], fs, tree).map(x => x.file.id).sort()
+    expect(r).toEqual(['care', 'how', 'price', 'root', 'size', 'spec'])
   })
 })

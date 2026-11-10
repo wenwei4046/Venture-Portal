@@ -179,7 +179,7 @@
 .sourceLine { display: flex; align-items: center; gap: 6px; min-width: 0; color: rgb(var(--lv-fg)); }
 .ch { flex: none; font-size: 11px; color: rgb(var(--lv-fg-4)); }
 .cut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.brand { font-size: 12px; color: rgb(var(--lv-fg-3)); }
+.brand { font-size: 12px; color: rgb(var(--lv-fg-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .salesNone { color: rgb(var(--lv-faint)); }
 .status { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-weight: 500; }
 .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; }

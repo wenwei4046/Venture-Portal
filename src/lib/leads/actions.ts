@@ -6,10 +6,11 @@ import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
 import { askModel } from './ai-model'
-import { agentMore as readAgent } from './agent-read'
+import { agentMore as readAgent, type AgentChat, type AgentOverride } from './agent-read'
 import { answerLeads } from './ai-answer'
 import type { RuleOf } from './rule-of'
-import { type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
+import type { FileQuestion, MemoryLine } from './agent-memory'
+import { type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { managedPages, subscribePage } from './pages-server'
 import type { ManagedPage, PageChannel, StaffLeave } from './pages'
@@ -25,6 +26,8 @@ import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
 import type { LibraryItem, ReplyRules, TemplateStep } from './template'
 import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
+import type { LeadOutlet } from './outlets'
+import type { TeamMember, TeamRole } from './team'
 
 /**
  * Lead View's writes (2026-10-16). Each stands behind the Lead View cell it is (mig 20261016300000), named on
@@ -177,6 +180,39 @@ export async function blockLead(contactId: string, on: boolean) {
 export async function saveAgentBrands(userId: string, brandIds: string[]) {
   await requireActionOn('/leads/settings', 'leads', 'manage')
   return call<null>('lead_save_agent_brands', { p_user: userId, p_brands: brandIds }, 'Their brands were not saved.')
+}
+
+/** Settings › Team (mig 20261110220100): add somebody or change them — answers the whole Team. */
+export async function saveTeamMember(staffId: string, m: { role: TeamRole; reply: boolean; reports: boolean; outlets: string[]; from: string | null; to: string | null }) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<TeamMember[]>('lead_team_save', {
+    p_staff: staffId, p_role: m.role, p_reply: m.reply, p_reports: m.reports, p_outlets: m.outlets, p_from: m.from || null, p_to: m.to || null,
+  }, 'The team was not saved.')
+}
+
+/** Settings › Team: Remove access. */
+export async function removeTeamMember(staffId: string) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<TeamMember[]>('lead_team_remove', { p_staff: staffId }, 'They were not removed.')
+}
+
+/** Settings › Brands › OUTLETS: a brand's whole list, in order (mig 20261110200000). Answers every brand's outlets. */
+export async function saveOutlets(brandId: string, list: Array<{ id?: string; name: string }>) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<LeadOutlet[]>('lead_save_outlets', { p_brand: brandId, p_list: list }, 'The outlets were not saved.')
+}
+
+/** An ad's outlet (null = no outlet) — Reply rules › Ads and Settings › Ads. */
+export async function setAdOutlet(adId: string, outletId: string | null) {
+  await requireActionOn(['/leads/rules', '/leads/settings'], 'leads', 'manage')
+  return call<null>('lead_set_ad_outlet', { p_ad: adId, p_outlet: outletId }, 'The ad’s outlet was not saved.')
+}
+
+/** The customer panel's Outlet: an outlet, 'none', or 'auto' (follow the ad again). */
+export async function setContactOutlet(contactId: string, choice: string) {
+  await requireActionOn('/leads', 'leads', 'edit')
+  const mode = choice === 'none' || choice === 'auto' ? choice : 'outlet'
+  return call<null>('lead_set_contact_outlet', { p_contact: contactId, p_mode: mode, p_outlet: mode === 'outlet' ? choice : null }, 'The outlet was not saved.')
 }
 
 /** Which reply rule the chat follows now (mig 20261102240000): the chat header's Rule chip. */
@@ -397,7 +433,11 @@ export async function removeLibraryItem(itemId: string) {
  * AI Agent's Save for one brand (also AI corrections' "Save as fixed answer"): settings, fixed answers, playbook and —
  * from AI Agent only — Knowledge (mig 20261102140000); a save without it leaves Knowledge as it is.
  */
-export async function saveAgent(brandId: string, data: { settings: unknown; answers: FixedAnswer[]; playbook: PlaySituation[]; knowledge?: KnowledgePick[] }) {
+export async function saveAgent(brandId: string, data: {
+  settings: unknown; answers: FixedAnswer[]; playbook: PlaySituation[]; knowledge?: KnowledgePick[]
+  /** v3 § 5 (mig 20261110230000) — each only when sent; a save without them leaves them as they are. */
+  memory?: MemoryLine[]; fileQs?: FileQuestion[]; suggestions?: Array<{ id: string; status: 'used' | 'dismissed' }>
+}) {
   await requireActionOn(['/leads/ai', '/leads/corrections'], 'leads', 'manage')
   return call<null>('lead_save_ai', {
     p_brand: brandId,
@@ -406,6 +446,9 @@ export async function saveAgent(brandId: string, data: { settings: unknown; answ
       answers: data.answers.map(a => ({ id: a.id.startsWith('new-') ? '' : a.id, question: a.question, answer: a.answer, draftId: a.draftId ?? null })),
       playbook: data.playbook.map(p => ({ ...p, id: p.id.startsWith('new-') ? '' : p.id })),
       ...(data.knowledge ? { knowledge: data.knowledge.map(k => ({ kind: k.kind, ref: k.ref, paused: k.paused })) } : {}),
+      ...(data.memory ? { memory: data.memory.map(m => ({ id: m.id.startsWith('new-') ? '' : m.id, kind: m.kind, outletId: m.outletId, body: m.body, status: m.status, dir: m.dir })) } : {}),
+      ...(data.fileQs ? { fileQs: data.fileQs } : {}),
+      ...(data.suggestions ? { suggestions: data.suggestions } : {}),
     },
   }, 'The AI agent was not saved.')
 }
@@ -625,9 +668,10 @@ export async function draftLeadReply(contactId: string): Promise<LeadOutcome<Dra
   if (!ctx.ok) return ctx
   const { persona, knowledge, contact, messages, today } = ctx.data
   // AI Agent v2 (mig 20261023200000): the settings, fixed answers, playbook, General info and files — when there.
-  const more = await agentMore(contact.brandId, today)
+  // v3 § 5: this chat's earlier conversations and its outlet's lines too.
+  const more = await agentMore(contact.brandId, today, undefined, { contactId, outletId: contact.outletId ?? null })
   const cards = more ? more.cards(knowledge) : knowledge
-  const answer = await askModel(systemPrompt(persona, cards, today), conversationPrompt(contact, turnsOf(messages)), more?.ask)
+  const answer = await askModel(systemPrompt(persona, cards, today), conversationPrompt(contact, turnsOf(messages), more?.factsOff), more?.ask)
   if (!answer.ok) return answer
   const draft = readDraft(answer.text, cards)
   if (!draft) return { ok: false, reason: 'The AI agent’s answer was not usable — please try again.' }
@@ -650,15 +694,15 @@ export async function setDraftOutcome(draftId: number, outcome: DraftOutcome, se
 }
 
 /** The agent's reading (lib/leads/agent-read.ts), under the caller's own session. */
-async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook' | 'knowledge'>) {
-  return readAgent((await createClient()) as unknown as SupabaseClient, brandId, today, override)
+async function agentMore(brandId: string, today: string, override?: AgentOverride, chat?: AgentChat) {
+  return readAgent((await createClient()) as unknown as SupabaseClient, brandId, today, override, chat)
 }
 
 /**
  * AI Agent › Try it: a brand's cards for today and the soul as the form holds it (saved or not), on a pretend
  * conversation. Nothing is kept and nothing reaches a customer.
  */
-export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[], v2?: Pick<AgentMore, 'settings' | 'answers' | 'playbook' | 'knowledge'>): Promise<LeadOutcome<AgentDraft>> {
+export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[], v2?: AgentOverride): Promise<LeadOutcome<AgentDraft>> {
   await requireActionOn('/leads/ai', 'leads', 'manage')
   const ctx = await quiet<{ persona: Persona; knowledge: KnowledgeCard[]; today: string }>(
     'lead_ai_try_context', { p_brand: brandId }, 'The brand could not be read.')

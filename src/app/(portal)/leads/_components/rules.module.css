@@ -3,13 +3,14 @@
 .grid { flex: 1; min-height: 0; display: grid; gap: 12px; }
 .left { min-height: 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .card { flex: none; background: rgb(var(--lv-surface)); border: 1px solid rgb(var(--lv-line)); border-radius: 14px; overflow: hidden; }
-.cols { display: grid; grid-template-columns: minmax(200px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr) 96px; gap: 16px; align-items: center; }
+/* v3 § 3: Pages and Ads share one grid — name | outlet | Working hours | After hours | actions, everything left-aligned. */
+.cols { display: grid; grid-template-columns: minmax(250px, 1.1fr) minmax(200px, 1fr) minmax(0, 1fr) minmax(0, 1fr) 56px; gap: 16px; align-items: center; }
 .head { composes: cols; padding: 16px 20px 10px; }
 .adsHead { composes: cols; padding: 16px 20px 10px; border-bottom: 1px solid rgb(var(--lv-line-2)); }
 .fold { cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 0; border: none; background: transparent; font-family: inherit; line-height: normal; color: rgb(var(--lv-fg)); }
 .foldIcon { display: flex; color: rgb(var(--lv-fg-3)); }
 .title { font-weight: 600; font-size: 15px; }
-.colHead { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--lv-fg-3)); }
+.colHead { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--lv-fg-3)); }
 .tip { display: flex; color: rgb(var(--lv-disabled)); cursor: help; }
 .titleRow { display: flex; align-items: center; gap: 12px; }
 .brand { display: flex; flex-direction: column; border-top: 1px solid rgb(var(--lv-line-2)); }
@@ -31,7 +32,7 @@
 
 /* A reply chip: a dropdown, never click-to-cycle */
 .chip {
-  cursor: pointer; justify-self: center; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px 0 12px;
+  cursor: pointer; justify-self: start; margin-left: -10px; white-space: nowrap; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 10px;
   border-radius: 9px; border: none; background: rgb(var(--lv-surface)); color: rgb(var(--lv-fg));
   font-family: inherit; font-size: 13px; font-weight: 500; line-height: normal;
 }
@@ -57,6 +58,21 @@
 }
 .addRule:disabled { cursor: default; background: rgb(var(--lv-disabled)); }
 .addCell { display: flex; justify-content: flex-end; }
+
+/* An ad's outlet (v3 § 3): styled like the rule chips — map-pin, name, chevron, transparent; unset = rust "Choose outlet" */
+.outBtn {
+  cursor: pointer; justify-self: start; margin-left: -10px; min-width: 0; max-width: calc(100% + 10px); white-space: nowrap; display: flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 8px 0 10px; border-radius: 9px; border: none; background: transparent;
+  font-family: inherit; font-size: 13px; font-weight: 500; line-height: normal; color: rgb(var(--lv-fg));
+}
+.outBtn:hover:not(:disabled) { background: rgb(var(--lv-surface-sel)); }
+.outBtn:disabled { cursor: default; }
+.outBtn[data-none] { color: rgb(var(--lv-accent)); }
+.outPin { flex: none; display: flex; color: rgb(var(--lv-fg-3)); }
+.outBtn[data-none] .outPin { color: rgb(var(--lv-accent)); }
+.outName { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.outChev { flex: none; opacity: 0.5; }
+
 .trash {
   width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; border-radius: 8px;
   background: transparent; color: rgb(var(--lv-fg-4)); padding: 0;

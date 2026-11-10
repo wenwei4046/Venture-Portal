@@ -31,6 +31,8 @@ export interface LeadAd {
   source: 'manual' | 'meta' | null
   fetchedAt: string | null
   updatedByName: string
+  /** The outlet this ad belongs to (mig 20261110200000); null / absent = none. */
+  outletId?: string | null
 }
 
 /** What Ads Manager says of one ad, as lead_save_meta_ads takes it. */

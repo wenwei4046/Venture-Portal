@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { NOT_SET_UP, loadAdPosts, loadAds, loadChangesOf, loadFlows, loadLeadConfig, loadPages, loadReplyRules } from '@/lib/leads/server'
+import { NOT_SET_UP, loadAdPosts, loadAds, loadChangesOf, loadFlows, loadLeadConfig, loadOutlets, loadPages, loadReplyRules } from '@/lib/leads/server'
 import { managedPages } from '@/lib/leads/pages-server'
 import { routeRows, ruleLog, type LeadPage } from '@/lib/leads/pages'
 import type { ReplyRules, ReplyTemplate, TemplateStep } from '@/lib/leads/template'
@@ -17,9 +17,10 @@ export const dynamic = 'force-dynamic'
 export default async function Page() {
   await requirePage('/leads/rules')
   const user = await requirePermission('leads')
-  const [config, rules, ads, flows, pages, managed, changes, posts] = await Promise.all([
-    loadLeadConfig(), loadReplyRules(), loadAds(), loadFlows(), loadPages(), managedPages(), loadChangesOf(['lead_reply_pages', 'lead_reply_rules']), loadAdPosts(),
+  const [config, rules, ads, flows, pages, managed, changes, posts, outletsRead] = await Promise.all([
+    loadLeadConfig(), loadReplyRules(), loadAds(), loadFlows(), loadPages(), managedPages(), loadChangesOf(['lead_reply_pages', 'lead_reply_rules', 'lead_ad_outlets']), loadAdPosts(), loadOutlets(),
   ])
+  const outlets = outletsRead.ok ? outletsRead.data : []
   if (!config.ok || (!rules.ok && rules.reason !== NOT_SET_UP)) {
     return (
       <HvPage>
@@ -49,9 +50,10 @@ export default async function Page() {
     brand: id => brands.find(b => b.id === id)?.name ?? 'A brand',
     ad: id => { const a = adList.find(x => x.adId === id); return a ? (a.name || a.headline || `Ad ${id}`) : `Ad ${id}` },
     templates,
+    outlet: id => outlets.find(o => o.id === id)?.name ?? 'An outlet',
   }) : []
   return (
     <RulesView rules={rules.ok ? rules.data : fallback} ready={rules.ok} rows={rows} ads={adList} brands={brands.map(b => ({ id: b.id, name: b.name }))}
-      templates={templates} log={log} canEdit={canDo(user, 'leads', 'manage')} />
+      templates={templates} log={log} canEdit={canDo(user, 'leads', 'manage')} outlets={outlets} />
   )
 }

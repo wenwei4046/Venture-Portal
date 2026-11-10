@@ -20,6 +20,9 @@ export const AUDIT_MODULES: Readonly<Record<string, { module: string; href: stri
   lead_ai_playbook: { module: 'AI Agent', href: '/leads/ai' },
   lead_ai_sources: { module: 'AI Agent', href: '/leads/ai' },
   lead_ai_knowledge: { module: 'AI Agent', href: '/leads/ai' },
+  lead_ai_memory: { module: 'AI Agent', href: '/leads/ai' },
+  lead_ai_file_questions: { module: 'AI Agent', href: '/leads/ai' },
+  lead_ai_suggestions: { module: 'AI Agent', href: '/leads/ai' },
   lead_data_folders: { module: 'Data Center', href: '/leads/knowledge' },
   lead_business_hours: { module: 'Working hours', href: '/leads/hours' },
   lead_staff_leave: { module: 'Working hours', href: '/leads/hours' },
@@ -29,6 +32,10 @@ export const AUDIT_MODULES: Readonly<Record<string, { module: string; href: stri
   lead_brands: { module: 'Settings', href: '/leads/settings' },
   lead_sales: { module: 'Settings', href: '/leads/settings' },
   lead_ads: { module: 'Settings', href: '/leads/settings' },
+  lead_outlets: { module: 'Settings', href: '/leads/settings' },
+  lead_team: { module: 'Settings', href: '/leads/settings' },
+  lead_team_outlets: { module: 'Settings', href: '/leads/settings' },
+  lead_ad_outlets: { module: 'Reply rules', href: '/leads/rules' },
 }
 export const AUDIT_TABLES = Object.keys(AUDIT_MODULES)
 

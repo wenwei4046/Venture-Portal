@@ -163,6 +163,8 @@ export function ruleLog(changes: RuleChange[], names: {
   brand: (id: string) => string
   ad: (id: string) => string
   templates: ReadonlyArray<{ id: string; name: string }>
+  /** An outlet's name (mig 20261110200000). */
+  outlet?: (id: string) => string
 }): RuleLogLine[] {
   const out: RuleLogLine[] = []
   const WIN: Record<string, string> = { open: 'working hours', closed: 'after hours', any: 'any time' }
@@ -181,6 +183,10 @@ export function ruleLog(changes: RuleChange[], names: {
       const ad = names.ad(row.ad_id)
       if (c.op === 'DELETE') push(`Removed rule for ${ad}`)
       else if (c.op === 'INSERT' || c.changed?.some(k => k === 'reply' || k === 'at_when' || k === 'ad_id')) push(`${ad} · ${WIN[row.at_when] ?? row.at_when} → ${replyLabel(row.reply, names.templates)}`)
+    } else if (c.table_name === 'lead_ad_outlets') {
+      // An ad's outlet, as the prototype logs it: "<ad> · outlet → <outlet | No outlet>".
+      const to = c.op === 'DELETE' ? 'No outlet' : (names.outlet?.(row.outlet_id) || 'An outlet')
+      if (c.op !== 'UPDATE' || c.changed?.includes('outlet_id')) push(`${names.ad(row.ad_id)} · outlet → ${to}`)
     }
   }
   return out

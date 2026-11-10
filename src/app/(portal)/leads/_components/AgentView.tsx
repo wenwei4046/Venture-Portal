@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { addAgentLink, openDataFile, saveAgent, saveAgentPersona, setDataFileUntil, tryAgent } from '@/lib/leads/actions'
@@ -10,7 +10,9 @@ import {
   type AgentMore, type AgentSettings, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation,
 } from '@/lib/leads/agent'
 import { FAQ_CATS, PLAY_CATS, endsWarn, faqCat, knowledgeLog, pbCat, type LogRow } from '@/lib/leads/agent-page'
-import { dayMon, dcState, dcTree, extOf, hostOf, placeOf, type DataFolder, type Place } from '@/lib/leads/data-center'
+import { dayMon, dcState, dcTree, extOf, hostOf, placeOf, readLine, type DataFolder, type Place, type ReadLevel } from '@/lib/leads/data-center'
+import { DEFAULT_LEARN, memoryMeta, moveSource, rateOf, readEntries, type FileQuestion, type LearnSettings, type MemoryLine, type MemorySuggestion } from '@/lib/leads/agent-memory'
+import type { LeadOutlet } from '@/lib/leads/outlets'
 import { INFO_KIND_LABEL, forBrand, infoKind, type LeadInfo } from '@/lib/leads/info'
 import type { AuditChange } from '@/lib/audit/changes'
 import { LeadIcon, type LeadIconName } from '@/components/layout/lead-icons'
@@ -29,9 +31,13 @@ import a from './agent.module.css'
  * before though not drawn: a figure the portal has no source for reads "—" (uses, share, replied after).
  */
 
-type Draft = { settings: AgentSettings; answers: FixedAnswer[]; playbook: PlaySituation[]; knowledge: KnowledgePick[] }
+type Draft = {
+  settings: AgentSettings; answers: FixedAnswer[]; playbook: PlaySituation[]; knowledge: KnowledgePick[]
+  /** v3 § 5 (mig 20261110230000): Memory's lines (Knowledge › Outlets' too), the files' questions, the suggestions decided. */
+  memory: MemoryLine[]; fileQs: FileQuestion[]; sugg: Record<string, 'used' | 'dismissed'>
+}
 type Tab = 'how' | 'know' | 'answers' | 'play' | 'mem'
-type KnowCat = 'files' | 'links' | 'info' | 'log'
+type KnowCat = 'files' | 'links' | 'info' | 'outlets' | 'log'
 const TAB_OF: Record<string, Tab> = { how: 'how', behaviour: 'how', know: 'know', knowledge: 'know', answers: 'answers', ans: 'answers', playbook: 'play', play: 'play', memory: 'mem', mem: 'mem' }
 const draftOf = (m: AgentMore | undefined, p: Persona | undefined, files: DataFile[], brandId: string): Draft => ({
   settings: settingsOf(m?.settings, p?.goal ?? ''),
@@ -39,6 +45,9 @@ const draftOf = (m: AgentMore | undefined, p: Persona | undefined, files: DataFi
   playbook: m?.playbook ?? [],
   // Before mig 20261102140000 there are no picks: show what the agent reads (its folder and Shared) as files picked.
   knowledge: m?.knowledge ?? agentReads(files, brandId).map(s => ({ kind: s.file.kind === 'link' ? 'link' : 'file', ref: s.file.id, paused: s.paused })),
+  memory: m?.memory ?? [],
+  fileQs: m?.fileQs ?? [],
+  sugg: {},
 })
 let seq = 0
 const newId = () => `new-${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -47,7 +56,9 @@ const SAMPLES: Record<string, string[]> = {
   default: ['L 型沙發多少錢?', 'Can I pay by instalments?', 'Too expensive lah', 'Where is your showroom?'],
 }
 
-export default function AgentView({ personas, more, files, folders, foldersReady, info, history, today, connected, ready, canManage, initialBrand, initialTab }: {
+export default function AgentView({ personas, more, files, folders, foldersReady, info, history, today, connected, ready, canManage, initialBrand, initialTab, outlets = [] }: {
+  /** Every brand's outlets (Knowledge › Outlets, From goal results' outlet suggestions). */
+  outlets?: LeadOutlet[]
   personas: Persona[]
   more: Record<string, AgentMore>
   files: DataFile[]
@@ -77,6 +88,9 @@ export default function AgentView({ personas, more, files, folders, foldersReady
   const [error, setError] = useState('')
   const [busy, start] = useTransition()
   const dis = !canManage
+  // v3 § 5: Memory and Knowledge's questions save once mig 20261110230000 is in (lead_ai_more carries them).
+  const memoryReady = personas.length > 0 && personas.every(p => Array.isArray(more[p.brandId]?.memory))
+  const brandOutlets = outlets.filter(o => o.brandId === brandId)
   useEffect(() => {
     const anyDirty = Object.keys(drafts).some(k => JSON.stringify(drafts[k]) !== JSON.stringify(saved[k]))
     if (!anyDirty) return
@@ -85,6 +99,18 @@ export default function AgentView({ personas, more, files, folders, foldersReady
     return () => window.removeEventListener('beforeunload', ask)
   }, [drafts, saved])
 
+  // What the server holds, taken again after a save or a refresh — by each brand with nothing unsaved (a new memory
+  // line's id is the database's, so the next save updates it instead of making it again).
+  const latest = useRef({ drafts, saved })
+  latest.current = { drafts, saved }
+  const moreKey = JSON.stringify(more)
+  useEffect(() => {
+    const { drafts: dr, saved: sv } = latest.current
+    const next: Record<string, Draft> = Object.fromEntries(personas.map(p => [p.brandId, draftOf(more[p.brandId], p, files, p.brandId)]))
+    setSaved(next)
+    setDrafts(Object.fromEntries(Object.keys(next).map(k => [k, !dr[k] || JSON.stringify(dr[k]) === JSON.stringify(sv[k]) ? next[k] : dr[k]])))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- moreKey stands for more
+  }, [moreKey])
   const set = (fn: (x: Draft) => Draft) => { setDrafts(all => ({ ...all, [brandId]: fn(all[brandId] ?? d) })); setError('') }
   const setS = (o: Partial<AgentSettings>) => set(x => ({ ...x, settings: { ...x.settings, ...o } }))
   const setPhone = (o: Partial<AgentSettings['phone']>) => set(x => ({ ...x, settings: { ...x.settings, phone: { ...x.settings.phone, ...o } } }))
@@ -97,7 +123,14 @@ export default function AgentView({ personas, more, files, folders, foldersReady
     setTimeout(() => setCopied(''), 2500)
   }
   const save = () => start(async () => {
-    const r = await saveAgent(brandId, { settings: d.settings, answers: d.answers, playbook: d.playbook, ...(foldersReady ? { knowledge: d.knowledge } : {}) })
+    const r = await saveAgent(brandId, {
+      settings: d.settings, answers: d.answers, playbook: d.playbook, ...(foldersReady ? { knowledge: d.knowledge } : {}),
+      // v3 § 5: only once the memory's migration is in (the brand's agent reads it back).
+      ...(memoryReady ? {
+        memory: d.memory, fileQs: d.fileQs.filter(q => q.custom || q.instruction.trim()),
+        suggestions: Object.entries(d.sugg).map(([id, status]) => ({ id, status })),
+      } : {}),
+    })
     if (!r.ok) { setError(r.reason); return }
     // A brand whose agent is set up drafts in the Inbox (copilot).
     if (persona && persona.mode !== 'copilot') {
@@ -105,10 +138,13 @@ export default function AgentView({ personas, more, files, folders, foldersReady
       if (!m.ok) { setError(m.reason); return }
     }
     setSaved(x => ({ ...x, [brandId]: d }))
+    // New lines get their ids from the database: the refresh brings them, and a brand with nothing unsaved takes them.
     router.refresh()
   })
 
-  const review = 0
+  // The Test chat, opened with a message sent (How to reach the goal's and the playbook's Try it).
+  const tryText = (text: string) => { setTestOpen(true); setTimeout(() => window.dispatchEvent(new CustomEvent('lead-agent-try', { detail: text })), 0) }
+  const review = d.memory.filter(m => m.kind === 'collected' && m.status === 'review').length
   const t = useMemo(() => dcTree(personas.map(p => ({ id: p.brandId, name: p.brandName })), folders, files), [personas, folders, files])
   const fileOf = (id: string) => files.find(f => f.id === id)
   const liveFile = (k: KnowledgePick) => { const f = k.kind === 'file' ? fileOf(k.ref) : null; return !f || !dcState(f, today).expired }
@@ -171,14 +207,15 @@ export default function AgentView({ personas, more, files, folders, foldersReady
         <div className={a.body}>
           {error ? <div className={a.error} role="alert">{error}</div> : null}
           {!ready ? <div className={a.error} style={{ color: 'rgb(var(--lv-fg-3))' }}>Waiting for the database update — you can try the page, but nothing is saved yet.</div> : null}
-          {tab === 'how' ? <HowTab d={d} dis={dis} setS={setS} setPhone={setPhone} /> : null}
+          {tab === 'how' ? <HowTab d={d} dis={dis} setS={setS} setPhone={setPhone} onTry={() => tryText((SAMPLES[(persona?.brandName ?? '').toLowerCase()] ?? SAMPLES.default)[0])} /> : null}
           {tab === 'know' ? (
             <KnowTab key={brandId} brandId={brandId} brandName={persona?.brandName ?? ''} d={d} set={set} dis={dis} t={t} files={files} folders={folders} foldersReady={foldersReady}
-              info={info} infoCards={infoCards} infoOnCount={infoOnCount} history={history} today={today} personas={personas} setS={setS} setError={setError} />
+              info={info} infoCards={infoCards} infoOnCount={infoOnCount} history={history} today={today} personas={personas} setS={setS} setError={setError}
+              outlets={brandOutlets} asked={more[brandId]?.asked ?? {}} memoryReady={memoryReady} minChats={d.settings.learn.min} />
           ) : null}
           {tab === 'answers' ? <AnswersTab key={brandId} d={d} set={set} dis={dis} /> : null}
-          {tab === 'play' ? <PlayTab key={brandId} d={d} set={set} dis={dis} onTry={text => { setTestOpen(true); setTimeout(() => window.dispatchEvent(new CustomEvent('lead-agent-try', { detail: text })), 0) }} /> : null}
-          {tab === 'mem' ? <MemTab d={d} dis={dis} setS={setS} /> : null}
+          {tab === 'play' ? <PlayTab key={brandId} d={d} set={set} dis={dis} onTry={tryText} /> : null}
+          {tab === 'mem' ? <MemTab key={brandId} d={d} set={set} setS={setS} dis={dis} outlets={brandOutlets} memoryReady={memoryReady} suggestions={more[brandId]?.suggestions ?? []} /> : null}
         </div>
       </section>
       {testOpen ? (
@@ -252,7 +289,7 @@ function NumBox({ value, onChange, label, disabled, sm }: { value: number; onCha
 
 // ── How it replies ──
 
-function HowTab({ d, dis, setS, setPhone }: { d: Draft; dis: boolean; setS: (o: Partial<AgentSettings>) => void; setPhone: (o: Partial<AgentSettings['phone']>) => void }) {
+function HowTab({ d, dis, setS, setPhone, onTry }: { d: Draft; dis: boolean; setS: (o: Partial<AgentSettings>) => void; setPhone: (o: Partial<AgentSettings['phone']>) => void; onTry: () => void }) {
   const [sec, setSec] = useState<'voice' | 'limits' | 'hand'>('voice')
   const [topic, setTopic] = useState('')
   const [trig, setTrig] = useState('')
@@ -269,6 +306,16 @@ function HowTab({ d, dis, setS, setPhone }: { d: Draft; dis: boolean; setS: (o: 
               <textarea className={a.area} rows={2} value={s.goal} maxLength={1000} disabled={dis} aria-label="Goal" onChange={e => setS({ goal: e.target.value })} />
               <div className={a.goals}>{GOALS.map(([l, text]) => <button key={l} type="button" className={a.goal} aria-pressed={s.goal === text} disabled={dis} onClick={() => setS({ goal: text })}>{l}</button>)}</div>
             </Field>
+            {/* v3 § 5: How to reach the goal — free text the AI reads before every reply; Try it opens the Test chat. */}
+            <div className={a.field}>
+              <div className={a.fieldHead}>
+                <div className={a.fieldTitles}><span className={a.label}>How to reach the goal</span><span className={a.fieldHelp}>Write it like you’d brief a new staff member. The AI reads this before every reply.</span></div>
+                <button type="button" className={a.tryBtn} onClick={onTry}><LeadIcon name="message-square" size={14} />Try it</button>
+              </div>
+              <textarea className={a.area} data-tall="" rows={7} value={s.howGoal} maxLength={4000} disabled={dis} aria-label="How to reach the goal"
+                placeholder="e.g. Answer their question first. Ask one question to understand what they need. Only ask for the phone after their second message, and give a reason, like sending photos or the price list on WhatsApp."
+                onChange={e => setS({ howGoal: e.target.value })} />
+            </div>
             <Field label="Tone">
               <Seg options={TONES} value={s.tone} disabled={dis} onChange={tone => setS({ tone })} />
               <Note value={s.toneNote} placeholder="Describe the tone in your own words" disabled={dis} onChange={toneNote => setS({ toneNote })} />
@@ -337,6 +384,12 @@ function HowTab({ d, dis, setS, setPhone }: { d: Draft; dis: boolean; setS: (o: 
                   <NumBox sm value={s.maxReplies} disabled={dis} label="Agent replies before a person" onChange={maxReplies => setS({ maxReplies })} />
                   agent replies</span>
               </div>
+              <div className={a.handNote}>
+                <span className={a.handNoteL}>Also hand over when…</span>
+                <textarea className={a.area} rows={3} value={s.handNote} maxLength={2000} disabled={dis} aria-label="Also hand over when"
+                  placeholder="e.g. They ask about an order they already paid for. They want to speak to a manager. They ask for a price we haven’t published."
+                  onChange={e => setS({ handNote: e.target.value })} />
+              </div>
             </Field>
           </>
         ) : null}
@@ -347,8 +400,13 @@ function HowTab({ d, dis, setS, setPhone }: { d: Draft; dis: boolean; setS: (o: 
 
 // ── Knowledge ──
 
-function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersReady, info, infoCards, infoOnCount, history, today, personas, setS, setError }: {
+function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersReady, info, infoCards, infoOnCount, history, today, personas, setS, setError, outlets, asked, memoryReady, minChats }: {
   brandId: string
+  /** v3 § 5: this brand's outlets (Knowledge › Outlets), what customers asked per file, and whether memory saves yet. */
+  outlets: LeadOutlet[]
+  asked: Record<string, string[]>
+  memoryReady: boolean
+  minChats: number
   brandName: string
   d: Draft
   set: (fn: (x: Draft) => Draft) => void
@@ -395,7 +453,10 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
   }
   const CATS: Array<{ k: KnowCat; l: string; icon: LeadIconName; n: string }> = [
     { k: 'files', l: 'Files', icon: 'file-text', n: String(fileRows.length) }, { k: 'links', l: 'Web links', icon: 'link', n: String(linkRows.length) },
-    { k: 'info', l: 'General info', icon: 'store', n: String(infoOnCount) }, { k: 'log', l: 'History', icon: 'history', n: '' },
+    { k: 'info', l: 'General info', icon: 'store', n: String(infoOnCount) },
+    // v3 § 5: Outlets — the number of outlets with lines (none counted shows nothing, as drawn).
+    { k: 'outlets', l: 'Outlets', icon: 'map-pin', n: String(new Set(d.memory.filter(m => m.kind === 'outlet').map(m => m.outletId)).size || '') },
+    { k: 'log', l: 'History', icon: 'history', n: '' },
   ]
   const title = CATS.find(c => c.k === cat)!.l
   const stOf = (k: KnowledgePick) => (k.paused ? { l: 'Paused', t: 'paused' } : { l: 'In use', t: 'on' })
@@ -429,10 +490,14 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
               {fileRows.map(k => {
                 const f = k.kind === 'file' ? fileOf(k.ref)! : null, node = k.kind === 'folder' ? t.get(k.ref)! : null
                 const st = stOf(k)
+                // v3 § 5: the folders it also reads, under its name ("Also reads Sofa › 3 seater › Pushback").
+                const line = readLine(k, files, folders)
+                const trail = line.slice(1, k.kind === 'file' ? undefined : -1).map(l => l.name)
                 return (
                   <div key={pickKey(k)} className={a.kRow} role="option" aria-selected={cur ? pickKey(cur) === pickKey(k) : false} onClick={() => setSel(pickKey(k))}>
-                    <span className={a.kName}><span className={a.ext}>{f ? extOf(f.name, f.mime).ext : 'DIR'}</span><span>{f ? f.name : node!.name}</span></span>
-                    <span className={a.dim}>{f ? t.pathOf(placeOf(f)) : t.pathOf(node!.parent) || 'Data center'}</span>
+                    <span className={a.kName}><span className={a.ext}>{f ? extOf(f.name, f.mime).ext : 'DIR'}</span>
+                      <span className={a.kNames}><span className={a.kTitle}>{f ? f.name : node!.name}</span>{trail.length ? <span className={a.kTrail}>Also reads {trail.join(' › ')}</span> : null}</span></span>
+                    <span className={a.dim}>{brandFor(f ? f.brandId : node!.brandId)}</span>
                     <span className={a.dim} data-mid={f?.validUntil ? '' : undefined} data-none={f?.validUntil ? undefined : ''}>{f?.validUntil ? dayMon(f.validUntil) : '—'}</span>
                     <span className={a.st} data-t={st.t}>{st.l}</span>
                   </div>
@@ -465,6 +530,9 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
                     <div className={a.stat}><span>—</span><span>of AI replies</span></div>
                   </div>
                   <div className={a.sBody}>
+                    <ReadPath line={readLine(cur, files, folders)} brandName={brandFor(f ? f.brandId : node!.brandId)} />
+                    <AskedAbout key={pickKey(cur)} pick={cur} d={d} set={set} dis={dis || !memoryReady}
+                      asked={f ? asked[f.id] ?? [] : [...new Set(readLine(cur, files, folders).at(-1)?.files.flatMap(x => asked[x.id] ?? []) ?? [])].slice(0, 3)} />
                     <div className={a.sSect} data-tight="">
                       <span className={a.kicker} data-pb="">DETAILS</span>
                       {f ? (
@@ -528,6 +596,8 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
           </div>
         ) : null}
 
+        {cat === 'outlets' ? <OutletLines d={d} set={set} dis={dis || !memoryReady} outlets={outlets} minChats={minChats} /> : null}
+
         {cat === 'log' ? (
           <div className={a.listGrid}>
             <div className={a.listCol}>
@@ -554,6 +624,149 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
           </div>
         ) : null}
       </div>
+    </div>
+  )
+}
+
+/** WHAT THE AI READS · N files (v3 § 5): the brand down to the pick, the files read at each level, the folders beside it not read. */
+function ReadPath({ line, brandName }: { line: ReadLevel[]; brandName: string }) {
+  if (line.length < 2) return null
+  const n = line.reduce((s, l) => s + l.files.length, 0)
+  return (
+    <div className={a.sSect}>
+      <span className={a.kicker}>WHAT THE AI READS · {n} {n === 1 ? 'file' : 'files'}</span>
+      <div className={a.path}>
+        {line.map((l, i) => {
+          const last = i === line.length - 1
+          return (
+            <div key={l.place} className={a.pLevel} data-last={last || undefined}>
+              <div className={a.pRail}><span className={a.pDot} /><span className={a.pLine} /></div>
+              <div className={a.pBody}>
+                <span className={a.pName}>{i === 0 ? brandName : l.name}</span>
+                {l.files.map(f => <span key={f.id} className={a.pFile}><span className={a.pExt}>{extOf(f.name, f.mime).ext}</span><span className={a.pFileName}>{f.name}</span></span>)}
+                {!l.files.length ? <span className={a.pNone}>No files here</span> : null}
+                {l.skipped.length ? <span className={a.pSkip}><LeadIcon name="circle-minus" size={12} />Not read: {l.skipped.join(', ')}</span> : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * ASKED ABOUT (v3 § 5): what customers asked when the AI used this file (the last 30 days), and questions people add —
+ * each with how the AI should answer it, which goes to the AI with the file.
+ */
+function AskedAbout({ pick, d, set, dis, asked }: { pick: KnowledgePick; d: Draft; set: (fn: (x: Draft) => Draft) => void; dis: boolean; asked: string[] }) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [nq, setNq] = useState('')
+  const kind = pick.kind === 'folder' ? 'folder' : 'file'
+  const mine = d.fileQs.filter(q => q.kind === kind && q.ref === pick.ref)
+  const rows = [...asked.filter(q => !mine.some(m => m.question === q)).map(q => ({ question: q, instruction: '', custom: false })), ...mine]
+    .sort((x, y) => Number(x.custom) - Number(y.custom))
+  const put = (question: string, patch: Partial<FileQuestion> | null, custom = false) => set(x => {
+    const rest = x.fileQs.filter(q => !(q.kind === kind && q.ref === pick.ref && q.question === question))
+    if (!patch) return { ...x, fileQs: rest }
+    const had = x.fileQs.find(q => q.kind === kind && q.ref === pick.ref && q.question === question)
+    return { ...x, fileQs: [...rest, { kind, ref: pick.ref, question, instruction: '', custom, ...had, ...patch }] }
+  })
+  const add = (e: FormEvent) => {
+    e.preventDefault()
+    const q = nq.trim().slice(0, 300)
+    if (!q || rows.some(r => r.question === q)) return
+    put(q, { custom: true }, true); setNq(''); setEditing(q)
+  }
+  return (
+    <div className={a.sSect} data-asked="">
+      <span className={a.kicker}>ASKED ABOUT</span>
+      <span className={a.askHelp}>Tell the AI how to answer when this comes up.</span>
+      <div className={a.askList}>
+        {rows.map(r => (
+          <div key={r.question} className={a.askRow}>
+            <div className={a.askQ}><span className={a.askBubble}>{r.question}</span>
+              {r.custom && !dis ? <button type="button" className={a.askX} title="Remove question" aria-label="Remove question" onClick={() => put(r.question, null)}><LeadIcon name="x" size={12} /></button> : null}</div>
+            {editing === r.question ? (
+              <div className={a.askEdit}><LeadIcon name="corner-down-right" size={13} className={a.askArrow} />
+                <textarea className={a.askArea} rows={2} value={r.instruction} maxLength={1000} autoFocus disabled={dis} aria-label={`How to answer: ${r.question}`}
+                  placeholder="e.g. Say it’s in stock at Kelana Jaya, then ask if they want to come try it"
+                  onChange={e => put(r.question, { instruction: e.target.value }, r.custom)} onBlur={() => setEditing(null)} /></div>
+            ) : r.instruction ? (
+              <button type="button" className={a.askShow} disabled={dis} onClick={() => setEditing(r.question)}><LeadIcon name="corner-down-right" size={13} className={a.askArrow} /><span>{r.instruction}</span></button>
+            ) : !dis ? (
+              <button type="button" className={a.askAdd} onClick={() => setEditing(r.question)}><LeadIcon name="plus" size={12} />Add instruction</button>
+            ) : null}
+          </div>
+        ))}
+        {!dis ? (
+          <form className={a.askForm} onSubmit={add}>
+            <input className={a.askIn} value={nq} maxLength={300} placeholder="Add a question customers ask" aria-label="Add a question customers ask" onChange={e => setNq(e.target.value)} />
+            <button type="submit" className={a.askPlus} data-on={nq.trim() ? '' : undefined} title="Add" aria-label="Add"><LeadIcon name="plus" size={14} /></button>
+          </form>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/** Numbered memory lines, edited in place (Knowledge › Outlets and From goal results); each with its figure. */
+function Lines({ rows, dis, onText, onDel, rate }: { rows: MemoryLine[]; dis: boolean; onText: (id: string, t: string) => void; onDel: (id: string) => void; rate?: (m: MemoryLine) => { text: string; tone: string } }) {
+  return (
+    <>
+      {rows.map((m, i) => {
+        const r = rate?.(m)
+        return (
+          <div key={m.id} className={a.lineRow}>
+            <span className={a.lineN}>{i + 1}</span>
+            <textarea className={a.lineText} rows={1} value={m.body} maxLength={1000} disabled={dis} placeholder="Write one thing the AI should do" aria-label={`Line ${i + 1}`} onChange={e => onText(m.id, e.target.value)} />
+            <span className={a.lineRes} data-tone={r?.tone}>{r?.text ?? ''}</span>
+            {!dis ? <button type="button" className={a.lineX} title="Remove line" aria-label="Remove line" onClick={() => onDel(m.id)}><LeadIcon name="x" size={14} /></button> : <span />}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+const blankLine = (kind: MemoryLine['kind'], outletId: string | null = null): MemoryLine => ({
+  id: newId(), kind, outletId, body: '', status: 'on', dir: null, source: '', cases: 0, addedByName: '', createdAt: new Date().toISOString(), chats: 0, reached: 0,
+})
+
+/** Knowledge › Outlets (v3 § 5): facts and rules for one outlet, used only in that outlet's chats. */
+function OutletLines({ d, set, dis, outlets }: { d: Draft; set: (fn: (x: Draft) => Draft) => void; dis: boolean; outlets: LeadOutlet[]; minChats: number }) {
+  const [menu, setMenu] = useState(false)
+  const [picked, setPicked] = useState<string | null>(null)
+  const lines = (id: string) => d.memory.filter(m => m.kind === 'outlet' && m.outletId === id)
+  const shown = outlets.filter(o => lines(o.id).length || picked === o.id)
+  const free = outlets.filter(o => !lines(o.id).length)
+  const text = (id: string, t: string) => set(x => ({ ...x, memory: x.memory.map(m => (m.id === id ? { ...m, body: t } : m)) }))
+  const del = (id: string) => set(x => ({ ...x, memory: x.memory.filter(m => m.id !== id) }))
+  const add = (outletId: string) => set(x => ({ ...x, memory: [...x.memory, blankLine('outlet', outletId)] }))
+  return (
+    <div className={a.outs}>
+      <span className={a.outsHelp}>Facts and rules for one outlet, like parking or opening days. The AI uses them only in chats from that outlet.</span>
+      {shown.map(o => (
+        <div key={o.id} className={a.outBlock}>
+          <span className={a.outName}><LeadIcon name="map-pin" size={14} />{o.name}</span>
+          <Lines rows={lines(o.id)} dis={dis} onText={text} onDel={del} />
+          {!dis ? <button type="button" className={a.lineAdd} onClick={() => add(o.id)}><LeadIcon name="plus" size={14} />Add line</button> : null}
+        </div>
+      ))}
+      {!dis && free.length ? (
+        <div className={a.outAddWrap}>
+          <button type="button" className={a.outAdd} onClick={() => setMenu(m => !m)}><LeadIcon name="plus" size={14} />Add for an outlet</button>
+          {menu ? (
+            <>
+              <div className={a.catch} onClick={() => setMenu(false)} aria-hidden="true" />
+              <div className={a.outMenu} role="menu">
+                {free.map(o => <button key={o.id} type="button" role="menuitem" className={a.outItem} onClick={() => { add(o.id); setPicked(o.id); setMenu(false) }}>{o.name}</button>)}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      {!outlets.length ? <div className={a.empty}>This brand has no outlets yet — add them in Settings › Brands.</div> : null}
     </div>
   )
 }
@@ -849,21 +1062,246 @@ function PlayTab({ d, set, dis, onTry }: { d: Draft; set: (fn: (x: Draft) => Dra
 
 // ── Memory ──
 
-function MemTab({ d, dis, setS }: { d: Draft; dis: boolean; setS: (o: Partial<AgentSettings>) => void }) {
-  const [cat, setCat] = useState<'rv' | 'use' | 'set'>('rv')
-  const title = { rv: 'To review', use: 'In use', set: 'Settings' }[cat]
+/**
+ * Memory (Lead View v3 § 5; mig 20261110230000) — four parts, as drawn:
+ * - **Fixed memory**: rules the AI always uses and never changes; only people edit them.
+ * - **Collected**: LEARNING DIRECTION (topics to learn more about / never), then To review (Edit · Dismiss · Use it) and
+ *   In use (👍 More like this / 👎 Less like this, Edit, Turn off, Make fixed). Lessons come from the learning run, which
+ *   is not built yet — the lists stay empty until it is.
+ * - **From goal results**: the lines that reach the goal, each with how often it does ("58% reached · 212 chats"), and
+ *   the learning run's suggestions (Change line N / Add a line / Add for an outlet).
+ * - **How it learns**: the reading order (higher wins), each source on or off, the brand's own sources, and the
+ *   learning settings.
+ */
+function MemTab({ d, set, setS, dis, outlets, memoryReady, suggestions }: {
+  d: Draft
+  /** From goal results' open suggestions (the learning run's; none until it is built). */
+  suggestions: MemorySuggestion[]
+  set: (fn: (x: Draft) => Draft) => void
+  setS: (o: Partial<AgentSettings>) => void
+  dis: boolean
+  outlets: LeadOutlet[]
+  memoryReady: boolean
+}) {
+  const [cat, setCat] = useState<'fix' | 'col' | 'goal' | 'set'>('fix')
+  const [colTab, setColTab] = useState<'rv' | 'use'>('rv')
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
+  const [moreIn, setMoreIn] = useState('')
+  const [lessIn, setLessIn] = useState('')
+  const [hover, setHover] = useState<string | null>(null)
+  const [readEd, setReadEd] = useState<string | null>(null)
+  const off = dis || !memoryReady
+  const s = d.settings, L = s.learn ?? DEFAULT_LEARN
+  const setL = (o: Partial<LearnSettings>) => setS({ learn: { ...L, ...o } })
+  const setMem = (fn: (m: MemoryLine[]) => MemoryLine[]) => set(x => ({ ...x, memory: fn(x.memory) }))
+  const patch = (id: string, p: Partial<MemoryLine>) => setMem(ms => ms.map(m => (m.id === id ? { ...m, ...p } : m)))
+  const fixed = d.memory.filter(m => m.kind === 'fixed')
+  const review = d.memory.filter(m => m.kind === 'collected' && m.status === 'review')
+  const inUse = d.memory.filter(m => m.kind === 'collected' && m.status === 'on')
+  const goal = d.memory.filter(m => m.kind === 'goal')
+  const sugg = suggestions.filter(g => !d.sugg[g.id] && (g.kind !== 'edit' || goal.some(l => l.id === g.memoryId)) && (g.kind !== 'outlet' || outlets.some(o => o.id === g.outletId)))
+  const rate = (m: MemoryLine) => rateOf(m, L.min)
+  const title = { fix: 'Fixed memory', col: 'Collected', goal: 'From goal results', set: 'How it learns' }[cat]
+  const chipAdd = (key: 'dirMore' | 'dirLess', v: string, clear: () => void) => {
+    const t = v.trim().slice(0, 80)
+    if (t && !s[key].includes(t)) setS({ [key]: [...s[key], t] } as Partial<AgentSettings>)
+    clear()
+  }
+  const accept = (g: MemorySuggestion) => {
+    setMem(ms => g.kind === 'edit' ? ms.map(m => (m.id === g.memoryId ? { ...blankLine('goal'), body: g.body } : m))
+      : [...ms, { ...blankLine(g.kind === 'outlet' ? 'outlet' : 'goal', g.kind === 'outlet' ? g.outletId : null), body: g.body }])
+    set(x => ({ ...x, sugg: { ...x.sugg, [g.id]: 'used' } }))
+  }
+  const entries = readEntries(L)
+  const sel = (v: string, opts: ReadonlyArray<[string, string]>, on: (v: string) => void, label: string) => (
+    <select className={a.lSel} value={v} disabled={off} aria-label={label} onChange={e => on(e.target.value)}>{opts.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+  )
+  const seg = (v: string, opts: ReadonlyArray<[string, string]>, on: (v: string) => void) => (
+    <div className={a.lSeg} role="group">{opts.map(([k, l]) => <button key={k} type="button" className={a.lSegBtn} aria-pressed={v === k} disabled={off} onClick={() => on(k)}>{l}</button>)}</div>
+  )
+  const learnRows: Array<{ t: string; d: string; c: ReactNode }> = [
+    { t: 'Learn from its own chats', d: 'Looks at chats the AI handled and suggests lessons.', c: <button type="button" role="switch" aria-checked={s.autoLearn} aria-label="Learn from its own chats" className={a.lTog} disabled={off} onClick={() => setS({ autoLearn: !s.autoLearn })} /> },
+    { t: 'Learn from CS and templates', d: 'Also looks at chats handled by your team and by templates.', c: <button type="button" role="switch" aria-checked={s.learnOthers} aria-label="Learn from CS and templates" className={a.lTog} disabled={off} onClick={() => setS({ learnOthers: !s.learnOthers })} /> },
+    { t: 'Learn from', d: 'Which chats count when it looks for lessons.', c: seg(L.from, [['goal', 'Reached the goal'], ['all', 'All chats']], v => setL({ from: v as LearnSettings['from'] })) },
+    { t: 'New lessons', d: 'What happens when it finds something new.', c: sel(L.newL, [['ask', 'Ask me first'], ['auto', 'Use right away'], ['off', 'Don’t collect']], v => setL({ newL: v as LearnSettings['newL'] }), 'New lessons') },
+    { t: 'Minimum chats', d: 'How many chats a lesson needs before it’s suggested.', c: <span className={a.lNum}><NumBox value={L.min} disabled={off} label="Minimum chats" onChange={min => setL({ min })} />chats</span> },
+    { t: 'Forget unused lessons', d: 'Turns off collected lessons that haven’t been used for a while. Fixed memory is never forgotten.', c: sel(L.forget, [['never', 'Never'], ['30', 'After 30 days'], ['90', 'After 90 days']], v => setL({ forget: v as LearnSettings['forget'] }), 'Forget unused lessons') },
+    { t: 'Share lessons across outlets', d: 'A lesson learned in one outlet can be used in the others.', c: <button type="button" role="switch" aria-checked={L.share} aria-label="Share lessons across outlets" className={a.lTog} disabled={off} onClick={() => setL({ share: !L.share })} /> },
+  ]
   return (
     <div className={a.split}>
-      <Nav items={[{ k: 'rv', l: 'To review', icon: 'inbox', n: '0' }, { k: 'use', l: 'In use', icon: 'circle-check', n: '0' }, { k: 'set', l: 'Settings', icon: 'settings-2', n: '' }]} cur={cat} onPick={setCat} />
+      <Nav items={[
+        { k: 'fix', l: 'Fixed memory', icon: 'pin', n: String(fixed.length) },
+        { k: 'col', l: 'Collected', icon: 'inbox', n: review.length ? `${review.length} new` : '', rust: review.length > 0 },
+        { k: 'goal', l: 'From goal results', icon: 'target', n: sugg.length ? String(sugg.length) : '', rust: sugg.length > 0 },
+        { k: 'set', l: 'How it learns', icon: 'settings-2', n: '' },
+      ]} cur={cat} onPick={setCat} />
       <div className={a.col} data-w="680">
         <Head icon="brain" title={title} />
-        {cat === 'rv' ? <div className={a.empty} style={{ borderTop: '1px solid rgb(var(--lv-line-2))' }}>Nothing to review</div> : null}
-        {cat === 'use' ? <div className={a.empty} style={{ borderTop: '1px solid rgb(var(--lv-line-2))' }}>No lessons in use yet</div> : null}
+        {!memoryReady ? <div className={a.memWait}>Waiting for the database update — nothing here saves yet.</div> : null}
+
+        {cat === 'fix' ? (
+          <div className={a.fix}>
+            <span className={a.memHelp}>Always used, in every chat. The AI never changes or forgets these. Only people can edit them.</span>
+            {fixed.map(m => (
+              <div key={m.id} className={a.fixRow}>
+                <span className={a.fixPin}><LeadIcon name="pin" size={14} /></span>
+                <div className={a.fixBody}>
+                  <textarea className={a.fixText} rows={1} value={m.body} maxLength={1000} disabled={off} placeholder="Something the AI must always remember" aria-label="Fixed memory" onChange={e => patch(m.id, { body: e.target.value })} />
+                  <span className={a.fixMeta}>{m.id.startsWith('new-') ? 'Just now' : memoryMeta(m)}</span>
+                </div>
+                {!off ? <button type="button" className={a.lineX} data-top="" title="Remove" aria-label="Remove" onClick={() => setMem(ms => ms.filter(x => x.id !== m.id))}><LeadIcon name="x" size={14} /></button> : null}
+              </div>
+            ))}
+            {!off ? <button type="button" className={a.fixAdd} onClick={() => setMem(ms => [...ms, blankLine('fixed')])}><LeadIcon name="plus" size={14} />Add fixed memory</button> : null}
+          </div>
+        ) : null}
+
+        {cat === 'col' ? (
+          <div className={a.colWrap}>
+            <div className={a.dirCard}>
+              <span className={a.kicker}>LEARNING DIRECTION</span>
+              {([['dirMore', 'Learn more about', 'It looks harder for lessons on these.', moreIn, setMoreIn], ['dirLess', 'Don’t learn about', 'Lessons on these are never suggested.', lessIn, setLessIn]] as const).map(([key, t, help, v, setV]) => (
+                <div key={key} className={a.dirSect}>
+                  <div className={a.dirTitles}><span className={a.dirT}>{t}</span><span className={a.dirHelp}>{help}</span></div>
+                  <div className={a.dirChips}>
+                    {s[key].map(c => <span key={c} className={a.dirChip} data-k={key}>{c}{!off ? <button type="button" className={a.dirX} title="Remove" aria-label={`Remove ${c}`} onClick={() => setS({ [key]: s[key].filter(x => x !== c) } as Partial<AgentSettings>)}><LeadIcon name="x" size={12} /></button> : null}</span>)}
+                    {!off ? <form className={a.dirForm} onSubmit={e => { e.preventDefault(); chipAdd(key, v, () => setV('')) }}><input className={a.dirIn} value={v} maxLength={80} placeholder="Add a topic…" aria-label={`${t}: add a topic`} onChange={e => setV(e.target.value)} /></form> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={a.lSeg} role="group">
+              {([['rv', 'To review', review.length], ['use', 'In use', inUse.length]] as const).map(([k, l, n]) => (
+                <button key={k} type="button" className={a.lSegBtn} aria-pressed={colTab === k} onClick={() => setColTab(k)}>{l}<span className={a.colN} data-rust={k === 'rv' && n ? '' : undefined}>{n}</span></button>
+              ))}
+            </div>
+            <div className={a.colList}>
+              {(colTab === 'rv' ? review : inUse).map(m => {
+                const ed = editing?.id === m.id
+                return (
+                  <div key={m.id} className={a.colRow}>
+                    {ed ? <textarea className={a.area} rows={3} value={editing!.text} maxLength={1000} autoFocus aria-label="Lesson" onChange={e => setEditing({ id: m.id, text: e.target.value })} />
+                      : <span className={a.colText}>{m.body}</span>}
+                    <div className={a.colMetaRow}><span className={a.colMeta}>{memoryMeta(m)}</span>{m.dir ? <span className={a.colDir} data-dir={m.dir}>{m.dir === 'up' ? 'Learning more like this' : 'Learning less like this'}</span> : null}</div>
+                    {ed ? (
+                      <div className={a.colActs}>
+                        <button type="button" className={a.colBtn} onClick={() => setEditing(null)}>Cancel</button>
+                        <button type="button" className={a.colGo} onClick={() => { if (editing!.text.trim()) patch(m.id, { body: editing!.text.trim() }); setEditing(null) }}>Save</button>
+                      </div>
+                    ) : off ? null : m.status === 'review' ? (
+                      <div className={a.colActs}>
+                        <button type="button" className={a.colBtn} onClick={() => setEditing({ id: m.id, text: m.body })}>Edit</button>
+                        <button type="button" className={a.colBtn} onClick={() => patch(m.id, { status: 'off' })}>Dismiss</button>
+                        <button type="button" className={a.colGo} onClick={() => patch(m.id, { status: 'on' })}>Use it</button>
+                      </div>
+                    ) : (
+                      <div className={a.colActs} data-used="">
+                        <button type="button" className={a.vote} data-on={m.dir === 'up' ? 'up' : undefined} title="More like this" aria-label="More like this" aria-pressed={m.dir === 'up'} onClick={() => patch(m.id, { dir: m.dir === 'up' ? null : 'up' })}><LeadIcon name="thumbs-up" size={15} /></button>
+                        <button type="button" className={a.vote} data-on={m.dir === 'down' ? 'down' : undefined} title="Less like this" aria-label="Less like this" aria-pressed={m.dir === 'down'} onClick={() => patch(m.id, { dir: m.dir === 'down' ? null : 'down' })}><LeadIcon name="thumbs-down" size={15} /></button>
+                        <span className={a.gap} />
+                        <button type="button" className={a.colBtn} onClick={() => setEditing({ id: m.id, text: m.body })}>Edit</button>
+                        <button type="button" className={a.colBtn} onClick={() => patch(m.id, { status: 'off' })}>Turn off</button>
+                        <button type="button" className={a.pinBtn} onClick={() => patch(m.id, { kind: 'fixed', status: 'on', dir: null })}><LeadIcon name="pin" size={13} />Make fixed</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {!(colTab === 'rv' ? review : inUse).length ? <div className={a.colEmpty}>Nothing here</div> : null}
+            </div>
+          </div>
+        ) : null}
+
+        {cat === 'goal' ? (
+          <div className={a.goalWrap}>
+            <span className={a.memHelp}>What the AI learned from chats that reached the goal, and how often each one works. Used together with your instructions in How it replies.</span>
+            <div className={a.goalLines}>
+              <Lines rows={goal} dis={off} rate={rate} onText={(id, t) => patch(id, { body: t })} onDel={id => setMem(ms => ms.filter(m => m.id !== id))} />
+              {!off ? <button type="button" className={a.lineAdd} onClick={() => setMem(ms => [...ms, blankLine('goal')])}><LeadIcon name="plus" size={14} />Add line</button> : null}
+            </div>
+            {goal.some(m => rate(m).tone === 'low') ? <span className={a.goalLow}><LeadIcon name="info" size={13} />Lines in red rarely lead to the goal. Try rewording or removing them.</span> : null}
+            {sugg.length ? (
+              <div className={a.suggs}>
+                <span className={a.suggHead}><LeadIcon name="sparkles" size={13} />{sugg.length === 1 ? '1 suggestion' : `${sugg.length} suggestions`} from recent chats</span>
+                {sugg.map(g => {
+                  const li = goal.findIndex(l => l.id === g.memoryId)
+                  return (
+                    <div key={g.id} className={a.sugg}>
+                      <span className={a.suggKind}>{g.kind === 'edit' ? `Change line ${li + 1}` : g.kind === 'outlet' ? `Add for ${outlets.find(o => o.id === g.outletId)?.name ?? 'an outlet'}` : 'Add a line'}</span>
+                      {g.kind === 'edit' && li >= 0 ? <span className={a.suggOld}>{goal[li].body}</span> : null}
+                      <span className={a.suggText}>{g.body}</span>
+                      <span className={a.suggWhy}>{g.why} Based on {g.chats} chats.</span>
+                      {!off ? (
+                        <div className={a.colActs}>
+                          <button type="button" className={a.colBtn} onClick={() => set(x => ({ ...x, sugg: { ...x.sugg, [g.id]: 'dismissed' } }))}>Dismiss</button>
+                          <button type="button" className={a.colGo} onClick={() => accept(g)}>Use it</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {cat === 'set' ? (
-          <div className={a.memSet}>
-            <div className={a.togRow}><Tog on={d.settings.autoLearn} disabled={dis} label="Learn from its own chats" onChange={autoLearn => setS({ autoLearn })} /><span>Learn from its own chats</span></div>
-            <div className={a.togRow}><Tog on={d.settings.learnOthers} disabled={dis} label="Learn from templates and CS" onChange={learnOthers => setS({ learnOthers })} /><span>Learn from templates and CS</span></div>
-            <span className={a.memNote}>Lessons come once the agent answers on its own — today it drafts and CS sends.</span>
+          <div className={a.learn}>
+            <div className={a.readWrap}>
+              <div className={a.readTitles}>
+                <div className={a.readTop}><span className={a.readT}>How it starts reading</span><span className={a.readN}>{entries.filter(e => e.on).length} of {entries.length} sources</span></div>
+                <span className={a.readHelp}>Read top to bottom before each reply. When two disagree, the higher one wins.</span>
+              </div>
+              <div className={a.readList}>
+                {(() => {
+                  let n = 0
+                  return entries.map((e, i) => {
+                    if (e.on) n++
+                    const ed = readEd === e.id, hv = hover === e.id || ed
+                    const cu = L.custom.find(c => c.id === e.id)
+                    return (
+                      <div key={e.id} className={a.readRow} data-hover={hv && !ed ? '' : undefined} data-editing={ed || undefined} onMouseEnter={() => setHover(e.id)} onMouseLeave={() => setHover(h => (h === e.id ? null : h))}>
+                        <div className={a.readLine}>
+                          <span className={a.readNum} data-off={!e.on || undefined}>{e.on ? n : ''}</span>
+                          <div className={a.readText} data-off={!e.on || undefined}>
+                            <span className={a.readName}>{e.title}{e.mine ? <span className={a.yours}>Yours</span> : null}</span>
+                            <span className={a.readDesc}>{e.on ? e.desc : 'Not read'}</span>
+                          </div>
+                          <div className={a.readCtl} data-show={hv && !off ? '' : undefined}>
+                            <button type="button" className={a.readBtn} title="Move up" aria-label={`Move ${e.title} up`} data-faint={i === 0 || undefined} onClick={() => setL(moveSource(L, e.id, -1))}><LeadIcon name="arrow-up" size={14} /></button>
+                            <button type="button" className={a.readBtn} title="Move down" aria-label={`Move ${e.title} down`} data-faint={i === entries.length - 1 || undefined} onClick={() => setL(moveSource(L, e.id, 1))}><LeadIcon name="arrow-down" size={14} /></button>
+                            {e.mine ? (
+                              <>
+                                <button type="button" className={a.readBtn} title="Edit" aria-label={`Edit ${e.title}`} onClick={() => setReadEd(ed ? null : e.id)}><LeadIcon name="pencil" size={14} /></button>
+                                <button type="button" className={a.readBtn} title="Remove" aria-label={`Remove ${e.title}`} onClick={() => { setL({ custom: L.custom.filter(c => c.id !== e.id), order: L.order.filter(x => x !== e.id) }); setReadEd(null) }}><LeadIcon name="trash-2" size={14} /></button>
+                              </>
+                            ) : null}
+                          </div>
+                          {e.id === 'fixed'
+                            ? <span className={a.readLock} title="Always read"><LeadIcon name="lock" size={13} /></span>
+                            : <button type="button" role="switch" aria-checked={e.on} className={a.readTog} title={e.on ? 'Stop reading this' : 'Read this'} aria-label={e.title} disabled={off} onClick={() => setL({ off: { ...L.off, [e.id]: e.on } })} />}
+                        </div>
+                        {ed && cu ? (
+                          <div className={a.readEdit}>
+                            <input className={a.readIn} value={cu.name} maxLength={80} placeholder="Name, e.g. Today’s stock" aria-label="Name" onChange={x => setL({ custom: L.custom.map(c => (c.id === e.id ? { ...c, name: x.target.value } : c)) })} />
+                            <textarea className={a.readArea} rows={3} value={cu.text} maxLength={2000} placeholder="What should the AI read or keep in mind here?" aria-label="What should the AI read or keep in mind here?" onChange={x => setL({ custom: L.custom.map(c => (c.id === e.id ? { ...c, text: x.target.value } : c)) })} />
+                            <button type="button" className={a.colGo} data-end="" onClick={() => setReadEd(null)}>Done</button>
+                          </div>
+                        ) : null}
+                      </div>
+                    )
+                  })
+                })()}
+                {!off ? <button type="button" className={a.readAdd} onClick={() => { const id = `cx${Date.now().toString(36)}`; setL({ custom: [...L.custom, { id, name: '', text: '' }], order: [...L.order, id] }); setReadEd(id) }}><LeadIcon name="plus" size={14} />Add your own</button> : null}
+              </div>
+            </div>
+            {learnRows.map(r => (
+              <div key={r.t} className={a.learnRow}>
+                <div className={a.learnText}><span className={a.learnT}>{r.t}</span><span className={a.learnD}>{r.d}</span></div>
+                {r.c}
+              </div>
+            ))}
           </div>
         ) : null}
       </div>
@@ -898,7 +1336,7 @@ function TestChat({ brandId, brandName, persona, draft, connected, canManage, on
     setTyped('')
     start(async () => {
       const r = await tryAgent(brandId, { agentName: persona.agentName, personality: persona.personality, tone: persona.tone, goal: draft.settings.goal, dos: persona.dos, donts: persona.donts, examples: persona.examples, mode: persona.mode },
-        next.map(l => ({ who: l.who, text: l.text })), { settings: draft.settings, answers: draft.answers, playbook: draft.playbook, knowledge: draft.knowledge })
+        next.map(l => ({ who: l.who, text: l.text })), { settings: draft.settings, answers: draft.answers, playbook: draft.playbook, knowledge: draft.knowledge, memory: draft.memory, fileQs: draft.fileQs })
       setChat(c => [...c, r.ok
         ? { who: 'us', text: r.data.reply, meta: [r.data.handoff ? `Hands to a person${r.data.note ? ` · ${r.data.note}` : ''}` : '', r.data.used.length ? `Used: ${r.data.used.map(u => u.title).join(', ')}` : ''].filter(Boolean).join(' · ') || undefined }
         : { who: 'us', text: r.reason, meta: 'Not an answer' }])

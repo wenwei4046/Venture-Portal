@@ -3,7 +3,7 @@ import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { officeToday } from '@/lib/office-time'
 import { isRangeId, rangeDays } from '@/lib/leads/stage'
-import { loadLeadConfig, loadLeads, loadThread } from '@/lib/leads/server'
+import { loadLeadConfig, loadLeads, loadOutlets, loadThread } from '@/lib/leads/server'
 import LeadsView from '../_components/LeadsView'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const range = isRangeId(sp.r) ? sp.r : 'month'
   const today = officeToday()
   const days = rangeDays(range, today, sp.from, sp.to)
-  const [config, list] = await Promise.all([loadLeadConfig(), loadLeads(days?.from ?? null, days?.to ?? null, today)])
+  const [config, list, outlets] = await Promise.all([loadLeadConfig(), loadLeads(days?.from ?? null, days?.to ?? null, today), loadOutlets()])
   if (!config.ok || !list.ok) {
     return (
       <HvPage>
@@ -50,6 +50,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       today={today}
       now={Date.now()}
       canEdit={canDo(user, 'leads', 'edit')}
+      outlets={outlets.ok ? outlets.data : []}
     />
   )
 }

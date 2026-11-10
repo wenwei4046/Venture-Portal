@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveLeadCard } from '@/lib/leads/actions'
+import { saveLeadCard, setContactOutlet } from '@/lib/leads/actions'
+import { outletName, outletsFor, type LeadOutlet } from '@/lib/leads/outlets'
 import { isVisitDate, phoneLabel, phoneStage, visitShown } from '@/lib/leads/inbox'
 import { copyText } from '@/lib/leads/clipboard'
 import { handedTo, handoffText } from '@/lib/leads/handoff'
@@ -35,7 +36,7 @@ const FIELDS: Array<{ icon: LeadIconName; k: string; key: keyof Draft }> = [
  * Kept from before: the name is edited with the rest; Customer Service's labels; *Copy details for sales* while there is
  * no confirmed phone; who it was handed to.
  */
-export default function CustomerPanel({ contact, brand, canEdit, canManage = false, labels = [], csName, onSaved }: {
+export default function CustomerPanel({ contact, brand, canEdit, canManage = false, labels = [], csName, onSaved, outlets = [] }: {
   contact: LeadContact
   csName: string
   brand: LeadBrand | undefined
@@ -43,6 +44,8 @@ export default function CustomerPanel({ contact, brand, canEdit, canManage = fal
   canManage?: boolean
   labels?: LeadLabel[]
   onSaved: () => void
+  /** Every brand's outlets (v3 § 3): the Outlet row. */
+  outlets?: LeadOutlet[]
 }) {
   const router = useRouter()
   const start: Draft = {
@@ -81,6 +84,20 @@ export default function CustomerPanel({ contact, brand, canEdit, canManage = fal
   }
   const copyForSales = async () => {
     flash((await copyText(handoffText(contact, brand?.name ?? '', null, csName))) ? 'Copied — paste it to the sales group' : 'Could not copy — try again')
+  }
+  // The customer's outlet (v3 § 3): the ad's, unless set here; shown at once, put back on a refusal.
+  const [out, setOut] = useState<{ id: string | null; by: string } | null>(null)
+  const outNow = out ?? { id: contact.outletId ?? null, by: contact.outletBy ?? '' }
+  const outFrom = outNow.by === 'cs' ? '· set by you' : outNow.id ? '· from the ad' : ''
+  const pickOutlet = (v: string) => {
+    const next = { id: v === 'none' ? null : v, by: 'cs' }
+    setOut(next)
+    setError(null)
+    startSaving(async () => {
+      const r = await setContactOutlet(contact.id, v)
+      if (!r.ok) { setError(r.reason); setOut(null); return }
+      onSaved()
+    })
   }
   const shownOf = (k: keyof Draft) => (k === 'preferredTime' ? visitShown(contact.preferredTime) : (contact[k as keyof LeadContact] as string | undefined) ?? '')
 
@@ -123,6 +140,22 @@ export default function CustomerPanel({ contact, brand, canEdit, canManage = fal
 
         <div className={s.fields}>
           <span className={s.fieldsTitle}>For the salesperson</span>
+          <div className={s.field}>
+            <span className={s.fieldKey}><LeadIcon name="store" size={15} />Outlet</span>
+            <div className={s.outlet} data-edit={canEdit || undefined}>
+              <span className={s.outletName} data-empty={outNow.id ? undefined : ''}>{outletName(outlets, outNow.id) || '—'}</span>
+              <span className={s.outletFrom}>{outFrom}</span>
+              {canEdit ? (
+                <>
+                  <LeadIcon name="chevron-down" size={13} className={s.outletChev} />
+                  <select className={s.outletSelect} value={outNow.id ?? 'none'} onChange={e => pickOutlet(e.target.value)} title="Change outlet" aria-label="Outlet" disabled={saving}>
+                    {outletsFor(outlets, contact.brandId).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    <option value="none">No outlet</option>
+                  </select>
+                </>
+              ) : null}
+            </div>
+          </div>
           {FIELDS.map(f => (
             <div key={f.key} className={s.field}>
               <span className={s.fieldKey}><LeadIcon name={f.icon} size={15} />{f.k}</span>

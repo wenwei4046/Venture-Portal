@@ -2,7 +2,7 @@ import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import type { AgentMore } from '@/lib/leads/agent'
-import { NOT_SET_UP, loadAiMore, loadChangesOf, loadDataFiles, loadDataFolders, loadInfo, loadLeadConfig, loadPersonas } from '@/lib/leads/server'
+import { NOT_SET_UP, loadAiMore, loadChangesOf, loadDataFiles, loadDataFolders, loadInfo, loadLeadConfig, loadOutlets, loadPersonas } from '@/lib/leads/server'
 import AgentView from '../_components/AgentView'
 
 export const dynamic = 'force-dynamic'
@@ -17,8 +17,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
   await requirePage('/leads/ai')
   const user = await requirePermission('leads')
   const sp = await searchParams
-  const [config, personas, files, folders, info, history] = await Promise.all([
-    loadLeadConfig(), loadPersonas(), loadDataFiles(), loadDataFolders(), loadInfo(), loadChangesOf(['lead_ai_knowledge'], 300),
+  const [config, personas, files, folders, info, history, outlets] = await Promise.all([
+    loadLeadConfig(), loadPersonas(), loadDataFiles(), loadDataFolders(), loadInfo(), loadChangesOf(['lead_ai_knowledge'], 300), loadOutlets(),
   ])
   if (!config.ok || !personas.ok) {
     return (
@@ -43,6 +43,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
   return (
     <AgentView personas={personas.data} more={byBrand} files={files.ok ? files.data : []} folders={folders.ok ? folders.data : []} foldersReady={folders.ok}
       info={info.ok ? info.data : null} history={history.ok ? history.data : []} today={config.data.today}
-      connected={Boolean(process.env.ANTHROPIC_API_KEY)} ready={ready} canManage={canDo(user, 'leads', 'manage')} initialBrand={sp.b} initialTab={sp.tab} />
+      connected={Boolean(process.env.ANTHROPIC_API_KEY)} ready={ready} canManage={canDo(user, 'leads', 'manage')} initialBrand={sp.b} initialTab={sp.tab}
+      outlets={outlets.ok ? outlets.data : []} />
   )
 }
