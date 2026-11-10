@@ -15,9 +15,9 @@ import type { CrmData } from "@/lib/member/crm-data";
 import type { PeopleBook } from "../shared/people-book";
 import { useTeamActivity } from "../shared/use-team-activity";
 import { ACT_TOP_DESK, STRIP_LATE, activityOrder, foldTop, type ActivityVM, type ActSort, type Period, type SortKey } from "../shared/team-activity";
-import { AuditTimeline, type AuditTone } from "../shared/audit-timeline";
+import { AuditTimeline } from "../shared/audit-timeline";
 import { Ic } from "../shared/icons4a";
-import { C, avatarTint } from "../shared/palette";
+import { avatarTint } from "../shared/palette";
 import s from "./leave-cal.module.css";
 import { DateRangePicker, rangeWords } from "../shared/date-range";
 
@@ -50,7 +50,6 @@ const hm = (t: string) => t.replace(/^0(\d)/, "$1");
 /** A lead's status square (6 px, radius 2) in the CRM's status colour. */
 const SQ: Record<string, string> = { New: "var(--crm-st-new)", "Follow up": "var(--crm-st-follow)", Appointment: "var(--crm-st-appt)", "Handed away": "var(--crm-faint-2)" };
 const HEAD_KEY: Record<string, SortKey> = { Leads: "leads", "Avg reply": "avg", Waiting: "waitMax", Appt: "appt", "Show-up": "show" };
-const toneOf = (dot: string): AuditTone => (dot === C.green ? "green" : dot === C.oxblood || dot === C.rust ? "oxblood" : "ink");
 const ini = (n: string) => n.split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
 export interface DeskActivityIn {
@@ -265,7 +264,7 @@ export function DeskTeamActivityView({ v, inInsight = true }: { v: ActivityVM; i
             ))}
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "18px 24px 0" }}>
-            <AuditTimeline lines={d.events.map(e => ({ key: e.key, date: e.d, time: hm(e.t), title: e.title, detail: e.sub || undefined, tone: toneOf(e.dot) }))} />
+            <AuditTimeline lines={d.lines} />
           </div>
           <div style={{ flex: "none", padding: "16px 24px 24px", borderTop: "1px solid var(--crm-rule)" }}>
             <span {...press(d.openChat)} className={s.cta} style={{ height: "46px", borderRadius: "23px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", font: `600 14.5px ${INTER}`, background: "var(--crm-rust)", color: "#fff", cursor: "pointer" }}>Open chat</span>

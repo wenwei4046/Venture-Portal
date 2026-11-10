@@ -16,6 +16,8 @@ import { C } from "./palette";
 import type { PeopleBook } from "./people-book";
 import { addDays, dowOf } from "./people-book";
 import { officeStamp } from "./leave-cal-data";
+import type { AuditLine } from "./audit-timeline";
+import { customerLog } from "./customer-audit";
 
 export interface AssignedRow { contact_id: string; actor: string | null; data: { to?: string | null; from?: string | null } | null; at: string }
 export type Period = "Today" | "Week" | "Month" | "Custom";
@@ -194,22 +196,15 @@ export function activityVM(x: ActivityIn) {
   };
   const drawer = (lead: { id: string; key: string } | null, close: () => void) => {
     const l = lead ? stints.find(s => s.key === lead.key) : undefined;
-    if (!l) return { open: false, close, name: "", ad: "", facts: [] as { k: string; v: string; c: string }[], events: [] as { key: string; t: string; d: string; title: string; sub: string; dot: string; c: string; top: string; bot: string }[], openChat: () => {} };
+    if (!l) return { open: false, close, name: "", ad: "", facts: [] as { k: string; v: string; c: string }[], lines: [] as AuditLine[], openChat: () => {} };
     const who = x.nameOf(l.who), w = waitOf(l);
-    const ev: { t: string; d?: string; title: string; sub: string; dot: string; c?: string }[] = [
-      { t: hm(l.got), d: dm(l.got), title: l.from ? `Moved to ${who}` : `Got by ${who}`, sub: l.from ? `from ${x.nameOf(l.from)}${l.by ? ` · by ${x.nameOf(l.by)}` : ""}` : `${l.customer.ad || "No ad"} · ${l.by ? `by ${x.nameOf(l.by)}` : "auto"}`, dot: C.ink },
-    ];
-    if (l.reply == null && !l.end) { const lv = LV(w ?? 0); ev.push({ t: hm(nowStamp), d: dm(nowStamp), title: `No reply · ${fmt(w)}`, sub: lv[0] || "still waiting", dot: lv[0] ? lv[1] : C.amber, c: lv[0] ? lv[1] : C.ink }); }
-    else if (l.reply != null && l.replyAt) ev.push({ t: hm(officeStamp(l.replyAt)), d: dm(officeStamp(l.replyAt)), title: `First reply · ${fmt(l.reply)}`, sub: who, dot: C.green });
-    if (l.end && l.to) ev.push({ t: hm(officeStamp(l.end)), d: dm(officeStamp(l.end)), title: `Moved to ${x.nameOf(l.to)}`, sub: l.movedBy ? `by ${x.nameOf(l.movedBy)}` : "auto", dot: C.ink });
-    if (l.appt) {
-      const when = l.apptWhen ? officeStamp(l.apptWhen) : null;
-      ev.push({ t: l.apptAt ? hm(officeStamp(l.apptAt)) : when ? hm(when) : "", d: l.apptAt ? dm(officeStamp(l.apptAt)) : when ? dm(when) : "", title: "Appointment booked", sub: when ? new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kuala_Lumpur" }).format(new Date(l.apptWhen!)).replace(",", "") : "", dot: C.green });
-    }
-    if (l.show && l.showAt) ev.push({ t: hm(officeStamp(l.showAt)), d: dm(officeStamp(l.showAt)), title: "Showed up", sub: "", dot: C.green });
+    // ONE log per customer (the owner, 2026-11-10: "同一个客户应该只有一个 audit log … 从谁给到谁，然后回复的状态时间"):
+    // the customer's whole story, not only this person's part — shared/customer-audit.ts, as the chat and Reports draw it.
+    const lines = customerLog({ data: d, customer: l.customer, nameOf: x.nameOf, now: x.now,
+      assigned: (x.rows ?? []).filter(r => r.contact_id === l.customer.id) });
     return { open: true, close, name: l.customer.name, ad: l.from ? `from ${x.nameOf(l.from)}` : (l.customer.ad || "No ad"),
       facts: [{ k: "Got", v: `${dm(l.got)}, ${hm(l.got)}`, c: C.ink }, { k: "First reply", v: w != null ? `waiting ${fmt(w)}` : fmt(l.reply), c: w != null && LV(w)[0] ? LV(w)[1] : C.ink }, { k: "Now with", v: l.to ? x.nameOf(l.to) : who, c: C.ink }],
-      events: ev.map((e, i) => ({ key: `${i}`, c: C.ink, d: "", ...e, top: i ? C.rule : "transparent", bot: i < ev.length - 1 ? C.rule : "transparent" })),
+      lines,
       openChat: () => { close(); x.openChat(l.customer.id); } };
   };
 
