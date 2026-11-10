@@ -15,16 +15,30 @@ import { checkSavePayLines, type SavePayLinesInput } from '@/lib/revenue-pay-lin
  * transaction. The rules are `lib/revenue-pay-lines.ts`.
  */
 
-export interface SavePayLinesResult {
-  earnings: number
-  deductions: number
-  /** The month's payroll row took the new totals; false while it has none yet (it picks them up when made). */
-  payrollUpdated: boolean
-}
+/**
+ * A refusal is ANSWERED, never thrown (2026-11-10): production replaces a
+ * Server Action's thrown message with "Minified React error #441", so HR saw
+ * that instead of "Pay lines for PEI FEN changed since you opened them. Reload
+ * and try again" — an approved claim had added a line while the editor was open.
+ */
+export type SavePayLinesResult =
+  | {
+      ok: true
+      earnings: number
+      deductions: number
+      /** The month's payroll row took the new totals; false while it has none yet (it picks them up when made). */
+      payrollUpdated: boolean
+    }
+  | { ok: false; reason: string }
 
 export async function savePayLines(input: SavePayLinesInput): Promise<SavePayLinesResult> {
   await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
-  const save = checkSavePayLines(input)
+  let save: ReturnType<typeof checkSavePayLines>
+  try {
+    save = checkSavePayLines(input)
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : 'The pay lines could not be read.' }
+  }
   const supabase = (await createClient()) as unknown as SupabaseClient
 
   const { data, error } = await supabase.rpc('revenue_save_pay_lines', {
@@ -33,13 +47,14 @@ export async function savePayLines(input: SavePayLinesInput): Promise<SavePayLin
     p_lines: save.lines,
     p_seen: save.seen,
   })
-  if (error) throw new Error(error.message)
+  if (error) return { ok: false, reason: error.message }
 
   // The month page, its payslips and HR's payroll grid all read the lines.
   revalidatePath('/revenue', 'layout')
   revalidatePath('/hr-costing/payroll', 'layout')
   const result = (data ?? {}) as { earnings?: number | string; deductions?: number | string; payroll_updated?: boolean }
   return {
+    ok: true,
     earnings: Number(result.earnings ?? 0),
     deductions: Number(result.deductions ?? 0),
     payrollUpdated: Boolean(result.payroll_updated),

@@ -196,6 +196,7 @@ export default function SalaryCalculation({ staffName, period, commission, adjus
     startSaving(async () => {
       try {
         const result = await savePayLines({ staffId: source.staffId, period, lines: check.lines, seen: seenOf(openedFrom) })
+        if (!result.ok) { setProblem({ key: null, message: result.reason }); return }
         setJustSaved({ base: storedKey, lines: [...fromClaims, ...draftLines(drafts)] })
         setDrafts(null)
         setSavedNote(result.payrollUpdated
