@@ -922,3 +922,50 @@ bill's share ratio. Nothing changes for the ERP: the same deliveries, the same
 month's bills). Rebuilt on 2026-10-12 from the held deliveries the feed kept
 since 2026-09-26; an applied delivery before then kept no payload, so an older
 bill's trail starts with its next save.
+
+## 13. Staff — who works where, and who has left (2026-11-10)
+
+> The user, for Lead View's Team: "只能从 ERP 员工名单加人。ERP 职位是 Lead Executive 的设为 Customer
+> service，其他职位设为 Outlet staff … ERP 停用的人，权限自动停掉", and, asked where the list comes from:
+> "People + ERP feed".
+
+Logins stay People's (HR invites). The ERP says what People does not: each person's job, branch and whether they
+still work there. Lead View's Team reads it beside People — a "Lead Executive" is a Customer service, a branch
+pre-ticks the outlet of that name, and somebody the ERP marks inactive has their Lead View stopped at once.
+
+### 13.1 What travels
+
+One delivery = the WHOLE of one company's staff, active or not:
+
+```jsonc
+{ "companyId": 1, "snapshotAt": "2026-11-10T07:46:03Z",
+  "staff": [
+    { "staffId": "b7eabf08-…",          // scm.staff.id
+      "code": "S-0142", "name": "Daniel Chew", "email": "daniel@2990s.my",
+      "job": "Outlet manager", "branch": "Kelana Jaya",
+      "active": true, "leftOn": null } ] }   // leftOn: YYYY-MM-DD once they left
+```
+
+No pay, no IC, no bank. A person is matched to a People record by email, else by name — worked out when read,
+never stored as a link.
+
+### 13.2 The endpoint
+
+| | |
+|---|---|
+| Receiver | `POST https://<portal-host>/api/erp/v1/staff` — the `/sales-attending` sibling |
+| Auth | identical to the order feed — `x-sync-secret`, the same key |
+| Cap | 5,000 people a delivery |
+| Cadence | whenever somebody joins, moves, changes job or leaves — sent whole when the ERP's digest moved |
+
+`ingest_erp_staff` (mig `20261110220000`, service role only) owns every write: each person upserted into
+`erp_staff`, and **everybody of the company the delivery does not list deleted**. An older `snapshotAt` than the one
+held answers 200 `{ outcome: "stale" }`. Otherwise as Sales Attending: 401 wrong key, 422 unreadable (with the
+reason), 500 a database fault, 503 no key; 200 `{ ok, outcome: "applied", staff, unreadable, retired }`. Every
+delivery is logged in `erp_sync_events` (`doc_no = 'staff'`).
+
+### 13.3 What the ERP side does
+
+As §11.4: one SQL function builds a company's list from `scm.staff` (its job, branch and active flag), its md5 is the
+digest, a statement trigger on the staff table marks a change, and the kick / `*/5` cron posts it to `/staff` when the
+digest moved. Not built on the ERP side yet (2026-11-10) — until it is, Lead View's Team reads People alone.

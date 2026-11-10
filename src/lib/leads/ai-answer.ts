@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type KnowledgeCard, type Persona } from './ai'
 import { AI_NOT_CONNECTED, askModel } from './ai-model'
-import { agentMore } from './agent-read'
+import { agentMore, usedMemory } from './agent-read'
 import { sendLeadOutbox } from './messenger-outbox'
 import type { LeadContact } from './types'
 
@@ -68,9 +68,9 @@ async function answerOne(client: SupabaseClient, id: string): Promise<Stop | nul
     return lasting ? { keep: false, why: lasting } : { keep: true }
   }
   const { persona, knowledge, contact, messages, today } = ctx.data as Context
-  const more = await agentMore(client, contact.brandId, today)
+  const more = await agentMore(client, contact.brandId, today, undefined, { contactId: id, outletId: contact.outletId ?? null })
   const cards = more ? more.cards(knowledge) : knowledge
-  const answer = await askModel(systemPrompt(persona, cards, today, true), conversationPrompt(contact, turnsOf(messages)), more?.ask)
+  const answer = await askModel(systemPrompt(persona, cards, today, true), conversationPrompt(contact, turnsOf(messages), more?.factsOff), more?.ask)
   if (!answer.ok) {
     const lasting = lastingFailure(answer.reason)
     return lasting ? { keep: false, why: lasting } : { keep: true }
@@ -84,6 +84,12 @@ async function answerOne(client: SupabaseClient, id: string): Promise<Stop | nul
   if (kept.error) {
     console.error('lead_ai_answered failed:', kept.error.message)
     return { keep: true }
+  }
+  // The memory lines it followed, for From goal results' figures (mig 20261110230000; a failure only warns).
+  const mem = usedMemory(draft.used)
+  if (mem.length) {
+    const u = await client.rpc('lead_ai_memory_used', { p_contact: id, p_ids: mem })
+    if (u.error) console.warn('lead_ai_memory_used failed:', u.error.message)
   }
   return null
 }

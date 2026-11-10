@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { loadInbox, loadInfo, loadLabels, loadLeadConfig, loadPersonas, loadQuickReplies, loadThread, loadUnreadMarks } from '@/lib/leads/server'
+import { loadInbox, loadInfo, loadLabels, loadLeadConfig, loadOutlets, loadPersonas, loadQuickReplies, loadTeam, loadThread, loadUnreadMarks } from '@/lib/leads/server'
 import { withMetaUnread } from '@/lib/leads/inbox'
 import { metaUnread } from '@/lib/leads/meta-sync'
 import InboxView from './_components/InboxView'
@@ -13,7 +13,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   await requirePage('/leads')
   const user = await requirePermission('leads')
   const { c, q } = await searchParams
-  const [config, inbox, personas, info, quick, labels, marks] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas(), loadInfo(), loadQuickReplies(), loadLabels(), loadUnreadMarks()])
+  const canManage = canDo(user, 'leads', 'manage')
+  const [config, inbox, personas, info, quick, labels, marks, outlets, team] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas(), loadInfo(), loadQuickReplies(), loadLabels(), loadUnreadMarks(), loadOutlets(),
+    canManage ? loadTeam() : Promise.resolve(null)])
   if (!config.ok || !inbox.ok) {
     return (
       <HvPage>
@@ -35,7 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       initialQuery={q?.slice(0, 80) ?? ''}
       canReply={canDo(user, 'leads', 'create')}
       canEdit={canDo(user, 'leads', 'edit')}
-      canManage={canDo(user, 'leads', 'manage')}
+      canManage={canManage}
       csName={user.name || 'Customer Service'}
       // An API key for the AI Agent (never its value) — without one the composer says so.
       aiConnected={!!process.env.ANTHROPIC_API_KEY}
@@ -43,6 +45,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       info={info.ok ? info.data : null}
       // The Data Center's quick replies: "/shortcut" in the reply box (none before their migration).
       quick={quick.ok ? quick.data : []}
+      outlets={outlets.ok ? outlets.data : []}
+      // Settings › Team, for Preview as (Lead View · Manage; none before mig 20261110220100).
+      team={team?.ok ? team.data : null}
       // Customer Service's labels (none before mig 20261027190000).
       labels={labels.ok ? labels.data : []}
       // The chats this person marked unread to answer later (none before mig 20261028110000).

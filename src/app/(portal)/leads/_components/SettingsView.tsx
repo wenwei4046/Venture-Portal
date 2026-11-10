@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { LeadIcon, type LeadIconName } from '@/components/layout/lead-icons'
-import { connectPage, disconnectPage, saveAgentBrands, fetchAdNames, listManagedPages, nameAd, saveLeadBrand, sendTestEnquiry, setPage } from '@/lib/leads/actions'
+import { connectPage, disconnectPage, fetchAdNames, listManagedPages, nameAd, saveLeadBrand, saveOutlets, sendTestEnquiry, setAdOutlet, setPage, saveTeamMember, removeTeamMember } from '@/lib/leads/actions'
+import { outletName, outletsFor, type LeadOutlet } from '@/lib/leads/outlets'
 import { adsManagerLink, type LeadAd } from '@/lib/leads/ads'
-import { STATE_LABEL, connectable, replyLabel, followersLabel, pageName, pageState, type LeadPage, type ManagedPage, type PageChannel } from '@/lib/leads/pages'
+import { STATE_LABEL, adSlots, connectable, replyLabel, followersLabel, pageName, pageState, type LeadPage, type ManagedPage, type PageChannel } from '@/lib/leads/pages'
 import type { ReplyRules } from '@/lib/leads/template'
 import type { LeadBrand } from '@/lib/leads/types'
+import { ROLES, defaultsFor, initialsOf, pickRows, shortDay, stopped, subLine, type DirectoryPerson, type StaffDirectory, type TeamMember, type TeamRole } from '@/lib/leads/team'
 import Modal from './ui/Modal'
 import s from './settings.module.css'
 
@@ -22,10 +24,10 @@ import s from './settings.module.css'
  * the Test enquiry, as two more sections under the drawn two.
  */
 
-type View = 'pages' | 'brands' | 'team' | 'ads' | 'test'
+type View = 'pages' | 'brands' | 'ads' | 'team' | 'test'
 const CH_SUB: Record<PageChannel, string> = { messenger: 'Messenger', instagram: 'Instagram' }
 
-export default function SettingsView({ brands, pages, ready, managed, rules, templates, ads, canManage, canTest, team }: {
+export default function SettingsView({ brands, pages, ready, managed, rules, templates, ads, canManage, canTest, team, directory = null, outlets = [], outletsReady = false }: {
   brands: LeadBrand[]
   pages: LeadPage[]
   /** Is mig 20261102110000 applied? Before it the pages are read off the brands and nothing about them saves. */
@@ -37,8 +39,14 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
   ads: LeadAd[] | null
   canManage: boolean
   canTest: boolean
-  /** Settings › Team: the CS people and the brands each handles (none = every brand); null when it could not be read. */
-  team: Array<{ id: string; name: string; brandIds: string[] }> | null
+  /** Settings › Team (v3 § 4; mig 20261110220100); null before the migration. */
+  team: TeamMember[] | null
+  /** Add from ERP: People and the ERP's staff (Manage only); null before the migration or without Manage. */
+  directory?: StaffDirectory | null
+  /** Every brand's outlets (v3 § 3; mig 20261110200000) — none before it. */
+  outlets?: LeadOutlet[]
+  /** Is the outlets' migration in? Before it Brands draws no OUTLETS block and Ads no outlet. */
+  outletsReady?: boolean
 }) {
   const router = useRouter()
   const [view, setView] = useState<View>('pages')
@@ -56,6 +64,8 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
   const visB = brands.filter(b => !ql || b.name.toLowerCase().includes(ql))
   const selBrand = visB.find(b => b.id === selB) ?? visB[0] ?? null
   const bad = pages.filter(p => pageState(p, managed) === 'reconnect').length
+  // v3 § 3: ads with no outlet are a warning on the nav, once there are outlets to pick (before the migration, none).
+  const noOutlet = outletsReady ? (ads ?? []).filter(a => !a.outletId).length : 0
 
   const go = (v: View) => { setView(v); setQ(''); setError('') }
   const run = (fn: () => Promise<{ ok: boolean; reason?: string }>, done?: () => void) => start(async () => {
@@ -77,12 +87,14 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
     })
   }
 
-  const nav: Array<{ v: View; l: string; icon: LeadIconName; n: string; bad?: boolean; sep?: boolean }> = [
-    { v: 'pages', l: 'Pages', icon: 'radio-tower', n: bad ? `${bad} !` : String(pages.length), bad: bad > 0 },
+  // v3: Pages · Brands · Ads · Team as drawn (Ads is a section of its own now), then — kept, under a line — Test enquiry.
+  // A warning count ("1 !") says why on hover (README § 3).
+  const nav: Array<{ v: View; l: string; icon: LeadIconName; n: string; tip?: string; sep?: boolean }> = [
+    { v: 'pages', l: 'Pages', icon: 'radio-tower', n: bad ? `${bad} !` : String(pages.length), tip: bad ? `${bad} ${bad === 1 ? 'page needs' : 'pages need'} attention. Open it to reconnect.` : undefined },
     { v: 'brands', l: 'Brands', icon: 'store', n: String(brands.length) },
+    { v: 'ads', l: 'Ads', icon: 'megaphone', n: noOutlet ? `${noOutlet} !` : ads ? String(ads.length) : '', tip: noOutlet ? `${noOutlet} ${noOutlet === 1 ? 'ad has' : 'ads have'} no outlet. Its leads won’t show up when you filter by outlet.` : undefined },
     { v: 'team', l: 'Team', icon: 'users', n: team ? String(team.length) : '' },
-    { v: 'ads', l: 'Ads', icon: 'megaphone', n: ads ? String(ads.length) : '', sep: true },
-    { v: 'test', l: 'Test enquiry', icon: 'send', n: '' },
+    { v: 'test', l: 'Test enquiry', icon: 'send', n: '', sep: true },
   ]
   const wide = view === 'test'
 
@@ -96,7 +108,7 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
               <button type="button" className={s.navBtn} aria-pressed={view === n.v} onClick={() => go(n.v)}>
                 <LeadIcon name={n.icon} size={16} className={s.navIcon} />
                 <span className={s.navLabel}>{n.l}</span>
-                <span className={s.navCount} data-bad={n.bad || undefined}>{n.n}</span>
+                <span className={s.navCount} data-bad={n.tip ? '' : undefined} title={n.tip}>{n.n}</span>
               </button>
             </div>
           ))}
@@ -159,14 +171,16 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
               ) : null}
               {view === 'brands' && selBrand ? (
                 <BrandDetail key={selBrand.id} brand={selBrand} pages={pages.filter(p => p.brandId === selBrand.id)} managed={managed} canEdit={canManage} error={error}
-                  onRename={name => run(() => saveLeadBrand(selBrand.id, { name }))} onOpen={id => { setView('pages'); setQ(''); setSel(id) }} />
+                  onRename={name => run(() => saveLeadBrand(selBrand.id, { name }))} onOpen={id => { setView('pages'); setQ(''); setSel(id) }}
+                  outlets={outlets.filter(o => o.brandId === selBrand.id)} ads={ads ?? []} hasOutlets={outletsReady}
+                  onOutlets={list => run(() => saveOutlets(selBrand.id, list))} />
               ) : null}
             </div>
           </>
         ) : view === 'team' ? (
-          <TeamPanel team={team} brands={brands} canManage={canManage} />
+          <TeamPanel members={team} directory={directory} outlets={outlets} brands={brands} canManage={canManage} />
         ) : view === 'ads' ? (
-          <AdsSection ads={ads} brands={brands} canManage={canManage} />
+          <AdsSection ads={ads} brands={brands} canManage={canManage} outlets={outlets} rules={rules} templates={templates} />
         ) : (
           <TestSection brands={brands} canTest={canTest} />
         )}
@@ -275,7 +289,7 @@ function PageDetail({ page, brands, managed, rules, templates, canEdit, error, r
   )
 }
 
-function BrandDetail({ brand, pages, managed, canEdit, error, onRename, onOpen }: {
+function BrandDetail({ brand, pages, managed, canEdit, error, onRename, onOpen, outlets, ads, hasOutlets, onOutlets }: {
   brand: LeadBrand
   pages: LeadPage[]
   managed: ManagedPage[] | null
@@ -283,6 +297,12 @@ function BrandDetail({ brand, pages, managed, canEdit, error, onRename, onOpen }
   error: string
   onRename: (name: string) => void
   onOpen: (pageId: string) => void
+  /** This brand's outlets (v3 § 3). */
+  outlets: LeadOutlet[]
+  ads: LeadAd[]
+  /** Is the outlets' migration in? Before it the block is not drawn. */
+  hasOutlets: boolean
+  onOutlets: (list: Array<{ id?: string; name: string }>) => void
 }) {
   const [name, setName] = useState(brand.name)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -314,7 +334,55 @@ function BrandDetail({ brand, pages, managed, canEdit, error, onRename, onOpen }
         })}
         {!pages.length ? <span className={s.none}>No pages yet</span> : null}
       </div>
+      {hasOutlets ? <OutletsBlock key={outlets.map(o => o.id + o.name).join('|')} outlets={outlets} ads={ads} canEdit={canEdit} onSave={onOutlets} /> : null}
       {error ? <span className={s.error} role="alert">{error}</span> : null}
+    </div>
+  )
+}
+
+/**
+ * Settings › Brands › OUTLETS (v3 § 3): the brand's outlets — the name edited in place (saved when it leaves the box or
+ * on Enter), how many ads point at it, the bin (removing it lets its ads go back to "No outlet"), and *New outlet…* + Add.
+ * Each change saves the brand's whole list (lead_save_outlets).
+ */
+function OutletsBlock({ outlets, ads, canEdit, onSave }: {
+  outlets: LeadOutlet[]
+  ads: LeadAd[]
+  canEdit: boolean
+  onSave: (list: Array<{ id?: string; name: string }>) => void
+}) {
+  const [names, setNames] = useState<Record<string, string>>(() => Object.fromEntries(outlets.map(o => [o.id, o.name])))
+  const [nv, setNv] = useState('')
+  const list = (over?: { drop?: string; add?: string }) => [
+    ...outlets.filter(o => o.id !== over?.drop).map(o => ({ id: o.id, name: (names[o.id] ?? o.name).trim() || o.name })),
+    ...(over?.add ? [{ name: over.add }] : []),
+  ]
+  const commit = (o: LeadOutlet) => { const v = (names[o.id] ?? '').trim(); if (v && v !== o.name) onSave(list()); else setNames(m => ({ ...m, [o.id]: o.name })) }
+  const adsOf = (id: string) => ads.filter(a => a.outletId === id).length
+  return (
+    <div className={s.sect}>
+      <span className={s.sectKicker}>OUTLETS</span>
+      <div className={s.outlets}>
+        {outlets.map(o => {
+          const n = adsOf(o.id)
+          return (
+            <div key={o.id} className={s.outletRow}>
+              <LeadIcon name="map-pin" size={15} className={s.outletPin} />
+              <input className={s.outletInput} value={names[o.id] ?? o.name} disabled={!canEdit} maxLength={80} aria-label="Outlet name"
+                onChange={e => setNames(m => ({ ...m, [o.id]: e.target.value }))} onBlur={() => commit(o)}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+              <span className={s.outletAds}>{n ? `${n} ${n === 1 ? 'ad' : 'ads'}` : ''}</span>
+              {canEdit ? <button type="button" className={s.outletDel} title="Remove outlet" aria-label={`Remove ${o.name}`} onClick={() => onSave(list({ drop: o.id }))}><LeadIcon name="trash-2" size={14} /></button> : null}
+            </div>
+          )
+        })}
+      </div>
+      {canEdit ? (
+        <form className={s.outletAdd} onSubmit={e => { e.preventDefault(); const v = nv.trim(); if (!v) return; onSave(list({ add: v })); setNv('') }}>
+          <input className={s.outletNew} value={nv} onChange={e => setNv(e.target.value)} placeholder="New outlet, e.g. 2990s Puchong" maxLength={80} aria-label="New outlet" />
+          <button type="submit" className={s.outletGo} data-on={nv.trim() ? '' : undefined}><LeadIcon name="plus" size={14} />Add</button>
+        </form>
+      ) : null}
     </div>
   )
 }
@@ -399,52 +467,101 @@ function ConnectWindow({ brands, pages, onClose, onDone }: {
   )
 }
 
-/** Kept (the user's point 2): every ad conversations came from — its name by hand, or from Ads Manager. */
-function AdsSection({ ads, brands, canManage }: { ads: LeadAd[] | null; brands: LeadBrand[]; canManage: boolean }) {
+/**
+ * Settings › Ads (v3 § 3): every ad conversations came from, grouped by brand, with its outlet on the right ("No outlet"
+ * in rust); All / No outlet. Its detail: the outlet pills, the replies it gets and where they come from ("Ad rule" /
+ * "From the page"), its details. Kept from v2 (the user's point 2): naming an ad by hand and Fetch names from Meta.
+ */
+function AdsSection({ ads, brands, canManage, outlets, rules, templates }: {
+  ads: LeadAd[] | null
+  brands: LeadBrand[]
+  canManage: boolean
+  outlets: LeadOutlet[]
+  rules: ReplyRules | null
+  templates: Array<{ id: string; name: string }>
+}) {
   const router = useRouter()
   const [q, setQ] = useState('')
+  const [f, setF] = useState<'all' | 'none'>('all')
   const [sel, setSel] = useState<string | null>(null)
   const [busy, start] = useTransition()
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const list = (ads ?? []).filter(a => !q.trim() || `${a.name} ${a.headline} ${a.adId}`.toLowerCase().includes(q.trim().toLowerCase()))
-  const ad = list.find(a => a.adId === sel) ?? list[0] ?? null
-  const brandOf = (a: LeadAd) => a.brandIds.map(id => brands.find(b => b.id === id)?.name).filter(Boolean).join(', ')
+  const ql = q.trim().toLowerCase()
+  const all = ads ?? []
+  const labelOf = (a: LeadAd) => a.name || a.headline || `Ad ${a.adId}`
+  const brandOf = (a: LeadAd) => brands.find(b => b.id === a.brandIds[0])?.name ?? ''
+  const noO = all.filter(a => !a.outletId).length
+  const vis = all.filter(a => (!ql || `${labelOf(a)} ${brandOf(a)} ${outletName(outlets, a.outletId)} ${a.adId}`.toLowerCase().includes(ql)) && (f === 'all' || !a.outletId))
+  const ad = vis.find(a => a.adId === sel) ?? vis[0] ?? null
   const fetchAll = () => start(async () => {
     setMsg(null)
-    const r = await fetchAdNames((ads ?? []).map(a => a.adId))
-    setMsg(r.ok ? { ok: true, text: `Meta answered for ${r.data.named} of ${(ads ?? []).length} ads${r.data.refused ? ` — ${r.data.refused} are on ad accounts the system user cannot see: give it those accounts, or name them here.` : ''}` } : { ok: false, text: r.reason })
+    const r = await fetchAdNames(all.map(a => a.adId))
+    setMsg(r.ok ? { ok: true, text: `Meta answered for ${r.data.named} of ${all.length} ads${r.data.refused ? ` — ${r.data.refused} are on ad accounts the system user cannot see: give it those accounts, or name them here.` : ''}` } : { ok: false, text: r.reason })
     router.refresh()
   })
   return (
     <>
       <div className={s.mid}>
         <div className={s.midHead}>
-          <div className={s.search}><LeadIcon name="search" size={15} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search ads" aria-label="Search ads" /></div>
-          {canManage ? <button type="button" className={s.add} onClick={fetchAll} disabled={busy || !ads?.length}><LeadIcon name="refresh-cw" size={15} />{busy ? 'Asking Meta…' : 'Fetch names'}</button> : null}
+          <div className={s.search}><LeadIcon name="search" size={15} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search ads or outlets" aria-label="Search ads or outlets" /></div>
+          <div className={s.seg} role="group" aria-label="Show">
+            {([['all', 'All', all.length], ['none', 'No outlet', noO]] as const).map(([k, l, n]) => (
+              <button key={k} type="button" className={s.segBtn} aria-pressed={f === k} onClick={() => setF(k)}>
+                {l}<span className={s.segN} data-bad={k === 'none' && n ? '' : undefined}>{n}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        {msg ? <div style={{ padding: '0 18px 8px' }} className={msg.ok ? s.ok : s.error} role={msg.ok ? 'status' : 'alert'}>{msg.text}</div> : null}
         <div className={s.list}>
-          {!ads ? <div className={s.empty}>The ads could not be read.</div> : list.map(a => (
-            <div key={a.adId} className={s.row} role="option" aria-selected={ad?.adId === a.adId} tabIndex={0} onClick={() => setSel(a.adId)} onKeyDown={e => { if (e.key === 'Enter') setSel(a.adId) }}>
-              <div className={s.rowText}>
-                <span className={s.rowName}>{a.name || a.headline || `Ad ${a.adId}`}</span>
-                <span className={s.rowSub}>{[brandOf(a), a.channels.map(c => CH_SUB[c]).join(' · '), `${a.conversations} chats`].filter(Boolean).join(' · ')}</span>
+          {!ads ? <div className={s.empty}>The ads could not be read.</div> : brands.map(b => {
+            const rows = vis.filter(a => (a.brandIds[0] ?? '') === b.id)
+            if (!rows.length) return null
+            return (
+              <div key={b.id} className={s.group}>
+                <span className={s.kicker}>{b.name.toUpperCase()}</span>
+                {rows.map(a => (
+                  <div key={a.adId} className={s.row} role="option" aria-selected={ad?.adId === a.adId} tabIndex={0} onClick={() => setSel(a.adId)} onKeyDown={e => { if (e.key === 'Enter') setSel(a.adId) }}>
+                    <Tile ch={a.channels[0] ?? 'messenger'} />
+                    <div className={s.rowText}><span className={s.rowName}>{labelOf(a)}</span><span className={s.rowSub}>{a.channels.map(c => CH_SUB[c]).join(' · ')}</span></div>
+                    <span className={s.rowOutlet} data-none={a.outletId ? undefined : ''}><LeadIcon name="map-pin" size={13} />{outletName(outlets, a.outletId) || 'No outlet'}</span>
+                  </div>
+                ))}
               </div>
-              <span className={s.rowSub}>{a.source === 'meta' ? 'From Meta' : a.source === 'manual' ? 'Named' : 'Not named'}</span>
-            </div>
-          ))}
-          {ads && !list.length ? <div className={s.empty}>No conversation has come from an ad yet.</div> : null}
+            )
+          })}
+          {ads && !vis.length ? <div className={s.empty}>{all.length ? 'Nothing here' : 'No conversation has come from an ad yet.'}</div> : null}
         </div>
       </div>
-      <div className={s.side}>{ad ? <AdDetail key={ad.adId} ad={ad} canManage={canManage} /> : null}</div>
+      <div className={s.side}>
+        {ad ? (
+          <AdDetail key={ad.adId} ad={ad} brand={brandOf(ad)} canManage={canManage} outlets={outlets} rules={rules} templates={templates}
+            fetch={canManage && all.length ? (
+              <div className={s.fetch}>
+                <button type="button" className={s.fetchBtn} onClick={fetchAll} disabled={busy}><LeadIcon name="refresh-cw" size={13} />{busy ? 'Asking Meta…' : 'Fetch names from Meta'}</button>
+                {msg ? <span className={msg.ok ? s.ok : s.error} role={msg.ok ? 'status' : 'alert'}>{msg.text}</span> : null}
+              </div>
+            ) : null} />
+        ) : null}
+      </div>
     </>
   )
 }
 
-function AdDetail({ ad, canManage }: { ad: LeadAd; canManage: boolean }) {
+function AdDetail({ ad, brand, canManage, outlets, rules, templates, fetch }: {
+  ad: LeadAd
+  brand: string
+  canManage: boolean
+  outlets: LeadOutlet[]
+  rules: ReplyRules | null
+  templates: Array<{ id: string; name: string }>
+  /** Fetch names from Meta (kept), shown under More. */
+  fetch: ReactNode
+}) {
+  const [more, setMore] = useState(false)
   const router = useRouter()
   const mine = ad.source === 'manual'
   const [form, setForm] = useState({ name: mine ? ad.name : '', campaign: mine ? ad.campaign : '', adset: mine ? ad.adset : '', link: mine ? ad.link : '' })
+  const [outlet, setOutlet] = useState<string | null>(ad.outletId ?? null)
   const [busy, start] = useTransition()
   const [error, setError] = useState('')
   const save = (data: typeof form) => start(async () => {
@@ -454,23 +571,79 @@ function AdDetail({ ad, canManage }: { ad: LeadAd; canManage: boolean }) {
     flash(data.name ? 'Ad named' : 'Your name is cleared')
     router.refresh()
   })
+  const pickOutlet = (id: string | null) => {
+    if (id === outlet) return
+    const before = outlet
+    setOutlet(id)
+    start(async () => {
+      setError('')
+      const r = await setAdOutlet(ad.adId, id)
+      if (!r.ok) { setError(r.reason); setOutlet(before); return }
+      router.refresh()
+    })
+  }
+  // The replies it gets, as Reply rules answers them: its own rule, else its page's (the outlet layer is not built).
+  const channel = ad.channels[0] ?? 'messenger'
+  const page = rules?.pages.find(p => p.brandId === ad.brandIds[0] && p.channel === channel)
+  const slots = rules ? adSlots(rules.ads, ad.adId) : { w: 'follow' as const, a: 'follow' as const }
+  const reply = (slot: string, pageV: string | undefined) => slot === 'follow' ? { v: replyLabel(pageV ?? 'cs', templates), from: 'From the page' } : { v: replyLabel(slot, templates), from: 'Ad rule' }
+  const replies = [{ k: 'Working hours', ...reply(slots.w, page?.work) }, { k: 'After hours', ...reply(slots.a, page?.after) }]
   const am = adsManagerLink(ad.accountId, ad.adId)
   return (
     <div className={s.detail}>
-      <div className={s.dTitles}>
-        <span className={s.dName}>{ad.name || ad.headline || `Ad ${ad.adId}`}</span>
-        <span className={s.dSub}>{ad.headline && ad.name ? `“${ad.headline}” · ` : ''}{ad.adId}{ad.status ? ` · ${ad.status}` : ''}</span>
+      <div className={s.dHead}>
+        <Tile ch={channel} size={40} />
+        <div className={s.dTitles}>
+          <span className={s.dName}>{ad.name || ad.headline || `Ad ${ad.adId}`}</span>
+          <span className={s.dSub}>Ad · {CH_SUB[channel]}</span>
+        </div>
       </div>
-      <div className={s.kv}>
-        <div className={s.kvRow}><span>Campaign › Ad set</span><span>{[ad.campaign, ad.adset].filter(Boolean).join(' › ') || '—'}</span></div>
-        <div className={s.kvRow}><span>Chats · Phones</span><span>{ad.conversations} · {ad.phones}</span></div>
-        <div className={s.kvRow}><span>Named</span><span>{ad.source === 'meta' ? 'From Meta' : mine ? `By ${ad.updatedByName || 'hand'}` : 'Not yet'}</span></div>
+      <div className={s.sect}>
+        <span className={s.sectKicker}>OUTLET</span>
+        <div className={s.chips}>
+          {outletsFor(outlets, ad.brandIds[0]).map(o => (
+            <button key={o.id} type="button" className={s.chip} aria-pressed={outlet === o.id} disabled={!canManage || busy} onClick={() => pickOutlet(o.id)}>{o.name}</button>
+          ))}
+          <button type="button" className={s.chip} aria-pressed={!outlet} disabled={!canManage || busy} onClick={() => pickOutlet(null)}>No outlet</button>
+        </div>
       </div>
-      <div className={s.chips}>
-        {ad.link ? <a className={s.link} href={ad.link} target="_blank" rel="noopener noreferrer">View the ad<LeadIcon name="arrow-up-right" size={12} /></a> : null}
-        {am ? <a className={s.link} href={am} target="_blank" rel="noopener noreferrer">Ads Manager<LeadIcon name="arrow-up-right" size={12} /></a> : null}
+      <div className={s.sect}>
+        <div className={s.sectHead}>
+          <span className={s.sectKicker}>REPLIES</span>
+          <Link className={s.link} href="/leads/rules">Reply rules<LeadIcon name="arrow-up-right" size={12} /></Link>
+        </div>
+        <div className={s.kv}>
+          {replies.map(x => (
+            <div key={x.k} className={s.kvRow}><span className={s.kvKey}>{x.k}</span><span className={s.kvTwo}><span className={s.kvV}>{x.v}</span><span className={s.kvFrom}>{x.from}</span></span></div>
+          ))}
+        </div>
       </div>
-      {canManage ? (
+      <div className={s.sect}>
+        <span className={s.sectKicker}>DETAILS</span>
+        <div className={s.kv}>
+          <div className={s.kvRow}><span>Brand</span><span>{brand || '—'}</span></div>
+          <div className={s.kvRow}><span>Channel</span><span>{ad.channels.map(c => CH_SUB[c]).join(' · ')}</span></div>
+          <div className={s.kvRow}><span>Chats</span><span>{ad.conversations}</span></div>
+        </div>
+      </div>
+      {error ? <span className={s.error} role="alert">{error}</span> : null}
+      {/* Kept from v2, not drawn in v3: folded under More so the panel reads as drawn. */}
+      <button type="button" className={s.quiet} onClick={() => setMore(m => !m)} aria-expanded={more}><LeadIcon name={more ? 'chevron-down' : 'chevron-right'} size={13} />More</button>
+      {more ? (
+      <div className={s.sect}>
+        <div className={s.kv}>
+          <div className={s.kvRow}><span>Campaign › Ad set</span><span>{[ad.campaign, ad.adset].filter(Boolean).join(' › ') || '—'}</span></div>
+          <div className={s.kvRow}><span>Ad ID</span><span>{ad.adId}</span></div>
+        </div>
+        {ad.link || am ? (
+          <div className={s.chips}>
+            {ad.link ? <a className={s.link} href={ad.link} target="_blank" rel="noopener noreferrer">View the ad<LeadIcon name="arrow-up-right" size={12} /></a> : null}
+            {am ? <a className={s.link} href={am} target="_blank" rel="noopener noreferrer">Ads Manager<LeadIcon name="arrow-up-right" size={12} /></a> : null}
+          </div>
+        ) : null}
+      </div>
+      ) : null}
+      {more && canManage ? (
         <div className={s.sect}>
           <span className={s.sectKicker}>NAME BY HAND</span>
           <label className={s.field}>Name<input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={200} placeholder={ad.name || ad.headline || 'e.g. Oct Sofa Week · Video'} /></label>
@@ -478,13 +651,13 @@ function AdDetail({ ad, canManage }: { ad: LeadAd; canManage: boolean }) {
           <label className={s.field}>Ad set<input value={form.adset} onChange={e => setForm({ ...form, adset: e.target.value })} maxLength={200} placeholder={ad.adset} /></label>
           <label className={s.field}>Link to the ad<input value={form.link} onChange={e => setForm({ ...form, link: e.target.value })} placeholder={ad.link || 'https://www.facebook.com/…'} /></label>
           <span className={s.hint}>A name typed here wins over Meta’s.</span>
-          {error ? <span className={s.error} role="alert">{error}</span> : null}
           <div className={s.askRow}>
             {mine ? <button type="button" className={s.askNo} disabled={busy} onClick={() => save({ name: '', campaign: '', adset: '', link: '' })}>Clear my name</button> : null}
             <button type="button" className={s.go} disabled={busy} onClick={() => save(form)}>Save</button>
           </div>
         </div>
       ) : null}
+      {more ? fetch : null}
     </div>
   )
 }
@@ -527,49 +700,225 @@ function TestSection({ brands, canTest }: { brands: LeadBrand[]; canTest: boolea
 }
 
 /**
- * Settings › Team (2026-11-02 — the user: "有一个人会carress & 2990mini；另一个会专门负责2990，有办法设定这两个人登入时只看到自己
- * 负责的part吗？"; mig 20261102270000): each CS with the brands they handle. Ticked, they see only those brands' chats in the
- * Inbox, Leads and an opened chat; none ticked, every brand. Lead View · Manage always sees every brand. A tick saves at once.
+ * Settings › Team (Lead View v3 § 4; migs 20261110220000 / 220100): who has Lead View and how. The list is ACTIVE and
+ * INACTIVE (folded); a person's detail is the ERP link, why they are stopped, ROLE, and for Outlet staff their OUTLETS,
+ * CAN (See chats always, Reply, See reports) and ACCESS (Always / Only between dates). Each change saves at once
+ * (lead_team_save). *Add from ERP* lists People and the ERP's staff; a Lead Executive starts as Customer service,
+ * anybody else as Outlet staff with their branch's outlet ticked. The database's permission readers follow the Team.
  */
-function TeamPanel({ team, brands, canManage }: { team: Array<{ id: string; name: string; brandIds: string[] }> | null; brands: LeadBrand[]; canManage: boolean }) {
+function TeamPanel({ members, directory, outlets, brands, canManage }: {
+  members: TeamMember[] | null
+  directory: StaffDirectory | null
+  outlets: LeadOutlet[]
+  brands: LeadBrand[]
+  canManage: boolean
+}) {
   const router = useRouter()
-  const [picks, setPicks] = useState<Record<string, string[]>>(() => Object.fromEntries((team ?? []).map(t => [t.id, t.brandIds])))
+  const ready = members !== null
+  const [list, setList] = useState<TeamMember[]>(members ?? [])
+  useEffect(() => { setList(members ?? []) }, [members])
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState<string | null>(null)
+  const [offOpen, setOffOpen] = useState(false)
+  const [dated, setDated] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
+  const [pq, setPq] = useState('')
   const [busy, start] = useTransition()
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const namesOf = (ids: string[]) => brands.filter(b => ids.includes(b.id)).map(b => b.name).join(', ')
-  const toggle = (person: { id: string; name: string }, brandId: string) => {
-    const was = picks[person.id] ?? []
-    const next = was.includes(brandId) ? was.filter(x => x !== brandId) : [...was, brandId]
-    setPicks(p => ({ ...p, [person.id]: next }))
+  const [error, setError] = useState('')
+  const oName = (id: string) => outlets.find(o => o.id === id)?.name ?? ''
+  const ql = q.trim().toLowerCase()
+  const vis = list.filter(m => !ql || `${m.name} ${m.email} ${m.outlets.map(oName).join(' ')}`.toLowerCase().includes(ql))
+  const act = vis.filter(m => !stopped(m)), off = vis.filter(m => stopped(m))
+  const cur = vis.find(m => m.staffId === sel) ?? act[0] ?? vis[0] ?? null
+  const offShown = offOpen || (!!cur && stopped(cur) && sel === cur.staffId)
+  const can = canManage && !busy
+
+  useEffect(() => {
+    if (!picking) return
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setPicking(false) }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [picking])
+
+  const done = (r: { ok: true; data: TeamMember[] } | { ok: false; reason: string }, was: TeamMember[] | null, then?: () => void) => {
+    if (!r.ok) { setError(r.reason); if (was) setList(was); return }
+    setList(r.data)
+    then?.()
+    router.refresh()
+  }
+  const save = (m: TeamMember, next: Partial<TeamMember>) => {
+    const was = list
+    const merged = { ...m, ...next }
+    setList(xs => xs.map(x => (x.staffId === m.staffId ? merged : x)))
+    setError('')
     start(async () => {
-      const r = await saveAgentBrands(person.id, next)
-      if (!r.ok) { setPicks(p => ({ ...p, [person.id]: was })); setMsg({ ok: false, text: r.reason }); return }
-      setMsg({ ok: true, text: next.length ? `${person.name} sees ${namesOf(next)} only.` : `${person.name} sees every brand.` })
-      router.refresh()
+      done(await saveTeamMember(m.staffId, { role: merged.role, reply: merged.reply, reports: merged.reports, outlets: merged.outlets, from: merged.from, to: merged.to }), was)
     })
   }
+  const add = (p: DirectoryPerson) => {
+    const d = defaultsFor(p, outlets)
+    setPicking(false)
+    setError('')
+    start(async () => {
+      done(await saveTeamMember(p.staffId, { role: d.role, reply: true, reports: false, outlets: d.outlets, from: null, to: null }), null, () => setSel(p.staffId))
+    })
+  }
+  const remove = (m: TeamMember) => {
+    setError('')
+    start(async () => { done(await removeTeamMember(m.staffId), null, () => setSel(null)) })
+  }
+
+  const row = (m: TeamMember) => (
+    <div key={m.staffId} className={s.row} role="option" aria-selected={cur?.staffId === m.staffId} tabIndex={0}
+      onClick={() => setSel(m.staffId)} onKeyDown={e => { if (e.key === 'Enter') setSel(m.staffId) }}>
+      <span className={s.tmIni} data-off={stopped(m) || undefined} aria-hidden="true">{initialsOf(m.name)}</span>
+      <div className={s.rowText}>
+        <span className={s.rowName} data-off={stopped(m) || undefined}>{m.name}</span>
+        <span className={s.tmSub} data-off={stopped(m) || undefined}>{subLine(m, outlets)}</span>
+      </div>
+      {!stopped(m) && m.role === 'outlet' && m.to ? <span className={s.tmUntil}><LeadIcon name="calendar-clock" size={12} />Until {shortDay(m.to)}</span> : null}
+    </div>
+  )
+
+  const isDated = !!cur && (!!cur.from || !!cur.to || dated === cur.staffId)
+  const pick = directory ? pickRows(directory, pq) : []
+  const stopWords = (m: TeamMember) =>
+    m.why === 'erp' ? `Inactive in ERP${m.leftOn ? ` since ${shortDay(m.leftOn)}` : ''}. Access stopped automatically. It comes back if the ERP marks them active again.`
+    : m.why === 'people' ? `Not active in People${m.leftOn ? ` since ${shortDay(m.leftOn)}` : ''}. Access stopped automatically. It comes back if HR makes them active again.`
+    : `Access ended on ${shortDay(m.to)}. Pick new dates, or Always, to give it back.`
   return (
-    <div className={s.mid}>
-      <div className={s.midHead}><span className={s.rowName}>Who handles which brand</span></div>
-      {msg ? <div style={{ padding: '0 18px 8px' }} className={msg.ok ? s.ok : s.error} role={msg.ok ? 'status' : 'alert'}>{msg.text}</div> : null}
-      <div className={s.list}>
-        {!team ? <div className={s.empty}>The team could not be read.</div> : !team.length ? <div className={s.empty}>Nobody yet — a CS appears here once HR gives their own login Lead View › Inbox.</div> : team.map(t => {
-          const mine = picks[t.id] ?? []
-          return (
-            <div key={t.id} className={s.row}>
-              <div className={s.rowText}>
-                <span className={s.rowName}>{t.name}</span>
-                <span className={s.rowSub}>{mine.length ? `Sees ${namesOf(mine)} only` : 'Sees every brand'}</span>
+    <>
+      <div className={s.mid}>
+        <div className={s.midHead}>
+          <div className={s.search}><LeadIcon name="search" size={15} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search people or outlets" aria-label="Search people or outlets" /></div>
+          {canManage ? (
+            <button type="button" className={s.add} disabled={!ready || !directory} title={!ready || !directory ? 'Waiting for the database update' : undefined} onClick={() => { setPq(''); setPicking(true) }}>
+              <LeadIcon name="plus" size={15} />Add from ERP
+            </button>
+          ) : null}
+        </div>
+        <div className={s.list}>
+          {!ready ? <div className={s.empty}>Waiting for the database update.</div> : (
+            <>
+              <span className={s.tmKicker}>ACTIVE · {act.length}</span>
+              {act.map(row)}
+              {off.length ? (
+                <>
+                  <button type="button" className={s.tmOff} onClick={() => { if (offShown && cur && stopped(cur)) setSel(null); setOffOpen(!offShown) }} aria-expanded={offShown}>
+                    <span className={s.tmOffChev} data-open={offShown || undefined}><LeadIcon name="chevron-right" size={13} /></span>INACTIVE · {off.length}
+                  </button>
+                  {offShown ? off.map(row) : null}
+                </>
+              ) : null}
+              {!vis.length && ql ? <div className={s.empty}>Nothing here</div> : null}
+            </>
+          )}
+        </div>
+      </div>
+      <div className={s.side}>
+        {cur ? (
+          <div className={s.tmDetail}>
+            <div className={s.dHead}>
+              <span className={s.tmIniBig} aria-hidden="true">{initialsOf(cur.name)}</span>
+              <div className={s.tmTitles}><span className={s.dName}>{cur.name}</span><span className={s.tmEmail}>{cur.email || '—'}</span></div>
+            </div>
+            <div className={s.tmLink}>
+              <LeadIcon name="link-2" size={15} className={s.tmLinkIcon} />
+              <div className={s.tmLinkText}>
+                <span className={s.tmLinkTop}>{cur.erpCode ? `Linked to ERP · ${cur.erpCode}` : `In People · ${cur.code || '—'} · not found in the ERP`}</span>
+                <span className={s.tmLinkSub}>{[cur.erpJob || cur.title, cur.branch].filter(Boolean).join(' · ') || '—'}</span>
               </div>
-              <div className={s.teamBrands} role="group" aria-label={`Brands ${t.name} handles`}>
-                {brands.map(b => (
-                  <button key={b.id} type="button" className={s.teamBrand} aria-pressed={mine.includes(b.id)} disabled={!canManage || busy} onClick={() => toggle(t, b.id)}>{b.name}</button>
+            </div>
+            {stopped(cur) ? <div className={s.tmStop}><LeadIcon name="ban" size={15} className={s.tmStopIcon} /><span>{stopWords(cur)}</span></div> : null}
+            {!stopped(cur) && !cur.hasLogin ? <div className={s.tmStop}><LeadIcon name="user-x" size={15} className={s.tmStopIcon} /><span>No login yet. HR invites them from People; Lead View opens for them once they sign in.</span></div> : null}
+            <div className={s.tmSect}>
+              <span className={s.tmK}>ROLE</span>
+              <div className={s.tmRoles} role="radiogroup" aria-label="Role">
+                {(Object.keys(ROLES) as TeamRole[]).map(k => (
+                  <button key={k} type="button" role="radio" aria-checked={cur.role === k} className={s.tmRole} disabled={!can} onClick={() => { if (cur.role !== k) save(cur, { role: k }) }}>
+                    <span className={s.tmDot} aria-hidden="true" />
+                    <span className={s.tmRoleText}><span className={s.tmRoleL}>{ROLES[k][0]}</span><span className={s.tmRoleD}>{ROLES[k][1]}</span></span>
+                  </button>
                 ))}
               </div>
             </div>
-          )
-        })}
+            {cur.role === 'outlet' ? (
+              <>
+                <div className={s.tmSect}>
+                  <span className={s.tmK}>OUTLETS</span>
+                  {brands.filter(b => outlets.some(o => o.brandId === b.id)).map(b => (
+                    <div key={b.id} className={s.tmGroup}>
+                      <span className={s.tmGroupName}>{b.name}</span>
+                      <div className={s.tmPills}>
+                        {outlets.filter(o => o.brandId === b.id).map(o => {
+                          const on = cur.outlets.includes(o.id)
+                          return <button key={o.id} type="button" className={s.tmPill} aria-pressed={on} disabled={!can}
+                            onClick={() => save(cur, { outlets: on ? cur.outlets.filter(x => x !== o.id) : [...cur.outlets, o.id] })}>{o.name}</button>
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {!cur.outlets.length ? <span className={s.tmWarn}>Pick at least one outlet</span> : null}
+                </div>
+                <div className={s.tmCan}>
+                  <span className={s.tmK}>CAN</span>
+                  {([['See chats and leads', 'messages-square', true, null], ['Reply to customers', 'reply', cur.reply, 'reply'], ['See reports', 'chart-column', cur.reports, 'reports']] as const).map(([l, icon, v, k]) => (
+                    <button key={l} type="button" className={s.tmPerm} role="switch" aria-checked={v} disabled={!k || !can}
+                      onClick={() => { if (k) save(cur, { [k]: !v }) }}>
+                      <LeadIcon name={icon} size={15} className={s.tmPermIcon} /><span className={s.tmPermL}>{l}</span>
+                      <span className={s.tmSwitch} data-on={v || undefined} data-locked={!k || undefined}><span className={s.tmKnob} /></span>
+                    </button>
+                  ))}
+                </div>
+                <div className={s.tmSect}>
+                  <span className={s.tmK}>ACCESS</span>
+                  <div className={s.tmPills}>
+                    <button type="button" className={s.tmPill} aria-pressed={!isDated} disabled={!can} onClick={() => { setDated(null); if (cur.from || cur.to) save(cur, { from: null, to: null }) }}>Always</button>
+                    <button type="button" className={s.tmPill} aria-pressed={isDated} disabled={!can} onClick={() => setDated(cur.staffId)}>Only between dates</button>
+                  </div>
+                  {isDated ? (
+                    <>
+                      <div className={s.tmDates}>
+                        <input type="date" className={s.tmDate} value={cur.from ?? ''} disabled={!can} aria-label="From" onChange={e => save(cur, { from: e.target.value || null })} />
+                        <span className={s.tmTo}>to</span>
+                        <input type="date" className={s.tmDate} value={cur.to ?? ''} disabled={!can} aria-label="To" onChange={e => save(cur, { to: e.target.value || null })} />
+                      </div>
+                      <span className={s.tmNote}>Login stops working after the last day.</span>
+                    </>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+            {error ? <span className={s.error} role="alert">{error}</span> : null}
+            {canManage ? <div className={s.tmFoot}><button type="button" className={s.tmRemove} disabled={busy} onClick={() => remove(cur)}><LeadIcon name="user-x" size={14} />Remove access</button></div> : null}
+          </div>
+        ) : null}
       </div>
-    </div>
+      {picking ? (
+        <>
+          <div className={s.tmBack} onClick={() => setPicking(false)} aria-hidden="true" />
+          <div className={s.tmPick} role="dialog" aria-modal="true" aria-label="Add from ERP">
+            <div className={s.tmPickHead}>
+              <span className={s.tmPickTitle}>Add from ERP</span>
+              <button type="button" className={s.tmPickX} title="Close" aria-label="Close" onClick={() => setPicking(false)}><LeadIcon name="x" size={16} /></button>
+            </div>
+            <div className={s.tmPickSearch}>
+              <div className={s.tmPickBox}><LeadIcon name="search" size={15} /><input value={pq} onChange={e => setPq(e.target.value)} placeholder="Name, staff ID or branch" aria-label="Name, staff ID or branch" autoFocus /></div>
+            </div>
+            <div className={s.tmPickList}>
+              {pick.map(r => (
+                <div key={r.key} className={s.tmPickRow} data-has={r.tag ? '' : undefined} role="button" tabIndex={r.tag ? -1 : 0} aria-disabled={!!r.tag}
+                  onClick={() => { if (!r.tag && r.person) add(r.person) }} onKeyDown={e => { if (e.key === 'Enter' && !r.tag && r.person) add(r.person) }}>
+                  <span className={s.tmPickIni} aria-hidden="true">{initialsOf(r.name)}</span>
+                  <div className={s.tmLinkText}><span className={s.tmPickName}>{r.name}</span><span className={s.tmPickSub}>{r.sub}</span></div>
+                  {r.tag ? <span className={s.tmPickTag}>{r.tag}</span> : <span className={s.tmPickPlus}><LeadIcon name="plus" size={16} /></span>}
+                </div>
+              ))}
+              {!pick.length ? <div className={s.tmPickNone}>No one in the ERP matches</div> : null}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </>
   )
 }

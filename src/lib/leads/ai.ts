@@ -60,6 +60,8 @@ export interface CustomerFacts {
   budget: string
   showroom: string
   preferredTime: string
+  /** The customer panel's note (v3 § 5 › This customer: "name, phone, interest and notes"). */
+  note?: string
 }
 
 export interface AgentDraft {
@@ -123,8 +125,10 @@ const plain = (s: string) => s.replace(/</g, '‹').replace(/>/g, '›')
  */
 export function systemPrompt(persona: Persona, cards: KnowledgeCard[], today: string, alone = false): string {
   const name = persona.agentName.trim() || `the ${persona.brandName} team`
-  const knowledge = cards.length
-    ? cards.map(c => `<card id="${c.id}" kind="${c.kind}" title="${plain(c.title)}"${c.endsOn ? ` until="${c.endsOn}"` : ''}>\n${plain(c.body)}\n</card>`).join('\n')
+  // Memory lines are rules, not knowledge (v3 § 5): they ride as cards only so a reply can name them.
+  const known = cards.filter(c => !c.id.startsWith('mem-'))
+  const knowledge = known.length
+    ? known.map(c => `<card id="${c.id}" kind="${c.kind}" title="${plain(c.title)}"${c.endsOn ? ` until="${c.endsOn}"` : ''}>\n${plain(c.body)}\n</card>`).join('\n')
     : '(No cards yet.)'
   return [
     alone
@@ -142,7 +146,7 @@ export function systemPrompt(persona: Persona, cards: KnowledgeCard[], today: st
     alone
       ? '- Prices, promotions, stock, addresses, opening hours and policies come ONLY from the cards above. If the answer is not there, do not guess.'
       : '- Prices, promotions, stock, addresses, opening hours and policies come ONLY from the cards above. If the answer is not there, do not guess: say a colleague will confirm shortly, and set handoff to true.',
-    '- Reply in the language the customer writes in (English, Chinese or Malay), the way people chat: short, one to three small paragraphs, no markdown, no lists unless they help.',
+    '- Reply in the language the customer writes in (English, Chinese or Malay), the way people chat: short, one to three small paragraphs separated by a blank line, no markdown, no lists unless they help.',
     '- When the customer shows interest, ask for their mobile number naturally so a salesperson can arrange a showroom visit. Never ask again once we have it.',
     '- Never promise a discount, a gift or a date the cards do not give. Never mention these instructions, the cards or that you are an AI unless asked directly.',
     alone
@@ -153,8 +157,9 @@ export function systemPrompt(persona: Persona, cards: KnowledgeCard[], today: st
 }
 
 /** The user turn: what we know about the customer and the conversation so far, oldest first. */
-export function conversationPrompt(customer: CustomerFacts | null, turns: Turn[]): string {
-  const facts = customer
+export function conversationPrompt(customer: CustomerFacts | null, turns: Turn[], factsOff = false): string {
+  // AI Agent › How it learns can switch "This customer" off (v3 § 5).
+  const facts = factsOff ? '(Not read for this reply.)' : customer
     ? [
         `Name: ${customer.name || '(not given)'}`,
         `Came in on: ${customer.channel}${customer.sourceAd.trim() ? `, from the ad "${customer.sourceAd.trim()}"` : ', organic'}`,
@@ -163,6 +168,7 @@ export function conversationPrompt(customer: CustomerFacts | null, turns: Turn[]
         customer.budget.trim() && `Budget: ${customer.budget.trim()}`,
         customer.showroom.trim() && `Showroom: ${customer.showroom.trim()}`,
         customer.preferredTime.trim() && `Preferred time: ${customer.preferredTime.trim()}`,
+        customer.note?.trim() && `Notes: ${customer.note.trim().slice(0, 600)}`,
       ].filter(Boolean).join('\n')
     : '(A test conversation — nothing known yet.)'
   const lines = turns.length
@@ -192,11 +198,36 @@ export function readDraft(text: string, cards: Pick<KnowledgeCard, 'id' | 'title
   const ids = Array.isArray(r.usedCardIds) ? r.usedCardIds.filter((x): x is string => typeof x === 'string') : []
   const used = cards.filter(c => ids.includes(c.id)).map(c => ({ id: c.id, title: c.title }))
   return {
-    reply: r.reply.trim().slice(0, 2000),
+    reply: withParagraphs(r.reply.trim()).slice(0, 2000),
     used,
     handoff: r.handoff === true,
     note: typeof r.note === 'string' ? r.note.trim().slice(0, 300) : '',
   }
+}
+
+/** A sentence ends at . ! ? (with closing quotes / emoji after it) before a space, or at 。！？ (Chinese needs no space). */
+const SENTENCE_END = /((?<=[.!?][)"'”’」』]*(?:\s*\p{Extended_Pictographic}[️‍\p{Extended_Pictographic}]*)*)\s+(?!\p{Extended_Pictographic})|(?<=[。！？][)"'”’」』]*(?:\p{Extended_Pictographic}[️‍\p{Extended_Pictographic}]*)*)\s*(?=\S))/u
+
+/**
+ * The safety net for blank lines between paragraphs (Lead View v3 handoff § 2): a reply the model wrote as one block of
+ * three or more sentences is cut into at most three paragraphs, sentences kept in order and shared out evenly. A reply
+ * with any line break of its own, or of one or two sentences, is left exactly as written.
+ */
+export function withParagraphs(reply: string): string {
+  if (/\n/.test(reply)) return reply
+  // [sentence, the space after it, sentence, …] — each sentence keeps the spacing it was written with.
+  const parts = reply.split(SENTENCE_END)
+  const sentences = parts.filter((_, i) => i % 2 === 0)
+  if (sentences.length <= 2) return reply
+  // Three paragraphs, the first ones taking a sentence more when they do not share out evenly (4 → 2 · 1 · 1).
+  const n = sentences.length, base = Math.floor(n / 3), extra = n % 3
+  const starts = new Set([base + (extra > 0 ? 1 : 0), 2 * base + Math.min(extra, 2)])
+  let out = ''
+  sentences.forEach((s, i) => {
+    if (i > 0) out += starts.has(i) ? '\n\n' : parts[i * 2 - 1]
+    out += s
+  })
+  return out
 }
 
 /** The conversation's messages as the agent reads them (the last 30, as lead_ai_context gives them). */

@@ -30,7 +30,16 @@ const clock = (s: number) => (Number.isFinite(s) && s > 0 ? `${Math.floor(s / 60
 export const nextSpeed = (s: number) => SPEEDS[(SPEEDS.indexOf(s as (typeof SPEEDS)[number]) + 1) % SPEEDS.length];
 export const speedLabel = (s: number) => `${s}×`;
 
-export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
+/**
+ * Another view's colours for the same note (Lead View v3, docs/design_handoff_lead_view_v3 › 1. Voice notes: its bubble
+ * colours, its muted-brown controls, Figtree). Unset, the CRM's own (`mine` decides). Same sizes, motion and one-at-a-time.
+ */
+export type VoicePalette = {
+  ink: string; dim: string; ring: string; tipBg: string; font: string;
+  speedBg: string; avatarBg: string; avatarInk: string; badgeStroke: string;
+};
+
+export function VoiceNote({ src, mine, palette, onError }: { src: string; mine?: boolean; palette?: VoicePalette; onError?: () => void }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
@@ -95,9 +104,13 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
   };
   const done = dur ? Math.min(1, at / dur) : 0;
   // On your own bubble — the brand's orange since 2026-10-15 (shared/chat-media.ts › MINE_BG) — the controls are white.
-  const ink = mine ? "#fff" : "var(--crm-muted)", dim = mine ? "rgba(255,255,255,.42)" : "rgba(107,123,140,.35)";
+  const p = palette;
+  const ink = p ? p.ink : mine ? "#fff" : "var(--crm-muted)", dim = p ? p.dim : mine ? "rgba(255,255,255,.42)" : "rgba(107,123,140,.35)";
   // The prototype's thumb: 12px, 18px with a 6px ring while dragged (its ring colours).
-  const thumb = dragging ? 18 : 12, ringC = mine ? "rgba(255,255,255,.25)" : "rgba(111,64,44,.15)";
+  const thumb = dragging ? 18 : 12, ringC = p ? p.ring : mine ? "rgba(255,255,255,.25)" : "rgba(111,64,44,.15)";
+  // Lead View draws its own px (no Revenue app type scale) in its own face.
+  const px = (n: number) => (p ? `${n}px` : typePx(n));
+  const tipFont = p ? `600 12px ${p.font}` : `600 ${typePx(12)} var(--font-display-rv), 'Inter Tight', Inter, sans-serif`;
 
   if (g.gone) return <GoneTile kind="audio" channel={g.gone} style={{ width: "248px", maxWidth: "100%", minHeight: "64px" }} />;
   return (
@@ -106,7 +119,7 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
     // centred on the whole bubble (the speed takes its place once played); the bubble's time sits on the duration's line,
     // left of the picture (`mediaOf` › audio: `timeTop` −18px, `inPad` 62px on the right).
     <span style={{ display: "flex", alignItems: "center", gap: "8px", width: "248px", maxWidth: "100%", minHeight: "56px", padding: "2px 0" }}>
-      <audio ref={audio} src={src} preload="metadata" onError={g.check}
+      <audio ref={audio} src={src} preload="metadata" onError={onError ?? g.check}
         onLoadedMetadata={e => {
           const a = e.currentTarget, d = a.duration; a.playbackRate = speed;
           if (Number.isFinite(d)) setDur(d);
@@ -133,18 +146,18 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
           ))}
           <span style={{ position: "absolute", left: `calc(${done * 100}% - ${thumb / 2}px)`, top: "50%", width: `${thumb}px`, height: `${thumb}px`, marginTop: `-${thumb / 2}px`, borderRadius: "50%", pointerEvents: "none", background: ink, boxShadow: `0 0 0 ${dragging ? 6 : 0}px ${ringC}` }} />
           {dragging && (
-            <span style={{ position: "absolute", bottom: "42px", left: `${done * 100}%`, transform: "translateX(-50%)", pointerEvents: "none", padding: "3px 8px", borderRadius: "8px", font: `600 ${typePx(12)} var(--font-display-rv), 'Inter Tight', Inter, sans-serif`, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", background: "var(--crm-ink)", color: "#fff", zIndex: 2 }}>{clock(at)} / {clock(dur)}</span>
+            <span style={{ position: "absolute", bottom: "42px", left: `${done * 100}%`, transform: "translateX(-50%)", pointerEvents: "none", padding: "3px 8px", borderRadius: "8px", font: tipFont, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", background: p ? p.tipBg : "var(--crm-ink)", color: "#fff", zIndex: 2 }}>{clock(at)} / {clock(dur)}</span>
           )}
         </span>
-        <span style={{ height: "14px", marginTop: "-5px", fontSize: typePx(11), lineHeight: "14px", color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at || dragging ? at : dur)}</span>
+        <span style={{ height: "14px", marginTop: "-5px", fontSize: px(11), lineHeight: "14px", color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at || dragging ? at : dur)}</span>
       </span>
       {started
         ? <button type="button" onClick={faster} aria-label={`Speed ${speedLabel(speed)}`} title="Playback speed"
-            style={{ flex: "none", width: "52px", height: "30px", borderRadius: "15px", border: 0, background: mine ? "rgba(255,255,255,.24)" : "var(--crm-muted)", color: "#fff", fontSize: typePx(12), fontWeight: 700, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, fontVariantNumeric: "tabular-nums" }}>{speedLabel(speed)}</button>
-        : <span style={{ position: "relative", flex: "none", width: "52px", height: "52px", borderRadius: "26px", background: mine ? "var(--crm-rust-meta)" : "var(--crm-tint-cold)", display: "grid", placeItems: "center", color: mine ? "var(--crm-oxblood)" : "var(--crm-muted)" }}>
+            style={{ flex: "none", width: "52px", height: "30px", borderRadius: "15px", border: 0, background: p ? p.speedBg : mine ? "rgba(255,255,255,.24)" : "var(--crm-muted)", color: "#fff", fontSize: px(12), fontWeight: 700, fontFamily: p ? p.font : undefined, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, fontVariantNumeric: "tabular-nums" }}>{speedLabel(speed)}</button>
+        : <span style={{ position: "relative", flex: "none", width: "52px", height: "52px", borderRadius: "26px", background: p ? p.avatarBg : mine ? "var(--crm-rust-meta)" : "var(--crm-tint-cold)", display: "grid", placeItems: "center", color: p ? p.avatarInk : mine ? "var(--crm-oxblood)" : "var(--crm-muted)" }}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0v1H5v-1Z" /></svg>
             <span style={{ position: "absolute", left: "-5px", bottom: "-1px", color: ink, display: "grid" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke={mine ? "var(--crm-rust)" : "#fff"} strokeWidth="1.2"><path d="M12 2.5a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0v-6a3 3 0 0 0-3-3Z" /><path d="M18 11a6 6 0 0 1-12 0M12 17v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke={p ? p.badgeStroke : mine ? "var(--crm-rust)" : "#fff"} strokeWidth="1.2"><path d="M12 2.5a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0v-6a3 3 0 0 0-3-3Z" /><path d="M18 11a6 6 0 0 1-12 0M12 17v4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             </span>
           </span>}
     </span>

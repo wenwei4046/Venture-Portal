@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
+import { outletCounts, outletName, passesOutlet, type LeadOutlet, type OutletFilter as Filter } from '@/lib/leads/outlets'
+import OutletFilter from './ui/OutletFilter'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { handLeadToGroup, markLeadLost, reopenLead, setLeadStage } from '@/lib/leads/actions'
@@ -38,7 +40,7 @@ const SIZES = [20, 50, 100] as const
 const SETTABLE: readonly LeadStage[] = ['handed', 'contacted', 'appt', 'came', 'closed']
 const tone = (t: string) => `rgb(var(--lv-${t}))`
 
-export default function LeadsView({ config, contacts, range, from, to, today, now, stagesReady, canEdit, openLead = null }: {
+export default function LeadsView({ config, contacts, range, from, to, today, now, stagesReady, canEdit, openLead = null, outlets = [] }: {
   config: LeadConfig
   contacts: LeadContact[]
   range: RangeId
@@ -53,12 +55,15 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
   canEdit: boolean
   /** A lead to open on arrival (`?lead=`). */
   openLead?: string | null
+  /** Every brand's outlets (v3 § 3) — the All outlets filter and the Source column's second line. */
+  outlets?: LeadOutlet[]
 }) {
   const router = useRouter()
   const [q, setQ] = useState('')
   const [brand, setBrand] = useState('all')
   const [sales, setSales] = useState('all')
   const [source, setSource] = useState('all')
+  const [outlet, setOutlet] = useState<Filter>('all')
   const [menu, setMenu] = useState<'brand' | 'sales' | 'source' | 'range' | null>(null)
   const [staleOnly, setStaleOnly] = useState(false)
   const [tab, setTab] = useState<LeadStage | 'all'>('all')
@@ -69,7 +74,7 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [moveAt, setMoveAt] = useState<{ x: number; y: number; ids: string[] } | null>(null)
   const [busy, startBusy] = useTransition()
-  useEffect(() => { setPage(0) }, [q, brand, sales, source, staleOnly, tab, size, range, from, to])
+  useEffect(() => { setPage(0) }, [q, brand, sales, source, outlet, staleOnly, tab, size, range, from, to])
 
   const brands = useMemo(() => new Map(config.brands.map(b => [b.id, b])), [config.brands])
   const brandName = (id: string) => brands.get(id)?.name ?? '—'
@@ -78,7 +83,7 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
 
   const needle = q.trim().toLowerCase()
   const digits = needle.replace(/[\s-]/g, '')
-  const base = contacts.filter(c => (brand === 'all' || c.brandId === brand)
+  const base = contacts.filter(c => passesOutlet(outlet, c.outletId) && (brand === 'all' || c.brandId === brand)
     && (sales === 'all' || handedTo(c) === sales)
     && (source === 'all' || (source === 'organic' ? !adLabel(c) : source === 'ads' ? !!adLabel(c) : adLabel(c) === source))
     && (!needle || `${c.name} ${c.interest}`.toLowerCase().includes(needle) || (/^\d{3,}$/.test(digits) && (c.phone ?? '').includes(digits))))
@@ -190,6 +195,7 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
             <LeadIcon name="search" size={15} />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Name, phone or interest" aria-label="Search leads" />
           </label>
+          <OutletFilter outlets={outlets} brands={config.brands} value={outlet} onChange={setOutlet} counts={outletCounts(contacts, c => c.outletId)} />
           {filters.map(f => (
             <span key={f.k} className={s.anchor}>
               <button type="button" className={s.ghost} onClick={() => setMenu(m => (m === f.k ? null : f.k))} aria-haspopup="menu" aria-expanded={menu === f.k}>
@@ -263,7 +269,7 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
                 </div>
                 <div className={s.stack}>
                   <span className={s.sourceLine}><span className={s.ch}>{c.channel === 'instagram' ? 'IG' : 'FB'}</span><span className={s.cut}>{ad || 'Organic'}</span></span>
-                  <span className={s.brand}>{brandName(c.brandId)}</span>
+                  <span className={s.brand}>{brandName(c.brandId)}{c.outletId && outletName(outlets, c.outletId) ? ` · ${outletName(outlets, c.outletId)}` : ''}</span>
                 </div>
                 <span className={s.cut}>{c.interest}</span>
                 <span className={`${s.cut} ${salesName ? '' : s.salesNone}`}>{salesName ?? '—'}</span>

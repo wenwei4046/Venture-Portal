@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 const askModel = vi.fn()
 vi.mock('./ai-model', () => ({ AI_NOT_CONNECTED: 'not connected', askModel: (...a: unknown[]) => askModel(...a) }))
-vi.mock('./agent-read', () => ({ agentMore: async () => null }))
+vi.mock('./agent-read', () => ({ agentMore: async () => null, usedMemory: (used: Array<{ id: string }>) => used.filter(u => u.id.startsWith('mem-')).map(u => u.id.slice(4)) }))
 const sendLeadOutbox = vi.fn(async () => 1)
 vi.mock('./messenger-outbox', () => ({ sendLeadOutbox: (...a: unknown[]) => sendLeadOutbox(...(a as [])) }))
 

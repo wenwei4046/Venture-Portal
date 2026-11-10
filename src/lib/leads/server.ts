@@ -12,6 +12,8 @@ import type { AgentMore, Correction, DataFile } from './agent'
 import type { DataFolder } from './data-center'
 import type { QuickReply } from './quick'
 import type { LeadPage, StaffLeave } from './pages'
+import type { LeadOutlet } from './outlets'
+import type { StaffDirectory, TeamMember } from './team'
 import type { AuditChange, AuditTableLine } from '@/lib/audit/changes'
 import { AUDIT_TABLES } from './audit'
 import type { LeadConfig, LeadContact, LeadLabel, LeadThread } from './types'
@@ -192,6 +194,21 @@ export function loadAds(): Promise<Read<LeadAd[]>> {
 /** Each ad's own post and picture as Meta sent them with its chats (mig 20261102250000). */
 export function loadAdPosts(): Promise<Read<Array<{ adId: string; postUrl: string | null; picture: string | null; video: string | null }>>> {
   return rpc('lead_ad_posts', undefined, 'The ads’ posts')
+}
+
+/** Every brand's outlets (mig 20261110200000). Not ok before the migration: the screens then read as if no outlet were set. */
+export function loadOutlets(): Promise<Read<LeadOutlet[]>> {
+  return rpc<LeadOutlet[]>('lead_outlets', undefined, 'The outlets')
+}
+
+/** Settings › Team (mig 20261110220100): the Team, each with where they stand. */
+export function loadTeam(): Promise<Read<TeamMember[]>> {
+  return rpc<TeamMember[]>('lead_team', undefined, 'The team')
+}
+
+/** Settings › Team › Add from ERP: People and the ERP's staff list (Lead View · Manage). */
+export function loadStaffDirectory(): Promise<Read<StaffDirectory>> {
+  return rpc<StaffDirectory>('lead_staff_directory', undefined, 'The staff list')
 }
 
 /** Settings › Team: who handles which brands (mig 20261102270000). */

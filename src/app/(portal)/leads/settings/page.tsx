@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { NOT_SET_UP, loadAds, loadAgentBrands, loadAgents, loadFlows, loadLeadConfig, loadPages, loadReplyRules } from '@/lib/leads/server'
+import { NOT_SET_UP, loadAds, loadFlows, loadLeadConfig, loadOutlets, loadPages, loadReplyRules, loadStaffDirectory, loadTeam } from '@/lib/leads/server'
 import { managedPages } from '@/lib/leads/pages-server'
 import type { LeadPage } from '@/lib/leads/pages'
 import SettingsView from '../_components/SettingsView'
@@ -16,8 +16,10 @@ export const dynamic = 'force-dynamic'
 export default async function Page() {
   await requirePage('/leads/settings')
   const user = await requirePermission('leads')
-  const [config, pages, rules, flows, ads, managed, agents, agentBrands] = await Promise.all([
-    loadLeadConfig(), loadPages(), loadReplyRules(), loadFlows(), loadAds(), managedPages(), loadAgents(), loadAgentBrands(),
+  const canManage = canDo(user, 'leads', 'manage')
+  const [config, pages, rules, flows, ads, managed, team, directory, outlets] = await Promise.all([
+    loadLeadConfig(), loadPages(), loadReplyRules(), loadFlows(), loadAds(), managedPages(), loadTeam(),
+    canManage ? loadStaffDirectory() : Promise.resolve(null), loadOutlets(),
   ])
   if (!config.ok || (!pages.ok && pages.reason !== NOT_SET_UP)) {
     return (
@@ -41,9 +43,12 @@ export default async function Page() {
       rules={rules.ok ? rules.data : null}
       templates={flows.ok ? flows.data.map(f => ({ id: f.id, name: f.name })) : []}
       ads={ads.ok ? ads.data : null}
-      canManage={canDo(user, 'leads', 'manage')}
+      canManage={canManage}
       canTest={canDo(user, 'leads', 'create')}
-      team={agents.ok ? agents.data.map(a => ({ ...a, brandIds: (agentBrands.ok ? agentBrands.data : []).find(g => g.userId === a.id)?.brandIds ?? [] })) : null}
+      team={team.ok ? team.data : null}
+      directory={directory?.ok ? directory.data : null}
+      outlets={outlets.ok ? outlets.data : []}
+      outletsReady={outlets.ok}
     />
   )
 }

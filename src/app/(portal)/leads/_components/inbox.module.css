@@ -58,6 +58,7 @@
 .filterSearch input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 13px; color: rgb(var(--lv-fg)); padding: 0; }
 .filterSearch input::placeholder { color: rgb(var(--lv-fg-4)); opacity: 1; }
 .filterChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filterHead { flex-basis: 100%; font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-fg-4)); }
 .filterChip {
   cursor: pointer;
   height: 28px;
@@ -316,7 +317,16 @@ button.assignee { cursor: pointer; }
 .emojiBtn:hover, .emojiBtn[aria-pressed='true'] { background: rgb(var(--lv-surface-sel)); }
 .textBtn { cursor: pointer; border: none; background: transparent; padding: 0 4px; font: inherit; font-size: 12px; color: rgb(var(--lv-fg-2)); }
 .media { max-width: 260px; max-height: 260px; border-radius: 12px; border: 1px solid rgb(var(--lv-line)); display: block; object-fit: cover; }
-.mediaAudio { max-width: 260px; }
+/* A voice note (handoff v3 § 1): the bubble's colours, padded as the prototype's 4px 12px 4px 4px. */
+.voice {
+  max-width: 72%;
+  padding: 4px 12px 4px 4px;
+  border-radius: 14px;
+  background: rgb(var(--lv-surface));
+  border: 1px solid rgb(var(--lv-line));
+  box-sizing: border-box;
+}
+.msg[data-out] .voice { background: rgb(var(--lv-sel)); border-color: rgb(var(--lv-sel-edge)); }
 .mediaFile {
   display: inline-flex;
   align-items: center;
@@ -535,6 +545,15 @@ button.assignee { cursor: pointer; }
 .fieldKey { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgb(var(--lv-fg-3)); }
 .fieldValue { font-size: 14px; color: rgb(var(--lv-fg)); overflow-wrap: anywhere; }
 .fieldValue[data-empty] { color: rgb(var(--lv-disabled)); }
+/* The Outlet row (v3 § 3): the value as plain text, "· from the ad" / "· set by you", a chevron — the whole value a native select (opacity 0) */
+.outlet { position: relative; min-width: 0; display: flex; align-items: center; gap: 6px; margin-left: -8px; padding: 0 8px; height: 32px; border-radius: 7px; }
+.outlet[data-edit]:hover { background: rgb(var(--lv-surface-sel)); }
+.outletName { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: rgb(var(--lv-fg)); }
+.outletName[data-empty] { color: rgb(var(--lv-disabled)); }
+.outletFrom { flex: none; white-space: nowrap; font-size: 12px; color: rgb(var(--lv-fg-4)); }
+.outletChev { flex: none; color: rgb(var(--lv-fg-4)); }
+.outletSelect { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-family: inherit; font-size: 14px; }
+.outletSelect:disabled { cursor: default; }
 .fieldInput {
   min-width: 0;
   height: 34px;
@@ -647,3 +666,26 @@ select.fieldInput { padding: 0 8px; cursor: pointer; }
 .eventLine { flex: 1; width: 1px; background: rgb(var(--lv-line-4)); }
 .eventText { display: flex; flex-direction: column; padding-bottom: 14px; }
 .eventAt { font-size: 12px; color: rgb(var(--lv-fg-4)); }
+
+/* Inbox › Preview as (v3 § 4; the prototype's lines 60–63, 84, 143). */
+.vaBtn:hover { background: rgb(var(--lv-surface-sel)); }
+.vaPop { width: 260px; padding: 5px; gap: 0; }
+.vaHead { padding: 8px 10px 4px; font-size: 11px; letter-spacing: 0.08em; color: rgb(var(--lv-fg-4)); }
+.vaItem { cursor: pointer; display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; border: none; border-radius: 7px; background: transparent; font-family: inherit; text-align: left; }
+.vaItem[aria-pressed='true'] { background: rgb(var(--lv-page)); }
+.vaItem:hover { background: rgb(var(--lv-surface-sel)); }
+.vaName { font-size: 13px; color: rgb(var(--lv-fg)); }
+.vaSub { font-size: 12px; color: rgb(var(--lv-fg-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vaBanner { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; background: rgb(var(--lv-fg)); color: rgb(var(--lv-surface)); }
+.vaEye { flex: none; }
+.vaText { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vaTitle { font-size: 13px; font-weight: 500; }
+.vaScope { font-size: 12px; color: rgb(var(--lv-surface) / 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vaExit { flex: none; white-space: nowrap; cursor: pointer; height: 26px; padding: 0 10px; border: none; border-radius: 7px; background: rgb(var(--lv-surface) / 0.14); color: rgb(var(--lv-surface)); font-family: inherit; font-size: 12px; }
+.vaEmpty { grid-column: span 2; align-items: center; justify-content: center; gap: 8px; color: rgb(var(--lv-fg-3)); }
+.vaEmptyIcon { color: rgb(var(--lv-fg-4)); }
+.vaEmptyTitle { font-family: var(--lv-font-title); font-size: 18px; color: rgb(var(--lv-fg)); }
+.vaEmptySub { font-size: 13px; }
+.vaLocked { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 18px; border-radius: 999px; border: 1px dashed rgb(var(--lv-line-4)); background: rgb(var(--lv-surface-sel)); color: rgb(var(--lv-fg-3)); font-size: 14px; }
+.vaLocked > svg { flex: none; }
+.vaLocked > span { flex: 1; min-width: 0; }
