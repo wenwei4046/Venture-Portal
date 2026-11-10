@@ -2139,10 +2139,10 @@ table.ledger-table tr.lt-detail {
   textarea {
     font-size: 16px !important;
   }
-  /* The Revenue app, the HR phone app, the Finance phone app and its sheets (2026-10-15), the guest page and the soft dropdown's menu keep their prototypes' own control heights. */
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
-  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
-  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)) {
+  /* The Revenue app, the HR phone app, the Finance phone app and its sheets (2026-10-15), the guest page, the soft dropdown's menu and Lead View (desktop-first, its own control sizes — 2026-11-10: the Inbox filter's search box) keep their prototypes' own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *)),
+  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *)),
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label

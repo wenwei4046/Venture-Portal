@@ -32,6 +32,13 @@ describe('the portal’s field rules leave the prototype-drawn surfaces alone', 
     for (const s of SURFACES) expect(block).toContain(s)
   })
 
+  // 2026-11-10: on a narrow window the floor stood the Inbox filter's search box 44px tall inside its 34px frame.
+  it('the phone’s control floor leaves Lead View alone too', () => {
+    const floor = css.slice(css.indexOf("keep their prototypes' own control heights"))
+    const block = floor.slice(0, floor.indexOf('}'))
+    expect(block.match(/\[data-lead-view\] \*/g)).toHaveLength(3)
+  })
+
   it('the markers are on the guest page and the soft menu', () => {
     const guest = fs.readFileSync(path.resolve(__dirname, '../app/(guest)/g/[code]/_components/GuestPage.tsx'), 'utf8')
     const select = fs.readFileSync(path.resolve(__dirname, '../components/hrv/select.tsx'), 'utf8')
