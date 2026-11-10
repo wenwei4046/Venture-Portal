@@ -180,7 +180,11 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     sendBg: waShut ? SHUT_GREY : "var(--crm-rust)", sendCursor: waShut ? "default" : "pointer", sendSh: waShut ? "none" : "0 6px 20px rgba(42,22,12,.15)",
     sendCls: waShut ? undefined : "crm4a-primary", chatPadB: waShut ? "20px 28px 168px" : "20px 28px 104px", replyBottom: waShut ? "144px" : "82px",
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
-    draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void }) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } },
+    // Enter sends, Shift+Enter breaks a line (the box is a textarea since 2026-11-10); an Enter that only picks a word in
+    // a Chinese / Pinyin input method (isComposing, or keyCode 229 on Safari) is the input method's, never a send.
+    draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void; nativeEvent?: { isComposing?: boolean; keyCode?: number } }) => {
+      if (e.key !== "Enter" || e.shiftKey || e.nativeEvent?.isComposing || e.nativeEvent?.keyCode === 229) return;
+      e.preventDefault(); send(); },
     send, micD: draft.trim() ? "M5 12h14M13 6l6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3",
     sendTitle: draft.trim() ? "Send" : "Voice note",
     photo: () => pick("image/*,video/*", true),
