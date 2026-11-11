@@ -8,7 +8,7 @@ import { reportsVM } from "./reports-page";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import { teamsOf } from "../../panel/vm/common";
 
-const now = new Date("2026-11-11T12:00:00+08:00");
+const now = new Date(2026, 10, 11, 12);
 const AD = "120210000000001";
 const C = (id: string, extra: Partial<CrmCustomer> = {}) => ({ id, name: id, phone: "", channel: "whatsapp", adId: AD, ad: "Skyline", assignedTo: "p1", teamId: null,
   createdAt: "2026-11-05T02:00:00Z", status: "follow_up", wonAmount: null, messages: [], details: {}, unread: 0, lastCustomerAt: null, ...extra }) as unknown as CrmCustomer;
@@ -21,7 +21,7 @@ function vm(picks: string[], ui: Partial<DeskUi> = {}) {
     adNames: { [AD]: { name: "Skyline", source: "meta", status: "ACTIVE", statusAt: "2026-11-11T03:00:00Z", startAt: "2026-10-20T01:00:00Z", endAt: "2026-11-30T15:59:00Z" } },
     uiPrefs: { reportCols: picks } } as unknown as CrmData;
   const me = data.people.find(p => p.role === "boss") ?? data.people[0];
-  const ctx = { data, me, now, live: true, ui: { ...initialDeskUi(), tab: "reports", rpPer: "custom", rpRange: { a: new Date("2026-11-01T00:00:00+08:00").getTime(), b: now.getTime() }, ...ui },
+  const ctx = { data, me, now, live: true, ui: { ...initialDeskUi(), tab: "reports", rpPer: "custom", rpRange: { a: new Date(2026, 10, 1).getTime(), b: now.getTime() }, ...ui },
     set: vi.fn(), patch: vi.fn(), deskAct: { saveUiPref: vi.fn() }, act: {}, nameOf: () => "Chin Ying", teams: teamsOf(data), directors: [], W: 1440, H: 900, slotCounts: {} } as unknown as DeskCtx;
   return reportsVM(ctx);
 }
