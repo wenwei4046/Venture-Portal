@@ -266,9 +266,23 @@ describe("boardModel — a brand on its own scheme", () => {
   it("is no brand of the margin incentive: nothing is held for it, nor asked of it", () => {
     // 40% on Akemi clears Tier 1; the 2990s bills neither hold it (no cost waited for) nor need a ladder.
     expect(boardModel(input({ snapshot: snap, board: "margin" })).foot?.sub).toBe("Incentive Tier 1 reached");
-    // Sold nothing but 2990s: no margin, nothing reached and nothing held.
-    const onlyOwn = snapshot([person("me", "ME", { sales: 4000 }, true, { "2990S": { sales: 4000 } })], { brands, tiers: snap.tiers });
-    expect(boardModel(input({ snapshot: onlyOwn, board: "margin" })).foot?.sub).toBe("Below Incentive Tier 1");
+  });
+  // Found on production the day it went live: somebody posted to 2990s for the month read "Below Incentive Tier 1"
+  // and "No costed sales yet" on the Margin board — of sales that stand in no margin.
+  it("says Own scheme of somebody who sold nothing but the brand: placed nowhere on the Margin board, on no ladder", () => {
+    const onlyOwn = snapshot([
+      person("me", "ME", { sales: 4000 }, true, { "2990S": { sales: 4000 } }),
+      person("x", "XAVIER LIM", { sales: 500, marginRevenue: 500, marginCost: 300 }, false, { AKEMI: { sales: 500, marginRevenue: 500, marginCost: 300 } }),
+      person("n", "NOBODY YET", {}, false, {}),
+    ], { brands, tiers: snap.tiers });
+    const vm = boardModel(input({ snapshot: onlyOwn, board: "margin" }));
+    expect(vm.foot?.sub).toBe("Own scheme");
+    expect([vm.rank!.hero.state, vm.rank!.hero.chase]).toEqual(["unranked", "Own scheme"]);
+    expect(vm.rank!.rows.map(r => [r.name, r.pos, r.value])).toEqual([["XAVIER LIM", "1", "40.0%"], ["ME", "—", "—"], ["NOBODY YET", "—", "—"]]);
+    // Somebody with no sales at all is as before, and so is the Sales board.
+    const idle = boardModel(input({ snapshot: snapshot([person("me", "ME", {}, true, {}), onlyOwn.people[1]], { brands, tiers: snap.tiers }), board: "margin" }));
+    expect([idle.foot?.sub, idle.rank!.hero.chase]).toEqual(["Below Incentive Tier 1", "No costed sales yet"]);
+    expect(boardModel(input({ snapshot: onlyOwn })).rank!.hero.chase).toBe("You lead by RM 3,500");
   });
   it("an answer from before the flag lists every brand, as it did", () => {
     const old = snapshot(folk, { brands: brands.map(({ code, name }) => ({ code, name })) });

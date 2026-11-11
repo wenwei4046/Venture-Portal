@@ -90,6 +90,7 @@ function main(): InsightMainVM {
       kpi: { value: "27", pill: "Hit · 10 needed", pillTone: "good", sub: "Pillows 20 · Protectors 7" },
       orders: { value: "14", pill: "Deposit cleared", sub: "2 waiting for deposit", subAmber: true },
       overall: "38.6% overall",
+      ownOnly: false,
       brands: BRAND_M.map(x => {
         const t = band(x.m);
         return { code: CODE[x.name], name: x.name, sub: `${rm(x.goods)} goods · ${x.orders} orders`, pct: x.m == null ? "—" : x.m.toFixed(1) + "%", pill: x.m == null ? "Cost pending" : t!.l, tone: x.m == null ? "warn" : t!.tone };

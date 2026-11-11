@@ -50,7 +50,9 @@ function incentiveSub(m: IncomeMonth): string {
   if (m.incentive > 0 && m.bandKey) return `${brandList(m.brands.map(b => b.code))} at ${bandText(m.bandKey).replace(/^Incentive /, "")}`;
   if (pending.length) return `Held · ${brandList(pending)} ${pending.length === 1 ? "has" : "have"} a bill without cost`;
   if (given.length) return `No tier · ${brandList(given)} ${given.length === 1 ? "has" : "have"} no sales`;
-  return m.brands.length ? "No incentive tier reached yet" : "No sales yet";
+  if (m.brands.length) return "No incentive tier reached yet";
+  // No brand in a margin: the month's bills are a brand's on its own scheme (2990s), or there are none.
+  return m.bills.some(b => b.ownScheme === true) ? OWN_SCHEME_PILL : "No sales yet";
 }
 
 /** My income: the month's breakdown, then the months payroll has already paid. */

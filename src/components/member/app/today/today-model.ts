@@ -2,7 +2,7 @@ import type { MemberBand, MemberIncome, MemberInsightBlock, MemberMemo, MemberRe
 import type { MemberPay } from "@/lib/member/income-pay";
 import type { MemberOrderBook } from "@/lib/member/order-book";
 import type { ShareRequest } from "@/lib/member/share-requests";
-import { marginStanding } from "../insight/insight-model";
+import { marginStanding, noMarginTag, ownOnlyScore } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, arenaWeekFriday, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ChampStanding } from "@/lib/member/championship";
@@ -161,7 +161,7 @@ function teamMetrics(input: TodayInput, team: string): TodayMetric[] {
   return [
     { key: "sales", label: "Sales", value: teamAmount(g.sales), tag, tagTone: "sub" },
     { key: "margin", label: "Margin", value: margin === null ? "—" : `${margin.toFixed(1)}%`,
-      tag: margin === null ? (g.blindOrders > 0 ? "Cost pending" : "No sales yet") : tag, tagTone: "sub" },
+      tag: margin === null ? noMarginTag(g.blindOrders > 0, ownOnlyScore(g)) : tag, tagTone: "sub" },
     { key: "kpi", label: "KPI", value: kpiOff ? "—" : String(g.kpiQty), tag: kpiOff ? "Not counted" : tag, tagTone: "sub" },
   ];
 }
@@ -199,7 +199,8 @@ function marginMetric(input: TodayInput): TodayMetric {
     // margin, the tier every costed brand clears on its own ladder, held while
     // a bill has no cost — so Today and Insight can never disagree.
     const st = marginStanding(input.book, input.bands ?? []);
-    const tag = st.margin === null ? (st.blind > 0 ? "Cost pending" : "No sales yet")
+    // No margin to read: a cost waited for, a month of a brand on its own scheme (2990s — it sold, in no margin), or no sales.
+    const tag = st.margin === null ? noMarginTag(st.blind > 0, st.ownOnly)
       : st.tier ? `${shortTier(st.tier.label)}${st.held ? " · held" : ""}`
       : st.lowest ? `Below ${shortTier(st.lowest)}` : "No ladder";
     return { key: "margin", label: "Margin", value: st.margin === null ? "—" : `${st.margin.toFixed(1)}%`, tag, tagTone: st.tier && !st.held ? "good" : "sub" };
@@ -208,7 +209,7 @@ function marginMetric(input: TodayInput): TodayMetric {
   // Uncosted bills stay in sales and out of the blended margin (Insight's rule).
   const margin = me && me.marginRevenue > 0 ? ((me.marginRevenue - me.marginCost) / me.marginRevenue) * 100 : null;
   const tier = reachedTier(input);
-  const tag = margin === null ? (me && me.blindOrders > 0 ? "Cost pending" : "No sales yet") : tier ? shortTier(tier) : "Standard";
+  const tag = margin === null ? noMarginTag(!!me && me.blindOrders > 0, !!me && ownOnlyScore(me)) : tier ? shortTier(tier) : "Standard";
   return { key: "margin", label: "Margin", value: margin === null ? "—" : `${margin.toFixed(1)}%`, tag, tagTone: "good" };
 }
 

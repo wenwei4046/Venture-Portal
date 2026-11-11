@@ -63,6 +63,12 @@ describe("incomeVM", () => {
       expect(sub(m)).toBe("Held · Akemi has a bill without cost");
       expect(incomeVM(data(m), false).held?.strong).toBe("Akemi has a bill without cost.");
     });
+    // 2026-11-12: a month of 2990s bills — sold, in no margin — read "No sales yet" under the incentive.
+    it("says Own scheme of a month whose bills are a brand's on its own scheme, and No sales yet of one with none", () => {
+      expect(sub(month({ switches: on, brands: [], bills: [bill({ brand: "2990S", marginPct: null, ownScheme: true })] }))).toBe("Own scheme");
+      expect(sub(month({ switches: on, brands: [], bills: [] }))).toBe("No sales yet");
+      expect(sub(month({ switches: on, brands: [{ code: "AKEMI", marginPct: 0.3 }], bills: [bill(), bill({ orderId: "o3", brand: "2990S", ownScheme: true })] }))).toBe("No incentive tier reached yet");
+    });
   });
 });
 
