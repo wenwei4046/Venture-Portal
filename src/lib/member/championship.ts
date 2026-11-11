@@ -98,6 +98,13 @@ export interface ChampMonthInput {
   people: readonly ArenaPerson[];
   /** Brands with a board of their own (the scheme's brands). */
   brands: readonly string[];
+  /**
+   * The brands a Margin board is kept for — every brand but one that follows its own commission scheme (2990s,
+   * 2026-11-12: "他唯一不会出现的，只是所谓的 margin arena"). Margin by brand is read on the brand a person sold most
+   * AMONG THESE, so somebody posted to 2990s is placed on the brand with a ladder they sold most, never on 2990s.
+   * Left out: every brand, as before.
+   */
+  marginBrands?: readonly string[];
   tiers: readonly ArenaTier[];
   /** The booth history — every completed fair, booth by booth. */
   history: ArenaHistorySnapshot | null;
@@ -105,7 +112,8 @@ export interface ChampMonthInput {
 }
 
 const LABEL: Record<string, string> = { AKEMI: "Akemi", ERGOTEX: "Ergotex", DUNLOP: "Dunlopillo", ZANOTTI: "Zanotti" };
-const brandName = (code: string) => LABEL[code] ?? code;
+// A brand the map does not name reads as My honours reads it: its code in lower case after its first letter ("2990s").
+const brandName = (code: string) => LABEL[code] ?? code.charAt(0) + code.slice(1).toLowerCase();
 
 function emptyPart(item: ChampItem, note = ""): ChampPart {
   return { item, points: 0, place: 0, bonus: 0, position: null, of: 0, note };
@@ -177,11 +185,12 @@ function recordPlaces(month: string, history: ArenaHistorySnapshot | null): Map<
  */
 export function championshipMonth(input: ChampMonthInput): ChampMonth[] {
   const { month, people, brands, tiers, history, kpi } = input;
+  const marginBrands = input.marginBrands ?? brands;
   const sales = boardPoints(arenaRankings(people, "sales"));
   const margin = boardPoints(arenaRankings(people, "margin"));
   const kpiBoard = kpi.enabled ? boardPoints(arenaRankings(people, "kpi")) : new Map<string, ChampPlace>();
   const brandSales = new Map(brands.map(code => [code, boardPoints(arenaRankings(people, "sales", code))]));
-  const brandMargin = new Map(brands.map(code => [code, boardPoints(arenaRankings(people, "margin", code))]));
+  const brandMargin = new Map(marginBrands.map(code => [code, boardPoints(arenaRankings(people, "margin", code))]));
   const weeks = fairWeeks(month, history?.events ?? []);
   const records = recordPlaces(month, history);
 
@@ -197,16 +206,21 @@ export function championshipMonth(input: ChampMonthInput): ChampMonth[] {
       if (main) {
         const board = brandSales.get(main)!.get(person.id);
         if (board) parts.salesByBrand = { ...emptyPart("salesByBrand", brandName(main)), place: board.points, points: board.points, position: board.position, of: board.of };
-
-        const mb = brandMargin.get(main)!.get(person.id);
-        const score = person.brands[main];
-        const pending = !!score && score.blindOrders > 0;
-        const tier = brandTier(score, main, tiers);
-        const bonus = tierBonus(tier?.bandKey);
-        parts.marginByBrand = { ...emptyPart("marginByBrand", [brandName(main), tier?.label].filter(Boolean).join(" · ")),
-          place: mb?.points ?? 0, bonus, points: round2((mb?.points ?? 0) + bonus), position: mb?.position ?? null, of: mb?.of ?? 0, pending };
       } else {
         parts.salesByBrand.note = "No brand";
+      }
+
+      // Margin by brand: the brand with a Margin board they sold most — never one on its own scheme (2990s).
+      const mainMargin = marginBrands === brands ? main : mainBrand(person, marginBrands);
+      if (mainMargin) {
+        const mb = brandMargin.get(mainMargin)!.get(person.id);
+        const score = person.brands[mainMargin];
+        const pending = !!score && score.blindOrders > 0;
+        const tier = brandTier(score, mainMargin, tiers);
+        const bonus = tierBonus(tier?.bandKey);
+        parts.marginByBrand = { ...emptyPart("marginByBrand", [brandName(mainMargin), tier?.label].filter(Boolean).join(" · ")),
+          place: mb?.points ?? 0, bonus, points: round2((mb?.points ?? 0) + bonus), position: mb?.position ?? null, of: mb?.of ?? 0, pending };
+      } else {
         parts.marginByBrand.note = "No brand";
       }
 

@@ -87,4 +87,20 @@ describe("monthFinishes — a final month's places, from the Arena's own boards"
     const withKpi = monthFinishes({ month: "2026-09", snapshot: { ...snapshot, people: kpiPeople }, history: null, kpi: { enabled: true, threshold: 3 } });
     expect(withKpi.filter(f => f.board === "KPI").map(f => [f.staffId, f.title, f.place])).toEqual([["c", "KPI items", 1]]);
   });
+
+  // 2026-11-12 — 2990s follows its own commission scheme: a finish on its Sales board, and no Margin board of its own
+  // ("他唯一不会出现的，只是所谓的 margin arena，但他会出现到 sales arena、brand arena").
+  it("keeps a Sales finish for a brand on its own scheme, and no Margin board", () => {
+    const folk = [
+      person("a", { sales: 4300, marginRevenue: 300, marginCost: 150 }, { "2990S": { sales: 4000 }, AKEMI: { sales: 300, marginRevenue: 300, marginCost: 150 } }),
+      person("b", { sales: 3000 }, { "2990S": { sales: 3000 } }),
+    ];
+    const own = monthFinishes({ month: "2026-11", history: null, kpi: { enabled: false, threshold: null },
+      snapshot: { ...snapshot, people: folk, brands: [{ code: "AKEMI", name: "Akemi", ownScheme: false }, { code: "2990S", name: "2990s", ownScheme: true }] } });
+    const titles = (id: string, board: string) => own.filter(f => f.staffId === id && f.board === board).map(f => `${f.title} · ${f.place}`);
+    expect(titles("a", "Sales")).toEqual(["Total sales · 1", "Sales · Akemi · 1", "Sales · 2990s · 1"]);
+    expect(titles("b", "Sales")).toEqual(["Total sales · 2", "Sales · 2990s · 2"]);
+    expect(titles("a", "Margin")).toEqual(["Total margin · 1", "Margin · Akemi · 1"]);
+    expect(own.some(f => f.title === "Margin · 2990s")).toBe(false);
+  });
 });

@@ -59,6 +59,12 @@ export interface IncomeBill {
    * their sales, target or the Arena).
    */
   commissionOnly?: true;
+  /**
+   * A bill of a brand that follows its own commission scheme (2990s, 2026-11-12): paid the rank's rate for the brand,
+   * in no margin — it has none to read and waits for no cost. Live months only (the engine's row); a closed month
+   * reads it off the order book.
+   */
+  ownScheme?: true;
 }
 
 export interface IncomeOverride {
@@ -161,6 +167,7 @@ function bill(row: CommissionOrderRow): IncomeBill {
     sharePct: row.share && part ? part.pct : null,
     brand: row.brands[0] ?? null,
     ...(row.commissionOnly ? { commissionOnly: true as const } : {}),
+    ...(row.ownBrand ? { ownScheme: true as const } : {}),
   };
 }
 

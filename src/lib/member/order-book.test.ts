@@ -154,3 +154,19 @@ describe("readOrderBook — the whole bill and its margin cut", () => {
     expect(readOrderBook(raw())!.orders[0]).not.toHaveProperty("fullRevenue");
   });
 });
+
+// 2026-11-12 — 2990s follows its own commission scheme: its bill is the member's sale, in no margin. The server says
+// which bill it is; every other bill carries no flag, and anything but `true` is no flag.
+describe("readOrderBook — a bill of a brand on its own scheme", () => {
+  it("reads the flag only when the server says so", () => {
+    const own = raw();
+    Object.assign(own.orders[0], { brand: "2990S", margin: null, noSales: false, ownScheme: true });
+    expect(readOrderBook(own)!.orders[0]).toMatchObject({ brand: "2990S", margin: null, noSales: false, ownScheme: true });
+    expect(readOrderBook(raw())!.orders[0]).not.toHaveProperty("ownScheme");
+    for (const value of [false, "true", 1, null]) {
+      const other = raw();
+      Object.assign(other.orders[0], { ownScheme: value });
+      expect(readOrderBook(other)!.orders[0]).not.toHaveProperty("ownScheme");
+    }
+  });
+});
