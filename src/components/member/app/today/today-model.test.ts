@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MemberInsightBlock, MemberMemo, MemberRequest } from "@/lib/member/types";
 import type { MemberArenaSnapshot, ArenaPerson } from "@/lib/member/arena";
+import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
 import { amountParts, reachedTier, shortTier, thousands, todayModel, weekFriday, type TodayInput } from "./today-model";
 import { shareRequestFromRow } from "@/lib/member/share-requests";
@@ -245,6 +246,26 @@ describe("loading is never mistaken for no sales", () => {
     const loaded = todayModel({ ...base, metricsLoading: false, insight: block({ sales: 0 }, null) });
     expect(loaded.metrics.map(x => [x.value, x.tag])).toEqual([["RM 0k", "Counted sales"], ["—", "No sales yet"], ["0", "Below threshold"]]);
     expect(loaded.metrics.every(x => !x.loading)).toBe(true);
+  });
+
+  // 2026-11-12 — found on production the day 2990s went onto its own scheme: ETHAN's November, six 2990s bills, read
+  // "No sales yet" under Margin beside RM 21.2k of sales. What he sold stands in no margin, and waits for no cost.
+  it("a month of a brand on its own scheme says Own scheme where its margin would be", () => {
+    const sold = todayModel({ ...base, insight: block({ sales: 21_200, orders: 6 }, null) });
+    expect(sold.metrics.map(x => [x.value, x.tag])).toEqual([["RM 21.2k", "Counted sales"], ["—", "Own scheme"], ["0", "Below threshold"]]);
+    // A bill still waiting for its cost says so first.
+    expect(todayModel({ ...base, insight: block({ sales: 21_200, blindOrders: 1 }, null) }).metrics[1].tag).toBe("Cost pending");
+    // Read off Insight's own bills when they are there: every counted bill the brand's.
+    const own = (id: string, revenue: number): MemberBookOrder => ({
+      id, number: `2990-SO-2610-${id}`, ref: null, customer: "Helena", date: "2026-10-02", sourceMonth: "2026-10", recognitionMonth: "2026-10",
+      brand: "2990S", booth: "2990S", venue: "PENANG WATERFRONT", fairStart: "2026-10-02", fairEnd: "2026-10-04", organiser: "MALL MGMT",
+      week: "2026-10-02", revenue, margin: null, noSales: false, ownScheme: true, kpiQty: 0, cleared: true, carried: false, manual: false,
+      total: revenue, paid: revenue, depositNeeded: 0, lines: [], own: true, share: null,
+    });
+    const book: MemberOrderBook = { from: "2026-10", through: "2026-10", asOf: "2026-10-03T06:40:00Z", paysFrom: "2026-10", closedMonths: [], brandWeeks: {},
+      orders: [own("017", 3_740), own("020", 3_990)], margins: { overall: null, brands: {} } };
+    expect(todayModel({ ...base, insight: block({ sales: 7_730, orders: 2 }, null), book, bands: [] }).metrics[1]).toMatchObject({ value: "—", tag: "Own scheme" });
+    expect(todayModel({ ...base, insight: block({ sales: 0 }, null), book: { ...book, orders: [] }, bands: [] }).metrics[1]).toMatchObject({ value: "—", tag: "No sales yet" });
   });
 
   it("figures kept from an earlier open show while they are read again — no placeholder over them", () => {

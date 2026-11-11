@@ -124,6 +124,28 @@ export const ownSchemeBill = (o: MemberBookOrder): boolean => o.ownScheme === tr
 /** What such a bill says where a margin or its tier would be. */
 export const OWN_SCHEME_PILL = "Own scheme";
 
+/**
+ * What stands where a month's margin would be when it reads none (2026-11-12): a cost still waited for; the brand's
+ * own scheme when what was sold stands in no margin at all — a month of 2990s bills read "No sales yet" beside its
+ * RM 21,200 of sales; else no sales yet.
+ */
+export const noMarginTag = (pending: boolean, ownOnly: boolean): string =>
+  pending ? "Cost pending" : ownOnly ? OWN_SCHEME_PILL : "No sales yet";
+
+/**
+ * A month's score — a person's — that sold and stands in no margin: nothing of it is measured, costs anything or
+ * waits for a cost. Only the bills of a brand on its own scheme are so (the facts answer them no margin and a
+ * no-sales cost of 0); a gift costs something, an uncosted bill waits.
+ */
+export const ownOnlyScore = (score: { sales: number; marginRevenue: number; marginCost: number; blindOrders: number }): boolean =>
+  score.sales > 0 && !(score.marginRevenue > 0) && !(score.marginCost > 0) && !(score.blindOrders > 0);
+
+/** Every counted bill of the book is of a brand on its own scheme: the month sold, and stands in no margin. */
+const ownOnlyBook = (book: MemberOrderBook | null): boolean => {
+  const done = counted(book);
+  return done.length > 0 && done.every(ownSchemeBill);
+};
+
 /** Waits for a cost: a bill that sells with none yet, or a gift whose goods are not all costed. An answer from before the server said which bills have no sales reads as it always did. */
 const pendingCost = (o: MemberBookOrder): boolean =>
   o.margin === null && !ownSchemeBill(o) && (o.noSales === undefined ? o.revenue > 0 : !o.noSales);
@@ -189,6 +211,8 @@ export interface InsightMainVM {
     kpi: { value: string; pill: string; pillTone: Tone; sub: string };
     orders: { value: string; pill: string; sub: string; subAmber: boolean };
     overall: string;
+    /** The month sold and stands in no margin (every counted bill a brand's on its own scheme): no brand row, and no "No counted sales yet". */
+    ownOnly: boolean;
     brands: BrandRowVM[];
     notice: { title: string; body: string } | null;
   };
@@ -239,6 +263,8 @@ export interface MarginStanding {
   blind: number;
   /** The lowest incentive's label, for "Below Tier 1". */
   lowest: string | null;
+  /** The month sold, and every counted bill is of a brand on its own scheme (2026-11-12): no margin to read, none waited for. */
+  ownOnly: boolean;
 }
 
 /** Where the month's margin stands — one reading for Today and Insight alike. */
@@ -251,6 +277,7 @@ export function marginStanding(book: MemberOrderBook | null, bands: readonly Mem
     held: stats.some(s => s.blind > 0 || s.code === "UNCLASSIFIED"),
     blind: stats.reduce((n, s) => n + s.blind, 0),
     lowest,
+    ownOnly: ownOnlyBook(book),
   };
 }
 
@@ -325,7 +352,7 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const hits = kpiCounts ? team.filter(r => r.kpiQty >= threshold!).length : 0;
   const rows: TeamRowVM[] = [...team].sort((a, b) => b.sales - a.sales || a.name.localeCompare(b.name)).map(r => {
     const m = r.marginRevenue > 0 ? ((r.marginRevenue - r.marginCost) / r.marginRevenue) * 100 : null;
-    const marginText = m === null ? (r.blindOrders > 0 ? "Cost pending" : "No sales yet") : `${m.toFixed(1)}%`;
+    const marginText = m === null ? noMarginTag(r.blindOrders > 0, ownOnlyScore(r)) : `${m.toFixed(1)}%`;
     return {
       id: r.staffId || (r.mine ? "me" : r.name), ini: initials(r.name), name: r.mine ? `${r.name} (you)` : r.name, title: r.title,
       sales: rm(r.sales), meta: kpiCounts ? `${marginText} · ${r.kpiQty >= threshold! ? "KPI hit" : "KPI pending"}` : marginText, mine: r.mine,
@@ -342,7 +369,8 @@ export function insightMain(input: InsightInput): InsightMainVM {
         value: String(done.length), pill: "Deposit cleared",
         sub: held.length ? `${held.length} waiting for deposit` : "Nothing waiting", subAmber: held.length > 0,
       },
-      overall: overall === null ? (done.some(pendingCost) ? "Cost pending" : "No sales yet") : `${overall.toFixed(1)}% overall`,
+      overall: overall === null ? noMarginTag(done.some(pendingCost), ownOnlyBook(book)) : `${overall.toFixed(1)}% overall`,
+      ownOnly: ownOnlyBook(book),
       brands: stats.map(b => {
         const { pill, tone } = brandPill(b);
         return { code: b.code, name: brandName(b.code), sub: `${rm(b.goods)} goods · ${plural(b.orders, "order")}`, pct: b.margin === null ? "—" : `${b.margin.toFixed(1)}%`, pill, tone };

@@ -872,6 +872,39 @@ describe('CommissionWorkbench — a brand on its own scheme', () => {
     expect(salesRow(personalTable(), 'SO-one')).not.toHaveTextContent('Own scheme')
   })
 
+  // 2026-11-12 — ETHAN's November was six 2990s bills, and the list still read "Cost incomplete" under his margin.
+  it('says Own scheme under the margin of a month that is all the brand’s, and nothing for a month with no bill', () => {
+    const data = ownFixture()
+    data.input.orders = [sale('own', 1_000, { brandCode: '2990S' })]
+    renderBoard(data)
+    const summary = screen.getByRole('table', { name: 'Salesperson commission summary' })
+    const anthony = within(within(summary).getByRole('row', { name: /Anthony/ })).getAllByRole('cell')
+    expect(anthony[3]).toHaveTextContent('RM 1,000.00')
+    expect(anthony[8]).toHaveTextContent(/^—Own scheme$/)
+    // Alex sold nothing himself: no margin to read, and no cost to wait for.
+    const alex = within(within(summary).getByRole('row', { name: /Alex/ })).getAllByRole('cell')
+    expect(alex[8]).toHaveTextContent(/^—$/)
+    expect(summary).not.toHaveTextContent('Cost incomplete')
+
+    choose('Anthony')
+    expect(screen.getByText('Monthly margin').parentElement).toHaveTextContent(/^Monthly margin—Own scheme$/)
+    expect(screen.queryByText('Cost incomplete')).toBeNull()
+  })
+
+  it('still says Cost incomplete while one of their other bills waits for a cost', () => {
+    const data = ownFixture()
+    const bare = sale('one')
+    bare.lines = bare.lines.map(line => ({ ...line, costAmount: undefined }))
+    data.input.orders = [bare, sale('own', 1_000, { brandCode: '2990S' })]
+    renderBoard(data)
+    const summary = screen.getByRole('table', { name: 'Salesperson commission summary' })
+    const anthony = within(within(summary).getByRole('row', { name: /Anthony/ })).getAllByRole('cell')
+    expect(anthony[8]).toHaveTextContent(/^—Cost incomplete$/)
+
+    choose('Anthony')
+    expect(screen.getByText('Monthly margin').parentElement).toHaveTextContent(/^Monthly margin—Cost incomplete$/)
+  })
+
   it('pays the upline its differential on the brand’s rates', () => {
     renderBoard(ownFixture())
     choose('Alex')

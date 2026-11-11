@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { MemberBand } from "@/lib/member/types";
+import type { MemberBand, MemberDownlineRow } from "@/lib/member/types";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
-import { billGroups, billsView, brandPage, insightMain, kpiView, marginStanding, orderSheet, type InsightInput } from "./insight-model";
+import { billGroups, billsView, brandPage, insightMain, kpiView, marginStanding, noMarginTag, orderSheet, ownOnlyScore, type InsightInput } from "./insight-model";
 import { monthPeriod } from "./period";
 
 const band = (brand: string, key: string, kind: MemberBand["kind"], threshold: number, multiplier = 1, amount = 0): MemberBand =>
@@ -341,12 +341,37 @@ describe("Insight › a bill of a brand on its own scheme", () => {
     expect(pills).toEqual({ "1": "40.0%", "2": "Own scheme", "3": "Due RM 472" });
     expect(orderSheet(input({ book: mixed }), "2")).toMatchObject({ amt: "RM 4,240", margin: "—", tier: "Own scheme", status: "Deposit cleared" });
   });
-  it("with nothing else sold, the month has no margin to read and nothing held", () => {
+  // Found on production the day it went live: ETHAN's November — six 2990s bills, RM 21,200 — read "No sales yet" where
+  // its margin would be, on Today and on Insight, beside the sales themselves.
+  it("with nothing else sold, the month says Own scheme where its margin would be — never No sales yet — and nothing is held", () => {
     const only = { ...book([own({ id: "2", revenue: 3990 })]), margins: { overall: null, brands: {} } };
     const vm = insightMain(input({ book: only }));
-    expect([vm.personal.sales.amount, vm.personal.brands, vm.personal.overall, vm.personal.notice]).toEqual(["RM 3,990", [], "No sales yet", null]);
-    expect(marginStanding(only, BANDS)).toMatchObject({ margin: null, tier: null, held: false, blind: 0 });
+    expect([vm.personal.sales.amount, vm.personal.brands, vm.personal.overall, vm.personal.notice]).toEqual(["RM 3,990", [], "Own scheme", null]);
+    expect(vm.personal.ownOnly).toBe(true);
+    expect(marginStanding(only, BANDS)).toMatchObject({ margin: null, tier: null, held: false, blind: 0, ownOnly: true });
     // No brand page is its: the page opens on a brand a margin is read on, or on none.
     expect(brandPage(input({ book: only }), "2990S")).toBeNull();
+  });
+  it("still says No sales yet of a month with no bill, and Cost pending while another bill waits for its cost", () => {
+    const none = insightMain(input({ book: { ...book([]), margins: { overall: null, brands: {} } } }));
+    expect([none.personal.overall, none.personal.ownOnly]).toEqual(["No sales yet", false]);
+    const waits = { ...book([order({ id: "1", revenue: 2000, margin: null, noSales: false }), own({ id: "2", revenue: 3990 })]), margins: { overall: null, brands: {} } };
+    const vm = insightMain(input({ book: waits }));
+    expect([vm.personal.overall, vm.personal.ownOnly]).toEqual(["Cost pending", false]);
+    expect(marginStanding(waits, BANDS)).toMatchObject({ blind: 1, ownOnly: false });
+    // The sums a board carries say the same of a person: sold, in no margin, nothing waited for.
+    expect(noMarginTag(false, ownOnlyScore({ sales: 21200, marginRevenue: 0, marginCost: 0, blindOrders: 0 }))).toBe("Own scheme");
+    expect(noMarginTag(false, ownOnlyScore({ sales: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0 }))).toBe("No sales yet");
+    // A gift that cost something is a cost against the month, not a scheme of its own.
+    expect(noMarginTag(false, ownOnlyScore({ sales: 300, marginRevenue: 0, marginCost: 120, blindOrders: 0 }))).toBe("No sales yet");
+    expect(noMarginTag(true, ownOnlyScore({ sales: 300, marginRevenue: 0, marginCost: 0, blindOrders: 1 }))).toBe("Cost pending");
+  });
+  it("names it on My team's row of somebody whose month is all the brand's", () => {
+    const row = (name: string, score: Partial<MemberDownlineRow> = {}): MemberDownlineRow => ({
+      staffId: name, name, title: "Revenue Specialist", uplineId: null, depth: 1,
+      sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, lastOrder: null, ...score,
+    });
+    const vm = insightMain(input({ book: mixed, downline: [row("ETHAN", { sales: 21200, orders: 6 }), row("ESTHER"), row("SHELDON", { sales: 9480, marginRevenue: 2000, marginCost: 1200 })] }));
+    expect(Object.fromEntries(vm.team.rows.filter(r => !r.mine).map(r => [r.name, r.meta.split(" · ")[0]]))).toEqual({ ETHAN: "Own scheme", ESTHER: "No sales yet", SHELDON: "40.0%" });
   });
 });
