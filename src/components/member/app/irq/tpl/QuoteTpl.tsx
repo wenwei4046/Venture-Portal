@@ -2525,8 +2525,15 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                           {"\n                  "}
                         </span>
                         {"\n                  "}
-                        <span style={dcCss(`flex:0 0 auto;font-size:13.5px;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_o_12?.["ink"])}`)}>
-                          {dcText(L_o_12?.["delta"])}
+                        <span style={{"flex":"0 0 auto","display":"flex","flexDirection":"column","alignItems":"flex-end","gap":"8px"}}>
+                          <span style={dcCss(`flex:0 0 auto;font-size:13.5px;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_o_12?.["ink"])}`)}>
+                            {dcText(L_o_12?.["delta"])}
+                          </span>
+                          {(L_o_12?.["canUse"]) ? (<>
+                            <span role={"button"} onClick={L_o_12?.["use"]} style={{"display":"inline-flex","alignItems":"center","height":"32px","padding":"0 14px","borderRadius":"10px","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650","cursor":"pointer"}}>
+                              {dcText(L_o_12?.["useLabel"])}
+                            </span>
+                          </>) : null}
                         </span>
                         {"\n                "}
                       </button>
