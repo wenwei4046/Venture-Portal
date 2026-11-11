@@ -81,6 +81,12 @@ describe("the generated IR Quote templates", () => {
     expect(quote).toMatch(/"sqftD"\][\s\S]{0,400}\{"sqft"\}/);
   });
 
+  // The user, 2026-11-11, Change item open on a coffee table: "我要的是选了家私后 要储存我要的家私".
+  it("give each Change item / Add item option a Use button under its price", () => {
+    const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
+    expect(quote).toMatch(/"canUse"\][\s\S]{0,300}"use"\][\s\S]{0,600}"useLabel"\]/);
+  });
+
   it("read the app's own faces, never a font the page did not load", () => {
     for (const [f, src] of tpls) expect(/font-family:[^;"]*\b(Manrope|Space Grotesk)\b/.test(src.replace(/var\(--font-[a-z-]+\)/g, "")), f).toBe(false);
   });

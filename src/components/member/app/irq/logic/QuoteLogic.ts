@@ -545,6 +545,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         name: title(o.gname), code: [o.code || "—", o.color].filter(Boolean).join(" · "), img: im, initials: im ? "" : (o.name.match(/\b[A-Z]/g) || []).slice(0, 2).join(""),
         collection: o.collection || "", vars: o.vars, hasVars: o.hasVars, varCount: o.varCount,
         sample: !!o.sample, delta: o.delta, ink: o.ink, pick: () => this.apply(o.item),
+        // A Use (Add) button under the price, the option on show applied (2026-11-11); the one in use reads "Selected" alone.
+        canUse: !o.cur, useLabel: st.sheet?.mode === "swap" ? "Use" : "Add", use: e => { e.stopPropagation(); this.apply(o.item); },
         zoomTitle: im ? "View larger" : "", zoomCursor: im ? "zoom-in" : "inherit",
         zoom: e => { if (!im) return; e.stopPropagation(); this.openZoom(zl, zl.findIndex(z => z.img === im)); }
       }; });
