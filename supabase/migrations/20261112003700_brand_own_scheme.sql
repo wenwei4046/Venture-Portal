@@ -23,7 +23,7 @@
 --      (erp_sync_order_brand asks the company first; a Happi Sleep mattress on a 2990's Home document is a 2990s bill).
 --   2. ITS OWN RATE PER RANK (comm_rank_defs.brand_rates, keyed by the brand's id): the user's list, seeded on Fair's
 --      catalogue — Rank B (Team Leader) 8%, C 7%, D 6%, E 5%, F (Revenue Specialist) 4%. A rank with none pays the
---      nearest rank below that has one (lib/commission/engine.ts › brandRateOf); Rules › Ranks edits them.
+--      nearest rank below that has one (lib/commission/brand-rates.ts › brandRateOf); Rules › Ranks edits them.
 --   3. ONLY THE TEAM'S ARE KEPT. A NEW document of such a company whose salesperson is not on the sub-department's
 --      team in the month of the sale (erp_sync_outside_team: matched in comm_agent_aliases as the receiver matches,
 --      holding a place on the sub-department's scheme in that month or directing it, not resigned before the sale) is
@@ -33,45 +33,53 @@
 --      audit trail (they paid nobody; no release, share, exclusion or close names one); the team's own are stamped
 --      2990S, bills and lines. A bill HR took out by hand stays out — *Count this bill again* is HR's.
 --
+--   5. NO COST IS WAITED FOR. Such a bill stands in no margin, so the two lists of products a month still has no
+--      cost for leave its lines out: revenue_uncosted_products (Comm Cal › All bills) and revenue_costing_gaps
+--      (Product List › Costing gaps).
+--
 -- The run reads all of it in TypeScript (EngineInput.ownSchemeBrands, Rank.brandRates): a bill of such a brand is
 -- paid the rank's rate for the brand, the override up its line is read on those rates, it stands in no margin, and
 -- the sub-department's KPI items are not found on it.
 --
--- ingest_erp_sales_order is made again from PRODUCTION's body (2026-11-11, md5 of prosrc d8395b13…, the body
--- 20261107200000 left) with two statements swapped; erp_sync_order_brand from production's (d0cb3217…, the body
--- 20260927080000 left) with one answer put ahead of the rest — each refused if production's body has changed since.
+-- Four functions are made again from PRODUCTION's bodies (2026-11-11, md5 of prosrc), each refused if production's
+-- body has changed since: ingest_erp_sales_order (d8395b13…, the body 20261107200000 left) with two statements
+-- swapped; erp_sync_order_brand (d0cb3217…, 20260927080000's) with one answer put ahead of the rest;
+-- revenue_uncosted_products (89e2715b…) and revenue_costing_gaps (1348d459…) with one condition added each.
 --
 -- Rollback, in words: take the two swapped statements out of ingest_erp_sales_order again (or re-apply
 -- 20261107200000's body), give erp_sync_order_brand its four answers back, and switch the brand off
--- (comm_brands.is_active false for 2990S) — the removed bills come back with the ERP's next save of each, or its
--- back-fill.
+-- (comm_brands.is_active false for 2990S — the two lists then leave nothing out) — the removed bills come back
+-- with the ERP's next save of each, or its back-fill.
 --
 -- PGlite: tests/member-sql/validate-brand-own-scheme.mjs (production's bodies, md5-checked; the migration verbatim,
 -- twice).
 
 BEGIN;
 
--- Production's bodies (2026-11-11, pg_get_functiondef, md5 of prosrc), or this migration's own once it has run.
+-- The functions this migration makes again: production's body it was written from (2026-11-11, pg_get_functiondef,
+-- md5 of prosrc), and the body it makes.
+CREATE TEMP TABLE brand_own_scheme_fns (proc text PRIMARY KEY, written_from text NOT NULL, makes text NOT NULL) ON COMMIT DROP;
+INSERT INTO brand_own_scheme_fns VALUES
+  ('public.ingest_erp_sales_order(jsonb, uuid)',   'd8395b13f77fd3f4b3380b8ec0be9954', 'f928dad80f27bc09b268e2e34c51a708'),
+  ('public.erp_sync_order_brand(jsonb, uuid)',     'd0cb32176b535e5fa6927ac0e224ec5a', 'c1c371268abf92b9cbe27824bc080057'),
+  ('public.revenue_uncosted_products(uuid, date)', '89e2715b6230847840d30b8770ded97d', '1816132d91314150de8a8e57dc853ac2'),
+  ('public.revenue_costing_gaps(date, date)',      '1348d459ad65cd4efe6a4fdc5ff356ee', '4e7d29d4f2e109d1156d1c136f6afcdc');
+
+-- Each is production's body, or this migration's own once it has run — else nothing is touched.
 DO $$
 DECLARE
+  v_fn  record;
   v_md5 text;
 BEGIN
-  SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5
-    FROM pg_proc WHERE oid = to_regprocedure('public.ingest_erp_sales_order(jsonb, uuid)');
-  IF v_md5 IS NULL THEN
-    RAISE EXCEPTION 'public.ingest_erp_sales_order(jsonb, uuid) is not on this database';
-  END IF;
-  IF v_md5 IS DISTINCT FROM 'd8395b13f77fd3f4b3380b8ec0be9954' AND v_md5 IS DISTINCT FROM 'f928dad80f27bc09b268e2e34c51a708' THEN
-    RAISE EXCEPTION 'public.ingest_erp_sales_order is md5 %, not the body this migration was written from', v_md5;
-  END IF;
-  SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5
-    FROM pg_proc WHERE oid = to_regprocedure('public.erp_sync_order_brand(jsonb, uuid)');
-  IF v_md5 IS NULL THEN
-    RAISE EXCEPTION 'public.erp_sync_order_brand(jsonb, uuid) is not on this database';
-  END IF;
-  IF v_md5 IS DISTINCT FROM 'd0cb32176b535e5fa6927ac0e224ec5a' AND v_md5 IS DISTINCT FROM 'c1c371268abf92b9cbe27824bc080057' THEN
-    RAISE EXCEPTION 'public.erp_sync_order_brand is md5 %, not the body this migration was written from', v_md5;
-  END IF;
+  FOR v_fn IN SELECT * FROM brand_own_scheme_fns ORDER BY proc LOOP
+    SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure(v_fn.proc);
+    IF v_md5 IS NULL THEN
+      RAISE EXCEPTION '% is not on this database', v_fn.proc;
+    END IF;
+    IF v_md5 IS DISTINCT FROM v_fn.written_from AND v_md5 IS DISTINCT FROM v_fn.makes THEN
+      RAISE EXCEPTION '% is md5 %, not the body this migration was written from', v_fn.proc, v_md5;
+    END IF;
+  END LOOP;
 END $$;
 
 -- The old text, every run of whitespace matching any run, replaced by the new — found exactly once, or refused
@@ -90,6 +98,29 @@ BEGIN
   END IF;
   v_found := (regexp_match(p_src, '(' || v_pat || ')'))[1];
   RETURN replace(p_src, v_found, p_new);
+END
+$fn$;
+
+-- A function made again from the body the database holds, its statements swapped in pairs (old, new) — unless it is
+-- this migration's own body already.
+CREATE OR REPLACE FUNCTION pg_temp.remake(p_proc text, p_swaps text[])
+RETURNS void
+LANGUAGE plpgsql AS $fn$
+DECLARE
+  v_oid   regprocedure := to_regprocedure(p_proc);
+  v_makes text;
+  v_def   text;
+  i       integer;
+BEGIN
+  SELECT makes INTO STRICT v_makes FROM brand_own_scheme_fns WHERE proc = p_proc;
+  IF (SELECT md5(replace(prosrc, E'\r', '')) FROM pg_proc WHERE oid = v_oid) = v_makes THEN
+    RETURN;  -- made already
+  END IF;
+  v_def := pg_get_functiondef(v_oid);
+  FOR i IN 1 .. array_length(p_swaps, 1) / 2 LOOP
+    v_def := pg_temp.swap_text(v_def, p_swaps[2 * i - 1], p_swaps[2 * i]);
+  END LOOP;
+  EXECUTE v_def;
 END
 $fn$;
 
@@ -144,7 +175,14 @@ BEGIN
 END $$;
 
 COMMENT ON COLUMN public.comm_rank_defs.brand_rates IS
-  'What the rank pays on a bill of a brand that follows its own scheme (comm_brands.own_scheme), by the brand''s id: { "<brand id>": 0.08 } (2026-11-11 — 2990s: Team Leader 8%, each rank a point under Fair''s). A rank with none for a brand pays the nearest rank below that has one (brandRateOf, lib/commission/engine.ts). Edited on Rules › Ranks.';
+  'What the rank pays on a bill of a brand that follows its own scheme (comm_brands.own_scheme), by the brand''s id: { "<brand id>": 0.08 } (2026-11-11 — 2990s: Team Leader 8%, each rank a point under Fair''s). A rank with none for a brand pays the nearest rank below that has one (brandRateOf, lib/commission/brand-rates.ts). Edited on Rules › Ranks.';
+
+-- The run reads those rates with the ladder (comm_ranks → comm_rank_defs), behind every gate a month's commission is
+-- worked out under: Revenue · Edit joins the rank catalogue's readers, as it already reads the ladder itself.
+INSERT INTO public.permission_table_reads (table_name, actions) VALUES
+  ('comm_rank_defs', ARRAY['revenue.edit', 'revenue.manage', 'revenue.view:own'])
+ON CONFLICT (table_name) DO UPDATE SET actions = EXCLUDED.actions;
+SELECT public.permission_reads_guard('comm_rank_defs');
 
 -- ── 3. 2990s, for Fair ───────────────────────────────────────────────────────────────────────────────────────────────
 -- The ERP names its booths and its products "2990s Sofa" / "2990s Mattress": the brand's sub-brands, so a booth and a
@@ -297,12 +335,8 @@ REVOKE ALL ON FUNCTION public.erp_sync_outside_team(uuid, jsonb, date) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.erp_sync_outside_team(uuid, jsonb, date) TO authenticated, service_role;
 
 -- ── 6. The receiver keeps only the team's ────────────────────────────────────────────────────────────────────────────
-DO $made$
-DECLARE
-  v_oid regprocedure := to_regprocedure('public.ingest_erp_sales_order(jsonb, uuid)');
-  v_def text;
-  -- Each old text starts at its first character: a leading run of whitespace would take the line break before it.
-  v_swaps text[] := ARRAY[
+-- Each old text starts at its first character: a leading run of whitespace would take the line break before it.
+SELECT pg_temp.remake('public.ingest_erp_sales_order(jsonb, uuid)', ARRAY[
     -- (a) One more declaration.
     $o$v_old           JSONB;
     v_is_old        BOOLEAN := FALSE;
@@ -332,34 +366,41 @@ BEGIN$n$,
     END IF;
 
     -- (20260927010000) The fair the ERP names. Since 2026-09-13 the ERP makes$n$
-  ];
-  i integer;
-BEGIN
-  IF (SELECT md5(replace(prosrc, E'\r', '')) FROM pg_proc WHERE oid = v_oid) = 'f928dad80f27bc09b268e2e34c51a708' THEN
-    RETURN;  -- made already
-  END IF;
-  v_def := pg_get_functiondef(v_oid);
-  FOR i IN 1 .. array_length(v_swaps, 1) / 2 LOOP
-    v_def := pg_temp.swap_text(v_def, v_swaps[2 * i - 1], v_swaps[2 * i]);
-  END LOOP;
-  EXECUTE v_def;
-END $made$;
+]);
+
+-- ── 6b. No cost is waited for ────────────────────────────────────────────────────────────────────────────────────────
+-- A bill of a brand on its own scheme stands in no margin, so nobody has to cost its lines: they leave the two
+-- lists of products a month still has no cost for. One condition added to each of production's bodies.
+SELECT pg_temp.remake('public.revenue_uncosted_products(uuid, date)', ARRAY[
+    $o$WHERE sl.cost_source IS NULL$o$,
+    $n$WHERE sl.cost_source IS NULL
+           -- (20261112003700) A bill of a brand on its own scheme (2990s) stands in no margin: it waits for no cost.
+           AND NOT EXISTS (SELECT 1 FROM comm_brands ob
+                            WHERE ob.scheme_id = sc.id AND ob.own_scheme AND ob.is_active
+                              AND UPPER(BTRIM(ob.code)) = UPPER(BTRIM(o.brand_code)))$n$
+]);
+
+SELECT pg_temp.remake('public.revenue_costing_gaps(date, date)', ARRAY[
+    $o$AND l.cost_source IS NULL$o$,
+    $n$AND l.cost_source IS NULL
+           -- (20261112003700) A bill of a brand on its own scheme (2990s) stands in no margin: it waits for no cost.
+           AND NOT EXISTS (SELECT 1 FROM comm_brands ob
+                            WHERE ob.own_scheme AND ob.is_active
+                              AND UPPER(BTRIM(ob.code)) = UPPER(BTRIM(o.brand_code)))$n$
+]);
 
 -- What this migration made is what it was written to make.
 DO $$
 DECLARE
+  v_fn  record;
   v_md5 text;
 BEGIN
-  SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5
-    FROM pg_proc WHERE oid = to_regprocedure('public.ingest_erp_sales_order(jsonb, uuid)');
-  IF v_md5 IS DISTINCT FROM 'f928dad80f27bc09b268e2e34c51a708' THEN
-    RAISE EXCEPTION 'public.ingest_erp_sales_order ended as md5 %, not the body this migration makes', v_md5;
-  END IF;
-  SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5
-    FROM pg_proc WHERE oid = to_regprocedure('public.erp_sync_order_brand(jsonb, uuid)');
-  IF v_md5 IS DISTINCT FROM 'c1c371268abf92b9cbe27824bc080057' THEN
-    RAISE EXCEPTION 'public.erp_sync_order_brand ended as md5 %, not the body this migration makes', v_md5;
-  END IF;
+  FOR v_fn IN SELECT * FROM brand_own_scheme_fns ORDER BY proc LOOP
+    SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure(v_fn.proc);
+    IF v_md5 IS DISTINCT FROM v_fn.makes THEN
+      RAISE EXCEPTION '% ended as md5 %, not the body this migration makes', v_fn.proc, v_md5;
+    END IF;
+  END LOOP;
 END $$;
 
 -- ── 7. The bills already here ────────────────────────────────────────────────────────────────────────────────────────

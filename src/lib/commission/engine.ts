@@ -53,8 +53,10 @@ import {
   type KpiIndex,
 } from './kpi'
 import { costBasisOf, costDivisorFor, type CostBasis } from './cost-basis'
+import { brandRateOf } from './brand-rates'
 
 export * from './types'
+export { brandRateOf } from './brand-rates'
 export { EMPTY_KPI_INDEX, indexKpiItems, orderKpiHits, type KpiHit, type KpiIndex } from './kpi'
 export { costBasisOf, costDivisorFor, type CostBasis } from './cost-basis'
 
@@ -706,45 +708,9 @@ export function computeOverrides(
 }
 
 // ─── A brand with its own scheme ────────────────────────────────────────────
-
-/** The rate a rung itself names for a brand (`Rank.brandRates`), the code compared trimmed and in any case. */
-function namedBrandRate(rank: Rank, brand: string): number | undefined {
-  if (!rank.brandRates) return undefined
-  for (const [code, rate] of Object.entries(rank.brandRates)) {
-    if (normaliseCode(code) === brand && Number.isFinite(rate) && rate >= 0) return rate
-  }
-  return undefined
-}
-
-/**
- * What a rung pays on a bill of a brand that follows its own scheme
- * (2026-11-11 — 2990s; the user: "整个提成逻辑一样，只是它的 top rank 抽成是 8%
- * （以此类推，每级往下调 1%）": Team Leader 8%, Senior Team Assistant 7%, Team
- * Assistant 6%, Senior Revenue Specialist 5%, Revenue Specialist 4%).
- *
- * The rate the rung names for that brand. A rung that names none pays the
- * NEAREST RUNG BELOW that does — the brand's top rate stays its top rate (the
- * user's list ends at Team Leader, 8%), and a rung never pays less than the
- * one under it. With none below: the rung's own rate, never above the nearest
- * named rate over it. A brand no rung names a rate for pays every rung its own
- * rate.
- */
-export function brandRateOf(rank: Rank | undefined, brandCode: string, ladder: readonly Rank[]): number {
-  if (!rank) return 0
-  const brand = normaliseCode(brandCode)
-  const named = namedBrandRate(rank, brand)
-  if (named !== undefined) return named
-  let below: { rate: number; at: number } | null = null
-  let above: { rate: number; at: number } | null = null
-  for (const rung of ladder) {
-    const rate = namedBrandRate(rung, brand)
-    if (rate === undefined) continue
-    if (rung.sortOrder < rank.sortOrder && (!below || rung.sortOrder > below.at)) below = { rate, at: rung.sortOrder }
-    if (rung.sortOrder > rank.sortOrder && (!above || rung.sortOrder < above.at)) above = { rate, at: rung.sortOrder }
-  }
-  if (below) return below.rate
-  return above ? Math.min(rank.productRate, above.rate) : rank.productRate
-}
+// What a rung pays on such a brand's bill is `brandRateOf` (./brand-rates — a
+// rung's `brandRates` is keyed by the brand's code): the rate it names, else
+// the nearest rung below that names one.
 
 /**
  * How a run reads the brands that follow their own scheme

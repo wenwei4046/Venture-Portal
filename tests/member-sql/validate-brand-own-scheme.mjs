@@ -85,7 +85,10 @@ await db.exec(`
   CREATE TABLE sales_order_lines (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid REFERENCES sales_orders (id) ON DELETE CASCADE,
     line_no integer, item_group text, product_code text, product_name text, description2 text, uom text,
-    location text, qty numeric, unit_price numeric, line_amount numeric, brand_code text, cost_amount numeric, raw jsonb);
+    location text, qty numeric, unit_price numeric, line_amount numeric, brand_code text, cost_amount numeric, raw jsonb,
+    cost_source text, cost_detail jsonb);
+  CREATE TABLE comm_item_groups (scheme_id uuid, item_group text, commissionable boolean);
+  CREATE TABLE catalogue_skus (erp_product_id text, price numeric, price_grid jsonb);
   CREATE TABLE sales_order_brand_picks (order_id uuid PRIMARY KEY, brand_code text);
   CREATE TABLE sales_order_erp_changes (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sub_department_id uuid NOT NULL, order_no text NOT NULL,
@@ -135,6 +138,14 @@ await db.exec(`
   CREATE FUNCTION venue_key(text) RETURNS text LANGUAGE sql AS $$ SELECT NULLIF(UPPER(BTRIM($1)), '') $$;
   CREATE FUNCTION erp_sync_resequence_day(text, date) RETURNS void LANGUAGE sql AS $$ INSERT INTO reseq_log VALUES ($1, $2) $$;
   CREATE FUNCTION erp_sync_refresh_batch(uuid) RETURNS void LANGUAGE sql AS $$ INSERT INTO refresh_log VALUES ($1) $$;
+  -- The registry of who may read a table, and its guard (which re-makes the table's restrictive policy).
+  CREATE TABLE permission_table_reads (table_name text PRIMARY KEY, actions text[] NOT NULL);
+  CREATE TABLE guarded (table_name text);
+  CREATE FUNCTION permission_reads_guard(text) RETURNS void LANGUAGE sql AS $$ INSERT INTO guarded VALUES ($1) $$;
+  INSERT INTO permission_table_reads VALUES ('comm_rank_defs', '{revenue.manage,revenue.view:own}');
+  -- What the two lists of uncosted products ask besides the bills.
+  CREATE FUNCTION catalogue_sku_for_code(bigint, text) RETURNS TABLE (erp_id text) LANGUAGE sql AS $$ SELECT NULL::text WHERE false $$;
+  CREATE FUNCTION has_any_action(text[]) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
 
   INSERT INTO comm_sub_departments VALUES ('${FAIR_SUB}', 'Fair', 'FAIR'), ('${IR_SUB}', 'IR', NULL);
   INSERT INTO comm_schemes (id, sub_department_id, deposit_threshold_pct, effective_from) VALUES
@@ -167,9 +178,13 @@ await db.exec(`
 await db.exec((await readFile(new URL('./brand-own-scheme-production.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
 const md5Of = name => one(`SELECT md5(replace(prosrc, E'\\r', '')) FROM pg_proc WHERE proname = $1`, [name])
 check([await md5Of('ingest_erp_sales_order'), await md5Of('erp_sync_order_brand'), await md5Of('erp_sync_brand_code'),
-  await md5Of('sales_order_restamp_brand')],
+  await md5Of('sales_order_restamp_brand'), await md5Of('revenue_uncosted_products'), await md5Of('revenue_costing_gaps')],
   ['d8395b13f77fd3f4b3380b8ec0be9954', 'd0cb32176b535e5fa6927ac0e224ec5a', 'b0df3385c53987a71ca25a28e17d056e',
-    '19433c3e1a804498a93eeb0fd5b7aa27'], 'the fixture is production’s bodies')
+    '19433c3e1a804498a93eeb0fd5b7aa27', '89e2715b6230847840d30b8770ded97d', '1348d459ad65cd4efe6a4fdc5ff356ee'],
+  'the fixture is production’s bodies')
+// The products a month still has no cost for: Comm Cal's list (a sub-department's month) and the Product List's (a date range).
+const uncosted = async month => (await q('SELECT product_code FROM revenue_uncosted_products($1, $2) ORDER BY 1', [FAIR_SUB, month])).map(r => r.product_code)
+const gaps = async (from, to) => (await q('SELECT item_code FROM revenue_costing_gaps($1, $2) ORDER BY 1', [from, to])).map(r => r.item_code)
 
 let snapshot = 0
 // A delivery as the receiver's route hands it over (lib/erp-sync/contract.ts).
@@ -214,12 +229,16 @@ check([(await bill('2990-SO-2610-001')).staff, (await bill('2990-SO-2611-003')).
   await lineBrands('2990-SO-2611-021'), (await bill('2990-SO-2611-022')).brand, await lineBrands('2990-SO-2611-022')],
   [null, 'AKEMI', null, [null], 'AKEMI', ['AKEMI', 'AKEMI']],
   'before: 2990s’ own salespeople are unmatched agents of Fair’s months; a team member’s 2990s bill carries no brand, or the brand of a pillow on it')
+check([await uncosted(NOV), await gaps('2026-11-01', '2026-12-01')], [['2990-SF-01', 'AK-1', 'HS-PILLOW'], ['2990-SF-01', 'AK-1', 'HS-PILLOW']],
+  'and their products wait for a cost on both lists')
 await q('DELETE FROM reseq_log'); await q('DELETE FROM refresh_log'); await q('DELETE FROM fair_log')
 
 // ── The migration, verbatim, twice ───────────────────────────────────────────
 const migration = (await readFile(MIGRATION, 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(migration)
-const made = [await md5Of('ingest_erp_sales_order'), await md5Of('erp_sync_order_brand')]
+const MADE = ['ingest_erp_sales_order', 'erp_sync_order_brand', 'revenue_uncosted_products', 'revenue_costing_gaps']
+const madeNow = async () => Promise.all(MADE.map(md5Of))
+const made = await madeNow()
 const BRAND = await one(`SELECT id::text FROM comm_brands WHERE code = '2990S'`)
 const rates = async () => Object.fromEntries((await q(
   `SELECT label, brand_rates FROM comm_rank_defs WHERE scheme_id = $1 ORDER BY sort_order`, [FAIR_SCHEME]))
@@ -232,6 +251,9 @@ check(await rates(), { 'Rank F': 0.04, 'Rank E': 0.05, 'Rank D': 0.06, 'Rank C':
   'its rates: a point under each rank’s own — Team Leader 8% … Revenue Specialist 4%; the two ranks nobody named, none')
 check((await q(`SELECT own_scheme, erp_company_id FROM comm_brands WHERE code = 'AKEMI'`))[0], { own_scheme: false, erp_company_id: null },
   'every other brand: not on its own scheme, no company')
+check([await one(`SELECT actions FROM permission_table_reads WHERE table_name = 'comm_rank_defs'`), (await q('SELECT table_name FROM guarded')).map(r => r.table_name)],
+  [['revenue.edit', 'revenue.manage', 'revenue.view:own'], ['comm_rank_defs']],
+  'Revenue · Edit reads the rank catalogue now — the run reads the rates under it — and the table’s read guard is made again')
 
 // The bills already here.
 check([await bill('2990-SO-2610-001'), await bill('2990-SO-2610-002'), await bill('2990-SO-2611-003')], [undefined, undefined, undefined],
@@ -259,6 +281,8 @@ check([(await bill('2990-SO-2611-022')).brand, await lineBrands('2990-SO-2611-02
   'a bill a pillow had made Akemi’s is 2990s’ — the line keeps the brand its own product names')
 check([(await bill('2990-SO-2610-057')).brand, (await bill('2990-SO-2610-057')).cancelled], ['2990S', true],
   'a bill HR took out by hand is stamped too, and stays out')
+check([await uncosted(NOV), await gaps('2026-11-01', '2026-12-01')], [['AK-1'], ['AK-1']],
+  'no cost is waited for on a 2990s bill: its lines leave both lists — the pillow on it too; every other bill’s stay')
 check((await q('SELECT erp_project_id::int AS p, brand_code FROM erp_booths ORDER BY 1')),
   [{ p: 305, brand_code: 'AKEMI' }, { p: 400, brand_code: 'SOMEBODY ELSE' }, { p: 2289, brand_code: '2990S' }],
   'the 2990s booth reads as the brand’s; a booth whose name is no brand stays as the ERP wrote it')
@@ -268,12 +292,12 @@ await q(`UPDATE comm_rank_defs SET brand_rates = brand_rates - $1 WHERE id = $2`
 const before = await q(`SELECT (SELECT count(*) FROM sales_orders)::int AS bills, (SELECT count(*) FROM comm_brands)::int AS brands,
   (SELECT count(*) FROM sales_order_erp_changes)::int AS trail`)
 await db.exec(migration)
-check([await md5Of('ingest_erp_sales_order'), await md5Of('erp_sync_order_brand')], made, 'run again, the functions are the same')
+check(await madeNow(), made, 'run again, the functions are the same')
 check(await q(`SELECT (SELECT count(*) FROM sales_orders)::int AS bills, (SELECT count(*) FROM comm_brands)::int AS brands,
   (SELECT count(*) FROM sales_order_erp_changes)::int AS trail`), before, 'no bill, brand or trail row moves')
 check(await rates(), { 'Rank F': null, 'Rank E': 0.05, 'Rank D': 0.06, 'Rank C': 0.07, 'Rank B': 0.08, 'Rank A': null, 'Rank SS': null },
   'and a rate cleared on Rules is not seeded back')
-check([migration.includes(`'${made[0]}'`), migration.includes(`'${made[1]}'`)], [true, true], 'the md5s the migration checks are the bodies it makes')
+check(made.map(md5 => migration.includes(`'${md5}'`)), [true, true, true, true], 'the md5s the migration checks are the bodies it makes')
 await q(`UPDATE comm_rank_defs SET brand_rates = brand_rates || jsonb_build_object($1::text, 0.04) WHERE id = $2`, [BRAND, RANK.F])
 await q('DELETE FROM locked_months')
 
@@ -386,17 +410,24 @@ await q(`UPDATE comm_brands SET is_active = false WHERE code = '2990S'`)
 const off = await deliver('2990-SO-2611-130', { ...ng })
 check([off.status, off.warnings.includes('unmatched_salesperson'), (await bill('2990-SO-2611-130')).brand], ['applied', true, null],
   'with the brand off, a 2990s order is an order like any other again — the way back')
+check((await uncosted(NOV)).includes('2990-SF-01'), true, 'and its products wait for a cost again')
 await q(`UPDATE comm_brands SET is_active = true WHERE code = '2990S'`)
 
 // ── The migration refuses a body it was not written from ─────────────────────
-await db.exec(`CREATE OR REPLACE FUNCTION erp_sync_order_brand(p_order jsonb, p_order_id uuid DEFAULT NULL::uuid)
-  RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$`)
-await assert.rejects(db.exec(migration), /erp_sync_order_brand is md5 .*, not the body this migration was written from/)
+// (The four are checked in name order; each refusal leaves the transaction to be rolled back.)
+await db.exec(`DROP FUNCTION revenue_costing_gaps(date, date);
+  CREATE FUNCTION revenue_costing_gaps(p_from date, p_to date) RETURNS void LANGUAGE sql AS $$ SELECT $$`)
+await assert.rejects(db.exec(migration), /revenue_costing_gaps\(date, date\) is md5 .*, not the body this migration was written from/)
 checks++
 await db.exec('ROLLBACK')
 await db.exec(`CREATE OR REPLACE FUNCTION ingest_erp_sales_order(p_order jsonb, p_replay_of uuid DEFAULT NULL::uuid)
   RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`)
-await assert.rejects(db.exec(migration), /ingest_erp_sales_order is md5 .*, not the body this migration was written from/)
+await assert.rejects(db.exec(migration), /ingest_erp_sales_order\(jsonb, uuid\) is md5 .*, not the body this migration was written from/)
+checks++
+await db.exec('ROLLBACK')
+await db.exec(`CREATE OR REPLACE FUNCTION erp_sync_order_brand(p_order jsonb, p_order_id uuid DEFAULT NULL::uuid)
+  RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$`)
+await assert.rejects(db.exec(migration), /erp_sync_order_brand\(jsonb, uuid\) is md5 .*, not the body this migration was written from/)
 checks++
 
 console.log(`validate-brand-own-scheme: ${checks} checks passed`)

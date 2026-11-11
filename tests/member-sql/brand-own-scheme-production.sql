@@ -616,3 +616,105 @@ BEGIN
     RETURN erp_sync_after_delivery(v_sub_id, v_doc_no, p_order, v_result || JSONB_BUILD_OBJECT('orderId', v_order_id), v_before);
 END;
 $function$;
+
+-- revenue_uncosted_products(p_sub_department_id uuid, p_period date)
+-- md5(prosrc) = 89e2715b6230847840d30b8770ded97d
+CREATE OR REPLACE FUNCTION public.revenue_uncosted_products(p_sub_department_id uuid, p_period date)
+ RETURNS TABLE(product_code text, product_name text, item_group text, commissionable boolean, lines integer, qty numeric, amount numeric, orders integer, in_sku_master boolean, has_price boolean, reason text, erp_product_id text)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+    WITH scheme AS (
+        SELECT s.id
+          FROM comm_schemes s
+         WHERE s.sub_department_id = p_sub_department_id AND s.is_active
+         ORDER BY s.effective_from DESC
+         LIMIT 1
+    ), batch AS (
+        SELECT b.id
+          FROM sales_import_batches b
+         WHERE b.sub_department_id = p_sub_department_id
+           AND b.period_month = p_period
+           AND b.status = 'committed'
+    ), blind AS (
+        SELECT UPPER(BTRIM(sl.product_code))              AS product_code,
+               MIN(sl.product_name)                       AS product_name,
+               MIN(UPPER(BTRIM(sl.item_group)))           AS item_group,
+               BOOL_OR(COALESCE(g.commissionable, FALSE)) AS commissionable,
+               COUNT(*)::INTEGER                          AS lines,
+               SUM(COALESCE(sl.qty, 0))                   AS qty,
+               ROUND(SUM(COALESCE(sl.line_amount, 0)), 2) AS amount,
+               COUNT(DISTINCT sl.order_id)::INTEGER       AS orders,
+               MODE() WITHIN GROUP (ORDER BY sl.cost_detail->>'reason') AS reason,
+               MIN(COALESCE(o.erp_company_id, 1))         AS company
+          FROM sales_order_lines sl
+          JOIN sales_orders o ON o.id = sl.order_id
+          JOIN batch ON batch.id = o.batch_id
+          CROSS JOIN scheme sc
+          LEFT JOIN comm_item_groups g
+                 ON g.scheme_id = sc.id
+                AND UPPER(BTRIM(g.item_group)) = UPPER(BTRIM(sl.item_group))
+         WHERE sl.cost_source IS NULL
+           AND NULLIF(BTRIM(sl.product_code), '') IS NOT NULL
+         GROUP BY UPPER(BTRIM(sl.product_code))
+    )
+    SELECT b.product_code, b.product_name, b.item_group, b.commissionable,
+           b.lines, b.qty, b.amount, b.orders,
+           e.erp_id IS NOT NULL,
+           EXISTS (SELECT 1 FROM catalogue_skus s
+                    WHERE s.erp_product_id = e.erp_id
+                      AND (s.price IS NOT NULL OR jsonb_array_length(COALESCE(s.price_grid, '[]'::JSONB)) > 0)),
+           COALESCE(b.reason, CASE WHEN e.erp_id IS NULL THEN 'not_in_sku_master' ELSE 'unpriced' END),
+           e.erp_id
+      FROM blind b
+      LEFT JOIN LATERAL catalogue_sku_for_code(b.company, b.product_code) e ON TRUE
+     ORDER BY b.commissionable DESC, b.amount DESC;
+$function$;
+
+-- revenue_costing_gaps(p_from date, p_to date)
+-- md5(prosrc) = 1348d459ad65cd4efe6a4fdc5ff356ee
+CREATE OR REPLACE FUNCTION public.revenue_costing_gaps(p_from date, p_to date)
+ RETURNS TABLE(item_code text, item_group text, product_name text, brand_code text, lines bigint, bills bigint, qty numeric, revenue numeric, in_sku_master boolean, has_price boolean, reason text, erp_product_id text)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+#variable_conflict use_column
+BEGIN
+    IF NOT COALESCE(public.has_any_action(ARRAY['product_list.view']), FALSE) THEN
+        RAISE EXCEPTION 'Reading the costing gaps needs Product List · View.' USING ERRCODE = '42501';
+    END IF;
+    RETURN QUERY
+    WITH gaps AS (
+        SELECT l.product_code                                        AS item_code,
+               MIN(l.item_group)                                     AS item_group,
+               MIN(l.product_name)                                   AS product_name,
+               MIN(l.brand_code)                                     AS brand_code,
+               COUNT(*)                                              AS lines,
+               COUNT(DISTINCT l.order_id)                            AS bills,
+               ROUND(SUM(l.qty), 3)                                  AS qty,
+               ROUND(SUM(l.line_amount), 2)                          AS revenue,
+               MODE() WITHIN GROUP (ORDER BY l.cost_detail->>'reason') AS reason,
+               MIN(COALESCE(o.erp_company_id, 1))                    AS company
+          FROM sales_order_lines l
+          JOIN sales_orders o ON o.id = l.order_id
+         WHERE o.order_date >= p_from
+           AND o.order_date <  p_to
+           AND NOT o.cancelled
+           AND l.cost_source IS NULL
+         GROUP BY l.product_code
+    )
+    SELECT g.item_code, g.item_group, g.product_name, g.brand_code,
+           g.lines, g.bills, g.qty, g.revenue,
+           e.erp_id IS NOT NULL,
+           EXISTS (SELECT 1 FROM catalogue_skus s
+                    WHERE s.erp_product_id = e.erp_id
+                      AND (s.price IS NOT NULL OR jsonb_array_length(COALESCE(s.price_grid, '[]'::JSONB)) > 0)),
+           COALESCE(g.reason, CASE WHEN e.erp_id IS NULL THEN 'not_in_sku_master' ELSE 'unpriced' END),
+           e.erp_id
+      FROM gaps g
+      LEFT JOIN LATERAL catalogue_sku_for_code(g.company, g.item_code) e ON TRUE
+     ORDER BY g.revenue DESC, g.lines DESC;
+END
+$function$;

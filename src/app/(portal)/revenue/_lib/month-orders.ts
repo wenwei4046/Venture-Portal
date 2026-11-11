@@ -313,9 +313,10 @@ export async function loadOrderBrandPicks(
 }
 
 /**
- * The brands a bill can be given by hand: the scheme's margin-ladder brands —
- * with their sub-brands, so a booth the ERP calls HAPPI SLEEP is Akemi's
- * exhibition (`exhibitionBrandOf`), as SQL reads it.
+ * The scheme's brands — with their sub-brands, so a booth the ERP calls HAPPI
+ * SLEEP is Akemi's exhibition (`exhibitionBrandOf`), as SQL reads it. The ones
+ * a bill can be given by hand are those with a margin ladder (`pickableBrands`):
+ * a brand on its own scheme (2990s, 2026-11-11) is marked, never picked.
  */
 export async function loadBrandOptions(
   supabase: SupabaseClient,
@@ -324,13 +325,13 @@ export async function loadBrandOptions(
   if (!schemeId) return []
   const { data, error } = await supabase
     .from('comm_brands')
-    .select('code, name, sub_brands')
+    .select('code, name, sub_brands, own_scheme')
     .eq('scheme_id', schemeId)
     .eq('is_active', true)
     .order('code')
   if (error) throw new Error(`Could not read the brands: ${error.message}`)
-  return ((data ?? []) as Array<{ code: string; name: string | null; sub_brands: string[] | null }>)
-    .map(b => ({ code: b.code, name: b.name ?? b.code, subBrands: b.sub_brands ?? [] }))
+  return ((data ?? []) as Array<{ code: string; name: string | null; sub_brands: string[] | null; own_scheme: boolean | null }>)
+    .map(b => ({ code: b.code, name: b.name ?? b.code, subBrands: b.sub_brands ?? [], ...(b.own_scheme ? { ownScheme: true } : {}) }))
 }
 
 // ─── Shared bills (2026-09-24) ──────────────────────────────────────────────
