@@ -36,6 +36,13 @@ export const PROPERTY_TYPES = ["Landed", "Condo"];
 export const propertyType = v => PROPERTY_TYPES.find(o => o.toLowerCase() === String(v || "").trim().toLowerCase()) || "";
 export const budgetShown = v => String(v || "").replace(/^\s*RM\s*/i, "");
 export const budgetStored = typed => { const val = String(typed || "").replace(/[^0-9.,\-\sk+–]/gi, "").replace(/^\s+/, ""); /* "RM" typed or pasted leaves no second space */ return val ? "RM " + val : ""; };
+// Unit size is in sqft by default (the user, 2026-11-11: "默认 sqft（像 budget 一样呈现，但靠右）"): a figure is kept as
+// "800 sqft" and drawn "800" with "sqft" inside the field's right end. The CRM's room count ("3R 2R", which picks the room
+// type) is not a figure: kept and drawn as it is, no "sqft".
+const SQFT = /\s*(sq\.?\s*f(ee|oo)?t\.?|sf)\s*$/i;
+export const sizeIsArea = v => { const s = String(v || "").replace(SQFT, "").trim(); return !s || /^[\d.,\s]+$/.test(s); };
+export const sizeShown = v => sizeIsArea(v) ? String(v || "").replace(SQFT, "").trim() : String(v || "");
+export const sizeStored = typed => { const s = String(typed || "").replace(SQFT, ""), t = s.trim(); return !t ? "" : sizeIsArea(t) ? t + " sqft" : s.replace(/^\s+/, ""); };
 export const budgetWithRm = v => { const s = String(v || "").trim(); return !s || /^RM(?![a-z])/i.test(s) ? s.replace(/^RM\s*/i, "RM ") : "RM " + s; };
 const longDate = iso => { const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
 
@@ -203,7 +210,7 @@ export class QuoteLogic extends DcLogic {
     let diff = 0;
     const changes = [];
     lines.forEach(l => {
-      const now = l.cost * l.qty, was = l.orig ? l.orig.cost * l.orig.qty : 0;
+      const now = quoteDocLib.lineSum(l.cost, l.qty), was = l.orig ? quoteDocLib.lineSum(l.orig.cost, l.orig.qty) : 0; // whole ringgit a line, as printed (2026-11-11)
       const changed = !l.orig || l.cost !== l.orig.cost || l.qty !== l.orig.qty || l.code !== l.orig.code || l.name !== l.orig.name;
       if (changed) {
         const d = Math.round((now - was) * m);
@@ -323,11 +330,11 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const setCrm = id => e => { const val = e.target.value; if (id === "name") this.setState(s => ({ cust: { ...s.cust, att: val } })); else this.setState(s => ({ crm: { ...(s.crm || {}), [id]: val } })); };
     const fields = [
       // v10: the CRM's Property type (`type`; the prototype's `ptype`) is a Landed / Condo dropdown that also sets step 2's chips; Budget is "RM …".
-      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => { const sel = f.id === "type" || f.id === "ptype", money = f.id === "budget", raw = crmVal(f.id);
-        const value = money ? budgetShown(raw) : sel ? propertyType(raw) : raw;
-        const onChange = money ? e => { const val = budgetStored(e.target.value); this.setState(s => ({ crm: { ...(s.crm || {}), [f.id]: val } })); } : setCrm(f.id);
-        return { label: f.label, value, ph: f.id === "name" ? "Customer name" : money ? "0" : "", type: "text", onChange, crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required,
-          isSelect: sel, isMoney: money, isPlain: !sel && !money, selInk: value ? "#1F1F1C" : "#97978F", selLabel: value || "Select",
+      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => { const sel = f.id === "type" || f.id === "ptype", money = f.id === "budget", raw = crmVal(f.id), sqft = f.id === "size", area = sqft && sizeIsArea(raw); // Unit size in sqft (2026-11-11); a room count keeps the field, without "sqft"
+        const value = money ? budgetShown(raw) : sel ? propertyType(raw) : sqft ? sizeShown(raw) : raw;
+        const onChange = money ? e => { const val = budgetStored(e.target.value); this.setState(s => ({ crm: { ...(s.crm || {}), [f.id]: val } })); } : f.id === "size" ? e => { const val = sizeStored(e.target.value); this.setState(s => ({ crm: { ...(s.crm || {}), [f.id]: val } })); } : setCrm(f.id);
+        return { label: f.label, value, ph: f.id === "name" ? "Customer name" : money || area ? "0" : "", type: "text", onChange, crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required,
+          isSelect: sel, isMoney: money, isSqft: sqft, sqftD: area ? "block" : "none", sqftMode: area ? "decimal" : "text", sqftPad: area ? "52px" : "12px", isPlain: !sel && !money && !sqft, selInk: value ? "#1F1F1C" : "#97978F", selLabel: value || "Select",
           open: sel && st.selOpen === f.id, selBorder: sel && st.selOpen === f.id ? "#111111" : "rgba(20,20,18,.12)", selRing: sel && st.selOpen === f.id ? "0 0 0 3px rgba(17,17,17,.12)" : "none",
           toggle: () => this.setState(s => ({ selOpen: s.selOpen === f.id ? null : f.id })), close: () => this.setState({ selOpen: null }),
           opts: sel ? PROPERTY_TYPES.map(o => ({ label: o, on: o === value, bg: o === value ? "#FFF5EC" : "transparent", fw: o === value ? 650 : 500, pick: () => this.setState(s => ({ selOpen: null, crm: { ...(s.crm || {}), [f.id]: o }, cust: { ...s.cust, ptype: o } })) })) : [] }; }),
@@ -390,14 +397,14 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const gi = Math.min(st.gi || 0, Math.max(0, imgs.length - 1)), im = imgs[gi];
     const inIm = () => false;
     const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => this.lib.goodsSection(this.cfg, this.lib.sectionOfCat(this.cfg, c)); // a products section (2026-11-09: Quote settings › Categories › Sections)
-    const fItems = p.cats.filter(isF).flatMap(live), zl = fItems.map(i => { const im = this.imgFor(i); return im ? { img: im, name: title(i.name), code: i.code || "", delta: rm0((i.cost || 0) * (i.qty ?? 1)), item: null } : null; }).filter(Boolean), furn = fItems.map(i => { const im = this.imgFor(i); return { name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), cur: im ? "zoom-in" : "default", view: () => { if (im) this.openZoom(zl, zl.findIndex(z => z.img === im)); } }; });
-    const sCats = p.cats.filter(c => !isF(c) && live(c).length), sItems = sCats.flatMap(live), sSum = sItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0);
+    const fItems = p.cats.filter(isF).flatMap(live), zl = fItems.map(i => { const im = this.imgFor(i); return im ? { img: im, name: title(i.name), code: i.code || "", delta: rm0(quoteDocLib.lineSum(i.cost, i.qty ?? 1)), item: null } : null; }).filter(Boolean), furn = fItems.map(i => { const im = this.imgFor(i); return { name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0(quoteDocLib.lineSum(i.cost, i.qty ?? 1)), cur: im ? "zoom-in" : "default", view: () => { if (im) this.openZoom(zl, zl.findIndex(z => z.img === im)); } }; });
+    const sCats = p.cats.filter(c => !isF(c) && live(c).length), sItems = sCats.flatMap(live), sSum = sItems.reduce((a, i) => a + quoteDocLib.lineSum(i.cost, i.qty ?? 1), 0);
     const serv = sCats.length ? { count: sItems.length + " items", sum: rm0(sSum), open: !!st.servOpen, rot: st.servOpen ? "rotate(180deg)" : "none", toggle: () => this.setState(s => ({ servOpen: !s.servOpen })),
-      cats: sCats.map(c => ({ name: String(c.name).toUpperCase(), rows: live(c).map(i => ({ name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)) })) })) } : false;
-    const cats = p.cats.map(c => ({ name: String(c.name).toUpperCase(), rows: c.items.filter(i => (i.qty ?? 1) > 0).map(i => ({ name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), hl: inIm(i.name) ? "#FFEBD9" : "transparent" })) })).filter(c => c.rows.length);
+      cats: sCats.map(c => ({ name: String(c.name).toUpperCase(), rows: live(c).map(i => ({ name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0(quoteDocLib.lineSum(i.cost, i.qty ?? 1)) })) })) } : false;
+    const cats = p.cats.map(c => ({ name: String(c.name).toUpperCase(), rows: c.items.filter(i => (i.qty ?? 1) > 0).map(i => ({ name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0(quoteDocLib.lineSum(i.cost, i.qty ?? 1)), hl: inIm(i.name) ? "#FFEBD9" : "transparent" })) })).filter(c => c.rows.length);
     const n = imgs.length, set = k => this.setState({ gi: (k + n) % n });
     return { styleCards, styleTabs, sv: {
-      furn, furnOpen: st.furnOpen ?? !this._phone, furnRot: (st.furnOpen ?? !this._phone) ? "rotate(180deg)" : "none", furnToggle: () => this.setState(s => ({ furnOpen: !(s.furnOpen ?? !this._phone) })), furnCount: fItems.length + " items", furnSum: rm0(fItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0)), serv, name: sx.name || "Style", pkgName: p.groupLabel || title(p.name), hasPkgTabs: opts.length > 1, price: rm0(p.price), count: `${cats.reduce((a, c) => a + c.rows.length, 0)} items`,
+      furn, furnOpen: st.furnOpen ?? !this._phone, furnRot: (st.furnOpen ?? !this._phone) ? "rotate(180deg)" : "none", furnToggle: () => this.setState(s => ({ furnOpen: !(s.furnOpen ?? !this._phone) })), furnCount: fItems.length + " items", furnSum: rm0(fItems.reduce((a, i) => a + quoteDocLib.lineSum(i.cost, i.qty ?? 1), 0)), serv, name: sx.name || "Style", pkgName: p.groupLabel || title(p.name), hasPkgTabs: opts.length > 1, price: rm0(p.price), count: `${cats.reduce((a, c) => a + c.rows.length, 0)} items`,
       hasImg: !!im, noImg: !im, src: im ? this.u(im.src) : "", title: im ? im.title || "" : "", note: im ? im.note || "" : "", multi: n > 1, counter: `${gi + 1} / ${n}`,
       prev: () => set(gi - 1), next: () => set(gi + 1), enlarge: () => this.openZoom(imgs.map(t => ({ img: this.u(t.src), name: t.title || sx.name || "", code: t.sectionName && !/^images$/i.test(t.sectionName) ? t.sectionName : (sx.name || ""), delta: (imgs.indexOf(t) + 1) + " / " + n, item: null })), gi),
       ...(() => { const secOf = t => (t.sectionName && !/^images$/i.test(t.sectionName)) ? t.sectionName : (t === imgs[0] && sx.cover && t.src === sx.cover ? "Overview" : ""); const names = [...new Set(imgs.map(secOf).filter(Boolean))], cur = im ? secOf(im) : "";
@@ -482,7 +489,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           return {
             title: title(l.name), meta: [l.desc, l.code, this.colorFor(l)].filter(Boolean).join(" · "), qty: l.qty,
             adj: !!(l.adjust || (l.orig && l.orig.adjust)), locked: !(l.adjust || (l.orig && l.orig.adjust)) && !!(l.fixed || (l.orig && l.orig.fixed)), costV: String(l.cost ?? ""), onCost: e => { const n = parseFloat(e.target.value.replace(/[^\d.]/g, "")); this.setLine(l.id, x => ({ ...x, cost: isNaN(n) ? 0 : n })); },
-            sumText: rm0((+l.cost || 0) * Math.max(l.qty, 0)), eachText: l.qty === 1 ? "" : `${rm0(+l.cost || 0)} each`,
+            sumText: rm0(quoteDocLib.lineSum(l.cost, Math.max(l.qty, 0))), eachText: l.qty === 1 ? "" : `${rm0(+l.cost || 0)} each`,
             strike: l.qty === 0 ? "line-through" : "none", nameColor: l.qty === 0 ? "#6B6B66" : "#1F1F1C",
             tag: ch ? ch.tag.toUpperCase() : "", delta: ch ? signed(ch.d) : "", tagInk: tone ? tone[0] : "", tagBg: tone ? tone[1] : "",
             ...((im) => ({ lImg: im, lCursor: im ? "zoom-in" : "default", lView: () => { if (!im) return; const zl = st.lines.filter(x => x.qty > 0).map(x => { const i2 = this.imgFor(x); const c2 = changes.find(y => y.l.id === x.id); return i2 ? { img: i2, name: title(x.name), code: x.code || "", delta: c2 ? signed(c2.d) : "In package", item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); } }))(this.imgFor(l)),
@@ -494,7 +501,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       };
     }) : [];
     const secOf = ci => pkg && this.lib ? this.lib.sectionOfCat(this.cfg, pkg.cats[ci]) : "furn";
-    const grpSum = vs => rm0(vs.reduce((a, cv) => a + st.lines.filter(l => l.ci === cv._ci).reduce((b, l) => b + (+l.cost || 0) * Math.max(l.qty, 0), 0), 0));
+    const grpSum = vs => rm0(vs.reduce((a, cv) => a + st.lines.filter(l => l.ci === cv._ci).reduce((b, l) => b + quoteDocLib.lineSum(l.cost, Math.max(l.qty, 0)), 0), 0));
     // One tab a section, in Quote settings' order (Furniture, Services, then what the Principal added — 2026-11-09).
     const catGroups = (this.lib ? this.lib.sectionsOf(this.cfg) : []).map(s => ({ key: s.id, short: s.label, label: s.head, cats: catViews.filter(cv => secOf(cv._ci) === s.id) })).filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));
     const czKey = catGroups.some(g => g.key === st.czTab) ? st.czTab : (catGroups[0] || {}).key;
@@ -515,7 +522,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         const baseImg = this.imgFor(base) || imgFor(base.code);
         sheet = { eyebrow: "CHANGE ITEM", title: title(l.orig ? l.orig.name : l.name), sub: `${k.label || "Item"} · ${rm0(base.cost * m)}`, url: k.url || "", img: baseImg, zoom: e => { e.stopPropagation(); this.openZoom([{ img: baseImg, name: title(base.name), code: base.code || "", delta: rm0(base.cost * m), item: null }], 0); } };
         options = st.catalog.items.filter(it => it.kind === l.kind && it.cost != null && !it.noPrice && match(it)).map(it => {
-          const dd = Math.round((it.cost - base.cost) * m) * (l.qty || 1);
+          const dd = (quoteDocLib.unitPrice(it.cost) - quoteDocLib.unitPrice(base.cost)) * (l.qty || 1);
           const cur = it.code === l.code && it.name === l.name;
           return { ...it, item: it, cur, delta: cur ? "Selected" : dd === 0 ? "Same price" : signed(dd), ink: cur ? "#2F6B47" : dd > 0 ? "#1F1F1C" : "#2F6B47" };
         });
@@ -566,6 +573,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
 
     return {
       rootRef: this.rootRef, desk, phone, stepBarD: phone ? "none" : "flex", deskOnlyFlex: phone ? "none" : "flex",
+      saveHead: !phone && !!pkg && step <= 4, // Save draft beside Drafts, steps 1–4 (step 5 has Export › Save draft); 2026-11-11
       mood: (() => { const { sx, imgs } = this.moodPhotos(), on = !!st.withMood && imgs.length > 0, none = !imgs.length;
         return { on, none, boxBg: on ? "#F5871F" : "#FFFFFF", boxBorder: on ? "#F5871F" : "#C9C9C2", op: none ? .5 : 1, cursor: none ? "not-allowed" : "pointer",
           sub: none ? "No photos for " + (sx.name || "this style") + " in Quote Settings" : (sx.name || "Style") + " · " + imgs.length + " photo" + (imgs.length === 1 ? "" : "s") + " under the customer details",

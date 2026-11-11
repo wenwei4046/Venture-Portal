@@ -32,7 +32,7 @@ const rm0 = n => "RM " + Math.round(n).toLocaleString("en-MY");
 const money = n => (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const imgFor = code => /^(\d{6}|K\d{5})$/.test(code || "") ? `https://mm.hinlim.com/cache/b2bfs/product/${code}/${code}-550x500.jpg` : "";
 const num = v => { const n = parseFloat(String(v).replace(/[^\d.]/g, "")); return isNaN(n) ? 0 : n; };
-const cost = p => p.cats.reduce((a, c) => a + c.items.reduce((x, i) => x + (+i.cost || 0) * (+i.qty || 0), 0), 0);
+const cost = p => p.cats.reduce((a, c) => a + c.items.reduce((x, i) => x + quoteDocLib.lineSum(i.cost, i.qty), 0), 0); // whole ringgit a line, as the quote prints (2026-11-11)
 
 export class SettingsLogic extends DcLogic {
   state = { lib: null, base: null, cfg: null, savedJson: "", tab: "doc", sel: null, drag: null, over: null, arm: "", notice: "", pid: "p0", newUnit: null, kindFilter: "all", catQ: "", newKind: "" };
@@ -570,7 +570,7 @@ export class SettingsLogic extends DcLogic {
         addCat: () => setP(p => { p.cats.push({ name: "NEW CATEGORY", label: "New category", items: [] }); }),
         cats: ep.cats.map((c, ci) => ({
           section: lib.sectionOfCat(cfg, c), onSection: e => { const v = e.target.value; setP(p => { p.cats[ci].section = v; }); },
-          name: c.name, open: !(st.catShut || {})[ep.id + ":" + ci], rot: (st.catShut || {})[ep.id + ":" + ci] ? "rotate(-90deg)" : "none", toggle: () => this.setState(z => ({ catShut: { ...(z.catShut || {}), [ep.id + ":" + ci]: !(z.catShut || {})[ep.id + ":" + ci] } })), count: `${c.items.length} item${c.items.length === 1 ? "" : "s"}`, sum: money(c.items.reduce((a, i) => a + (+i.cost || 0) * (+i.qty || 0), 0)),
+          name: c.name, open: !(st.catShut || {})[ep.id + ":" + ci], rot: (st.catShut || {})[ep.id + ":" + ci] ? "rotate(-90deg)" : "none", toggle: () => this.setState(z => ({ catShut: { ...(z.catShut || {}), [ep.id + ":" + ci]: !(z.catShut || {})[ep.id + ":" + ci] } })), count: `${c.items.length} item${c.items.length === 1 ? "" : "s"}`, sum: money(c.items.reduce((a, i) => a + quoteDocLib.lineSum(i.cost, i.qty), 0)),
           onName: e => { const v = e.target.value.toUpperCase(); setP(p => { p.cats[ci].name = v; p.cats[ci].label = v.charAt(0) + v.slice(1).toLowerCase(); }); },
           remove: () => setP(p => { p.cats.splice(ci, 1); }),
           addRow: () => setP(p => { p.cats[ci].items.push({ name: "", desc: "", code: "", cost: 0, qty: 1, kind: null }); }),
@@ -583,7 +583,7 @@ export class SettingsLogic extends DcLogic {
                 const L = { b2b: ["#B5B5AE", "b2b", "Follows the b2b price · click to change"], fix: ["#111111", "fixed", "Fixed price · IR can't change it · click to change"], adj: ["#F5871F", "edit", "IR can edit this price in the quote · click to change"] }[mode];
                 return { srcDot: L[0], srcLabel: L[1], srcTip: L[2],
                   toggleFix: () => setI(x => { if (mode === "b2b") { x.fixed = true; x.adjust = false; } else if (mode === "fix") { x.fixed = true; x.adjust = true; } else { x.adjust = false; x.fixed = !it.linked; } }) }; })(), kindBorder: it.kind || it.code ? "#DEDED8" : "transparent", kindBg: it.kind || it.code ? "#FFFFFF" : "transparent", kindInk: it.kind ? "#1F1F1C" : "#C4C4BD", kindApp: it.kind || it.code ? "auto" : "none", // a coded row's cell reads as a dropdown before it has a category (2026-11-09) selKey: ep.id + ":" + ci + ":" + ii + ":" + (it.kind || "") + ":" + kindOpts.length,
-              qty: String(it.qty ?? ""), sum: money((+it.cost || 0) * (+it.qty || 0)), bg: ii % 2 ? "#F8F8F6" : "#FFFFFF",
+              qty: String(it.qty ?? ""), sum: money(quoteDocLib.lineSum(it.cost, it.qty)), bg: ii % 2 ? "#F8F8F6" : "#FFFFFF",
               onName: e => { const v = e.target.value; setI(x => { x.name = v; }); }, onDesc: e => { const v = e.target.value; setI(x => { x.desc = v; }); },
               onCode: e => { const v = e.target.value; setI(x => { x.code = v; }); }, onKind: e => { const v = e.target.value || null; setI(x => { x.kind = v; }); },
               onCost: e => { if (!it.fixed) return; const v = num(e.target.value); setI(x => { x.cost = v; }); }, onQty: e => { const v = Math.round(num(e.target.value)); setI(x => { x.qty = v; }); },

@@ -456,6 +456,15 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                       </span>
                     </>) : null}
                     {"\n              "}
+                    {(v["saveHead"]) ? (<>
+                      <button onClick={v["saveDraft"]} title={"Save draft"} style={{"display":"flex","alignItems":"center","gap":"6px","position":"relative","height":"36px","padding":"0 12px","borderRadius":"10px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"13.5px","fontWeight":"650"}} className={"irq-p3"}>
+                        <svg width={"18"} height={"18"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"}>
+                          <path d={"M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7"} />
+                        </svg>
+                        {"Save draft"}
+                      </button>
+                    </>) : null}
+                    {"\n              "}
                     <div style={{"position":"relative"}}>
                       {"\n                "}
                       <button onClick={v["toggleDrafts"]} style={{"display":"flex","alignItems":"center","gap":"6px","position":"relative","height":"36px","padding":"0 12px","borderRadius":"10px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"13.5px","fontWeight":"650"}} className={"irq-p3"}>
@@ -890,6 +899,15 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                 {"RM"}
                               </span>
                               <input value={dcValue(L_f_c?.["value"])} onChange={L_f_c?.["onChange"]} placeholder={L_f_c?.["ph"]} type={"text"} inputMode={"decimal"} style={{"height":"42px","padding":"0 12px 0 44px","borderRadius":"10px","border":"1px solid rgba(20,20,18,.12)","background":"var(--irq-c-ffffff)","fontSize":"15px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} className={"irq-p4"} />
+                            </span>
+                          </>) : null}
+                          {"\n                    "}
+                          {(L_f_c?.["isSqft"]) ? (<>
+                            <span style={{"position":"relative","display":"block"}}>
+                              <input value={dcValue(L_f_c?.["value"])} onChange={L_f_c?.["onChange"]} placeholder={L_f_c?.["ph"]} type={"text"} inputMode={L_f_c?.["sqftMode"]} style={dcCss(`height:42px;padding:0 ${dcS(L_f_c?.["sqftPad"])} 0 12px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:var(--irq-c-ffffff);font-size:15px;color:var(--irq-c-1f1f1c);outline:none;box-sizing:border-box;width:100%`)} className={"irq-p4"} />
+                              <span style={dcCss(`display:${dcS(L_f_c?.["sqftD"])};position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:600;color:var(--irq-c-6b6b66);pointer-events:none`)}>
+                                {"sqft"}
+                              </span>
                             </span>
                           </>) : null}
                           {"\n                    "}
