@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { buildCommissionWorkbench, type CommissionOrderRow, type OverrideOrderRow, type WorkbenchPerson } from '@/lib/commission/workbench'
-import { closeDrift, nextOpenPerson, salespersonFigures, type CloseDrift, type SalespersonClose, type SalespersonFigures } from '@/lib/commission/closes'
+import { closeDrift, nextOpenPerson, noMarginNote, salespersonFigures, type CloseDrift, type SalespersonClose, type SalespersonFigures } from '@/lib/commission/closes'
 import { unpricedBills, unpricedByStaff } from '@/lib/commission/unpriced'
 import { depositRequired } from '@/lib/commission/engine'
 import { billCountAction, type BillCountAction } from '@/lib/commission/bill-exclusion'
@@ -86,7 +86,13 @@ const NUMERIC_COLUMNS: Column[] = ['sales', 'commissionable', 'margin', 'product
 const money = formatMoney
 const quantity = (value: number) => new Intl.NumberFormat('en-MY', { maximumFractionDigits: 8 }).format(value)
 const pct = (n: number | null | undefined) => n == null ? '—' : `${(n * 100).toFixed(1).replace('.0', '')}%`
-const sum = <T,>(rows: T[], get: (row: T) => number) => Math.round(rows.reduce((a, r) => a + get(r), 0) * 100) / 100
+/**
+ * Under a month's margin: what it comes to in ringgit — or, when none is read, why (2026-11-12): the brand's own
+ * scheme, a cost still missing, or nothing at all for a month with no bill in a margin.
+ */
+const marginNote = (f: Pick<SalespersonFigures, 'marginPct' | 'marginRevenue' | 'marginCost' | 'noMargin'>, unit = ''): string | null =>
+  f.marginPct == null || f.marginRevenue === null || f.marginCost === null ? noMarginNote(f) : `${money(f.marginRevenue - f.marginCost)}${unit}`
+const sum =<T,>(rows: T[], get: (row: T) => number) => Math.round(rows.reduce((a, r) => a + get(r), 0) * 100) / 100
 const statusLabel = { eligible: 'Included', excluded: 'Excluded from draft', deposit_pending: 'Deposit pending', already_released: 'Previously paid' }
 const monthName = (month: string) => new Date(`${month}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const HEAD_TITLE = 'Department head'
@@ -951,6 +957,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           const qualifies = p?.statement?.qualifiesForRankKey && p.statement.qualifiesForRankKey !== p.statement.effectiveRankKey
             ? p.statement.qualifiesForRankKey : null
           const promotes = p?.statement?.promotesToTitleId ?? null
+          const underMargin = marginNote(f)
           const open = () => { if (p) choosePerson(p.staffId) }
           return <tr key={row.staffId} className={row.close ? c.rowClosed : undefined}><td className={s.stickyFirst}>
             <span className={c.nameCell}>{closeFacts && <input type="checkbox" aria-label={`Tick ${f.name}`} checked={closer.ticked.has(row.staffId)} onChange={() => closer.toggle(row.staffId)} />}
@@ -970,7 +977,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           <td className={s.numeric}>{f.groupRevenue !== null ? money(f.groupRevenue) : <span className={s.muted}>—</span>}</td>
           <td className={s.numeric}>{f.upsell ? money(f.upsell) : <span className={s.muted}>—</span>}</td>
           <td className={s.numeric}>{f.dropped ? <span className="neg">{money(f.dropped)}</span> : <span className={s.muted}>—</span>}</td>
-          <td className={s.numeric}>{pct(f.marginPct)}<small>{f.marginPct == null || f.marginRevenue === null || f.marginCost === null ? 'Cost incomplete' : money(f.marginRevenue - f.marginCost)}</small></td>
+          <td className={s.numeric}>{pct(f.marginPct)}{underMargin !== null && <small>{underMargin}</small>}</td>
           <td className={s.numeric}>{money(f.personal)}</td><td className={s.numeric}>{money(f.overriding)}</td><td className={s.stickyTotal}><button className={s.ghostButton} onClick={open} disabled={!p}>{money(f.total)}</button>{f.groupIncentive > 0 && <small>Includes {money(f.groupIncentive)} group reward</small>}
             {f.directorPay > 0 && <small>Includes {money(f.directorPay)} director pay</small>}
             {row.drift && <small className={c.live}>Live now {money(row.drift.liveTotal)}</small>}</td></tr>
@@ -1012,9 +1019,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.summaryGrid}>
         <Summary label="Personal commission" value={money(selectedClose?.summary.personal ?? selected.personalTotal)} />
         <Summary label="Overriding commission" value={money(selectedClose?.summary.overriding ?? selected.overrideTotal)} />
-        {selectedClose
-          ? <Summary label="Monthly margin" value={pct(selectedClose.summary.marginPct)} note={selectedClose.summary.marginPct == null || selectedClose.summary.marginRevenue === null || selectedClose.summary.marginCost === null ? 'Cost incomplete' : `${money(selectedClose.summary.marginRevenue - selectedClose.summary.marginCost)} margin`} />
-          : <Summary label="Monthly margin" value={pct(selected.statement?.marginPct)} note={selected.statement?.marginPct == null ? 'Cost incomplete' : `${money(selected.statement?.marginRevenue - selected.statement?.marginCost)} margin`} />}
+        {/* The closed month's margin as it was locked, else the live one — and under it what it comes to, or why none is read. */}
+        <Summary label="Monthly margin" value={pct((selectedClose?.summary ?? salespersonFigures(selected)).marginPct)}
+          note={marginNote(selectedClose?.summary ?? salespersonFigures(selected), ' margin') ?? undefined} />
         <Summary label="Estimated take-home pay" value={salary ? money(salary.net) : 'Not available'} note={salary ? (selectedClose ? 'Based on the closed commission' : 'Based on current commission') : data.payUnavailable ? 'Salary preview is unavailable for this session' : 'Payroll inputs are not set for this person'} />
       </div>
 
