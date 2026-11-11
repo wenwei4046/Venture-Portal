@@ -1,13 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { revenuePath } from '@/lib/revenue'
 
 /**
  * The month's Export (2026-11-11): Sales by Brand & Billing as an Excel
  * workbook or a PDF — `[period]/export?format=`. A plain download link each,
- * so nothing runs on the page and the browser saves the file.
+ * so nothing runs on the page and the browser saves the file. Offered only
+ * to whoever may take it out: `canExport` is the page's
+ * canDo(user, 'revenue', 'export') (`report-export-gates.test.ts`).
  */
-export default function BrandBillingExport({ href, align = 'right' }: { href: string; align?: 'left' | 'right' }) {
+export default function BrandBillingExport({ sub, period, canExport, align = 'right' }: {
+  sub: string
+  period: string
+  canExport: boolean
+  align?: 'left' | 'right'
+}) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
@@ -20,6 +28,8 @@ export default function BrandBillingExport({ href, align = 'right' }: { href: st
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc) }
   }, [open])
 
+  if (!canExport) return null
+  const href = revenuePath(sub, period, 'export')
   const item = 'block w-full text-left px-3 py-2 text-sm text-ink hover:bg-surface-2 rounded-control'
   return (
     <div ref={box} className="relative">

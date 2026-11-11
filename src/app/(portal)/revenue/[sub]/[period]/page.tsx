@@ -612,7 +612,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: sales.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         exhibitions={exhibitionRows}
-        exportHref={batchRow && canDo(acting, 'revenue', 'export') ? revenuePath(subDept.slug, period, 'export') : null}
+        canExport={!!batchRow && canDo(acting, 'revenue', 'export')}
         // Bills taken out by hand (Don't count this bill) — out of the
         // calculation, and listed on their seller's page to count again.
         notCounted={monthOrders.filter(o => o.cancelled && o.excludedReason === 'manual').map(o => ({

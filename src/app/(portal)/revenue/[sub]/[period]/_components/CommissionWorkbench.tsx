@@ -146,10 +146,10 @@ interface Props {
   exhibitions?: ExhibitionSales[]
   /**
    * The month's Sales by Brand & Billing export (2026-11-11) — beside the
-   * Sales exhibition heading, where the user asked for it. Null: no button
-   * (no Revenue · Export, or no bills yet).
+   * Sales exhibition heading, where the user asked for it. The page's
+   * canDo(user, 'revenue', 'export') on a month with bills.
    */
-  exportHref?: string | null
+  canExport?: boolean
   monthOverview?: ReactNode
   payroll?: PayrollBarFacts
   /**
@@ -219,7 +219,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, exhibitions = [], exportHref = null, monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, exhibitions = [], canExport = false, monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -1095,7 +1095,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.topLine}>
         <div className="flex items-center gap-3">
           <h2 className={s.sectionHeading}>Sales exhibition</h2>
-          {exportHref ? <BrandBillingExport href={exportHref} align="left" /> : null}
+          <BrandBillingExport sub={sub} period={period} canExport={canExport} align="left" />
         </div>
         <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(exhibitionTotals.total)}</strong></div></div>
       <div className={s.toolbar}>
