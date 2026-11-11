@@ -34,6 +34,12 @@ const FILES = [
 const NAV_BTN = '<button style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 8px;border:0;background:transparent;color:#6B6B66">';
 const PATCHES = {
   "IR Quote v10.dc.html": [
+    // Unit size is in sqft by default, drawn as Budget's "RM" but at the field's right end (the user, 2026-11-11:
+    // "默认 sqft（像 budget 一样呈现，但靠右）"); a CRM room count ("3R 2R") keeps the field without it.
+    ['<sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">', '<sc-if value="{{ f.isSqft }}" hint-placeholder-val="{{ false }}"><span style="position:relative;display:block"><input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" type="text" inputMode="{{ f.sqftMode }}" style="height:42px;padding:0 {{ f.sqftPad }} 0 12px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:#FFFFFF;font-size:15px;color:#1F1F1C;outline:none;box-sizing:border-box;width:100%" style-focus="border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.12)"><span style="display:{{ f.sqftD }};position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:600;color:#6B6B66;pointer-events:none">sqft</span></span></sc-if>\n                    <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">'],
+    // Save draft beside Drafts in a computer's header, Drafts' own look (the user, 2026-11-11, on Customize with Change item open:
+    // "增加 save button"): the rail's save icon is under the Change item panel while it is open.
+    ['<div style="position:relative">\n                <button onClick="{{ toggleDrafts }}"', '<sc-if value="{{ saveHead }}" hint-placeholder-val="{{ false }}"><button onClick="{{ saveDraft }}" title="Save draft" style="display:flex;align-items:center;gap:6px;position:relative;height:36px;padding:0 12px;border-radius:10px;border:0;background:transparent;color:#111111;font-size:13.5px;font-weight:650" style-hover="background:#EEEEEA"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7"></path></svg>Save draft</button></sc-if>\n              <div style="position:relative">\n                <button onClick="{{ toggleDrafts }}"'],
     // Three or more Customize tabs on a phone (Sections, 2026-11-09: "overlap"): each label stands over its sum.
     ["style=\"flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 6px;border-radius:8px;", "style=\"flex:1 1 0;min-width:0;display:flex;flex-direction:{{ zt.dir }};align-items:center;justify-content:center;gap:{{ zt.gap }};height:{{ zt.h }};padding:0 6px;border-radius:8px;"],
     // The app's own sidebar on a computer (with its real rows and counts) stands where the prototype drew a copy.
@@ -71,6 +77,8 @@ const PATCHES = {
      '<label title="{{ xvc.tip }}" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:{{ xvc.cursor }}">{{ xvc.imgEmpty }}<sc-if value="{{ xvc.canUpload }}" hint-placeholder-val="{{ false }}"><input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></sc-if></label>'],
   ],
   "Quote Settings v4.dc.html": [
+    // No "Package saving" on the quotation, so none in the A4 sample (the user, 2026-11-11: "就不需要了 … 总数对就可以了").
+    ['<div style="display:flex;gap:24px"><span contentEditable="true" suppressContentEditableWarning="{{ true }}" onBlur="{{ b.onSaving }}">{{ b.labels.saving }}</span><span style="min-width:110px;text-align:right">-1,357.00</span></div>\n                        ', ''],
     ["position:relative;height:100vh;width:100%;display:flex", "position:relative;height:{{ rootH }};width:100%;display:flex"],
     ['\n  <aside style="flex:0 0 240px', '\n  <sc-if value="{{ deskAside }}"><aside style="flex:0 0 240px'],
     ["    </div>\n  </aside>\n", "    </div>\n  </aside></sc-if>\n"],

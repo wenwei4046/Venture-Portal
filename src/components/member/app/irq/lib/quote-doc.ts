@@ -196,7 +196,12 @@ export function syncPrices(cfg) {
   })));
   return cfg;
 }
-const withSum = cfg => { syncPrices(cfg); (cfg.packages || []).forEach(p => { p.price = Math.round((p.cats || []).reduce((a, c) => a + c.items.reduce((b, it) => b + (+it.cost || 0) * (+it.qty || 1), 0), 0)); }); return cfg; };
+// A line's price is its cost rounded to the ringgit, once, as every screen and the quotation print it; a package's
+// price and a change are sums of those (the user, 2026-11-11, on the quotation's "Package saving -1.00": b2b's half-ringgit
+// prices (322.5) printed as 323 a line while the package summed 322.5 — the gap printed as a saving).
+export const unitPrice = cost => Math.round(+cost || 0);
+export const lineSum = (cost, qty) => unitPrice(cost) * (+qty || 0);
+const withSum = cfg => { syncPrices(cfg); (cfg.packages || []).forEach(p => { p.price = (p.cats || []).reduce((a, c) => a + c.items.reduce((b, it) => b + lineSum(it.cost, +it.qty || 1), 0), 0); }); return cfg; };
 // The quote's sections — the Customize step's tabs (the user, 2026-11-09: "新增电器；是否可以在哪个位置可以让我control加什么类型";
 // a new one is "多一个分页" and behaves "像家私"). Furniture and Services are built in; Quote settings › Categories adds,
 // names and orders the rest. `goods`: its items are products (Change item, photos, the Style step's furniture list).
@@ -352,7 +357,7 @@ export function factsTable(L, q, b, cell, n) {
   return `<tr><td colspan="${n}" style="padding:0"><table style="width:100%;table-layout:fixed;border-collapse:collapse"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:17%"><col style="width:33%"></colgroup>${rows}</table></td></tr>`;
 }
 
-// q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, saving, total }
+// q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, total }
 export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}) {
   const co = config.company;
   const blocks = config.doc.blocks.filter(b => !b.hidden);
@@ -405,7 +410,7 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       });
     } else if (b.type === "totals") {
       const rows = [];
-      if (q.saving > 0) rows.push([b.labels.saving, money(-q.saving), false]);
+      // No "Package saving" (the user, 2026-11-11: "Package saving 如果是这样的定义，就不需要了 … 总数对就可以了").
       if (q.discount) rows.push([b.labels.discount, money(-q.discount), false]);
       (q.adjust || []).forEach(a => rows.push([a.label, money(a.amount), false]));
       rows.push([b.labels.total, money(q.total), true]);

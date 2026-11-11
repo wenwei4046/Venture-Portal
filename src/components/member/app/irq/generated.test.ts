@@ -72,6 +72,15 @@ describe("the generated IR Quote templates", () => {
     expect(quote).toContain('v["sheet"]?.["zoom"]');
   });
 
+  // The user, 2026-11-11: "增加 save button" (Customize) and "默认 sqft（像 budget 一样呈现，但靠右）" (step 1's Unit size).
+  it("put Save draft beside Drafts, and sqft inside Unit size's right end", () => {
+    const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
+    expect(quote).toContain('v["saveHead"]');
+    expect(quote.indexOf('v["saveHead"]')).toBeLessThan(quote.indexOf('v["toggleDrafts"]'));
+    expect(quote).toContain('"isSqft"]');
+    expect(quote).toMatch(/"sqftD"\][\s\S]{0,400}\{"sqft"\}/);
+  });
+
   it("read the app's own faces, never a font the page did not load", () => {
     for (const [f, src] of tpls) expect(/font-family:[^;"]*\b(Manrope|Space Grotesk)\b/.test(src.replace(/var\(--font-[a-z-]+\)/g, "")), f).toBe(false);
   });
