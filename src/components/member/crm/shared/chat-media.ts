@@ -97,8 +97,10 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
   const k = md.kind, url = md.url, framed = k === "image" || k === "video" || k === "file";
   // A customer's file gone at Meta and never kept (2026-11-10): ChatImg / ChatVideo / VoiceNote / PdfCard draw the tile;
   // a plain document's tile says so itself and opens nothing.
-  if (md.gone) markGone(url, md.gone);
-  const lost = md.gone ?? goneOf(url);
+  // Only a customer's file is ever gone (2026-11-11): our own sends are ours in crm-media.
+  const theirs = m.from !== "me";
+  if (md.gone && theirs) markGone(url, md.gone);
+  const lost = theirs ? md.gone ?? goneOf(url) : null;
   return {
     ...NO_MEDIA, voiceMine,
     img: k === "image" ? url : "",

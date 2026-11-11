@@ -38,8 +38,11 @@ export function messengerExpiresAt(address: string | null | undefined): number |
  * A customer's file Meta no longer serves and we never kept (2026-11-10): which channel's, else null. A file in our own
  * bucket (media_path) never is; a WhatsApp media id older than 7 days is; a Messenger address past its `oe=`, or not on
  * Meta's hosts, is. GET /member/crm-media answers 410 for it and the chat draws "no longer available".
+ * OUR OWN message never is (2026-11-11 — the owner read two "Voice message no longer available" tiles as our sent voice
+ * notes): what we send is ours in crm-media, and Meta's 7 days are a customer's file only.
  */
-export function goneAtMeta(row: { media_id?: string | null; media_path?: string | null; media_url?: string | null; sent_at?: string | null }, now = Date.now()): "whatsapp" | "messenger" | null {
+export function goneAtMeta(row: { direction?: string | null; media_id?: string | null; media_path?: string | null; media_url?: string | null; sent_at?: string | null }, now = Date.now()): "whatsapp" | "messenger" | null {
+  if (row.direction === "out") return null;
   if (row.media_path) return null;
   if (row.media_url) {
     if (!messengerMediaAddress(row.media_url)) return "messenger";

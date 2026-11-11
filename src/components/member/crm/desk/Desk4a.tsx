@@ -200,7 +200,7 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
 /** A page's head: its title, underline tabs, a muted line, CRM alerts and the page's one primary button. */
 export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   const h = f4.head;
-  const pickAt = useRef<HTMLButtonElement>(null);
+  const pickAt = useRef<HTMLButtonElement>(null), cmpAt = useRef<HTMLButtonElement>(null);
   // Calendar and Team activity draw their prototypes' own title rows (docs/design_handoff_crm, 2026-11-08).
   if (f4.ownHead) return f4.addCust ? <DeskAddCustomer v={f4.addCust} /> : null;
   return (<>
@@ -222,11 +222,20 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
               </button>)}
           </div>
           {h.sub && <span data-period-dates="" style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{h.sub}</span>}
-          {h.cmp && (
+          {h.cmp && (h.cmp.on && h.cmp.open ? (
+            // On: the dates open the picker for the range compared with (2026-11-11, the owner: it offered only Stop comparing);
+            // × beside them stops comparing.
+            <span style={{ display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
+              {h.cmp.pick && <DateRangePicker value={h.cmp.pick.value} onApply={h.cmp.pick.apply} onCancel={h.cmp.pick.cancel} anchor={cmpAt} />}
+              <button ref={cmpAt} type="button" onClick={h.cmp.open} aria-haspopup="dialog" aria-expanded={!!h.cmp.pick} title="Pick the dates to compare with"
+                style={{ ...BTN, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: "3px" }}>{h.cmp.label}</button>
+              <button type="button" onClick={h.cmp.toggle} aria-label="Stop comparing" title="Stop comparing" style={{ ...BTN, padding: 0, display: "flex", color: "inherit" }}><Ic name="x" size={13} /></button>
+            </span>
+          ) : (
             <button type="button" onClick={h.cmp.toggle} aria-pressed={h.cmp.on} title={h.cmp.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, padding: 0, display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
               {h.cmp.on ? <>{h.cmp.label}<Ic name="x" size={13} /></> : <><Ic name="plus" size={13} />Compare</>}
             </button>
-          )}
+          ))}
         </div>
       )}
       {!h.seg && h.tabs.length > 0 && (

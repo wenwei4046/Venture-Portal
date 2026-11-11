@@ -133,7 +133,8 @@ function Head({ r, ads }: { r: R; ads?: AdsV }) {
 /** Columns (notes/25): tick a figure, a status or Channel to add it as a column; kept for this user. */
 function ColumnsPick({ o }: { o: O }) {
   const [open, setOpen] = useState(false);
-  const groups = ["Figures", "Statuses", "Channel"].map(g => ({ g, items: o.picker.filter(p => p.group === g) }));
+  // 2026-11-11: the ad's own (Status, Start, End) first, then the CRM's figures, Meta's, the statuses; a group with nothing is not drawn.
+  const groups = ["Ad", "Figures", "Meta Ads", "Statuses", "Channel"].map(g => ({ g, items: o.picker.filter(p => p.group === g) })).filter(x => x.items.length);
   return (
     <span style={{ marginLeft: "auto", position: "relative", display: "flex" }}>
       <button type="button" onClick={() => setOpen(x => !x)} aria-expanded={open} style={{ ...BTN, display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
@@ -141,7 +142,7 @@ function ColumnsPick({ o }: { o: O }) {
       </button>
       {open && (<>
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-        <div role="dialog" aria-label="Columns" style={{ position: "absolute", top: "26px", right: 0, zIndex: 21, width: "240px", padding: "8px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "2px" }}>
+        <div role="dialog" aria-label="Columns" style={{ position: "absolute", top: "26px", right: 0, zIndex: 21, width: "240px", maxHeight: "min(560px, calc(100vh - 180px))", overflowY: "auto", padding: "8px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "2px" }}>
           {groups.map(({ g, items }) => (
             <div key={g} style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
               <span style={{ padding: "8px 8px 4px", font: "600 11px Inter, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--crm-brown)" }}>{g}</span>

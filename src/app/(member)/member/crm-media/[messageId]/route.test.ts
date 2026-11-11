@@ -21,6 +21,26 @@ const oe = (s: number) => Math.floor(Date.now() / 1000 + s).toString(16);
 beforeEach(() => { process.env.META_SYSTEM_USER_TOKEN = "TOKEN"; });
 afterEach(() => { row.value = null; vi.unstubAllGlobals(); delete process.env.META_SYSTEM_USER_TOKEN; });
 
+describe("our own sent file (2026-11-11: Shane Law's chat, our voice notes of 25 Oct)", () => {
+  it("our voice note in crm-media: the signed link however old, never 410", async () => {
+    row.value = { direction: "out", media_id: null, media_path: "d33363d4/1792923814710-3a2c0b.ogg", media_url: null, media_mime: "audio/ogg", body: null, sent_at: daysAgo(17) };
+    const res = await call("GET");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("https://r2.example/d33363d4/1792923814710-3a2c0b.ogg?sig=1");
+    expect((await call("HEAD")).status).toBe(200);
+  });
+
+  it("ours with only an old media id is never the customer's 7 days: Meta's refusal is a plain 404", async () => {
+    row.value = { direction: "out", media_id: "123456", media_path: null, media_url: null, media_mime: "audio/ogg", body: null, sent_at: daysAgo(17) };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
+    for (const m of ["GET", "HEAD"] as const) {
+      const res = await call(m);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("x-media-gone")).toBeNull();
+    }
+  });
+});
+
 describe("a customer's file in the chat", () => {
   it("kept in our bucket: the signed link, however old its Meta id", async () => {
     row.value = { media_id: "123456", media_path: "c/in-1.jpg", media_url: null, media_mime: "image/jpeg", body: null, sent_at: daysAgo(30) };

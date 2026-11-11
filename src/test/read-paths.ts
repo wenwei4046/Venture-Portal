@@ -258,7 +258,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // IR Quote (2026-11-05, mig 20261105120000): every read and write of the quotation and its drafts.
   'ir_quote_read', 'ir_quote_save_config', 'ir_quote_save_draft', // the Drive's two went 2026-11-10 (mig 20261110010000)
   // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
-  'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status', 'crm_set_messenger_blocked',
+  'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status', 'crm_meta_ad_run', 'crm_set_messenger_blocked',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_auto_reply_due', 'crm_auto_reply_claim', 'crm_auto_reply_done',
   // A customer's file kept on arrival (mig 20261110140000): the webhooks' and the hourly sweep's service role alone.

@@ -40,6 +40,16 @@ describe("fetching a customer's media", () => {
     expect(messengerExpiresAt("https://cdn.fbsbx.com/v/a.pdf")).toBeNull();
   });
 
+  it("our own message is never gone at Meta, however old (2026-11-11: Shane Law's chat)", () => {
+    const now = Date.parse("2026-11-11T12:00:00Z");
+    // Production's sent voice note of 25 Oct: our copy in crm-media.
+    expect(goneAtMeta({ direction: "out", media_path: "d33363d4/1792923814710-3a2c0b.ogg", sent_at: "2026-10-25T10:23:39Z" }, now)).toBeNull();
+    // Even one with only a media id (none on production) is ours: never the customer's 7 days.
+    expect(goneAtMeta({ direction: "out", media_id: "123456", sent_at: "2026-10-01T00:00:00Z" }, now)).toBeNull();
+    // The customer's own voice note of that chat, never kept, is.
+    expect(goneAtMeta({ direction: "in", media_id: "123456", sent_at: "2026-10-25T10:13:01Z" }, now)).toBe("whatsapp");
+  });
+
   it("refuses anything that is not a media id, without asking Meta", async () => {
     const fetchImpl = vi.fn();
     expect((await fetchWhatsAppMedia("../../me", "TOKEN", fetchImpl)).ok).toBe(false);
