@@ -169,11 +169,24 @@ export function waitWords(ms: number): string {
  * lead, Won rate, each status (New, Attention, Follow up, Appointment, Cold) and Channel (a WhatsApp and a Messenger count)
  * — off by default, in this order wherever they were ticked.
  */
-export type RpColKey = "leads" | "avg" | "appt" | "show" | "won" | "lost" | "spend" | "perLead" | "wonRate" | "st:New" | "st:Attention" | "st:Follow up" | "st:Appointment" | "st:Cold leads" | "ch:wa" | "ch:ms";
+export type RpColKey = "leads" | "avg" | "appt" | "show" | "won" | "lost" | "spend" | "perLead" | "wonRate" | "st:New" | "st:Attention" | "st:Follow up" | "st:Appointment" | "st:Cold leads" | "ch:wa" | "ch:ms"
+  | "status" | "start" | "end" | "impr" | "reach" | "clicks" | "ctr" | "cpc" | "cpm" | "msgconv" | "cpmsg" | "apptRate" | "showRate" | "cpappt" | "wonAmt" | "roas";
 export const RP_BASE_COLS: [RpColKey, string, number][] = [["leads", "Leads", 80], ["avg", "Avg reply", 100], ["appt", "Appts", 80], ["show", "Show-up", 90], ["won", "Won", 70], ["lost", "Lost", 70]];
-/** The picker's choices: [pref key, label, its columns]. */
+/**
+ * The picker's choices: [pref key, label, its columns]. 2026-11-11 (the owner: "加广告的 start date、end date、status … 其他有用的
+ * Meta / CRM 数据"): the ad's Status (Running / Paused, as Ads performance reads it), Start date and End date (its ad set's run,
+ * kept hourly in crm_ad_names), Meta's Impressions, Reach, Link clicks, CTR, CPC, CPM, Conversations started and their cost,
+ * and the CRM's Appt rate, Show-up rate, Cost per appointment, Won amount and ROAS. Meta's and the ad's are an ad's own: a
+ * person's row reads "—" there.
+ */
 export const RP_PICKS: [string, string, [RpColKey, string, number][]][] = [
+  ["status", "Status", [["status", "Status", 90]]], ["start", "Start date", [["start", "Start", 92]]], ["end", "End date", [["end", "End", 92]]],
   ["spend", "Spend", [["spend", "Spend", 90]]], ["perLead", "Per lead", [["perLead", "Per lead", 80]]], ["wonRate", "Won rate", [["wonRate", "Won rate", 84]]],
+  ["apptRate", "Appt rate", [["apptRate", "Appt rate", 84]]], ["showRate", "Show-up rate", [["showRate", "Show-up rate", 100]]], ["cpappt", "Cost per appt", [["cpappt", "Per appt", 84]]],
+  ["wonAmt", "Won amount", [["wonAmt", "Won (RM)", 100]]], ["roas", "ROAS", [["roas", "ROAS", 70]]],
+  ["impr", "Impressions", [["impr", "Impressions", 100]]], ["reach", "Reach", [["reach", "Reach", 84]]], ["clicks", "Link clicks", [["clicks", "Link clicks", 90]]],
+  ["ctr", "CTR (link)", [["ctr", "CTR", 70]]], ["cpc", "CPC (link)", [["cpc", "CPC", 70]]], ["cpm", "CPM", [["cpm", "CPM", 70]]],
+  ["msgconv", "Conversations started", [["msgconv", "Convos", 80]]], ["cpmsg", "Cost per conversation", [["cpmsg", "Per convo", 90]]],
   ["st:New", "New", [["st:New", "New", 64]]], ["st:Attention", "Attention", [["st:Attention", "Attention", 84]]], ["st:Follow up", "Follow up", [["st:Follow up", "Follow up", 84]]],
   ["st:Appointment", "Appointment", [["st:Appointment", "Appointment", 104]]], ["st:Cold leads", "Cold", [["st:Cold leads", "Cold", 64]]],
 ];
@@ -185,11 +198,27 @@ export function readReportCols(v: unknown): string[] {
 export function reportColumns(picks: string[]): [RpColKey, string, number][] {
   return [...RP_BASE_COLS, ...RP_PICKS.filter(p => picks.includes(p[0])).flatMap(p => p[2])];
 }
-/** A column's raw figure (for sorting and drawing): spend from Meta when read, else null. */
-export function colValue(f: OverviewFigs, k: RpColKey, spend: number | null): number | null {
+/** Which group a pick stands under in Columns. */
+export const pickGroup = (k: string) => (k.startsWith("st:") ? "Statuses" : k === "channel" ? "Channel" : ["status", "start", "end"].includes(k) ? "Ad"
+  : ["impr", "reach", "clicks", "ctr", "cpc", "cpm", "msgconv", "cpmsg"].includes(k) ? "Meta Ads" : "Figures");
+/** An ad's own facts beside its figures: Meta's (vm/adsperf.ts › metaFigures, read for the period), its status and run. */
+export interface AdFacts { meta: Record<string, number | null>; status?: "Running" | "Paused" | null; start?: number | null; end?: number | null }
+/**
+ * A column's raw figure (for sorting and drawing): Meta's when read, else null. A number for every column — the status sorts
+ * Running (1) over Paused (0), a date by its time. A bare number is Meta's spend (as before 2026-11-11).
+ */
+export function colValue(f: OverviewFigs, k: RpColKey, facts: AdFacts | number | null): number | null {
+  const ad: AdFacts | null = typeof facts === "number" ? { meta: { spend: facts } } : facts;
+  const m = ad?.meta ?? {}, spend = m.spend ?? null;
   switch (k) {
     case "leads": return f.n; case "avg": return f.avgMin; case "appt": return f.appt; case "show": return f.show; case "won": return f.won; case "lost": return f.lost;
     case "spend": return spend; case "perLead": return spend != null && f.n ? spend / f.n : null; case "wonRate": return f.n ? f.won / f.n : null;
+    case "status": return ad?.status ? (ad.status === "Running" ? 1 : 0) : null;
+    case "start": return ad?.start ?? null; case "end": return ad?.end ?? null;
+    case "impr": case "reach": case "clicks": case "ctr": case "cpc": case "cpm": case "msgconv": case "cpmsg": return m[k] ?? null;
+    case "apptRate": return f.n ? f.appt / f.n : null; case "showRate": return f.appt ? f.show / f.appt : null;
+    case "cpappt": return spend != null && f.appt ? spend / f.appt : null;
+    case "wonAmt": return f.wonAmt ?? 0; case "roas": return spend ? (f.wonAmt ?? 0) / spend : null;
     case "ch:wa": return f.wa; case "ch:ms": return f.ms;
     default: return f.st[k.slice(3)] ?? 0;
   }
@@ -204,7 +233,7 @@ export function sortByCol<T extends { name: string; v: (k: RpColKey) => number |
 }
 
 /** A row's figures: its leads, average reply, appointments, show-ups, won and lost; per status and channel; who needs a reply. */
-export interface OverviewFigs { n: number; avgMin: number | null; appt: number; show: number; won: number; lost: number; st: Record<string, number>; wa: number; ms: number; need: number }
+export interface OverviewFigs { n: number; avgMin: number | null; appt: number; show: number; won: number; lost: number; st: Record<string, number>; wa: number; ms: number; need: number; /** RM of its won leads (2026-11-11). */ wonAmt?: number }
 export interface OverviewCustomer { id: string; name: string; status: string; avgMin: number | null; ad: string; rep: string; c: CrmCustomer }
 export interface OverviewPerson extends OverviewFigs { id: string; name: string; customers: OverviewCustomer[] }
 export interface OverviewAd extends OverviewFigs { key: string; name: string; channel: "whatsapp" | "messenger"; people: OverviewPerson[] }
@@ -230,6 +259,7 @@ export function overviewReport(cs: CrmCustomer[], range: [number, number], adNam
     return { n: list.length, avgMin: mean(list.flatMap(replyWaits)),
       appt: list.filter(c => live.has(c.id)).length, show: list.filter(c => (live.get(c.id) ?? []).some(v => v.state === "attended")).length,
       won: list.filter(c => c.status === "won").length, lost: list.filter(c => c.status === "lost").length,
+      wonAmt: list.reduce((s, c) => s + (c.status === "won" && Number.isFinite(Number(c.wonAmount)) ? Number(c.wonAmount) : 0), 0),
       st, wa: list.filter(c => c.channel === "whatsapp").length, ms: list.filter(c => c.channel === "messenger").length,
       need: list.filter(c => needsReply(replyState(c, visits, now).kind)).length };
   };

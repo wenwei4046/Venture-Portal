@@ -56,11 +56,13 @@ export interface InboxFilterBits {
 const pill = (on: boolean, h: number): CSSProperties => ({ ...BTN, height: `${h}px`, padding: h === 34 ? "0 11px" : "0 13px", borderRadius: `${h / 2}px`, display: "flex", alignItems: "center", gap: h === 34 ? "6px" : "7px",
   font: "500 13px Inter, sans-serif", background: on ? "var(--crm-sel)" : "#fff", border: `1px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, color: "var(--crm-ink)", whiteSpace: "nowrap" });
 
-/** D5a's filter: People / Status buttons, the tags, the result line; either button opens the 2c·2 picker over the list. */
+/** D5a's filter: People / Status buttons, the tags, the result line; each button opens its own picker (People: teams and people; Status: statuses; 2026-11-11). */
 const POP_W = 400;
 
 export function InboxFilter({ f }: { f: InboxFilterBits }) {
-  const [draft, setDraft] = useState<{ who: string[]; st: string[] } | null>(null);
+  // Each button opens its own picker (the owner, 2026-11-11: "people 跟 status 分开 filter"): People shows the teams and
+  // people only, Status the statuses only, and its Show / Clear touch that one; the other stays as applied.
+  const [draft, setDraft] = useState<{ sec: "people" | "status"; who: string[]; st: string[] } | null>(null);
   // Where the popover stands on the screen: fixed under the buttons, so the 340 px list column (overflow: auto) never cuts
   // it (the owner, 2026-11-10, a screenshot: "overlap") — kept inside the window, its height to the window's foot.
   const row = useRef<HTMLDivElement>(null);
@@ -77,10 +79,10 @@ export function InboxFilter({ f }: { f: InboxFilterBits }) {
     window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
   }, [isOpen]);
-  const open = (sec: "people" | "status") => { place(); setDraft({ who: f.who, st: f.st }); setTimeout(() => document.querySelector(`[data-ib-sec="${sec}"]`)?.scrollIntoView({ block: "nearest" }), 0); };
+  const open = (sec: "people" | "status") => { if (draft?.sec === sec) { setDraft(null); return; } place(); setDraft({ sec, who: f.who, st: f.st }); };
   const tg = (list: string[], v: string) => (list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
   const Btn = ({ sec, label, n }: { sec: "people" | "status"; label: string; n: number }) => (
-    <button type="button" onClick={() => open(sec)} aria-expanded={!!draft} style={{ ...BTN, flex: 1, minWidth: 0, height: "36px", padding: "0 10px", borderRadius: "9px", display: "flex", alignItems: "center", gap: "7px",
+    <button type="button" onClick={() => open(sec)} aria-expanded={draft?.sec === sec} aria-haspopup="dialog" style={{ ...BTN, flex: 1, minWidth: 0, height: "36px", padding: "0 10px", borderRadius: "9px", display: "flex", alignItems: "center", gap: "7px",
       background: "var(--crm-field)", border: "1px solid transparent", color: "var(--crm-ink)" }}>
       {sec === "people" ? <span style={{ display: "flex", flex: "none" }}><Ic name="users" size={14} /></span> : <span style={{ width: "9px", height: "9px", flex: "none", borderRadius: "3px", background: "var(--crm-ink)" }} />}
       <span style={{ flex: 1, minWidth: 0, font: "600 13px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
@@ -95,15 +97,14 @@ export function InboxFilter({ f }: { f: InboxFilterBits }) {
         <Btn sec="people" label="People" n={f.peopleN} /><Btn sec="status" label="Status" n={f.statusN} />
         {d && (<>
           <div onClick={() => setDraft(null)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
-          <div role="dialog" aria-label="Filter chats" style={{ position: "fixed", top: `${at?.top ?? 0}px`, left: `${at?.left ?? 0}px`, zIndex: 60, width: `${POP_W}px`, maxWidth: "calc(100vw - 24px)", maxHeight: `${at?.maxH ?? 620}px`, overflow: "auto", boxSizing: "border-box", padding: "18px 20px 20px",
+          <div role="dialog" aria-label={d.sec === "people" ? "Filter by people" : "Filter by status"} style={{ position: "fixed", top: `${at?.top ?? 0}px`, left: `${at?.left ?? 0}px`, zIndex: 60, width: `${POP_W}px`, maxWidth: "calc(100vw - 24px)", maxHeight: `${at?.maxH ?? 620}px`, overflow: "auto", boxSizing: "border-box", padding: "18px 20px 20px",
             background: "#fff", borderRadius: "16px", boxShadow: "0 16px 36px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "18px" }}>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <span style={{ font: `500 20px ${TIGHT}`, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>Filter chats</span>
-              <button type="button" onClick={() => setDraft({ who: [], st: [] })} style={{ ...BTN, marginLeft: "auto", font: "500 14px Inter, sans-serif", color: "var(--crm-rust)" }}>Clear all</button>
+              <span style={{ font: `500 20px ${TIGHT}`, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>{d.sec === "people" ? "People" : "Status"}</span>
+              <button type="button" onClick={() => setDraft(d.sec === "people" ? { ...d, who: [] } : { ...d, st: [] })} style={{ ...BTN, marginLeft: "auto", font: "500 14px Inter, sans-serif", color: "var(--crm-rust)" }}>Clear</button>
             </div>
-            <div data-ib-sec="people" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div style={{ display: "flex", alignItems: "baseline" }}><span style={{ font: "600 11px Inter, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--crm-brown)" }}>People</span>
-                <span style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick teams or people</span></div>
+            {d.sec === "people" && <div data-ib-sec="people" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <span style={{ marginTop: "-10px", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick teams or people</span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {f.teams.map(t => { const on = t.val ? d.who.includes(t.val) : t.people.length > 0 && t.people.every(p => d.who.includes(p.id));
                   return <button key={t.key} type="button" aria-pressed={on} onClick={() => setDraft({ ...d, who: t.val ? tg(d.who, t.val) : on ? d.who.filter(x => !t.people.some(p => p.id === x)) : [...d.who, ...t.people.map(p => p.id).filter(id => !d.who.includes(id))] })} style={pill(on, 38)}>
@@ -129,17 +130,16 @@ export function InboxFilter({ f }: { f: InboxFilterBits }) {
                       <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: t.dot }} />{p.label}<span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{p.n}</span></button>))))}
                 </div>
               )}
-            </div>
-            <div data-ib-sec="status" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div style={{ display: "flex", alignItems: "baseline" }}><span style={{ font: "600 11px Inter, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--crm-brown)" }}>Status</span>
-                <span style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick one or more</span></div>
+            </div>}
+            {d.sec === "status" && <div data-ib-sec="status" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <span style={{ marginTop: "-10px", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick one or more</span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {f.statuses.map(s => { const on = d.st.includes(s.label);
                   return <button key={s.label} type="button" aria-pressed={on} onClick={() => setDraft({ ...d, st: tg(d.st, s.label) })} style={pill(on, 38)}>
                     <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: s.dot }} />{s.label}<span style={{ fontVariantNumeric: "tabular-nums", color: s.hot && s.n ? "var(--crm-oxblood)" : "var(--crm-faint)" }}>{s.n}</span>
                     {on && <span style={{ display: "flex", color: "var(--crm-rust)" }}><Ic name="check" size={13} /></span>}</button>; })}
               </div>
-            </div>
+            </div>}
             <div style={{ display: "flex", gap: "8px", paddingTop: "4px" }}>
               <button type="button" onClick={() => setDraft(null)} style={{ ...BTN, flex: 1, height: "44px", borderRadius: "22px", textAlign: "center", font: "500 14px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }}>Cancel</button>
               <button type="button" onClick={() => { f.apply(d.who, d.st); setDraft(null); }} style={{ ...BTN, flex: 1.6, height: "44px", borderRadius: "22px", textAlign: "center", font: "500 14px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }}>

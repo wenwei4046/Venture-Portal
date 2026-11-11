@@ -20,20 +20,23 @@ export function adIdsOf(messages: Array<{ ad?: { sourceId: string | null } | nul
   return [...new Set(messages.map(m => m.ad?.sourceId?.trim() ?? '').filter(id => AD_ID.test(id)))]
 }
 
-export interface MetaAd { name: string | null; status: string | null }
+/** `start` / `end`: the ad set's start_time and end_time (2026-11-11, Reports › Overview's Start date / End date). */
+export interface MetaAd { name: string | null; status: string | null; start?: string | null; end?: string | null }
+
+const isoTime = (v: unknown) => (typeof v === 'string' && Number.isFinite(Date.parse(v)) ? v : null)
 
 function adOf(raw: unknown): MetaAd {
-  const o = (raw ?? {}) as { name?: unknown; effective_status?: unknown }
+  const o = (raw ?? {}) as { name?: unknown; effective_status?: unknown; adset?: { start_time?: unknown; end_time?: unknown } }
   const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 120) : null
   const status = typeof o.effective_status === 'string' && o.effective_status.trim() ? o.effective_status.trim().toUpperCase().slice(0, 40) : null
-  return { name, status }
+  return { name, status, start: isoTime(o.adset?.start_time), end: isoTime(o.adset?.end_time) }
 }
 
-/** The ad's name and effective_status in Ads Manager, or null (no access, no such ad, Meta slow — 3 s). */
+/** The ad's name, effective_status and its ad set's start / end in Ads Manager, or null (no access, no such ad, Meta slow — 3 s). */
 export async function metaAd(adId: string, token: string, fetchImpl: typeof fetch = fetch): Promise<MetaAd | null> {
   if (!AD_ID.test(adId)) return null
   try {
-    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}?fields=name,effective_status`, {
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}?fields=name,effective_status,adset{start_time,end_time}`, {
       headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(3000),
     })
     if (!res.ok) return null
@@ -94,6 +97,9 @@ export async function refreshAdStatuses(db: SupabaseClient, token: string | unde
       if (!ad?.status) continue
       const { data: ok, error: e } = await db.rpc('crm_meta_ad_status', { p_ad: id, p_name: ad.name ?? '', p_status: ad.status })
       if (!e && ok === true) kept++
+      // Its run's dates (2026-11-11, mig 20261111180000 — Reports › Overview's Start date / End date for every ad, not only
+      // the ones added from "+"). Best effort: before that migration the function is not there and nothing changes.
+      if (!e && ok === true && ad.start) await db.rpc('crm_meta_ad_run', { p_ad: id, p_start: ad.start, p_end: ad.end ?? null })
     }
     return kept
   } catch {

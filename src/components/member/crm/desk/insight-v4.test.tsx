@@ -130,3 +130,24 @@ describe("Ads performance's figures (notes/21)", () => {
     expect(toggle).toHaveBeenCalled();
   });
 });
+
+describe("the compare chip (2026-11-11: it offered only Stop comparing)", () => {
+  function CmpHead() {
+    const [on, setOn] = useState(true), [pick, setPick] = useState(false), [label, setLabel] = useState("vs 21 Oct – 31 Oct");
+    const cmp = { on, label, toggle: () => setOn(o => !o), open: () => setPick(true),
+      pick: pick ? { value: { a: new Date(2026, 9, 21).getTime(), b: new Date(2026, 9, 31).getTime() }, apply: () => { setLabel("vs 1 Oct – 11 Oct"); setPick(false); }, cancel: () => setPick(false) } : null };
+    const head = { title: "Insight", tabs: [{ label: "Custom", on: true, pick: () => {} }], seg: true, sub: "1–11 Nov", subTabs: [], cta: null, cmp, picker: null };
+    const f4 = { head, ownHead: false, addCust: null, alertsN: "", openAlerts: () => {}, bookPick: { open: false } } as unknown as Frame4a;
+    return <Desk4aHead f4={f4} />;
+  }
+  it("its dates open the date picker; × stops comparing", () => {
+    render(<CmpHead />);
+    const dates = screen.getByRole("button", { name: "vs 21 Oct – 31 Oct" });
+    expect(dates).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(dates);
+    expect(screen.getByRole("button", { name: "vs 21 Oct – 31 Oct" })).toHaveAttribute("aria-expanded", "true");
+    expect(document.querySelectorAll("[role='dialog']").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Stop comparing" }));
+    expect(screen.getByRole("button", { name: /Compare/ })).toHaveAttribute("aria-pressed", "false");
+  });
+});

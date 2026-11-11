@@ -36,7 +36,7 @@ const gone = (channel: "whatsapp" | "messenger") =>
     { status: 410, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Media-Gone": channel, ...NO_STORE } });
 const goTo = (url: string) => new Response(null, { status: 302, headers: { Location: url, "Cache-Control": KEEP, "Referrer-Policy": "no-referrer" } });
 
-type Message = { media_id: string | null; media_path: string | null; media_url: string | null; media_mime: string | null; body: string | null; sent_at: string | null };
+type Message = { direction: string | null; media_id: string | null; media_path: string | null; media_url: string | null; media_mime: string | null; body: string | null; sent_at: string | null };
 type Read = { message: Message; db: SupabaseClient } | { answer: Response };
 
 async function readMessage(messageId: string): Promise<Read> {
@@ -44,7 +44,7 @@ async function readMessage(messageId: string): Promise<Read> {
   if (!user?.is_active) return { answer: deny(401, "Sign in first.") };
   if (!/^[0-9a-f-]{36}$/i.test(messageId)) return { answer: deny(400, "Not a message.") };
   const db = (await createClient()) as unknown as SupabaseClient;
-  const { data: message } = await db.from("crm_messages").select("media_id, media_path, media_url, media_mime, body, sent_at").eq("id", messageId).maybeSingle();
+  const { data: message } = await db.from("crm_messages").select("direction, media_id, media_path, media_url, media_mime, body, sent_at").eq("id", messageId).maybeSingle();
   // Not readable under the member's own session = not found, never a hint that it exists.
   if (!message || !(message.media_id || message.media_path || message.media_url)) return { answer: deny(404, "Not found.") };
   return { message: message as Message, db };
@@ -72,7 +72,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ mess
   if (!token) return deny(503, "WhatsApp is not connected on this server.");
   const range = request.headers.get("range");
   const media = await fetchWhatsAppMedia(message.media_id as string, token, fetch, range);
-  if (!media.ok) return media.status === 410 ? gone("whatsapp") : deny(media.status, media.error);
+  // Our own message is never "gone at Meta" (2026-11-11): its media id failing is a plain not found, never the customer's 7 days.
+  if (!media.ok) return media.status === 410 && message.direction !== "out" ? gone("whatsapp") : deny(media.status === 410 ? 404 : media.status, media.error);
   const inline = inlineType(media.type);
   return new Response(media.body, {
     status: media.partial ? 206 : 200,
@@ -100,6 +101,9 @@ export async function HEAD(_request: Request, { params }: { params: Promise<{ me
   const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
   if (!token) return new Response(null, { status: 503, headers: NO_STORE });
   const info = await whatsAppMediaInfo(message.media_id as string, token);
-  if (!info.ok) return new Response(null, { status: info.status, headers: info.status === 410 ? { "X-Media-Gone": "whatsapp", ...NO_STORE } : NO_STORE });
+  if (!info.ok) {
+    const lostHere = info.status === 410 && message.direction !== "out";
+    return new Response(null, { status: info.status === 410 && !lostHere ? 404 : info.status, headers: lostHere ? { "X-Media-Gone": "whatsapp", ...NO_STORE } : NO_STORE });
+  }
   return new Response(null, { status: 200, headers: NO_STORE });
 }

@@ -11,9 +11,11 @@ import type { Icon4a } from "../../shared/icons4a";
 export interface F4Item { label: string; icon: Icon4a; on: boolean; pick: () => void; badge: string }
 export interface F4Tab { label: string; on: boolean; pick: () => void }
 export interface F4Menu { open: boolean; close: () => void; items: { tag: string; label: string; bg: string; fg: string; pick: () => void }[] }
+/** The compare chip: on, its dates open the picker (`open`, `pick` while it is open) and × stops comparing (2026-11-11). */
+export interface F4Cmp { on: boolean; label: string; toggle(): void; open?(): void; pick?: { value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null }
 export interface F4Head { /** Insight's comparison, a pill that turns it off and on. */ vs?: { on: boolean; label: string; toggle(): void };
   /** v4 notes/20: the period tabs drawn as one segmented control, the dates in grey after it. */ seg?: boolean;
-  /** v4 D2a: "+ Compare" after the dates (Insight › Ads performance). */ cmp?: { on: boolean; label: string; toggle(): void } | null; title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; /** Up next: the tab bar holds the ad dropdown (DeskUpNext). */ subSlot?: boolean; /** A tab's padding where the design differs (Assignment: 10px 0, CRM Assignment People.dc.html). */ subPad?: string; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
+  /** v4 D2a: "+ Compare" after the dates (Insight › Ads performance). */ cmp?: F4Cmp | null; title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; /** Up next: the tab bar holds the ad dropdown (DeskUpNext). */ subSlot?: boolean; /** A tab's padding where the design differs (Assignment: 10px 0, CRM Assignment People.dc.html). */ subPad?: string; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
   /** A tab's date picker open (Insight's Custom — shared/date-range.tsx), anchored on the tab it belongs to. */
   picker?: { tab: string; allFrom?: number; value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
   /** An outline button left of the primary one (Showrooms' Save as draft). */
@@ -128,7 +130,7 @@ interface HeadBits {
   insightPdf: () => void;
   insightSub: string;
   insVs?: { on: boolean; label: string; toggle(): void };
-  insCmp?: { on: boolean; label: string; toggle(): void } | null;
+  insCmp?: F4Cmp | null;
   insTabs: F4Tab[];
   insPicker?: { value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
   kUpNext?: boolean;

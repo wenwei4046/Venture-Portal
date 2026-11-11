@@ -6,6 +6,7 @@
  */
 import type { CrmVisit } from "@/lib/member/crm-data";
 import type { DeskCtx } from "./ctx";
+import { openViewer } from "../../shared/viewer";
 
 export type KeyState = "out" | "back" | "none";
 export const KEY_STATES: [KeyState | "all", string][] = [["all", "All"], ["out", "Key out"], ["back", "Returned"], ["none", "Not collected"]];
@@ -51,7 +52,14 @@ export function keyLogVM(ctx: DeskCtx) {
     out: all.filter(r => r.state === "out").length,
     rooms: [{ v: "all", label: "All showrooms" }, ...roomNames.map(n => ({ v: n, label: n }))], room, setRoom: (e: { target: { value: string } }) => patch({ klRoom: e.target.value }),
     states: KEY_STATES.map(([k, label]) => ({ label, on: st === k, n: k === "all" ? all.length : all.filter(r => r.state === k).length, pick: () => patch({ klState: k }) })),
-    photo: (path: string) => () => { void ctx.act.keyPhotoUrl(path).then(url => { if (url) void import("../../shared/viewer").then(m => m.openViewer([{ kind: "image", url, name: "Key photo" }], 0)); }); },
+    // A key photo opens in the viewer the chats use (2026-11-11, the owner: "照片点了没反应"): the viewer is imported as every
+    // other photo's is. It came through a dynamic import(), a chunk of its own on the live site, whose openViewer told a viewer
+    // store nobody had mounted, so nothing opened; and a failure anywhere on the way now says so instead of nothing.
+    photo: (path: string) => () => {
+      void Promise.resolve().then(() => ctx.act.keyPhotoUrl(path))
+        .then(url => { if (url) openViewer([{ kind: "image", url, name: "Key photo" }], 0); })
+        .catch(() => ctx.act.toast?.("The photo could not be opened."));
+    },
     excel: async () => {
       const XLSX = await import("xlsx"), wb = XLSX.utils.book_new();
       const head = ["Visit", "Showroom", "Customer", "Salesperson", "Key", "Collected", "Collected by", "Returned", "Returned by"];

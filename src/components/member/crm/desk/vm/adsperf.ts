@@ -131,7 +131,9 @@ export function adsPerfVM(ctx: DeskCtx) {
   const onIns = ui.tab === "insight", ir = onIns ? insightRange(ctx).r : null;
   const [ra, rb] = ir ? [Math.min(ir.a, T), Math.max(Math.min(ir.a, T), Math.min(ir.b, T))] : custom ? [tOf(ui.apF), tOf(ui.apT)] : [R[ui.apRange as number][1], R[ui.apRange as number][2]];
   const len = Math.round((rb - ra) / DAY) + 1;
-  const cmp = ui.apCmp, cmode = ir ? 0 : ui.apCmpMode ?? 0;
+  // Under Insight the compare range is the period before, or the dates picked on the chip (2026-11-11, the owner: the
+  // "vs 21 Oct – 31 Oct ×" chip only offered Stop comparing — pressing its dates now opens the date picker).
+  const cmp = ui.apCmp, cmode = ir ? (ui.apCmpMode === "custom" && ui.apCF && ui.apCT ? "custom" : 0) : ui.apCmpMode ?? 0;
   const [ca, cb] = cmode === "range" || cmode === "custom" ? [tOf(ui.apCF), tOf(ui.apCT)]
     : cmode === 1 ? [new Date(new Date(ra).getFullYear(), new Date(ra).getMonth() - 1, new Date(ra).getDate()).getTime(), new Date(new Date(rb).getFullYear(), new Date(rb).getMonth() - 1, new Date(rb).getDate()).getTime()]
       : cmode === 2 ? [new Date(new Date(ra).getFullYear() - 1, new Date(ra).getMonth(), new Date(ra).getDate()).getTime(), new Date(new Date(rb).getFullYear() - 1, new Date(rb).getMonth(), new Date(rb).getDate()).getTime()]
@@ -275,7 +277,11 @@ export function adsPerfVM(ctx: DeskCtx) {
     // D2a: under Insight the range button (the third filter) goes — the head's period drives the page.
     apInIns: onIns,
     // D2a: "+ Compare" in Insight's head (the range button that held it went); on, it reads "vs 22–31 Oct" with ×.
-    insCmp: onIns && ui.insTab === "ads" ? { on: cmp, label: `vs ${rangeTxt(ca, cb)}`, toggle: () => patch({ apCmp: !cmp, apCmpMode: 0 }) } : null,
+    insCmp: onIns && ui.insTab === "ads" ? { on: cmp, label: `vs ${rangeTxt(ca, cb)}`, toggle: () => patch({ apCmp: !cmp, apCmpMode: 0, insCmpPick: false }),
+      // The chip's dates open the picker on the range compared now; Apply compares with the days picked.
+      open: () => patch({ insCmpPick: true }),
+      pick: cmp && ui.insCmpPick ? { value: { a: ca, b: cb }, apply: (r: { a: number; b: number }) => patch({ apCmp: true, apCmpMode: "custom", apCF: isoOf(r.a), apCT: isoOf(r.b), insCmpPick: false }),
+        cancel: () => patch({ insCmpPick: false }) } : null } : null,
     // v4 notes/20: the head reads its dates as every Insight tab does ("1–10 Nov", D2a), so switching tabs changes no width.
     ...(onIns && ui.insTab === "ads" ? { insightSub: insightDates({ a: ra, b: rb }) } : {}),
     // Insight › Ads performance (v2 frame 01b) is this page's body under Insight's head.

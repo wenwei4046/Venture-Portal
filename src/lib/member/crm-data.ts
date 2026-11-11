@@ -701,7 +701,7 @@ export function personName(name: string): string {
 
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
-  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true, startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}), ...(a.hidden_at ? { hidden: true } : {}) };
+  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true } : {}), ...(a.starts_at || a.ends_at ? { startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}), ...(a.hidden_at ? { hidden: true } : {}) };
   const customerLabels: Record<string, string[]> = {};
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {

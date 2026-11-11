@@ -63,9 +63,10 @@ export function useGone(src: string): { gone: GoneChannel | null; check: () => v
   return { gone: g, check: () => { void askGone(src); } };
 }
 
-const NOUN: Record<MediaKind, string> = { image: "Photo", video: "Video", audio: "Voice message", file: "File" };
+// Named as the customer's (2026-11-11): two "Voice message no longer available" tiles were read as our own sent notes.
+const NOUN: Record<MediaKind, string> = { image: "Customer's photo", video: "Customer's video", audio: "Customer's voice message", file: "Customer's file" };
 
-/** The tile's two lines: "Photo no longer available" · "WhatsApp keeps a customer's files 7 days". */
+/** The tile's two lines: "Customer's photo no longer available" · "WhatsApp keeps a customer's files 7 days". */
 export function goneWords(kind: MediaKind, channel: GoneChannel): { title: string; why: string } {
   return {
     title: `${NOUN[kind]} no longer available`,
