@@ -53,6 +53,12 @@ export interface RankDefRow {
   label: string
   /** Pay order, 10/20/30 … from the lowest rate up, then group packages. */
   sort_order: number
+  /**
+   * What the rank pays on a bill of a brand that follows its own scheme, by the
+   * brand's id (2026-11-11 — 2990s: `{ "<brand id>": 0.08 }`). A rank with none
+   * for a brand pays the nearest rank below that has one (`brandRateOf`).
+   */
+  brand_rates?: Record<string, number> | null
 }
 
 export interface RankRow {
@@ -172,6 +178,13 @@ export interface BrandRow {
   hc_bill_pct: number | null
   note: string | null
   is_active: boolean
+  /**
+   * The brand follows its own commission scheme (2026-11-11 — 2990s): its own
+   * rate per rank (Rules › Ranks), no margin, none of the sub-department's KPI items.
+   */
+  own_scheme?: boolean
+  /** The Houzs ERP company whose every sales order is this brand's (2990's Home is 2); null for every other brand. */
+  erp_company_id?: number | null
 }
 
 export interface MarginBandRow {

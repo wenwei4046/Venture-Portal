@@ -15,6 +15,31 @@ cross-apply the two programmes.
 
 ---
 
+## A brand on its own commission scheme (2990s) — 2026-11-12 amendment
+
+Adds to §4 (the components), §4.6 (margin) and §14 (the ERP feed). The user,
+2026-11-11, of the sales orders of 2990's Home (ERP company 2) that Fair's
+team sells: "依然算作 Fair 的 revenue … 唯一不同的是看不到 margin，因为 2990s
+本身没有 calculate 进 margin，它是跟着自己独立的一套 commission scheme。整个提成
+逻辑一样，只是它的 top rank 抽成是 8%（以此类推，每级往下调 1%）"; and of the
+orders 2990s' own salespeople key: "不需要把 sales order export 过来这边算薪水".
+
+| | |
+|---|---|
+| The brand | `comm_brands.own_scheme` (it follows its own scheme) and `comm_brands.erp_company_id` (every sales order of that ERP company is this brand's). Fair's **2990S** — "2990s", company 2 |
+| Which orders | only those a team member sold: the receiver skips a NEW document of that company whose salesperson is not on the sub-department's team in the month of the sale (`erp_sync_outside_team`; `docs/erp-sync/contract.md` §3) |
+| C1 | the same sales, paid at the rank's rate FOR THE BRAND — `comm_rank_defs.brand_rates` (by the brand's id): Team Leader 8%, Senior Team Assistant 7%, Team Assistant 6%, Senior Revenue Specialist 5%, Revenue Specialist 4%. A rank with none pays the nearest rank below that has one (`brandRateOf`). Edited on Rules › Ranks |
+| C4 (override) | the uplines' differential, read on the brand's rates and kept apart from the other bills' |
+| Margin (§4.6) | none: no penalty, not in the month's margin or its incentive, never a bill waiting for a cost. No Product List, no calculator in the Quote |
+| C2 (KPI) | the sub-department's KPI items are not found on such a bill; the brand's own KPI items (Upgrade fabric, Upgrade latex seat — the user's list) are a later change |
+| Everything else | as any bill: the rung and group sales, promotion, the deposit gate, shares, half comm, drops and upsells, the month's cards and Commissionable value, the directors' threshold |
+| The engine | `EngineInput.ownSchemeBrands`, `Rank.brandRates`, `ownSchemesOf` (`lib/commission/engine.ts`, `brand-rates.ts`) |
+| Database | `20261112003700_brand_own_scheme` |
+
+The rules and their history: `.claude/rules/revenue/comm-cal.md` › 2990s.
+
+---
+
 ## Open Bill is gone — 2026-10-31 amendment
 
 Supersedes §4.4 (C3) and every line below that names Open Bill — what they say

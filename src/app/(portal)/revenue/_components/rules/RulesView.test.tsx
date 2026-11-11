@@ -194,6 +194,22 @@ describe('RulesView', () => {
     expect(screen.getByRole('textbox', { name: 'hc_bill_pct' })).toHaveValue('')
   })
 
+  // 2026-11-12 — 2990s follows its own commission scheme: it stands in no margin, so Brands & margin bands names it
+  // *Own scheme* and keys in no ladder for it (its rate per rank is Rules › Ranks').
+  it('names a brand on its own scheme and offers it no margin ladder', () => {
+    nav.params = new URLSearchParams('tab=brands')
+    const akemi = { id: 'a', code: 'AKEMI', name: 'Akemi', item_code_prefixes: ['AK-'], sub_brands: [], ref_prefixes: [], hc_bill_pct: null, note: null, is_active: true }
+    const own = { ...akemi, id: 'n', code: '2990S', name: '2990s', item_code_prefixes: [], sub_brands: ['2990S SOFA', '2990S MATTRESS'], own_scheme: true, erp_company_id: 2 }
+    renderView(true, { data: dataWith(true, { brands: [akemi, own] }) })
+    // Akemi, open first: its ladder's table is there to key in.
+    expect(screen.getByRole('columnheader', { name: 'Band' })).toBeInTheDocument()
+    const pill = screen.getByRole('button', { name: '2990s · Own scheme' })
+    fireEvent.click(pill)
+    expect(pill).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('textbox', { name: 'sub_brands' })).toHaveValue('2990S SOFA, 2990S MATTRESS')
+    expect(screen.queryByRole('columnheader', { name: 'Band' })).toBeNull()
+  })
+
   it('says so when the sub-department has no scheme yet', () => {
     renderView(true, { data: { ...dataWith(true), scheme: null } })
     expect(screen.getByText('Fair has no scheme yet.')).toBeInTheDocument()

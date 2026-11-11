@@ -81,7 +81,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   comm_organisers: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_products: ['product_list.edit', 'revenue.create', 'revenue.edit'],
   comm_promotion_rules: ['revenue.manage', 'revenue.view:own'],
-  comm_rank_defs: ['revenue.manage', 'revenue.view:own'],
+  comm_rank_defs: ['revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_ranks: ['revenue.edit', 'revenue.manage', 'revenue.view:own', 'team.create', 'team.view:own'],
   comm_runs: ['hr_costing.view:own', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_salesperson_closes: ['hr_costing.view:own', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],

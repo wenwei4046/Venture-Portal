@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows, fetchByKeys } from '@/lib/paginate'
 import { monthsBefore } from '@/lib/commission/engine'
-import { toEngineInput } from '@/lib/commission/run-payload'
+import { ownSchemeBrandsOf, toEngineInput } from '@/lib/commission/run-payload'
 import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
 import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
@@ -13,6 +13,7 @@ import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
 import type {
+  BrandRow,
   CostRatioBrandRow,
   GwpRow,
   CostRatioRow,
@@ -172,7 +173,7 @@ export async function loadCommissionInput(
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, cutover,
-    costRatios, costRatiosByBrand, gwp, heads, directorRows, directorPayRows, standingCloses, appliedRuns] = await Promise.all([
+    costRatios, costRatiosByBrand, gwp, heads, directorRows, directorPayRows, standingCloses, appliedRuns, brands] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -186,8 +187,10 @@ export async function loadCommissionInput(
       supabase.from('comm_order_releases').select('order_no, run_id')
         .eq('sub_department_id', scheme.sub_department_id).order('order_no').range(from, to)),
     readRows<RankRow>('commission ranks', (from, to) =>
+      // comm_rank_defs (brand_rates): what the rank pays on a bill of a brand
+      // with its own scheme (2026-11-11 — 2990s), keyed by the brand's id.
       supabase.from('comm_ranks')
-        .select('rank_key, title_id, titles (name), label, product_rate, group_incentive_amount, group_subsidy_cap, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
+        .select('rank_key, title_id, titles (name), label, product_rate, group_incentive_amount, group_subsidy_cap, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order, comm_rank_defs (brand_rates)')
         .eq('scheme_id', scheme.id).order('sort_order').order('id').range(from, to)),
     readRows<ItemGroupRow>('commission item groups', (from, to) =>
       supabase.from('comm_item_groups').select('item_group, commissionable')
@@ -267,6 +270,11 @@ export async function loadCommissionInput(
     readRows<{ period_month: string }>('the applied runs', (from, to) =>
       supabase.from('comm_runs').select('period_month')
         .eq('sub_department_id', scheme.sub_department_id).in('status', ['applied', 'locked']).order('id').range(from, to)),
+    // The scheme's brands (2026-11-11): one that follows its own scheme — 2990s —
+    // is paid at its own rate per rank and stands outside every margin.
+    readRows<BrandRow>('the brands', (from, to) =>
+      supabase.from('comm_brands').select('id, code, own_scheme')
+        .eq('scheme_id', scheme.id).order('id').range(from, to)),
   ])
 
   const releasedOrderNos = releases.filter(row => row.run_id !== options.replayRunId).map(row => row.order_no)
@@ -303,7 +311,11 @@ export async function loadCommissionInput(
   }))]
   // A KPI item that is a fabric series (2026-10-29) finds a line's fabric on the ERP's fabric list.
   const needsFabrics = namesFabricSeries([...kpiItems, ...currentKpiItems])
-  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms] = await Promise.all([
+  // A drop or an upsell on a bill of a brand with its own scheme is paid — or
+  // taken back — at the rate that bill was paid at (2026-11-11): the brand of
+  // the bill each one changed, read only while a brand has its own scheme.
+  const ownBrands = ownSchemeBrandsOf(brands)
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -321,8 +333,23 @@ export async function loadCommissionInput(
     needsFabrics ? readFabricSeries(supabase) : Promise.resolve([]),
     // Half comm (2026-11-10): the bills paid half their commission.
     loadHalfComms(supabase, orderIds),
+    ownBrands.size > 0
+      ? readByKeys<{ id: string; brand_code: string | null }>('the bills drops and upsells changed', upsaleBillIds,
+        (chunk, from, to) => supabase.from('sales_orders').select('id, brand_code')
+          .in('id', chunk).order('id').range(from, to))
+      : Promise.resolve([]),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
+  const ownBrandCodes = new Set(ownBrands.values())
+  const ownBrandOfBill = new Map(upsaleBillBrands.flatMap(bill => {
+    const code = (bill.brand_code ?? '').trim().toUpperCase()
+    return ownBrandCodes.has(code) ? [[bill.id, code] as const] : []
+  }))
+  for (const upsale of upsales) {
+    const bill = upsaleBillId(upsale, upsaleDocBills)
+    const brand = bill ? ownBrandOfBill.get(bill) : undefined
+    if (brand) upsale.brand_code = brand
+  }
 
   const linesByOrder = new Map<string, SalesLineRow[]>()
   for (const line of lines) {
@@ -387,6 +414,7 @@ export async function loadCommissionInput(
     directors,
     monthCommissionableValue: monthValue,
     feedFloor,
+    brands,
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,

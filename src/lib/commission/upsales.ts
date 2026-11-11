@@ -44,6 +44,12 @@ export interface UpsaleRow {
    * settled. Its shares split the change.
    */
   settled_order_id?: string | null
+  /**
+   * The brand of the bill it changed — set by the loader, never a column
+   * (2026-11-11): a change to a bill of a brand with its own scheme (2990s) is
+   * paid, or taken back, at the rate that bill was paid at.
+   */
+  brand_code?: string | null
 }
 
 /**
@@ -103,6 +109,8 @@ export function upsalesToOrders(rows: readonly UpsaleRow[], periodMonth: string)
       orderTotal: amount,
       paidAmount: amount,
       upsale: true,
+      // The brand of the bill it changed: its rate, when that brand has its own (2026-11-11).
+      ...(u.brand_code?.trim() ? { brandCode: u.brand_code.trim() } : {}),
       lines: [
         {
           id: u.id,

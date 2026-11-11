@@ -28,8 +28,9 @@ import BillCountNotice from '../orders/_components/BillCountNotice'
 import BillShareNotice from '../orders/_components/BillShareNotice'
 import BillMoveNotice from '../orders/_components/BillMoveNotice'
 import { billMoveAction, movedNote, type BillMoveAction } from '@/lib/commission/bill-move'
-import { billBrandAction, brandOutcomeMessage, type BrandOption } from '@/lib/commission/bill-brand'
+import { billBrandAction, brandOutcomeMessage, pickableBrands, type BrandOption } from '@/lib/commission/bill-brand'
 import { closeVerdicts, ORIGIN_TONE, rowOrigin, type RowOrigin } from '@/lib/commission/row-origin'
+import { OWN_SCHEME_LABEL } from '@/lib/commission/brand-rates'
 import { billShareAction, sharePct, type BillShareAction, type ShareCandidate, type ShareHolder } from '@/lib/commission/bill-share'
 import { useBillMenu } from '../orders/_components/useBillMenu'
 import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionMonthSummary'
@@ -666,7 +667,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         runLocked: lockedMonths.has(row.periodMonth),
         closedReason: closedHolder(row, 'changing a bill’s brand'),
         monthLabel: monthName(row.periodMonth),
-        hasOptions: brandOptions.length > 0,
+        hasOptions: pickableBrands(brandOptions).length > 0,
       },
     )
   }
@@ -762,6 +763,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         : money(row.orderTotal)
       case 'commissionable': return <>{money(row.commissionableValue)}<NoCommission amount={row.orderTotal - row.commissionableValue} /></>
       case 'margin': return row.upsale ? 'Not applicable'
+        // A brand on its own scheme (2026-11-11 — 2990s): the bill stands in no margin.
+        : row.ownBrand ? <>—<small className={s.muted}>{OWN_SCHEME_LABEL}</small></>
         // A gift on a bill of its own: no margin to read, its cost in the month's (2026-10-30).
         : 'noSales' in row && row.noSales ? <>No sales<small className={s.muted}>{money(row.marginRevenue - (row.marginCost ?? 0))}</small></>
         : <>{pct(row.marginPct)}<small className={s.muted}>{row.marginCost == null ? 'Cost incomplete' : money(row.marginRevenue - row.marginCost)}</small></>

@@ -17,6 +17,17 @@ export interface BrandOption {
   name: string
   /** Its sub-brands (Akemi's: HAPPI SLEEP) — what an ERP booth may call it. */
   subBrands?: readonly string[]
+  /**
+   * The brand follows its own commission scheme (2026-11-11 — 2990s): no margin
+   * ladder, so never a brand to PICK for a bill's margin (`pickableBrands`); it
+   * still names its booths and its bills.
+   */
+  ownScheme?: boolean
+}
+
+/** The brands *Brand for the margin* offers: the ones with a margin ladder. */
+export function pickableBrands<T extends BrandOption>(options: readonly T[]): T[] {
+  return options.filter(b => !b.ownScheme)
 }
 
 export type BillBrandAction =

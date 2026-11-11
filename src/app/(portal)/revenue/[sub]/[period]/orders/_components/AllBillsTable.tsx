@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { formatMoney } from '@/lib/utils'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
 import { brandOutcomeMessage, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
+import { OWN_SCHEME_LABEL } from '@/lib/commission/brand-rates'
 import { billShareAction, holdersOf, type BillShareAction } from '@/lib/commission/bill-share'
 import { ORIGIN_TONE, type RowOrigin } from '@/lib/commission/row-origin'
 import { billMoveAction, movedNote, type BillMoveAction, type BillMoved } from '@/lib/commission/bill-move'
@@ -59,6 +60,8 @@ export interface BillRow {
   marginKeyed: boolean
   /** A gift on a bill of its own (2026-10-30): no margin to read, its cost — `marginValue`, below nothing — the month's. */
   noSales?: boolean
+  /** A bill of a brand on its own scheme (2990s, 2026-11-11): it stands in no margin, and waits for no cost. */
+  ownScheme?: boolean
   /** The bill's standing, in words: Included / Deposit pending / why it is excluded. */
   status: string
   cancelled: boolean
@@ -296,7 +299,9 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
       case 'sales': return money(r.orderTotal)
       case 'commissionable': return <>{money(r.commissionable)}<NoCommission amount={r.orderTotal - r.commissionable} /></>
       case 'paid': return <>{money(r.paidAmount)}{r.depositShort !== null && <small className="text-danger">needs {money(r.depositShort)}</small>}</>
-      case 'margin': return r.noSales
+      case 'margin': return r.ownScheme
+        ? <>—<small className={s.muted}>{OWN_SCHEME_LABEL}</small></>
+        : r.noSales
         ? <>No sales<small className={s.muted}>{r.marginValue === null ? '' : money(r.marginValue)}</small></>
         : r.marginPct === null
         ? <>—<small className={s.muted}>Cost incomplete</small></>

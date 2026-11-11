@@ -124,6 +124,9 @@ export interface SalesOrder {
    * brand given away, a bed frame, any accessory: riders — their cost counts
    * in this bill's margin, measured on this brand's ladder. Absent (a bed
    * frame on its own, an old import) = the lines decide, as they always did.
+   * On an upsale or a drop: the brand of the bill it changed, so a change to a
+   * bill paid at a brand's own rate is paid — or taken back — at that rate
+   * (2026-11-11, `EngineInput.ownSchemeBrands`).
    */
   brandCode?: string | null
   /**
@@ -281,6 +284,14 @@ export interface Rank {
   personalSalesThreshold: number | null
   consecutiveMonths: number | null
   sortOrder: number
+  /**
+   * What this rung pays on a bill of a brand that follows its own commission
+   * scheme (2026-11-11 — 2990s: Team Leader 8%, Senior Team Assistant 7%, Team
+   * Assistant 6%, Senior Revenue Specialist 5%, Revenue Specialist 4%), by that
+   * brand's code. A rung with none for a brand pays the nearest rung below
+   * that has one (`brandRateOf`). Absent = no brand has a rate of its own here.
+   */
+  brandRates?: Record<string, number>
 }
 
 /**
@@ -414,6 +425,17 @@ export interface EngineInput {
    * director has an incentive to judge.
    */
   monthCommissionableValue?: number
+  /**
+   * The brands that follow their own commission scheme (`comm_brands.own_scheme`,
+   * 2026-11-11 — 2990s; the user: "它是跟着自己独立的一套 commission scheme"). A
+   * bill written under one is the sub-department's sale like any other — its
+   * holder's sales, their rung, the group's revenue, the month's figures — and
+   * differs in three things: it is paid at the brand's own rate for the rung
+   * (`Rank.brandRates`), and so is the override up its line; it is in NO margin
+   * (no penalty, no monthly margin, no incentive, never a bill without a cost);
+   * and the sub-department's KPI items are not found on it. Absent = none.
+   */
+  ownSchemeBrands?: string[]
 }
 
 /** One department head's pay in this sub-department (Rules › Directors). */
@@ -458,6 +480,14 @@ export interface StatementLine {
   qty: number | null
   amount: number
   note: string
+  /**
+   * Set on a line paid at a brand's own rate (2026-11-11, `EngineInput.ownSchemeBrands`):
+   * the bill's own commission, and the override an upline earns on that brand's
+   * bills — one override line a downline and brand, beside the line for the rest.
+   * Never saved (the note says the brand); the ledger reads it to put each
+   * override on the bills it was earned on.
+   */
+  brandCode?: string
 }
 
 /** Where a bill's margin came from. */
