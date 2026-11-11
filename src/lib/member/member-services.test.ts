@@ -9,7 +9,9 @@ import {
   defaultEffective,
   defaultSeat,
   effectiveWhen,
+  filterByStatus,
   filterRequests,
+  statusGroup,
   foodDaysLine,
   hasSignedForm,
   isOpen,
@@ -171,6 +173,29 @@ describe('Request reviews · words and facts', () => {
     const all = [req({ id: 'a' }), req({ id: 'b', kind: 'claim' }), req({ id: 'c', kind: 'replacement' })]
     expect(filterRequests(all, 'all').map(r => r.id)).toEqual(['a', 'b', 'c'])
     expect(filterRequests(all, 'claim').map(r => r.id)).toEqual(['b'])
+  })
+
+  it('filters by status: pending, approved, withdrawn, rejected (2026-11-12)', () => {
+    const all = [
+      req({ id: 'p1', status: 'submitted' }),
+      req({ id: 'p2', kind: 'claim', status: 'needs_info' }),
+      req({ id: 'a1', kind: 'claim', status: 'approved' }),
+      req({ id: 'a2', kind: 'claim', status: 'paid' }),
+      req({ id: 'a3', status: 'waiting' }),
+      req({ id: 'a4', kind: 'replacement', status: 'scheduled' }),
+      req({ id: 'a5', kind: 'replacement', status: 'executed' }),
+      req({ id: 'w1', status: 'withdrawn' }),
+      req({ id: 'r1', kind: 'claim', status: 'rejected' }),
+      req({ id: 'f1', status: 'failed' }),
+    ]
+    expect(filterByStatus(all, 'all')).toHaveLength(10)
+    expect(filterByStatus(all, 'pending').map(r => r.id)).toEqual(['p1', 'p2'])
+    expect(filterByStatus(all, 'approved').map(r => r.id)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5'])
+    expect(filterByStatus(all, 'withdrawn').map(r => r.id)).toEqual(['w1'])
+    expect(filterByStatus(all, 'rejected').map(r => r.id)).toEqual(['r1'])
+    expect(statusGroup(req({ status: 'failed' }))).toBeNull()
+    // The two filters stack: kind first, then status.
+    expect(filterByStatus(filterRequests(all, 'claim'), 'approved').map(r => r.id)).toEqual(['a1', 'a2'])
   })
 })
 
