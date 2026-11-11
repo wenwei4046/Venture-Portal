@@ -97,7 +97,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
             <div role="menu" aria-label="Switch module" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% - 8px)", zIndex: 8, padding: "6px", background: "#fff",
               borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "2px" }}>
               <span style={{ padding: "6px 8px 4px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>SWITCH MODULE</span>
-              {MODULE_ROWS.map(([id, label]) => { const on = id === f.modules!.current;
+              {(f.modules.rows ?? MODULE_ROWS).map(([id, label]) => { const on = id === f.modules!.current;
                 return <button key={id} type="button" role="menuitemradio" aria-checked={on} onClick={() => { setMods(false); if (!on) f.modules!.onPick(id); }}
                   style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 8px", borderRadius: "7px", font: "500 13px Inter, sans-serif",
                     color: "var(--crm-ink)", background: on ? "var(--crm-sel)" : "transparent" }}>
@@ -106,7 +106,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
           </>)}
           <button type="button" aria-label="Switch module" aria-expanded={mods} onClick={() => setMods(o => !o)} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px",
             height: "36px", padding: open ? "0 10px" : 0, justifyContent: open ? undefined : "center", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "var(--crm-sidebar-text)", border: "1px solid rgba(255,255,255,.12)" }}>
-            <Ic name="layout-grid" size={15} />{open && <>Revenue<span style={{ marginLeft: "auto", display: "flex" }}><Ic name="chevron-down" size={13} /></span></>}
+            <Ic name="layout-grid" size={15} />{open && <>{f.modules.label ?? "Revenue"}<span style={{ marginLeft: "auto", display: "flex" }}><Ic name="chevron-down" size={13} /></span></>}
           </button>
         </>)}
         {v.meMenuOpen && (<>

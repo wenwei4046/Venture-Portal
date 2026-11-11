@@ -1,6 +1,7 @@
 'use client'
 
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
+import type { ChangeViewRow } from '@/lib/marketing/change-view'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cancelWarmIntent, warmOnIntent } from '@/lib/nav-warm'
@@ -29,6 +30,8 @@ export interface MktSidebarProps {
   onSettings: () => void
   /** A row just clicked lights at once, before its page answers. */
   onPick: (key: MktNavKey | `sub:${string}`) => void
+  /** Change view's rows (lib/marketing/change-view.ts) — none: no row. */
+  views?: ChangeViewRow[]
 }
 
 const TONE: Record<MktNavRow['tone'], string> = { sand: s.sand, mist: s.mist, peach: s.peach, cream: s.cream }
@@ -187,6 +190,7 @@ export default function MktSidebar(p: MktSidebarProps) {
       </nav>
       <div className={s.foot}>
         {foot.map(row)}
+        {p.views && p.views.length > 1 ? <ChangeView views={p.views} collapsed={collapsed} /> : null}
         <button
           type="button"
           className={`${s.row}${p.settingsOn ? ` ${s.rowOn}` : ''}`}
@@ -200,5 +204,50 @@ export default function MktSidebar(p: MktSidebarProps) {
         </button>
       </div>
     </aside>
+  )
+}
+
+/**
+ * Change view (2026-11-11): for a Marketing login the Principal opened the CRM to (CRM · View in People ›
+ * Permissions) — Marketing, where one is, and the CRM. A plain navigation: the CRM is the Revenue app's page.
+ */
+function ChangeView({ views, collapsed }: { views: ChangeViewRow[]; collapsed: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={s.viewWrap}>
+      {open ? <div className={s.viewScrim} onClick={() => setOpen(false)} aria-hidden="true" /> : null}
+      {open ? (
+        <div className={s.viewMenu} role="menu" aria-label="Change view">
+          <div className={s.viewMenuHead}>Change view</div>
+          {views.map(v => {
+            const on = v.key === 'marketing'
+            return on ? (
+              <button key={v.key} type="button" role="menuitemradio" aria-checked="true" className={s.menuItem} onClick={() => setOpen(false)}>
+                <span aria-hidden="true">{v.emoji}</span>
+                <span>{v.label}</span>
+                <span className={s.viewCheck} aria-hidden="true">✓</span>
+              </button>
+            ) : (
+              <a key={v.key} href={v.href} role="menuitemradio" aria-checked="false" className={s.menuItem}>
+                <span aria-hidden="true">{v.emoji}</span>
+                <span>{v.label}</span>
+              </a>
+            )
+          })}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className={`${s.row}${open ? ` ${s.rowOn}` : ''}`}
+        title="Change view"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className={`${s.tile} ${s.mist}`} aria-hidden="true">🔀</span>
+        <span className={s.label}>Change view</span>
+        {collapsed ? null : <span className={s.viewCheck} style={{ fontWeight: 400, fontSize: '.85em' }}>Marketing</span>}
+      </button>
+    </div>
   )
 }

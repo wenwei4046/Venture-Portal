@@ -264,3 +264,14 @@
 /* The Principal's view switch — the words, as on HR's and Finance's bars (2026-10-27, layout/ViewSwitch): 20px clear of
    + New Project, as the words sit from the date there. */
 .view { display: flex; margin-right: 12px; }
+
+/* ── Change view (2026-11-11): the foot's row for a login with the cross-team CRM · View — its menu opens above it ── */
+.viewWrap { position: relative; }
+.viewMenu {
+  position: absolute; left: 0; bottom: calc(100% + 6px); width: 220px; z-index: 30; background: rgb(var(--mk-white));
+  border: 1px solid rgb(var(--mk-line)); border-radius: 12px; box-shadow: var(--mk-shadow-pop); padding: 6px;
+  animation: mkIn .15s ease-out;
+}
+.viewMenuHead { padding: 6px 10px 6px; font-size: .75em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+.viewCheck { margin-left: auto; color: rgb(var(--mk-brown)); font-weight: 600; }
+.viewScrim { position: fixed; inset: 0; z-index: 29; }

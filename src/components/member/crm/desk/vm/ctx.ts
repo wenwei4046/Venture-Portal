@@ -324,8 +324,9 @@ export interface DeskApp {
   crmUnread?: number;
   /** the Product List row (an account holding product_list), */
   products?: { group: string; onOpen: () => void } | null;
-  /** and the module switcher (a Principal's). */
-  modules?: { current: string; onPick: (id: string) => void } | null;
+  /** and the module switcher (a Principal's; or, 2026-11-11, Change view's — a Marketing login the CRM was opened to:
+   *  its own rows and the button's word). */
+  modules?: { current: string; onPick: (id: string) => void; rows?: readonly (readonly [string, string])[]; label?: string } | null;
 }
 
 /**
