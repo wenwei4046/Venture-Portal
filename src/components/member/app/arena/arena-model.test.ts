@@ -239,3 +239,39 @@ describe("recordModel", () => {
     expect(vm.cardLine).toBe("Yours: RM 900 · 2nd of 3");
   });
 });
+
+// 2026-11-12 — 2990s follows its own commission scheme (the user: "他唯一不会出现的，只是所谓的 margin arena，但他会出现
+// 到 sales arena、brand arena"). The Arena's answer says which brand it is; its bills are in nobody's margin figures.
+describe("boardModel — a brand on its own scheme", () => {
+  const brands = [{ code: "AKEMI", name: "Akemi", ownScheme: false }, { code: "2990S", name: "2990s", ownScheme: true }];
+  const folk = [
+    person("me", "ME", { sales: 4500, marginRevenue: 500, marginCost: 300 }, true,
+      { AKEMI: { sales: 500, marginRevenue: 500, marginCost: 300 }, "2990S": { sales: 4000 } }),
+    person("x", "XAVIER LIM", { sales: 3000 }, false, { "2990S": { sales: 3000 } }),
+  ];
+  const snap = snapshot(folk, { brands, tiers: [{ brand: "AKEMI", bandKey: "tier1", label: "Incentive Tier 1", marginPct: 0.36, amount: 300 }] });
+
+  it("ranks its sales with everybody's, and on a Sales board of its own", () => {
+    expect(boardModel(input({ snapshot: snap })).rank!.rows.map(r => [r.name, r.pos, r.value])).toEqual([["ME", "1", "RM 4,500"], ["XAVIER LIM", "2", "RM 3,000"]]);
+    const vm = boardModel(input({ snapshot: snap, sub: "brand", brand: "2990S" }));
+    expect(vm.brands.map(b => b.label)).toEqual(["Akemi", "2990s"]);
+    expect(vm.title).toBe("Sales · 2990s");
+    expect(vm.rank!.rows.map(r => [r.name, r.pos, r.value])).toEqual([["ME", "1", "RM 4,000"], ["XAVIER LIM", "2", "RM 3,000"]]);
+  });
+  it("keeps no Margin board for it: By brand lists the brands a margin is read on", () => {
+    const vm = boardModel(input({ snapshot: snap, board: "margin", sub: "brand", brand: "2990S" }));
+    expect(vm.brands.map(b => b.code)).toEqual(["AKEMI"]);
+    expect([vm.brand, vm.title]).toEqual(["AKEMI", "Margin · Akemi"]);
+  });
+  it("is no brand of the margin incentive: nothing is held for it, nor asked of it", () => {
+    // 40% on Akemi clears Tier 1; the 2990s bills neither hold it (no cost waited for) nor need a ladder.
+    expect(boardModel(input({ snapshot: snap, board: "margin" })).foot?.sub).toBe("Incentive Tier 1 reached");
+    // Sold nothing but 2990s: no margin, nothing reached and nothing held.
+    const onlyOwn = snapshot([person("me", "ME", { sales: 4000 }, true, { "2990S": { sales: 4000 } })], { brands, tiers: snap.tiers });
+    expect(boardModel(input({ snapshot: onlyOwn, board: "margin" })).foot?.sub).toBe("Below Incentive Tier 1");
+  });
+  it("an answer from before the flag lists every brand, as it did", () => {
+    const old = snapshot(folk, { brands: brands.map(({ code, name }) => ({ code, name })) });
+    expect(boardModel(input({ snapshot: old, board: "margin", sub: "brand" })).brands.map(b => b.code)).toEqual(["AKEMI", "2990S"]);
+  });
+});

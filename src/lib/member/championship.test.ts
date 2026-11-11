@@ -106,3 +106,38 @@ describe("championshipMonth", () => {
     expect(standings.find(s => s.id === "d")!.position).toBeNull();
   });
 });
+
+// 2026-11-12 — 2990s follows its own commission scheme (the user: "他唯一不会出现的，只是所谓的 margin arena，但他会出现
+// 到 sales arena、brand arena"). Its sales are ranked — in total and on its own Sales board — and no Margin board is
+// its: Margin by brand reads the brand WITH a ladder a person sold most.
+describe("championshipMonth — a brand on its own scheme", () => {
+  const people = [
+    // Posted to 2990s for the month: most of the sales there, some Akemi at 50%.
+    person("a", { sales: 4300, marginRevenue: 300, marginCost: 150 }, { "2990S": { sales: 4000 }, AKEMI: { sales: 300, marginRevenue: 300, marginCost: 150 } }),
+    // Akemi alone, 35%.
+    person("b", { sales: 200, marginRevenue: 200, marginCost: 130 }, { AKEMI: { sales: 200, marginRevenue: 200, marginCost: 130 } }),
+    // 2990s alone.
+    person("c", { sales: 3000 }, { "2990S": { sales: 3000 } }),
+  ];
+  const input = { month: "2026-11", people, brands: ["AKEMI", "2990S"], tiers, history: null, kpi: { enabled: false, threshold: null } };
+  const rows = championshipMonth({ ...input, marginBrands: ["AKEMI"] });
+  const row = (id: string) => rows.find(r => r.id === id)!;
+
+  it("places its sales in total and on its own Sales board", () => {
+    expect(row("a").parts.totalSales).toMatchObject({ position: 1, of: 3, points: 25 });
+    expect(row("a").parts.salesByBrand).toMatchObject({ position: 1, of: 2, points: 25, note: "2990s" });
+    expect(row("c").parts.salesByBrand).toMatchObject({ position: 2, of: 2, points: 22.5, note: "2990s" });
+  });
+  it("reads Margin by brand on the brand with a ladder sold most — never on 2990s", () => {
+    // A's 50% on Akemi leads B's 35%: first, with Tier 2's bonus.
+    expect(row("a").parts.marginByBrand).toMatchObject({ position: 1, place: 25, note: "Akemi · Incentive Tier 2" });
+    expect(row("b").parts.marginByBrand).toMatchObject({ position: 2, place: 22.5, note: "Akemi" });
+    // Sold nothing with a ladder: no brand to be placed on, and nothing pending.
+    expect(row("c").parts.marginByBrand).toMatchObject({ position: null, points: 0, note: "No brand" });
+    expect(row("c").parts.marginByBrand.pending).toBeUndefined();
+  });
+  it("without the margin brands named, every brand is one — as before", () => {
+    const before = championshipMonth(input).find(r => r.id === "a")!;
+    expect(before.parts.marginByBrand).toMatchObject({ position: null, points: 0, note: "2990s" });
+  });
+});

@@ -37,7 +37,12 @@ export interface MemberArenaSnapshot {
   principalView?: boolean; viewedStaffId?: string;
   membershipId: string; department: string; selfId: string;
   period: string; window: ArenaWindow; from: string; through: string; asOf: string; live: boolean;
-  people: ArenaPerson[]; brands: { code: string; name: string }[];
+  people: ArenaPerson[];
+  /**
+   * The scheme's brands. `ownScheme` (2026-11-12): a brand that follows its own commission scheme (2990s) — ranked on
+   * the Sales, Brand and KPI boards, on no Margin board: its bills stand in no margin. Absent from an older answer.
+   */
+  brands: { code: string; name: string; ownScheme?: boolean }[];
   /** The old pick store (empty; see ArenaWeekPicks) — a brand week is the history's `weeks` now. */
   brandWeeks: ArenaBrandWeeks | null;
   weekLocks?: ArenaWeekLock[];
@@ -54,6 +59,9 @@ export interface MemberArenaSnapshot {
   history?: ArenaHistorySnapshot;
   historyError?: string;
 }
+/** The brands a Margin board is kept for: every brand of the scheme but one on its own commission scheme (2990s). */
+export const marginBrandCodes = (brands: MemberArenaSnapshot["brands"]): string[] =>
+  brands.filter(b => b.ownScheme !== true).map(b => b.code);
 export interface ArenaRankedPerson {
   id: string; name: string; self: boolean; position: number | null; value: number | null;
   pending: boolean; hasActivity: boolean;

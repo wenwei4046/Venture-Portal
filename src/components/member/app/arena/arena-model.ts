@@ -361,10 +361,14 @@ export interface ArenaInput {
   director?: boolean;
 }
 
-/** The scheme's brands, in the prototype's order. */
-export function boardBrands(snapshot: MemberArenaSnapshot | null): { code: string; label: string }[] {
+/**
+ * The scheme's brands, in the prototype's order. `margin`: the brands a margin is read on — never one that follows
+ * its own commission scheme (2990s, 2026-11-12; the user: "他唯一不会出现的，只是所谓的 margin arena，但他会出现到 sales
+ * arena、brand arena"): its bills stand in no margin, so no Margin board is its.
+ */
+export function boardBrands(snapshot: MemberArenaSnapshot | null, margin = false): { code: string; label: string }[] {
   const names = new Map((snapshot?.brands ?? []).map(b => [b.code, b.name]));
-  return (snapshot?.brands ?? []).map(b => b.code)
+  return (snapshot?.brands ?? []).filter(b => !(margin && b.ownScheme === true)).map(b => b.code)
     .sort((a, b) => (BRAND_ORDER.indexOf(a) + 99) % 99 - (BRAND_ORDER.indexOf(b) + 99) % 99 || a.localeCompare(b))
     .map(code => ({ code, label: brandLabel(code, names) }));
 }
@@ -419,7 +423,7 @@ function footSub(person: ArenaPerson | undefined, tiers: readonly ArenaTier[], p
 
 export function boardModel(input: ArenaInput): BoardVM {
   const { board, snapshot, period } = input;
-  const brands = board === "sales" || board === "margin" ? boardBrands(snapshot) : [];
+  const brands = board === "sales" || board === "margin" ? boardBrands(snapshot, board === "margin") : [];
   const hasSub = board === "sales" || board === "margin";
   const sub: ArenaSub = !hasSub ? "total" : board === "margin" && input.sub === "fair" ? "total" : input.sub;
   const brand = sub === "brand" ? (brands.find(b => b.code === input.brand)?.code ?? brands[0]?.code ?? "") : "";

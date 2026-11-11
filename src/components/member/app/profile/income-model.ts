@@ -3,7 +3,7 @@ import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { payLinesTotal, type IncomeBill, type IncomeMonth, type IncomeOverride, type MemberIncome } from "@/lib/member/income";
 import { arenaMonthFridays } from "@/lib/member/arena";
 import { brandLadder, rowFor } from "../insight/ladder";
-import { brandName, noSalesBill } from "../insight/insight-model";
+import { brandName, noSalesBill, OWN_SCHEME_PILL, ownSchemeBill } from "../insight/insight-model";
 import { monthName, monthShort, rm, rm2, shortDay } from "../format";
 import type { CoRowVM, CoSheetVM, IncomeOrdersVM, IncomePastVM, IncomeRowVM, IncomeVM, Tone } from "./profile-vm";
 
@@ -175,6 +175,8 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
     const commission = Math.round(b.personal * 100) / 100;
     const margin = b.marginPct ?? o?.margin ?? null;
     const gift = margin === null && !!o && noSalesBill(o);
+    // A bill of a brand on its own commission scheme (2990s, 2026-11-12): no margin to read — never *Cost pending*.
+    const own = b.ownScheme === true || (!!o && ownSchemeBill(o));
     // An old bill topped up (2026-11-07): commission only, no sale of theirs — its margin cuts its commission as any
     // bill's does ("need follow the margin as well"), so it is said beside it.
     const old = b.commissionOnly === true;
@@ -183,9 +185,10 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
       // An old bill (2026-11-07) was sold at a fair months before: no week of this month is its.
       meta: [o?.customer, old ? null : weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
       tag: waiting ? "Waiting for deposit"
-        : old ? (margin === null ? "Commission only" : `Commission only · ${margin.toFixed(1)}% margin`)
+        : old ? (margin === null || own ? "Commission only" : `Commission only · ${margin.toFixed(1)}% margin`)
+        : own ? OWN_SCHEME_PILL
         : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
-      tone: waiting ? "warn" : old && margin === null ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
+      tone: waiting ? "warn" : own || (old && margin === null) ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
       amt: rm(o?.total ?? b.orderTotal ?? b.commissionable),
       commLabel: "Commission",
       comm: waiting ? "Waiting" : money(commission),

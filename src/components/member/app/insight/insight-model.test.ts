@@ -311,3 +311,42 @@ describe("Insight › the whole bill, and what of it counts", () => {
     }
   });
 });
+
+// 2026-11-12 — 2990s follows its own commission scheme (the user: "依然算作 Fair 的 revenue … 唯一不同的是看不到 margin";
+// "他唯一不会出现的，只是所谓的 margin arena，但他会出现到 sales arena、brand arena"). The server flags such a bill
+// `ownScheme`: its margin is null for good and its brand is among no margins.
+describe("Insight › a bill of a brand on its own scheme", () => {
+  const own = (o: Partial<MemberBookOrder> & Pick<MemberBookOrder, "id">) => order({
+    number: `2990-SO-2609-${o.id}`, brand: "2990S", booth: "2990S", margin: null, noSales: false, ownScheme: true,
+    lines: [{ name: "2990 SOFA", code: "2990-SF-01", qty: 1, amount: o.revenue ?? 1000, goods: true, kpiQty: 0 }], ...o,
+  });
+  const akemi = order({ id: "1", revenue: 2000, margin: 40 });
+  const mixed = { ...book([akemi, own({ id: "2", revenue: 3990, total: 4240 }), own({ id: "3", revenue: 3240, total: 3240, cleared: false, paid: 500, depositNeeded: 972 })]),
+    margins: { overall: 40, brands: { AKEMI: 40 } } };
+
+  it("counts it in the sales and the orders — and in no margin, nor among the bills waiting for a cost", () => {
+    const vm = insightMain(input({ book: mixed }));
+    expect(vm.personal.sales.amount).toBe("RM 5,990");
+    expect(vm.personal.orders).toMatchObject({ value: "2", sub: "1 waiting for deposit" });
+    // Margin by brand lists the brands a margin is read on: 2990s is no row of it.
+    expect(vm.personal.brands.map(b => [b.name, b.pct, b.pill])).toEqual([["Akemi", "40.0%", "Incentive Tier 1"]]);
+    expect(vm.personal.overall).toBe("40.0% overall");
+    expect(vm.personal.notice).toBeNull();
+    expect(marginStanding(mixed, BANDS)).toMatchObject({ margin: 40, held: false, blind: 0 });
+    expect(marginStanding(mixed, BANDS).tier?.label).toBe("Incentive Tier 1");
+  });
+  it("says Own scheme where its margin would be — never Cost pending — and its deposit as any bill's", () => {
+    const vm = billsView(input({ book: mixed }));
+    const pills = Object.fromEntries(vm.weeks["2026-09-11"].bills.map(b => [b.id, b.pill]));
+    expect(pills).toEqual({ "1": "40.0%", "2": "Own scheme", "3": "Due RM 472" });
+    expect(orderSheet(input({ book: mixed }), "2")).toMatchObject({ amt: "RM 4,240", margin: "—", tier: "Own scheme", status: "Deposit cleared" });
+  });
+  it("with nothing else sold, the month has no margin to read and nothing held", () => {
+    const only = { ...book([own({ id: "2", revenue: 3990 })]), margins: { overall: null, brands: {} } };
+    const vm = insightMain(input({ book: only }));
+    expect([vm.personal.sales.amount, vm.personal.brands, vm.personal.overall, vm.personal.notice]).toEqual(["RM 3,990", [], "No sales yet", null]);
+    expect(marginStanding(only, BANDS)).toMatchObject({ margin: null, tier: null, held: false, blind: 0 });
+    // No brand page is its: the page opens on a brand a margin is read on, or on none.
+    expect(brandPage(input({ book: only }), "2990S")).toBeNull();
+  });
+});
