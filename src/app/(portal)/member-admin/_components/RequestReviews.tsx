@@ -15,6 +15,7 @@ import { AUTOMATIC_MONTH, claimApprovedDone, claimMonthChoices, claimOwnMonth } 
 import {
   ACCEPT_NOTE,
   REQUEST_FILTERS,
+  STATUS_FILTERS,
   approveLabel,
   approvedText,
   arrangementOf,
@@ -22,6 +23,7 @@ import {
   defaultEffective,
   defaultSeat,
   effectiveWhen,
+  filterByStatus,
   filterRequests,
   hasSignedForm,
   isOpen,
@@ -37,6 +39,7 @@ import {
   seatOptions,
   type RequestFacts,
   type RequestFilter,
+  type StatusFilter,
 } from '@/lib/member/member-services'
 import { scheduleReplacement, unscheduleReplacement } from '../replacement-actions'
 import s from './member-services.module.css'
@@ -63,6 +66,7 @@ export default function RequestReviews({
   initialRequestId: string | null
 }) {
   const [filter, setFilter] = useState<RequestFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [picked, setPicked] = useState<string | null>(initialRequestId)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
@@ -73,7 +77,8 @@ export default function RequestReviews({
   // A claim's payroll month, picked per request (2026-11-10); empty = Automatic.
   const [months, setMonths] = useState<Record<string, string>>({})
 
-  const shown = filterRequests(data.requests, filter)
+  const ofKind = filterRequests(data.requests, filter)
+  const shown = filterByStatus(ofKind, statusFilter)
   const selected = data.requests.find(r => r.id === picked) ?? shown[0] ?? null
 
   function open(id: string) {
@@ -150,6 +155,18 @@ export default function RequestReviews({
               {label}
             </button>
           ))}
+          <Select
+            className={s.statusFilter}
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+            aria-label="Status"
+          >
+            {STATUS_FILTERS.map(([key, label]) => (
+              <option key={key} value={key}>
+                {key === 'all' ? label : `${label} (${filterByStatus(ofKind, key).length})`}
+              </option>
+            ))}
+          </Select>
         </div>
         <div className={s.rows}>
           {shown.map(r => {
@@ -164,7 +181,7 @@ export default function RequestReviews({
               </button>
             )
           })}
-          {shown.length === 0 ? <p className={s.empty}>{data.requests.length ? 'No requests of this type.' : 'No requests yet.'}</p> : null}
+          {shown.length === 0 ? <p className={s.empty}>{data.requests.length ? (statusFilter === 'all' ? 'No requests of this type.' : 'No requests with this status.') : 'No requests yet.'}</p> : null}
         </div>
       </section>
 
