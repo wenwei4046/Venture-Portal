@@ -10,6 +10,7 @@ import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE } from '@/lib/marketing-view'
 import { densityOf, lookToCookie, LOOK_SIZES, type Look } from '@/lib/marketing/look'
 import { mktCrumb, mktFinancePage, mktNavActive, mktNavRows, mktOwnPage, type MktNavKey } from '@/lib/marketing/nav'
 import { groupTone, toneBg } from '@/lib/marketing/groups'
+import { changeViews } from '@/lib/marketing/change-view'
 import { initialOf } from '@/lib/marketing/shell'
 import { ToastHost } from '@/components/hrv/toast'
 import { FinViewProvider } from '@/components/layout/fin-view'
@@ -63,6 +64,8 @@ export default function MktShell({
   }, [pathname, query])
 
   const rows = useMemo(() => mktNavRows(navUser.tabs), [navUser.tabs])
+  // Change view (2026-11-11): Marketing and the CRM, for a login the CRM was opened to (CRM · View).
+  const views = useMemo(() => changeViews(user), [user])
   // + New Project: Marketing · Create as New Project's page keeps it — never while viewing as somebody.
   const newProject = useMemo(() => {
     if (user.viewingAs || !opensPath(navUser.tabs, '/marketing/new')) return false
@@ -127,6 +130,7 @@ export default function MktShell({
           settingsOn={panel === 'appearance'}
           onSettings={() => toggle('appearance')}
           onPick={setPending}
+          views={views}
         />
       </div>
       <div className={s.main}>

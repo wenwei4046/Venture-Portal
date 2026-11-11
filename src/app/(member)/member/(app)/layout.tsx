@@ -9,6 +9,8 @@ import { appClosed } from "@/lib/member/app-pages";
 import RevenueApp from "@/components/member/app/RevenueApp";
 import { interTight } from "@/components/member/app/fonts";
 import { isPrincipalAccount } from "@/lib/view-as";
+import { isMarketingView } from "@/lib/marketing-view";
+import { changeViews } from "@/lib/marketing/change-view";
 import { loadMyNotices } from "@/lib/push/notices-server";
 import { loginIsPersonal } from "@/lib/account/personal-login";
 import { changeMyPassword, loadMyEmailChange, requestEmailChange, withdrawEmailChange } from "@/lib/account/actions";
@@ -47,11 +49,14 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   const itDesk = canDo(account, "it_requests", "view")
     ? { group: isPrincipalAccount(user) ? "PRINCIPAL" : "MANAGEMENT", edit: canDo(account, "it_requests", "edit") }
     : null;
+  // Change view (2026-11-11): a Marketing login the CRM was opened to (CRM · View in People › Permissions) goes back
+  // to Marketing from the CRM's desktop module menu — the account's own, as the CRM is.
+  const crossViews = isMarketingView(account) ? changeViews(account) : [];
   // The pages and sends their ticks close (2026-10-11): only what somebody unticked for them.
   // The display face (2026-10-14): Inter Tight's variable on a wrapper that draws no box, so the
   // app and its loading frame read it and the portal never downloads the font.
   return <div className={interTight.variable} style={{ display: "contents" }}>
-    <RevenueApp initialData={data} productList={products} crm={crm} itDesk={itDesk} closed={appClosed(user.closed)} notices={notices}
+    <RevenueApp initialData={data} productList={products} crm={crm} itDesk={itDesk} crossViews={crossViews} closed={appClosed(user.closed)} notices={notices}
       changePassword={password ? changeMyPassword : undefined}
       requestEmail={password ? { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange } : undefined}
       own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>

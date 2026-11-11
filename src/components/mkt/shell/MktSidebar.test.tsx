@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { changeViews } from '@/lib/marketing/change-view'
 import { MKT_NAV } from '@/lib/marketing/nav'
 import type { MktShellData } from '@/lib/marketing/shell'
 
@@ -22,7 +23,7 @@ const shell: MktShellData = {
   counts: { myspace: 0, calendar: 0, projects: 0, tracking: 0, claims: 0 },
   notices: 0,
 }
-const sidebar = (manager: boolean, subsOpen = true) =>
+const sidebar = (manager: boolean, subsOpen = true, views: ReturnType<typeof changeViews> = []) =>
   render(
     <MktSidebar
       rows={MKT_NAV.filter(r => manager || !r.manager)}
@@ -38,6 +39,7 @@ const sidebar = (manager: boolean, subsOpen = true) =>
       settingsOn={false}
       onSettings={() => {}}
       onPick={() => {}}
+      views={views}
     />,
   )
 
@@ -54,5 +56,23 @@ describe('the sidebar’s + Add subsidiary', () => {
     unmount()
     sidebar(true, false)
     expect(screen.queryByRole('link', { name: /Add subsidiary/ })).toBeNull()
+  })
+})
+
+// 2026-11-11 — Change view: a Marketing login the CRM was opened to (CRM · View in People › Permissions).
+describe('the sidebar’s Change view', () => {
+  const crm = changeViews({ permissions: ['marketing', 'member_crm'], actions: { 'marketing.view': 'all', 'crm.view': 'all' } })
+
+  it('is not there without the cross-team permission', () => {
+    sidebar(false, true, [])
+    expect(screen.queryByRole('button', { name: /Change view/ })).toBeNull()
+  })
+
+  it('opens Marketing (ticked) and the CRM', () => {
+    sidebar(false, true, crm)
+    fireEvent.click(screen.getByRole('button', { name: /Change view/ }))
+    const menu = screen.getByRole('menu', { name: 'Change view' })
+    expect(menu.querySelector('[aria-checked="true"]')?.textContent).toContain('Marketing')
+    expect(screen.getByRole('menuitemradio', { name: /CRM/ }).getAttribute('href')).toBe('/member?page=account&view=crm')
   })
 })
