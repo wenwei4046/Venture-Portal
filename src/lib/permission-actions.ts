@@ -227,6 +227,8 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'reports.view': 'all',
   'revenue.create': 'all',
   'revenue.edit': 'all',
+  // Comm Cal month › Export (Sales by Brand & Billing, 2026-11-11).
+  'revenue.export': 'all',
   'revenue.manage': 'all',
   'revenue_app.create': 'own', // IR Quote's server actions (ir-quote-actions.ts): quoting, the member's own
   'rooms.create': 'all',

@@ -84,6 +84,8 @@ export async function loadCommissionWorkbench(
     return {
       orderId: o.orderId, venue: o.venueGroupName ?? o.venue, location: o.location,
       refNo: o.refNo, paperNo: o.paperNo,
+      // The Sales by Brand & Billing export's columns (2026-11-11).
+      customer: o.customerName, brandCode: o.brandCode,
       organizer: fair?.organiserName ?? fair?.erpOrganiserText ?? o.organizer,
       eventName: fair?.startDate ? fairDays(fair.startDate, fair.endDate) : null,
       fair: fair ? { id: fair.fairId, venueKey: fair.venueKey, venueName: fair.displayName } : null,
@@ -140,5 +142,6 @@ export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' 
     carriedCloses?: readonly CloseBills[]
     moves?: Readonly<Record<string, BillMoved>>
     halfComms?: Readonly<Record<string, HalfCommMark>>
-    orders: (Omit<Loaded['orders'][number], 'saleMonth' | 'oldBill'> & { saleMonth?: string | null; oldBill?: OldBill | null })[]
+    orders: (Omit<Loaded['orders'][number], 'saleMonth' | 'oldBill' | 'customer' | 'brandCode'>
+      & { saleMonth?: string | null; oldBill?: OldBill | null; customer?: string | null; brandCode?: string | null })[]
   }

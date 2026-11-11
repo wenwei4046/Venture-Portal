@@ -36,6 +36,7 @@ import CommissionMonthSummary, { type CommissionMonthStats } from './CommissionM
 import SalaryCalculation, { type SalaryAdjustment } from './SalaryCalculation'
 import NoCommission, { COMMISSIONABLE_HINT, DEPOSIT_HINT, DROP_HINT, GROUP_SALES_HINT, SALES_VALUE_HINT, UPSELL_HINT } from './NoCommission'
 import CloseBar from './CloseBar'
+import BrandBillingExport from './BrandBillingExport'
 import PayrollBar from './PayrollBar'
 import DirectorPayNote from './DirectorPayNote'
 import PersonCloseControl from './PersonCloseControl'
@@ -143,6 +144,12 @@ interface Props {
    * adds up to the Total sales value card.
    */
   exhibitions?: ExhibitionSales[]
+  /**
+   * The month's Sales by Brand & Billing export (2026-11-11) — beside the
+   * Sales exhibition heading, where the user asked for it. Null: no button
+   * (no Revenue · Export, or no bills yet).
+   */
+  exportHref?: string | null
   monthOverview?: ReactNode
   payroll?: PayrollBarFacts
   /**
@@ -212,7 +219,7 @@ interface ListRow {
   drift: CloseDrift | null
 }
 
-export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, exhibitions = [], monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
+export default function CommissionWorkbench({ data, sub, period, runStatus, savedTotals, monthStats, exhibitions = [], exportHref = null, monthOverview, payroll, switches, notCounted = [], lockedPeriods = [], brandMenu = null, closes: closeFacts, shareTeam, reviews }: Props) {
   const router = useRouter()
   // Where the workbench stands is the URL's (2026-09-27, lib/commission/
   // workbench-nav.ts): which cut, whose ledger, which of their tables. Every
@@ -1085,7 +1092,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </>}
 
     {tab === 'exhibition' && <>
-      <div className={s.topLine}><h2 className={s.sectionHeading}>Sales exhibition</h2>
+      <div className={s.topLine}>
+        <div className="flex items-center gap-3">
+          <h2 className={s.sectionHeading}>Sales exhibition</h2>
+          {exportHref ? <BrandBillingExport href={exportHref} align="left" /> : null}
+        </div>
         <div className={s.overviewTotal}><span>Total sales value</span><strong>{money(exhibitionTotals.total)}</strong></div></div>
       <div className={s.toolbar}>
         <input className={s.search} aria-label="Search exhibitions" placeholder="Search brand, venue or organizer…" value={query} onChange={e => setQuery(e.target.value)} />

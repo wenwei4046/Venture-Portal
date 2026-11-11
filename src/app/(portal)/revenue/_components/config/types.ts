@@ -166,6 +166,10 @@ export interface BrandRow {
   item_code_prefixes: string[]
   /** The ERP brandings that are this brand (Akemi's: HAPPI SLEEP, 2026-10-31). */
   sub_brands: string[]
+  /** The paper Ref No. prefixes that name this brand (HC, ZNT …) — the Sales by Brand export (2026-11-11). */
+  ref_prefixes: string[]
+  /** Houzs Venture bills Houzs Century this share of the brand's sales (0.14 = 14%); null = not set. */
+  hc_bill_pct: number | null
   note: string | null
   is_active: boolean
 }

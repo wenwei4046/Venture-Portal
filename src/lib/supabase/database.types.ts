@@ -1284,33 +1284,39 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          hc_bill_pct: number | null
           id: string
           is_active: boolean
           item_code_prefixes: string[]
           name: string
           note: string | null
+          ref_prefixes: string[]
           scheme_id: string
           sub_brands: string[]
         }
         Insert: {
           code: string
           created_at?: string
+          hc_bill_pct?: number | null
           id?: string
           is_active?: boolean
           item_code_prefixes?: string[]
           name: string
           note?: string | null
+          ref_prefixes?: string[]
           scheme_id: string
           sub_brands?: string[]
         }
         Update: {
           code?: string
           created_at?: string
+          hc_bill_pct?: number | null
           id?: string
           is_active?: boolean
           item_code_prefixes?: string[]
           name?: string
           note?: string | null
+          ref_prefixes?: string[]
           scheme_id?: string
           sub_brands?: string[]
         }
