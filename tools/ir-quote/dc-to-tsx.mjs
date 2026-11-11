@@ -77,6 +77,8 @@ const PATCHES = {
      '<label title="{{ xvc.tip }}" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:{{ xvc.cursor }}">{{ xvc.imgEmpty }}<sc-if value="{{ xvc.canUpload }}" hint-placeholder-val="{{ false }}"><input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></sc-if></label>'],
   ],
   "Quote Settings v4.dc.html": [
+    // No "Package saving" on the quotation, so none in the A4 sample (the user, 2026-11-11: "就不需要了 … 总数对就可以了").
+    ['<div style="display:flex;gap:24px"><span contentEditable="true" suppressContentEditableWarning="{{ true }}" onBlur="{{ b.onSaving }}">{{ b.labels.saving }}</span><span style="min-width:110px;text-align:right">-1,357.00</span></div>\n                        ', ''],
     ["position:relative;height:100vh;width:100%;display:flex", "position:relative;height:{{ rootH }};width:100%;display:flex"],
     ['\n  <aside style="flex:0 0 240px', '\n  <sc-if value="{{ deskAside }}"><aside style="flex:0 0 240px'],
     ["    </div>\n  </aside>\n", "    </div>\n  </aside></sc-if>\n"],

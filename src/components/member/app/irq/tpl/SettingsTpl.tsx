@@ -1714,15 +1714,6 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             <div style={{"display":"flex","flexDirection":"column","alignItems":"flex-end","gap":"3px"}}>
                               {"\n                        "}
                               <div style={{"display":"flex","gap":"24px"}}>
-                                <span contentEditable={"true"} suppressContentEditableWarning={true} onBlur={L_b_q?.["onSaving"]}>
-                                  {dcText(L_b_q?.["labels"]?.["saving"])}
-                                </span>
-                                <span style={{"minWidth":"110px","textAlign":"right"}}>
-                                  {"-1,357.00"}
-                                </span>
-                              </div>
-                              {"\n                        "}
-                              <div style={{"display":"flex","gap":"24px"}}>
                                 <span contentEditable={"true"} suppressContentEditableWarning={true} onBlur={L_b_q?.["onDiscount"]}>
                                   {dcText(L_b_q?.["labels"]?.["discount"])}
                                 </span>

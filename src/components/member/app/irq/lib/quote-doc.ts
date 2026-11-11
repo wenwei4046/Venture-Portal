@@ -357,7 +357,7 @@ export function factsTable(L, q, b, cell, n) {
   return `<tr><td colspan="${n}" style="padding:0"><table style="width:100%;table-layout:fixed;border-collapse:collapse"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:17%"><col style="width:33%"></colgroup>${rows}</table></td></tr>`;
 }
 
-// q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, saving, total }
+// q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, total }
 export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}) {
   const co = config.company;
   const blocks = config.doc.blocks.filter(b => !b.hidden);
@@ -410,7 +410,7 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       });
     } else if (b.type === "totals") {
       const rows = [];
-      if (q.saving > 0) rows.push([b.labels.saving, money(-q.saving), false]);
+      // No "Package saving" (the user, 2026-11-11: "Package saving 如果是这样的定义，就不需要了 … 总数对就可以了").
       if (q.discount) rows.push([b.labels.discount, money(-q.discount), false]);
       (q.adjust || []).forEach(a => rows.push([a.label, money(a.amount), false]));
       rows.push([b.labels.total, money(q.total), true]);

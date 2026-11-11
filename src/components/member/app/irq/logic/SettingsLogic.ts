@@ -493,7 +493,7 @@ export class SettingsLogic extends DcLogic {
           ...co.addr.map((a, i) => coField(`Address line ${i + 1}`, () => a, (o, v) => { o.addr[i] = v; })),
           coField("Phone", () => co.phone, (o, v) => { o.phone = v; }), coField("Email", () => co.email, (o, v) => { o.email = v; })
         ] : false ? sb.labels.map((f, i) => ({ label: FACT_NAMES[f.key] || f.key, value: f.label, onChange: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.labels[i].label = v; }); } }))
-          : t === "totals" ? [["total", "Total"], ["discount", "Discount"], ["saving", "Package saving"]].map(([k, label]) => ({ label, value: sb.labels[k], onChange: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.labels[k] = v; }); } }))
+          : t === "totals" ? [["total", "Total"], ["discount", "Discount"]].map(([k, label]) => ({ label, value: sb.labels[k], onChange: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.labels[k] = v; }); } }))
           : t === "signature" ? [{ label: "Left line", value: sb.text || "Prepared by", onChange: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.text = v; }); } }, { label: "Right line", value: sb.text2 || "Customer acknowledgement", onChange: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.text2 = v; }); } }]
           : null,
         columns: t === "table" ? sb.columns.map((c, i) => ({

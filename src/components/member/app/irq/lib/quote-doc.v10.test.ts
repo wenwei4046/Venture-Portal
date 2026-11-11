@@ -96,6 +96,14 @@ describe("the quotation (renderDoc)", () => {
     ...extra,
   });
 
+  // The user, 2026-11-11: "Package saving 如果是这样的定义，就不需要了 … 总数对就可以了".
+  it("prints no Package saving, whatever it is handed: the discount, then the total", () => {
+    const html = renderDoc(cfg(), q({ saving: 724, discount: 500, total: 500 }));
+    expect(html).not.toContain("Package saving");
+    expect(html).toContain("Discount");
+    expect(html).toContain("TOTAL (RM)");
+  });
+
   it("has a PHOTO column after CODE/COLOUR", () => {
     const keys = COLUMNS.map(c => c.key);
     expect(keys.indexOf("photo")).toBe(keys.indexOf("code") + 1);

@@ -268,18 +268,15 @@ export class QuoteLogic extends DcLogic {
   docHtml(forExcel) {
     if (this.lib) {
       const { m, pkg, total, disc, adjust } = this.calc();
-      const adjSum = adjust.reduce((a, x) => a + x.amount, 0);
       const cfg = JSON.parse(JSON.stringify(this.cfg));
       const tb = cfg.doc.blocks.find(b => b.type === "table");
       if (tb && this.props.showItemPrices) tb.columns.forEach(c => { if (c.key === "price" || c.key === "sum") c.show = true; });
-      const priced = tb && tb.columns.some(c => c.show && (c.key === "price" || c.key === "sum"));
       const cats = this.docRows(pkg, m);
-      const list = cats.reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0);
       const c = this.state.cust;
       const facts = { att: c.att, by: c.by, bill: c.bill, building: c.building, address: [c.unit, c.building, cfg.buildings?.find(b => b.name === c.building)?.address].filter(Boolean).join(", "), unit: this.unitFact(pkg), layout: this.lib.packageName(this.state.data?.packages, pkg), date: longDate(c.date) };
       (cfg.doc.blocks.find(b => b.type === "facts")?.labels || []).filter(f => f.custom).forEach(f => { facts[f.key] = this.state.extra[f.key] || ""; });
       const ci = cfg.custInfo || {}, custRows = [...(this.lib.CRM_FIELDS || []).filter(f => f.id !== "name" && (ci.crm || {})[f.id] && ci.crm[f.id].show && ci.crm[f.id].print).map(f => ({ label: f.label, value: (this.state.crm || {})[f.id] })), ...(ci.own || []).filter(f => !["unit", "bill", "building", "date", "by"].includes(f.id) && f.print).map(f => ({ label: f.label, value: this.state.extra["ci_" + f.id] }))];
-      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.lib.principalPictures(cfg.doc.blocks, this.state.extra), sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total, moodboard: this.moodboard() }, { excel: forExcel, title: this.fileBase() });
+      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.lib.principalPictures(cfg.doc.blocks, this.state.extra), sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, total, moodboard: this.moodboard() }, { excel: forExcel, title: this.fileBase() });
     }
     return this.docHtmlLegacy(forExcel);
   }
@@ -288,7 +285,6 @@ export class QuoteLogic extends DcLogic {
     const { m, pkg, total, disc } = this.calc();
     const co = data.company, show = !!this.props.showItemPrices;
     const cats = this.docRows(pkg, m);
-    const list = cats.reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0);
     const cols = show ? 7 : 5;
     const facts = this.facts(pkg);
     const td = (v, st = "") => `<td style="padding:4px 6px;border-bottom:1px solid #ddd;${st}">${esc(v)}</td>`;
@@ -298,7 +294,6 @@ export class QuoteLogic extends DcLogic {
       c.rows.forEach(r => { body += `<tr>${td(r.no)}${td(r.item)}${td(r.desc)}${td(r.code)}${td(r.qty, "text-align:right")}${show ? td(money(r.unit), "text-align:right") + td(money(r.sum), "text-align:right") : ""}</tr>`; });
     });
     const sums = [];
-    if (show && list - (total + disc) > 0) sums.push(["Package saving", money(-(list - total - disc))]);
     if (disc) sums.push(["Discount", money(-disc)]);
     const sumRows = sums.map(([k, v]) => `<tr><td colspan="${cols - 1}" style="text-align:right;padding:3px 6px">${k}</td><td style="text-align:right;padding:3px 6px">${v}</td></tr>`).join("");
     const factRows = [0, 2, 4, 6].map(i => `<tr><td style="font-weight:bold;padding:2px 6px">${esc(facts[i].k)}</td><td colspan="${cols > 5 ? 3 : 2}" style="padding:2px 6px">${esc(facts[i].v)}</td><td style="font-weight:bold;padding:2px 6px">${esc(facts[i + 1].k)}</td><td colspan="${cols > 5 ? 2 : 1}" style="padding:2px 6px">${esc(facts[i + 1].v)}</td></tr>`).join("");
@@ -558,10 +553,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const kindForCustom = st.sheet?.mode === "swap" ? st.lines.find(x => x.id === st.sheet.id)?.kind : null;
 
     const docCats = pkg ? this.docRows(pkg, m).map(c => ({ name: c.name, rows: c.rows.map(r => ({ ...r, price: money(r.unit), sum: money(r.sum) })) })) : [];
-    const listTotal = docCats.length ? this.docRows(pkg, m).reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0) : 0;
     const show = !!this.props.showItemPrices;
     const docSums = [];
-    if (show && listTotal - (total + disc) > 0) docSums.push({ k: "Package saving", v: money(-(listTotal - total - disc)) });
     if (disc) docSums.push({ k: "Discount", v: money(-disc) });
 
     const primary = step === 1 ? { label: "Room type", d: ICON.arrowRight, run: go(2) }
