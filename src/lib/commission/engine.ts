@@ -705,6 +705,78 @@ export function computeOverrides(
   return credits
 }
 
+// ─── A brand with its own scheme ────────────────────────────────────────────
+
+/** The rate a rung itself names for a brand (`Rank.brandRates`), the code compared trimmed and in any case. */
+function namedBrandRate(rank: Rank, brand: string): number | undefined {
+  if (!rank.brandRates) return undefined
+  for (const [code, rate] of Object.entries(rank.brandRates)) {
+    if (normaliseCode(code) === brand && Number.isFinite(rate) && rate >= 0) return rate
+  }
+  return undefined
+}
+
+/**
+ * What a rung pays on a bill of a brand that follows its own scheme
+ * (2026-11-11 — 2990s; the user: "整个提成逻辑一样，只是它的 top rank 抽成是 8%
+ * （以此类推，每级往下调 1%）": Team Leader 8%, Senior Team Assistant 7%, Team
+ * Assistant 6%, Senior Revenue Specialist 5%, Revenue Specialist 4%).
+ *
+ * The rate the rung names for that brand. A rung that names none pays the
+ * NEAREST RUNG BELOW that does — the brand's top rate stays its top rate (the
+ * user's list ends at Team Leader, 8%), and a rung never pays less than the
+ * one under it. With none below: the rung's own rate, never above the nearest
+ * named rate over it. A brand no rung names a rate for pays every rung its own
+ * rate.
+ */
+export function brandRateOf(rank: Rank | undefined, brandCode: string, ladder: readonly Rank[]): number {
+  if (!rank) return 0
+  const brand = normaliseCode(brandCode)
+  const named = namedBrandRate(rank, brand)
+  if (named !== undefined) return named
+  let below: { rate: number; at: number } | null = null
+  let above: { rate: number; at: number } | null = null
+  for (const rung of ladder) {
+    const rate = namedBrandRate(rung, brand)
+    if (rate === undefined) continue
+    if (rung.sortOrder < rank.sortOrder && (!below || rung.sortOrder > below.at)) below = { rate, at: rung.sortOrder }
+    if (rung.sortOrder > rank.sortOrder && (!above || rung.sortOrder < above.at)) above = { rate, at: rung.sortOrder }
+  }
+  if (below) return below.rate
+  return above ? Math.min(rank.productRate, above.rate) : rank.productRate
+}
+
+/**
+ * How a run reads the brands that follow their own scheme
+ * (`EngineInput.ownSchemeBrands`): which bills are theirs, and the KPI items
+ * found on a bill. One reading for the engine, the ledger (`workbench.ts`) and
+ * the releases (`run-payload.ts`), so they cannot disagree about what a bill's
+ * sales are.
+ */
+export interface OwnSchemes {
+  /** The own-scheme brand the bill was written under — its code as the brand list spells it — else null. */
+  brandOf(order: Pick<SalesOrder, 'brandCode'>): string | null
+  /**
+   * The KPI items a bill may carry: the sub-department's, and none on a bill of
+   * a brand with its own scheme — its KPI items are its own (the user: "这个 KPI
+   * item 是独立的，属于 2990s 专属的 KPI item").
+   */
+  kpiIndexFor(order: Pick<SalesOrder, 'brandCode'>): KpiIndex
+}
+
+export function ownSchemesOf(input: Pick<EngineInput, 'ownSchemeBrands'>, kpiIndex: KpiIndex): OwnSchemes {
+  const brands = new Map((input.ownSchemeBrands ?? []).flatMap(code => {
+    const key = normaliseCode(code)
+    return key ? [[key, code.trim()] as const] : []
+  }))
+  const brandOf = (order: Pick<SalesOrder, 'brandCode'>) =>
+    brands.size > 0 && order.brandCode ? brands.get(normaliseCode(order.brandCode)) ?? null : null
+  return {
+    brandOf,
+    kpiIndexFor: order => (brandOf(order) ? EMPTY_KPI_INDEX : kpiIndex),
+  }
+}
+
 // ─── Engine ─────────────────────────────────────────────────────────────────
 
 interface BrandTally {
@@ -721,6 +793,13 @@ interface Draft {
   productRevenue: number
   /** Σ (order product revenue × that bill's margin multiplier) — the override base. */
   penaltyWeightedRevenue: number
+  /**
+   * The override base, apart for each brand that follows its own scheme
+   * (2026-11-11): '' holds the bills paid at the rung's own rate, a brand's code
+   * the bills paid at that brand's — an upline's differential is read on the
+   * rates those bills were paid at. The values add up to `penaltyWeightedRevenue`.
+   */
+  overrideBase: Map<string, number>
   excludedRevenue: number
   deferredRevenue: number
   kpiRevenue: number
@@ -742,6 +821,13 @@ interface BillPenalty {
   band: MarginBand | null
   /** 1 when no band cuts it (no penalty, no margin yet, or the penalty switched off). */
   multiplier: number
+  /**
+   * The bill is of a brand that follows its own scheme (2026-11-11 — 2990s, the
+   * user: "看不到 margin，因为 2990s 本身没有 calculate 进 margin"): in no margin
+   * at all — no penalty, none of the month's margin or its incentive, and never
+   * a bill that waits for a cost. Its code, else null.
+   */
+  ownBrand: string | null
 }
 
 /**
@@ -800,7 +886,12 @@ function halfNote(order: Pick<SalesOrder, 'halfComm'>): string {
 export function computeCommissionRun(input: EngineInput): EngineResult {
   const warnings: string[] = []
   const { scheme } = input
-  const kpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
+  const schemeKpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
+  // The brands that follow their own scheme (2026-11-11 — 2990s): their bills
+  // are paid at the brand's rate for the rung, stand outside every margin, and
+  // carry none of the sub-department's KPI items.
+  const own = ownSchemesOf(input, schemeKpiIndex)
+  const kpiIndexOf = own.kpiIndexFor
   // Every line's cost ÷ its own SKU's ratio, else the sub-department's.
   const costBasis = costBasisOf(scheme.costDivisor, scheme.costRatios, scheme.costRatiosByBrand)
   const groupIndex = indexItemGroups(scheme.itemGroups)
@@ -899,10 +990,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const penaltyOf = (order: SalesOrder): BillPenalty => {
     let hit = penalties.get(order)
     if (!hit) {
-      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
-      const bill = billMargin(order, base)
+      const base = marginBase(order.lines, kpiIndexOf(order), groupIndex, costBasis, order.brandCode ?? null)
+      const ownBrand = own.brandOf(order)
+      // A brand with its own scheme has no margin to read: whatever its lines
+      // cost, or a margin keyed on the bill, it is judged on none.
+      const bill: BillMargin = ownBrand ? { pct: null, source: 'none', cost: 0 } : billMargin(order, base)
       const band = scheme.enableMarginPenalty && bill.pct !== null ? penaltyBandFor(bill.pct, base.brandCode, input.marginBands) : null
-      hit = { base, bill, band, multiplier: band?.commissionMultiplier ?? 1 }
+      hit = { base, bill, band, multiplier: band?.commissionMultiplier ?? 1, ownBrand }
       penalties.set(order, hit)
     }
     return hit
@@ -929,7 +1023,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // An earlier applied run already paid this one; never pay it twice.
       if (order.alreadyReleased) continue
 
-      const opr = orderProductRevenue(order, kpiIndex, groupIndex)
+      const opr = orderProductRevenue(order, kpiIndexOf(order), groupIndex)
 
       // An upsale is recorded once the customer has paid for it; the deposit
       // gate is a question about ERP bills.
@@ -975,6 +1069,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       eligibleOrders,
       productRevenue,
       penaltyWeightedRevenue: 0,
+      overrideBase: new Map(),
       excludedRevenue,
       deferredRevenue,
       kpiRevenue: 0,
@@ -996,6 +1091,11 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const resolved = new Map<string, ResolvedRank>()
   const rateOf = new Map<string, number>()
   const overrideRateOf = new Map<string, number>()
+  // The rung each of those two rates is read from (2026-11-11): a bill of a
+  // brand with its own scheme is paid — and overridden — at that rung's rate
+  // for the brand. A package recipient's own rate is no rung's: nothing.
+  const payRankOf = new Map<string, Rank | undefined>()
+  const overrideRankOf = new Map<string, Rank | undefined>()
   const packageRecipients = new Set<string>()
   const groupResults = new Map<string, IrGroupsResult>()
   const packageRanks = ranks.filter(r => (r.groupIncentiveAmount ?? 0) > 0)
@@ -1020,6 +1120,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       const rung = directorRung(staffId)
       resolved.set(staffId, { effective: rung, base: rung, qualifiesFor: undefined })
       rateOf.set(staffId, rung?.productRate ?? 0)
+      payRankOf.set(staffId, rung)
       continue
     }
     const node = nodes.get(staffId)
@@ -1048,6 +1149,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     // its component is off. Only independent qualifying lines activate it.
     let r = resolveRank(percentageNode, percentageRanks, figures)
     let comparisonRate = r.effective?.productRate ?? 0
+    let comparisonRank = r.effective
 
     if (scheme.enableGroupIncentive && packageRanks.length <= 1) {
       if (packageFloor && !fallback) {
@@ -1076,7 +1178,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           if (node.rateMode === 'variable' || placedPackage) {
             r = { ...r, effective: candidate, qualifiesFor }
             packageRecipients.add(staffId)
-            comparisonRate = [...percentageRanks].reverse().find(p => p.sortOrder < candidate.sortOrder)?.productRate ?? comparisonRate
+            const under = [...percentageRanks].reverse().find(p => p.sortOrder < candidate.sortOrder)
+            comparisonRate = under?.productRate ?? comparisonRate
+            comparisonRank = under ?? comparisonRank
           } else {
             r = { ...r, qualifiesFor }
           }
@@ -1086,7 +1190,15 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     resolved.set(staffId, r)
     rateOf.set(staffId, packageRecipients.has(staffId) ? 0 : r.effective?.productRate ?? 0)
     overrideRateOf.set(staffId, comparisonRate)
+    payRankOf.set(staffId, packageRecipients.has(staffId) ? undefined : r.effective)
+    overrideRankOf.set(staffId, comparisonRank)
   }
+
+  // What a person is paid on one bill: their rung's rate, or — on a bill of a
+  // brand with its own scheme — that rung's rate for the brand (2026-11-11).
+  const billRate = (staffId: string, ownBrand: string | null): number =>
+    ownBrand === null ? rateOf.get(staffId) ?? 0 : brandRateOf(payRankOf.get(staffId), ownBrand, ranks)
+  const ownRateNote = (ownBrand: string | null) => (ownBrand === null ? '' : ` · ${ownBrand} rate`)
 
   // ── Pass D: C1 / C2, each bill scaled by its margin penalty ────────────
   let ordersWithoutCost = 0
@@ -1098,10 +1210,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     // Without a rung, no rate: their sales still stand on the statement and
     // the bills still close with the month.
     if (heads.has(draft.staffId)) {
-      const headRate = rateOf.get(draft.staffId) ?? 0
-      if (!scheme.enableProductRevenue || headRate <= 0) continue
+      if (!scheme.enableProductRevenue) continue
       for (const order of draft.eligibleOrders) {
-        const opr = orderRevenueSplit(order, kpiIndex, groupIndex).main
+        const ownBrand = own.brandOf(order)
+        // Their rung's rate — on a bill of a brand with its own scheme, that rung's rate for the brand.
+        const headRate = billRate(draft.staffId, ownBrand)
+        if (headRate <= 0) continue
+        const opr = orderRevenueSplit(order, kpiIndexOf(order), groupIndex).main
         if (opr === 0) continue
         const carried = order.periodMonth !== input.periodMonth
         draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * halfOf(order))
@@ -1112,21 +1227,21 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           rate: headRate,
           qty: null,
           amount: halved(order, round2(opr * headRate)),
-          note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill${halfNote(order)}`,
+          note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill${ownRateNote(ownBrand)}${halfNote(order)}`,
+          ...(ownBrand ? { brandCode: ownBrand } : {}),
         })
       }
       // An old bill topped up (2026-11-07): their rate on it too, and — as
       // their own bills — nothing else, no margin penalty either.
       for (const order of draft.commissionOnlyOrders) {
-        const line = commissionOnlyLine(order, headRate, input.periodMonth, kpiIndex, groupIndex)
+        const line = commissionOnlyLine(order, billRate(draft.staffId, own.brandOf(order)), input.periodMonth, kpiIndexOf(order), groupIndex)
         if (line) draft.lines.push(line)
       }
       continue
     }
-    const rate = rateOf.get(draft.staffId) ?? 0
 
     for (const order of draft.eligibleOrders) {
-      const split = orderRevenueSplit(order, kpiIndex, groupIndex)
+      const split = orderRevenueSplit(order, kpiIndexOf(order), groupIndex)
       const opr = split.main
       const carried = order.periodMonth !== input.periodMonth
       const carriedNote = carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''
@@ -1135,34 +1250,44 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // import has a problem and the margin ladder becomes ambiguous. The
       // brand only chooses a margin ladder, so a month that pays no margin
       // has nothing to ask about it (2026-09-27).
-      const { base, bill, band: penaltyBand, multiplier } = penaltyOf(order)
-      if (base.mixedBrand && (scheme.enableMarginPenalty || scheme.enableMarginIncentive)) {
-        warnings.push(
-          `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
-        )
-      }
-      // A bill with no sales of its own still costs the month what its goods cost (2026-10-30) — no sales, so none of
-      // the month's revenue, even where its KPI items and charges take more than it sold; a gift that costs nothing
-      // is no part of it.
-      const giftCost = noSalesCost(order.lines, base, groupIndex)
-
-      if (base.revenue > 0 || giftCost === null || (giftCost ?? 0) > 0) {
-        if (base.brandCode === null) draft.missingBrand = true
-        else {
-          const tally = draft.marginByBrand.get(base.brandCode) ?? { revenue: 0, cost: 0, complete: true }
-          tally.revenue = round2(tally.revenue + Math.max(base.revenue, 0))
-          if (giftCost === undefined) {
-            tally.cost = round2(tally.cost + bill.cost)
-            if (bill.source === 'none') tally.complete = false
-          } else if (giftCost === null) tally.complete = false
-          else tally.cost = round2(tally.cost + giftCost)
-          draft.marginByBrand.set(base.brandCode, tally)
+      const { base, bill, band: penaltyBand, multiplier, ownBrand } = penaltyOf(order)
+      // The rung's rate — or, on a bill of a brand with its own scheme, the rung's rate for that brand (2026-11-11).
+      const rate = billRate(draft.staffId, ownBrand)
+      // A brand with its own scheme stands outside every margin (2026-11-11):
+      // no ladder to choose, nothing tallied into the month's margin or its
+      // incentive, and its lines' missing costs hold nothing back.
+      if (ownBrand === null) {
+        if (base.mixedBrand && (scheme.enableMarginPenalty || scheme.enableMarginIncentive)) {
+          warnings.push(
+            `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
+          )
         }
-      }
+        // A bill with no sales of its own still costs the month what its goods cost (2026-10-30) — no sales, so none of
+        // the month's revenue, even where its KPI items and charges take more than it sold; a gift that costs nothing
+        // is no part of it.
+        const giftCost = noSalesCost(order.lines, base, groupIndex)
 
-      if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
-      // The override base: cut by the margin, and halved on a half-comm bill.
-      draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * multiplier * halfOf(order))
+        if (base.revenue > 0 || giftCost === null || (giftCost ?? 0) > 0) {
+          if (base.brandCode === null) draft.missingBrand = true
+          else {
+            const tally = draft.marginByBrand.get(base.brandCode) ?? { revenue: 0, cost: 0, complete: true }
+            tally.revenue = round2(tally.revenue + Math.max(base.revenue, 0))
+            if (giftCost === undefined) {
+              tally.cost = round2(tally.cost + bill.cost)
+              if (bill.source === 'none') tally.complete = false
+            } else if (giftCost === null) tally.complete = false
+            else tally.cost = round2(tally.cost + giftCost)
+            draft.marginByBrand.set(base.brandCode, tally)
+          }
+        }
+
+        if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
+      }
+      // The override base: cut by the margin, and halved on a half-comm bill —
+      // kept apart for each brand paid at its own rate.
+      const overridden = opr * multiplier * halfOf(order)
+      draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + overridden)
+      draft.overrideBase.set(ownBrand ?? '', round2((draft.overrideBase.get(ownBrand ?? '') ?? 0) + overridden))
 
       const penaltyNote = penaltyBand
         ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
@@ -1182,7 +1307,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           rate,
           qty: null,
           amount: halved(order, cut),
-          note: `${order.orderNo} · ${order.orderDate}${carriedNote}${penaltyNote}${halfNote(order)}`,
+          note: `${order.orderNo} · ${order.orderDate}${carriedNote}${penaltyNote}${ownRateNote(ownBrand)}${halfNote(order)}`,
+          ...(ownBrand ? { brandCode: ownBrand } : {}),
         })
       }
 
@@ -1227,9 +1353,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     // and nothing else: no margin tally or incentive, no KPI, no override base
     // (after the KPI tally above, which it is no part of).
     for (const order of scheme.enableProductRevenue ? draft.commissionOnlyOrders : []) {
-      const { base, bill, band: penaltyBand, multiplier } = penaltyOf(order)
-      if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
-      const line = commissionOnlyLine(order, rate, input.periodMonth, kpiIndex, groupIndex, {
+      const { base, bill, band: penaltyBand, multiplier, ownBrand } = penaltyOf(order)
+      const rate = billRate(draft.staffId, ownBrand)
+      if (ownBrand === null && scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
+      const line = commissionOnlyLine(order, rate, input.periodMonth, kpiIndexOf(order), groupIndex, {
         multiplier,
         note: penaltyBand
           ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
@@ -1278,28 +1405,43 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
   // ── Pass E: overrides, on the PENALTY-WEIGHTED revenue ─────────────────
   if (scheme.enableOverride) {
-    const baseByStaff = new Map<string, number>()
-    for (const d of drafts.values()) {
-      baseByStaff.set(
-        d.staffId,
-        scheme.overrideIncludesKpi
-          ? round2(d.penaltyWeightedRevenue + d.kpiRevenue)
-          : d.penaltyWeightedRevenue,
-      )
-    }
-
-    for (const credit of computeOverrides(nodes, overrideRateOf, baseByStaff, warnings, scheme.overrideDepth ?? null, packageRecipients)) {
-      const draft = drafts.get(credit.uplineStaffId)
-      if (!draft || credit.amount === 0) continue
-      draft.lines.push({
-        component: 'override',
-        sourceStaffId: credit.downlineStaffId,
-        basisAmount: credit.basisAmount,
-        rate: credit.rate,
-        qty: null,
-        amount: credit.amount,
-        note: `Override on downline ${credit.downlineStaffId} · ${round2(credit.rate * 100)}% differential`,
-      })
+    // The bills paid at the rungs' own rates first, then each brand paid at
+    // its own (2026-11-11), A→Z: an upline's differential is the gap between
+    // the rates THOSE bills were paid at — a Team Assistant over a Revenue
+    // Specialist earns 7% − 5% on an Akemi bill and 6% − 4% on a 2990s one.
+    const classes = ['', ...[...new Set([...drafts.values()].flatMap(d => [...d.overrideBase.keys()]))].filter(Boolean).sort()]
+    const said = new Set(warnings)
+    for (const brand of classes) {
+      const baseByStaff = new Map<string, number>()
+      for (const d of drafts.values()) {
+        // (A head's own bills are in no base: nobody holds a line above them.)
+        const base = d.overrideBase.get(brand) ?? 0
+        baseByStaff.set(d.staffId, brand === '' && scheme.overrideIncludesKpi ? round2(base + d.kpiRevenue) : base)
+      }
+      const rates = brand === ''
+        ? overrideRateOf
+        : new Map([...overrideRankOf].map(([staffId, rank]) => [staffId, brandRateOf(rank, brand, ranks)]))
+      // The roll-up says a broken line once, not once a brand.
+      const found: string[] = []
+      for (const credit of computeOverrides(nodes, rates, baseByStaff, found, scheme.overrideDepth ?? null, packageRecipients)) {
+        const draft = drafts.get(credit.uplineStaffId)
+        if (!draft || credit.amount === 0) continue
+        draft.lines.push({
+          component: 'override',
+          sourceStaffId: credit.downlineStaffId,
+          basisAmount: credit.basisAmount,
+          rate: credit.rate,
+          qty: null,
+          amount: credit.amount,
+          note: `Override on downline ${credit.downlineStaffId} · ${round2(credit.rate * 100)}% differential${brand === '' ? '' : ` · ${brand}`}`,
+          ...(brand === '' ? {} : { brandCode: brand }),
+        })
+      }
+      for (const warning of found) {
+        if (said.has(warning)) continue
+        said.add(warning)
+        warnings.push(warning)
+      }
     }
   }
 
