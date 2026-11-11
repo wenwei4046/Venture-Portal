@@ -10,8 +10,9 @@
 // somebody on the team in the month of the sale (matched by the ERP's id or by name, a place on the scheme that month
 // or a director, not resigned before the sale) and is otherwise skipped with nothing written — no fair, no month, no
 // payload; a bill already here is updated whoever the ERP names; the company decides the brand over the ERP's Branding,
-// the booth and a restamp; the brand switched off, everything is kept as before; the migration refuses a body it was
-// not written from. No live I/O.
+// the booth and a restamp; no catalogue model sells under the brand (catalogue_brand_of — the ERP's "2990s Sofa" models
+// stay brandless, so the Quote gains no calculator without a ladder) while booths and lines read its words; the brand
+// switched off, everything is kept as before; the migration refuses a body it was not written from. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -178,10 +179,19 @@ await db.exec(`
 await db.exec((await readFile(new URL('./brand-own-scheme-production.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
 const md5Of = name => one(`SELECT md5(replace(prosrc, E'\\r', '')) FROM pg_proc WHERE proname = $1`, [name])
 check([await md5Of('ingest_erp_sales_order'), await md5Of('erp_sync_order_brand'), await md5Of('erp_sync_brand_code'),
-  await md5Of('sales_order_restamp_brand'), await md5Of('revenue_uncosted_products'), await md5Of('revenue_costing_gaps')],
+  await md5Of('sales_order_restamp_brand'), await md5Of('revenue_uncosted_products'), await md5Of('revenue_costing_gaps'),
+  await md5Of('catalogue_brand_of')],
   ['d8395b13f77fd3f4b3380b8ec0be9954', 'd0cb32176b535e5fa6927ac0e224ec5a', 'b0df3385c53987a71ca25a28e17d056e',
-    '19433c3e1a804498a93eeb0fd5b7aa27', '89e2715b6230847840d30b8770ded97d', '1348d459ad65cd4efe6a4fdc5ff356ee'],
+    '19433c3e1a804498a93eeb0fd5b7aa27', '89e2715b6230847840d30b8770ded97d', '1348d459ad65cd4efe6a4fdc5ff356ee',
+    'c57e06e354ec2b08906c081d8d3d9977'],
   'the fixture is production’s bodies')
+// The brand a catalogue model sells under (Product List › Modular, the Quote's catalogue): its category, the model's
+// branding, the SKU's.
+const catalogueBrand = async (category, model, sku = null) => one('SELECT catalogue_brand_of($1, $2, $3)', [category, model, sku])
+check([await catalogueBrand('SOFA', '2990s Sofa'), await catalogueBrand('MATTRESS', '2990s Mattress', '2990s Mattress'),
+  await catalogueBrand('MATTRESS', 'Akemi'), await catalogueBrand('MATTRESS', null, 'Happi Sleep'), await catalogueBrand('BEDFRAME', 'Akemi')],
+  [null, null, 'AKEMI', 'AKEMI', null],
+  'before: the ERP’s 2990s models sell under no brand; a mattress under its brand or its sub-brand; a bed frame under none')
 // The products a month still has no cost for: Comm Cal's list (a sub-department's month) and the Product List's (a date range).
 const uncosted = async month => (await q('SELECT product_code FROM revenue_uncosted_products($1, $2) ORDER BY 1', [FAIR_SUB, month])).map(r => r.product_code)
 const gaps = async (from, to) => (await q('SELECT item_code FROM revenue_costing_gaps($1, $2) ORDER BY 1', [from, to])).map(r => r.item_code)
@@ -236,7 +246,7 @@ await q('DELETE FROM reseq_log'); await q('DELETE FROM refresh_log'); await q('D
 // ── The migration, verbatim, twice ───────────────────────────────────────────
 const migration = (await readFile(MIGRATION, 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(migration)
-const MADE = ['ingest_erp_sales_order', 'erp_sync_order_brand', 'revenue_uncosted_products', 'revenue_costing_gaps']
+const MADE = ['ingest_erp_sales_order', 'erp_sync_order_brand', 'revenue_uncosted_products', 'revenue_costing_gaps', 'catalogue_brand_of']
 const madeNow = async () => Promise.all(MADE.map(md5Of))
 const made = await madeNow()
 const BRAND = await one(`SELECT id::text FROM comm_brands WHERE code = '2990S'`)
@@ -287,6 +297,23 @@ check((await q('SELECT erp_project_id::int AS p, brand_code FROM erp_booths ORDE
   [{ p: 305, brand_code: 'AKEMI' }, { p: 400, brand_code: 'SOMEBODY ELSE' }, { p: 2289, brand_code: '2990S' }],
   'the 2990s booth reads as the brand’s; a booth whose name is no brand stays as the ERP wrote it')
 
+// No product list, no calculator: the words are the brand's, but no catalogue model sells under it.
+check([await one(`SELECT erp_sync_brand_code('2990s Sofa')`), await one(`SELECT erp_sync_brand_code('2990S MATTRESS')`),
+  await one(`SELECT erp_sync_brand_code('2990s')`)], ['2990S', '2990S', '2990S'],
+  'a booth, a bill and a line read “2990s Sofa” / “2990s Mattress” as the brand’s')
+check([await catalogueBrand('SOFA', '2990s Sofa'), await catalogueBrand('MATTRESS', '2990s Mattress', '2990s Mattress'),
+  await catalogueBrand('SOFA', null, '2990S'), await catalogueBrand('MATTRESS', 'Akemi'), await catalogueBrand('MATTRESS', null, 'Happi Sleep'),
+  await catalogueBrand('MATTRESS', '2990s Mattress', 'Akemi'), await catalogueBrand('BEDFRAME', 'Akemi')],
+  [null, null, null, 'AKEMI', 'AKEMI', 'AKEMI', null],
+  'the catalogue does not: the ERP’s 2990s models still sell under no brand — no calculator without a ladder — and every other brand answers as before')
+check([await one(`SELECT catalogue_ladder_brand('2990s Sofa')`), await one(`SELECT catalogue_ladder_brand('Happi Sleep')`),
+  await one(`SELECT catalogue_ladder_brand('Nobody')`), await one(`SELECT catalogue_ladder_brand(NULL)`)], [null, 'AKEMI', null, null],
+  'catalogue_ladder_brand: a brand with a ladder, never one on its own scheme')
+check((await q(`SELECT has_function_privilege('anon', 'catalogue_ladder_brand(text)', 'EXECUTE') AS anon,
+  has_function_privilege('authenticated', 'catalogue_ladder_brand(text)', 'EXECUTE') AS signed_in,
+  has_function_privilege('service_role', 'catalogue_ladder_brand(text)', 'EXECUTE') AS service`))[0],
+  { anon: false, signed_in: true, service: true }, 'asked by the Quote’s catalogue (the service role) and Costing Setting’s save, never the publishable key')
+
 // Run again — after HR cleared a rate on Rules: nothing changes, nothing is seeded again.
 await q(`UPDATE comm_rank_defs SET brand_rates = brand_rates - $1 WHERE id = $2`, [BRAND, RANK.F])
 const before = await q(`SELECT (SELECT count(*) FROM sales_orders)::int AS bills, (SELECT count(*) FROM comm_brands)::int AS brands,
@@ -297,7 +324,7 @@ check(await q(`SELECT (SELECT count(*) FROM sales_orders)::int AS bills, (SELECT
   (SELECT count(*) FROM sales_order_erp_changes)::int AS trail`), before, 'no bill, brand or trail row moves')
 check(await rates(), { 'Rank F': null, 'Rank E': 0.05, 'Rank D': 0.06, 'Rank C': 0.07, 'Rank B': 0.08, 'Rank A': null, 'Rank SS': null },
   'and a rate cleared on Rules is not seeded back')
-check(made.map(md5 => migration.includes(`'${md5}'`)), [true, true, true, true], 'the md5s the migration checks are the bodies it makes')
+check(made.map(md5 => migration.includes(`'${md5}'`)), [true, true, true, true, true], 'the md5s the migration checks are the bodies it makes')
 await q(`UPDATE comm_rank_defs SET brand_rates = brand_rates || jsonb_build_object($1::text, 0.04) WHERE id = $2`, [BRAND, RANK.F])
 await q('DELETE FROM locked_months')
 
@@ -411,10 +438,16 @@ const off = await deliver('2990-SO-2611-130', { ...ng })
 check([off.status, off.warnings.includes('unmatched_salesperson'), (await bill('2990-SO-2611-130')).brand], ['applied', true, null],
   'with the brand off, a 2990s order is an order like any other again — the way back')
 check((await uncosted(NOV)).includes('2990-SF-01'), true, 'and its products wait for a cost again')
+check([await one(`SELECT erp_sync_brand_code('2990s Sofa')`), await catalogueBrand('SOFA', '2990s Sofa'), await catalogueBrand('MATTRESS', 'Akemi')],
+  [null, null, 'AKEMI'], 'its words are nobody’s again; the catalogue answers as it always did')
 await q(`UPDATE comm_brands SET is_active = true WHERE code = '2990S'`)
+// A brand of the same words WITH a ladder (were 2990s ever given one): its models sell under it, as any brand's.
+await q(`UPDATE comm_brands SET own_scheme = false WHERE code = '2990S'`)
+check(await catalogueBrand('SOFA', '2990s Sofa'), '2990S', 'off its own scheme, the brand is a brand like any other in the catalogue')
+await q(`UPDATE comm_brands SET own_scheme = true WHERE code = '2990S'`)
 
 // ── The migration refuses a body it was not written from ─────────────────────
-// (The four are checked in name order; each refusal leaves the transaction to be rolled back.)
+// (The five are checked in name order; each refusal leaves the transaction to be rolled back.)
 await db.exec(`DROP FUNCTION revenue_costing_gaps(date, date);
   CREATE FUNCTION revenue_costing_gaps(p_from date, p_to date) RETURNS void LANGUAGE sql AS $$ SELECT $$`)
 await assert.rejects(db.exec(migration), /revenue_costing_gaps\(date, date\) is md5 .*, not the body this migration was written from/)
@@ -428,6 +461,11 @@ await db.exec('ROLLBACK')
 await db.exec(`CREATE OR REPLACE FUNCTION erp_sync_order_brand(p_order jsonb, p_order_id uuid DEFAULT NULL::uuid)
   RETURNS text LANGUAGE sql AS $$ SELECT NULL::text $$`)
 await assert.rejects(db.exec(migration), /erp_sync_order_brand\(jsonb, uuid\) is md5 .*, not the body this migration was written from/)
+checks++
+await db.exec('ROLLBACK')
+await db.exec(`CREATE OR REPLACE FUNCTION catalogue_brand_of(p_category text, p_model_branding text, p_sku_branding text)
+  RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULL::text $$`)
+await assert.rejects(db.exec(migration), /catalogue_brand_of\(text, text, text\) is md5 .*, not the body this migration was written from/)
 checks++
 
 console.log(`validate-brand-own-scheme: ${checks} checks passed`)

@@ -410,6 +410,53 @@ describe('a KPI special on a bed frame (2026-09-27)', () => {
   })
 })
 
+// 2026-11-11 — 2990s (the user: "依然算作 Fair 的 revenue … 唯一不同的是看不到 margin … 它是跟着自己独立的一套
+// commission scheme"): the agent's 5% is 4% on a 2990s bill, the leader's 8% is 6%.
+describe('a brand with its own scheme on the ledger — 2990s', () => {
+  const ranks = [rank('agent', 0.05, 1, { brandRates: { '2990S': 0.04 } }), rank('leader', 0.08, 2, { brandRates: { '2990S': 0.06 } })]
+  // The same bill as any other — the sub-department's KPI pillow on it too — written under 2990S.
+  const source = input({ ranks, ownSchemeBrands: ['2990S'], orders: [sale('one'), sale('own', 1_000, { brandCode: '2990S' })] })
+  const board = buildCommissionWorkbench(source)
+  const agent = board.people.find(person => person.staffId === 'agent')!
+  const own = board.personalRows.find(row => row.orderId === 'own')!
+
+  it('pays the bill the rung’s rate for the brand, on all of it: no KPI item is found on it', () => {
+    expect(own).toMatchObject({
+      ownBrand: '2990S', status: 'eligible', productRate: 0.04, productRevenue: 1_000, productCommission: 40,
+      kpiQty: 0, kpiBase: 0, kpiBonus: 0, totalCommission: 40,
+    })
+  })
+
+  it('reads it in no margin: none of its own, none of the month’s incentive, no penalty', () => {
+    expect(own).toMatchObject({ marginPct: null, marginSource: 'none', marginRevenue: 0, marginCost: null, marginIncentive: 0, penaltyWithheld: 0 })
+    expect(own).not.toHaveProperty('noSales')
+    // The month's margin is the other bill's alone — (980 − 600) ÷ 980 — and its whole incentive rides on that bill.
+    expect(agent.statement?.marginPct).toBeCloseTo(380 / 980, 6)
+    expect(board.personalRows.find(row => row.orderId === 'one')).toMatchObject({ marginIncentive: 1_000, kpiBase: 20 })
+    expect(board.result.warnings).toEqual([])
+  })
+
+  it('pays the upline its differential on the brand’s rates, on that bill alone', () => {
+    // 8% − 5% on the other bill; 6% − 4% on the 2990s one.
+    expect(board.overridingRows.map(row => [row.orderId, row.ownBrand ?? null, row.overrideBasis, Math.round(row.overrideRate * 1e6) / 1e6, row.overrideAmount]))
+      .toEqual([['one', null, 980, 0.03, 29.4], ['own', '2990S', 1_000, 0.02, 20]])
+  })
+
+  it('adds up, and is the engine’s own answer', () => {
+    expect(board.result).toEqual(computeCommissionRun(source))
+    // 49 + 20 KPI + 1,000 margin incentive, and the 2990s bill's 40.
+    expect(agent.totalCommission).toBe(1_109)
+    reconcile(board)
+  })
+
+  it('reads the same bill as any other while its brand follows no scheme of its own', () => {
+    const plain = buildCommissionWorkbench(input({ ranks, orders: [sale('one'), sale('own', 1_000, { brandCode: '2990S' })] }))
+    const row = plain.personalRows.find(r => r.orderId === 'own')!
+    expect(row).not.toHaveProperty('ownBrand')
+    expect(row).toMatchObject({ productRate: 0.05, productRevenue: 980, kpiBase: 20 })
+  })
+})
+
 describe('commission display allocation', () => {
   it('assigns residual cents deterministically and supports refunds', () => {
     expect(allocateCommissionAmount(0.07, [1, 1, 1])).toEqual([0.03, 0.02, 0.02])

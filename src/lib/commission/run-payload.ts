@@ -394,7 +394,8 @@ export function toBrandRates(raw: unknown, ownBrands: ReadonlyMap<string, string
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ownBrands.size === 0) return undefined
   const rates: Record<string, number> = {}
   for (const [brandId, value] of Object.entries(raw as Record<string, unknown>)) {
-    const code = ownBrands.get(brandId)
+    // An id is compared in lower case, as the database writes one.
+    const code = ownBrands.get(brandId) ?? ownBrands.get(brandId.toLowerCase())
     const rate = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN
     if (code && Number.isFinite(rate) && rate >= 0 && rate <= 1) rates[code] = rate
   }

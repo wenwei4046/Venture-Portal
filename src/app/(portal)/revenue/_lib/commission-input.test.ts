@@ -228,6 +228,53 @@ describe('authoritative commission input', () => {
     expect(lines.map(l => l.specials)).toEqual([undefined, ['HB Straight'], ['Hydraulic']])
   })
 
+  // 2026-11-11 — 2990s: a brand that follows its own scheme.
+  describe('a brand with its own scheme', () => {
+    const upsale = (id: string, bill: string, amount = 500) => ({
+      id, sub_department_id: 'sub-1', period_month: '2026-09-01', status: 'confirmed', kind: amount < 0 ? 'drop' : 'upsale',
+      staff_id: 'person-a', amount, sold_on: '2026-09-18', original_ref: id.toUpperCase(), settled_order_id: bill,
+    })
+    const withBrand = () => {
+      const data = fixture()
+      data.comm_order_releases = []
+      data.comm_brands = [
+        { id: 'brand-2990', scheme_id: 'scheme-1', code: '2990S', own_scheme: true },
+        { id: 'brand-akemi', scheme_id: 'scheme-1', code: 'AKEMI', own_scheme: false },
+        // Another scheme's: not this run's to read.
+        { id: 'brand-outlet', scheme_id: 'scheme-2', code: 'OUTLET', own_scheme: true },
+      ]
+      data.comm_ranks[0].comm_rank_defs = { brand_rates: { 'brand-2990': 0.04, 'brand-outlet': 0.01 } }
+      data.sales_orders = [order('current', '2026-09-01', { brand_code: '2990S' }), order('hc', '2026-09-01', { brand_code: 'AKEMI' })]
+      data.comm_upsales = [upsale('p1', 'current'), upsale('p2', 'hc'), upsale('p3', 'current', -200)]
+      return data
+    }
+
+    it('reads the scheme’s brands on their own scheme and each rank’s rate for them', async () => {
+      const loaded = await loadCommissionInput('2026-09-01', 'sub-1', database(withBrand()).client)
+      expect(loaded.input.ownSchemeBrands).toEqual(['2990S'])
+      expect(loaded.input.ranks[0].brandRates).toEqual({ '2990S': 0.04 })
+      expect(loaded.input.orders.filter(o => !o.upsale).map(o => [o.id, o.brandCode])).toEqual([['current', '2990S'], ['hc', 'AKEMI']])
+    })
+
+    it('gives an upsell or a drop the brand of the bill it changed — only where that brand follows its own scheme', async () => {
+      const loaded = await loadCommissionInput('2026-09-01', 'sub-1', database(withBrand()).client)
+      const brandOf = Object.fromEntries(loaded.input.orders.filter(o => o.upsale).map(o => [o.orderNo, o.brandCode ?? null]))
+      expect(brandOf).toEqual({ 'UPSALE P1': '2990S', 'UPSALE P2': null, 'DROP P3': '2990S' })
+    })
+
+    it('asks for no bill’s brand, and hands the engine no brand, while none follows its own scheme', async () => {
+      const data = withBrand()
+      data.comm_brands = data.comm_brands.map(b => ({ ...b, own_scheme: false }))
+      const db = database(data)
+      const loaded = await loadCommissionInput('2026-09-01', 'sub-1', db.client)
+      expect(loaded.input).not.toHaveProperty('ownSchemeBrands')
+      expect(loaded.input.ranks[0]).not.toHaveProperty('brandRates')
+      expect(loaded.input.orders.filter(o => o.upsale).every(o => !o.brandCode)).toBe(true)
+      // The month's bills and the earlier months' — never a third read for the bills behind the upsells.
+      expect(db.requests.filter(r => r.table === 'sales_orders')).toHaveLength(2)
+    })
+  })
+
   it('returns the current team separately without silently replacing missing historical membership', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-24T10:00:00Z'))

@@ -29,6 +29,7 @@ import { describeExclusion } from '@/lib/commission/bill-exclusion'
 import { parseWorkbenchReturn } from '@/lib/commission/workbench-nav'
 import { holdersLine, holdersOf } from '@/lib/commission/bill-share'
 import { paperRef } from '@/lib/commission/paper-ref'
+import { isOwnSchemeBill, OWN_SCHEME_LABEL, ownSchemeCodes } from '@/lib/commission/brand-rates'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 import { loadBillMoves } from '../../../../_lib/row-origins'
@@ -215,7 +216,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -292,7 +293,17 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         : Promise.resolve({ data: null }),
       // What a purchase earns free, its cost out of the margin (Product List › GWP, 2026-11-08).
       supabase.from('catalogue_gwp').select('id, catalogue_gwp_items (role, product_code, qty)'),
+      // The brands on their own scheme (2990s, 2026-11-11): a bill of one stands in no margin.
+      subDept.schemeId
+        ? supabase.from('comm_brands').select('code').eq('scheme_id', subDept.schemeId).eq('own_scheme', true).eq('is_active', true)
+        : Promise.resolve({ data: null }),
     ])
+  // A bill of a brand that follows its own scheme: paid at that brand's rate for the rank, in no margin, and found
+  // none of the sub-department's KPI items — as the run reads it (`ownSchemesOf`).
+  const ownScheme = isOwnSchemeBill(
+    order.brand_code,
+    ownSchemeCodes(((ownBrandData ?? []) as Array<{ code: string }>).map(b => ({ code: b.code, ownScheme: true }))),
+  )
   const byHand = exclusions?.get(orderId) ?? null
   const moved = moves[orderId] ?? null
   const changes = ((changeData ?? []) as unknown as ChangeRow[]).map(change => ({
@@ -324,7 +335,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const depositPct = threshold === null || threshold === undefined ? null : Number(threshold)
   // The KPI items the run pays — none while the scheme has KPI switched off.
   const kpiRows = (kpiData ?? []) as KpiItemRow[]
-  const kpiIndex = scheme?.enable_kpi ? indexKpiItems(toKpiItems(kpiRows)) : EMPTY_KPI_INDEX
+  const kpiIndex = scheme?.enable_kpi && !ownScheme ? indexKpiItems(toKpiItems(kpiRows)) : EMPTY_KPI_INDEX
   // A fabric series item finds a line's fabric on the ERP's fabric list, as the run does (2026-10-29).
   const fabrics = kpiIndex.size > 0 && namesFabricSeries(kpiRows)
     ? indexFabricSeries(await readFabricSeries(supabase))
@@ -388,8 +399,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const baseMissing = goodsLines.filter(c => c.line.cost_amount === null && (gwpParts.get(c.line.id) ?? 0) < 1).length
   const cost = base.cost
   const manualMargin = order.manual_margin_pct === null ? null : Number(order.manual_margin_pct)
-  const margin =
-    manualMargin !== null
+  const margin = ownScheme
+    ? null
+    : manualMargin !== null
       ? manualMargin
       : baseMissing > 0 || base.revenue <= 0
         ? null
@@ -525,10 +537,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         />
         <StatCard
           label="Margin"
-          value={margin === null ? 'no cost' : pct(margin)}
+          value={ownScheme ? '—' : margin === null ? 'no cost' : pct(margin)}
           icon="percent"
           note={
-            manualMargin !== null
+            ownScheme
+              ? OWN_SCHEME_LABEL
+              : manualMargin !== null
               ? 'Keyed by hand — it wins over the line costs'
               : baseMissing > 0
                 ? `${baseMissing} of ${goodsLines.length} commissionable lines have no cost, so the bill cannot be judged`
@@ -536,7 +550,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                   ? `On the sales less ${formatMoney(charged)} charged for bed frame options`
                   : 'Every commissionable line carries a cost'
           }
-          tone={margin === null ? 'danger' : undefined}
+          tone={margin === null && !ownScheme ? 'danger' : undefined}
         />
       </StatCards>
 
@@ -632,6 +646,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 none resolved
               </span>
             )}
+            {ownScheme ? (
+              <span className="chip info ml-1">
+                <span className="dot" />
+                {OWN_SCHEME_LABEL}
+              </span>
+            ) : null}
           </Fact>
           <Fact label="Customer">
             {order.customer_name ?? '—'}
@@ -735,22 +755,27 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                         </div>
                       ) : null}
                     </td>
-                    <td className="num m-hide" data-label="Cost">
-                      {lineCost === null ? <span className="neg">none</span> : formatMoney(lineCost)}
-                      {(() => {
-                        // Where the cost came from — the Product List, a combo,
-                        // or why nothing could price it.
-                        const p = costProvenance(l.cost_source, l.cost_detail, lineCost !== null)
-                        return (
-                          <div
-                            className={`font-sans text-[11px] mt-0.5 whitespace-normal ${p.missing ? 'text-danger' : ''}`}
-                          >
-                            {p.label}
-                          </div>
-                        )
-                      })()}
-                    </td>
-                    <td className="num m-hide" data-label="Margin">{pct(lineMargin)}</td>
+                    {/* A bill of a brand on its own scheme waits for no cost: nothing to say is missing. */}
+                    {ownScheme ? (
+                      <td className="num m-hide" data-label="Cost">{lineCost === null ? '—' : formatMoney(lineCost)}</td>
+                    ) : (
+                      <td className="num m-hide" data-label="Cost">
+                        {lineCost === null ? <span className="neg">none</span> : formatMoney(lineCost)}
+                        {(() => {
+                          // Where the cost came from — the Product List, a combo,
+                          // or why nothing could price it.
+                          const p = costProvenance(l.cost_source, l.cost_detail, lineCost !== null)
+                          return (
+                            <div
+                              className={`font-sans text-[11px] mt-0.5 whitespace-normal ${p.missing ? 'text-danger' : ''}`}
+                            >
+                              {p.label}
+                            </div>
+                          )
+                        })()}
+                      </td>
+                    )}
+                    <td className="num m-hide" data-label="Margin">{ownScheme ? '—' : pct(lineMargin)}</td>
                   </LedgerRow>
                 )
               })}
@@ -763,8 +788,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 <td>Bill</td>
                 <td className="m-hide" colSpan={5} />
                 <td className="num">{formatMoney(Number(order.order_total))}</td>
-                <td className="num m-hide">{baseMissing > 0 ? '—' : formatMoney(cost)}</td>
-                <td className="num m-hide">{pct(margin)}</td>
+                <td className="num m-hide">{ownScheme || baseMissing > 0 ? '—' : formatMoney(cost)}</td>
+                <td className="num m-hide">{ownScheme ? '—' : pct(margin)}</td>
                 <td className="lt-toggle" aria-hidden />
               </tr>
             </tfoot>

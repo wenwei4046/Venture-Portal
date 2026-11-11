@@ -192,6 +192,40 @@ describe('AllBillsTable — brand for the margin', () => {
 
 // 2026-09-30: the right-click's *Share this bill…* is on Sales orders too —
 // the same write as *Share…* under the name.
+// 2026-11-11 — 2990s: a brand that follows its own commission scheme. Its bill stands in no margin, and the brand
+// is never one to pick for another bill's margin.
+describe('AllBillsTable — a brand on its own scheme', () => {
+  const OWN = [...BRANDS, { code: '2990S', name: '2990s', ownScheme: true }]
+
+  it('reads Own scheme where a margin would be — never Cost incomplete — at the rank’s rate for the brand', () => {
+    table([bill({
+      orderId: 'order-2990', orderNo: '2990-SO-2611-021', customerName: 'Mei Ling', brands: ['2990S'],
+      marginPct: null, marginValue: null, ownScheme: true, rate: 0.04, commission: { product: 180, kpi: 0, marginIncentive: 0, total: 180 },
+    })])
+    const row = screen.getByText('Mei Ling').closest('tr')!
+    expect(within(row).getByText('Own scheme')).toBeInTheDocument()
+    expect(within(row).queryByText('Cost incomplete')).toBeNull()
+    expect(row).toHaveTextContent('4%')
+  })
+
+  it('still says Cost incomplete on any other bill without a margin', () => {
+    table([bill({ marginPct: null, marginValue: null })])
+    expect(screen.getByText('Cost incomplete')).toBeInTheDocument()
+    expect(screen.queryByText('Own scheme')).toBeNull()
+  })
+
+  it('never offers the brand for a bill’s margin: it has no ladder to follow', () => {
+    render(
+      <AllBillsTable rows={[bill({ orderId: 'order-127', orderNo: 'HC-SO-2609-127', customerName: 'Chu Fook tiang', brands: [], brandAction: { kind: 'pick', picked: null } })]}
+        team={[]} commissionNote={null} initialShowExcluded={false} monthLabel="September 2026" hasRun brandOptions={OWN} />,
+    )
+    fireEvent.contextMenu(screen.getByText('Chu Fook tiang'), { clientX: 400, clientY: 300 })
+    fireEvent.click(screen.getByRole('menuitem', { name: /Brand for the margin/ }))
+    const panel = screen.getByRole('dialog', { name: 'Brand for HC-SO-2609-127' })
+    expect(within(panel).getAllByRole('button').map(b => b.textContent)).toEqual(['Akemi', 'Dunlopillo', 'Ergotex', 'Zanotti', 'Cancel'])
+  })
+})
+
 describe('AllBillsTable — Share this bill…', () => {
   const TEAM = [{ staffId: 's-1', name: 'ANTHONY' }, { staffId: 's-2', name: 'ADRIAN' }]
   function shared() {

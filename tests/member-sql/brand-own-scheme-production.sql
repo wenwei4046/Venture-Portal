@@ -1,4 +1,4 @@
--- Production's bodies (pg_get_functiondef, 2026-11-11) the migration 20261112003700 was written from — read by
+-- Production's bodies (pg_get_functiondef, 2026-11-11 and 12) the migration 20261112003700 was written from — read by
 -- validate-brand-own-scheme.mjs, which checks each md5 before the migration runs. Never edited by hand.
 
 -- erp_sync_brand_code(p_name text)
@@ -20,6 +20,20 @@ AS $function$
                   THEN 0 ELSE 1 END,
              b.created_at
     LIMIT 1;
+$function$;
+
+-- catalogue_brand_of(p_category text, p_model_branding text, p_sku_branding text)
+-- md5(prosrc) = c57e06e354ec2b08906c081d8d3d9977
+CREATE OR REPLACE FUNCTION public.catalogue_brand_of(p_category text, p_model_branding text, p_sku_branding text)
+ RETURNS text
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+    SELECT CASE WHEN UPPER(BTRIM(COALESCE(p_category, ''))) IN ('MATTRESS', 'SOFA')
+                THEN COALESCE(erp_sync_brand_code(NULLIF(BTRIM(p_model_branding), '')),
+                              erp_sync_brand_code(NULLIF(BTRIM(p_sku_branding), '')))
+           END;
 $function$;
 
 -- erp_sync_order_brand(p_order jsonb, p_order_id uuid)

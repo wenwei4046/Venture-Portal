@@ -36,34 +36,42 @@
 --   5. NO COST IS WAITED FOR. Such a bill stands in no margin, so the two lists of products a month still has no
 --      cost for leave its lines out: revenue_uncosted_products (Comm Cal › All bills) and revenue_costing_gaps
 --      (Product List › Costing gaps).
+--   6. NO PRODUCT LIST, NO CALCULATOR (the user: "因为不需要算它的 margin，所以不会有它的 product list"). The ERP's
+--      catalogue names 31 models "2990s Sofa" / "2990s Mattress" (266 SKUs; none offered or priced on 2026-11-12).
+--      Those words are the brand's now — a booth and a bill's line read them — but a model sells under a brand
+--      with a margin ladder only (catalogue_ladder_brand): the catalogue reads those models as it did before the
+--      brand existed, a mattress or a sofa the ERP gives no brand, so the Quote gains no calculator without a ladder.
 --
 -- The run reads all of it in TypeScript (EngineInput.ownSchemeBrands, Rank.brandRates): a bill of such a brand is
 -- paid the rank's rate for the brand, the override up its line is read on those rates, it stands in no margin, and
 -- the sub-department's KPI items are not found on it.
 --
--- Four functions are made again from PRODUCTION's bodies (2026-11-11, md5 of prosrc), each refused if production's
--- body has changed since: ingest_erp_sales_order (d8395b13…, the body 20261107200000 left) with two statements
--- swapped; erp_sync_order_brand (d0cb3217…, 20260927080000's) with one answer put ahead of the rest;
--- revenue_uncosted_products (89e2715b…) and revenue_costing_gaps (1348d459…) with one condition added each.
+-- Five functions are made again from PRODUCTION's bodies (2026-11-11 and 12, md5 of prosrc), each refused if
+-- production's body has changed since: ingest_erp_sales_order (d8395b13…, the body 20261107200000 left) with two
+-- statements swapped; erp_sync_order_brand (d0cb3217…, 20260927080000's) with one answer put ahead of the rest;
+-- revenue_uncosted_products (89e2715b…) and revenue_costing_gaps (1348d459…) with one condition added each;
+-- catalogue_brand_of (c57e06e3…, 20261031200000's) asking catalogue_ladder_brand where it asked
+-- erp_sync_brand_code.
 --
 -- Rollback, in words: take the two swapped statements out of ingest_erp_sales_order again (or re-apply
 -- 20261107200000's body), give erp_sync_order_brand its four answers back, and switch the brand off
--- (comm_brands.is_active false for 2990S — the two lists then leave nothing out) — the removed bills come back
--- with the ERP's next save of each, or its back-fill.
+-- (comm_brands.is_active false for 2990S — the two lists then leave nothing out, and catalogue_brand_of answers
+-- as it did) — the removed bills come back with the ERP's next save of each, or its back-fill.
 --
 -- PGlite: tests/member-sql/validate-brand-own-scheme.mjs (production's bodies, md5-checked; the migration verbatim,
 -- twice).
 
 BEGIN;
 
--- The functions this migration makes again: production's body it was written from (2026-11-11, pg_get_functiondef,
--- md5 of prosrc), and the body it makes.
+-- The functions this migration makes again: production's body it was written from (2026-11-11 and 12,
+-- pg_get_functiondef, md5 of prosrc), and the body it makes.
 CREATE TEMP TABLE brand_own_scheme_fns (proc text PRIMARY KEY, written_from text NOT NULL, makes text NOT NULL) ON COMMIT DROP;
 INSERT INTO brand_own_scheme_fns VALUES
   ('public.ingest_erp_sales_order(jsonb, uuid)',   'd8395b13f77fd3f4b3380b8ec0be9954', 'f928dad80f27bc09b268e2e34c51a708'),
   ('public.erp_sync_order_brand(jsonb, uuid)',     'd0cb32176b535e5fa6927ac0e224ec5a', 'c1c371268abf92b9cbe27824bc080057'),
   ('public.revenue_uncosted_products(uuid, date)', '89e2715b6230847840d30b8770ded97d', '1816132d91314150de8a8e57dc853ac2'),
-  ('public.revenue_costing_gaps(date, date)',      '1348d459ad65cd4efe6a4fdc5ff356ee', '4e7d29d4f2e109d1156d1c136f6afcdc');
+  ('public.revenue_costing_gaps(date, date)',      '1348d459ad65cd4efe6a4fdc5ff356ee', '4e7d29d4f2e109d1156d1c136f6afcdc'),
+  ('public.catalogue_brand_of(text, text, text)',  'c57e06e354ec2b08906c081d8d3d9977', 'df876d9917f4e109ea88d3831cc92c94');
 
 -- Each is production's body, or this migration's own once it has run — else nothing is touched.
 DO $$
@@ -387,6 +395,41 @@ SELECT pg_temp.remake('public.revenue_costing_gaps(date, date)', ARRAY[
            AND NOT EXISTS (SELECT 1 FROM comm_brands ob
                             WHERE ob.own_scheme AND ob.is_active
                               AND UPPER(BTRIM(ob.code)) = UPPER(BTRIM(o.brand_code)))$n$
+]);
+
+-- ── 6c. No product list, no calculator ───────────────────────────────────────────────────────────────────────────────
+-- "2990s Sofa" and "2990s Mattress" are the brand's words now (its sub-brands), and the ERP's catalogue brands 31
+-- models with them. A catalogue item sells under a brand with a margin ladder and a calculator; a brand on its own
+-- scheme has neither, so it is no answer here — those models stay what they were before the brand existed: a mattress
+-- or a sofa the ERP gives no brand (not offered until a ladder is picked for it on Modular). Booths, bills and lines
+-- still read the words as the brand's (erp_sync_brand_code is untouched).
+CREATE OR REPLACE FUNCTION public.catalogue_ladder_brand(p_name text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $fn$
+    SELECT c.code
+      FROM (SELECT erp_sync_brand_code(p_name) AS code) c
+     WHERE c.code IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM comm_brands b
+                        WHERE b.is_active AND b.own_scheme
+                          AND UPPER(BTRIM(b.code)) = UPPER(BTRIM(c.code)));
+$fn$;
+
+COMMENT ON FUNCTION public.catalogue_ladder_brand(text) IS
+  'The brand an ERP brand word stands for in the CATALOGUE (2026-11-12): erp_sync_brand_code''s answer, unless that brand follows its own commission scheme (comm_brands.own_scheme — 2990s), which has no margin ladder, no product list and no calculator. Read by catalogue_brand_of.';
+
+-- Read as the caller, like erp_sync_brand_code: the Quote's catalogue (the service role) and Costing Setting's save.
+REVOKE ALL ON FUNCTION public.catalogue_ladder_brand(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.catalogue_ladder_brand(text) TO authenticated, service_role;
+
+SELECT pg_temp.remake('public.catalogue_brand_of(text, text, text)', ARRAY[
+    $o$THEN COALESCE(erp_sync_brand_code(NULLIF(BTRIM(p_model_branding), '')),
+                              erp_sync_brand_code(NULLIF(BTRIM(p_sku_branding), '')))$o$,
+    $n$-- (20261112003700) A brand with a margin ladder only: one on its own scheme (2990s) has no product list.
+                THEN COALESCE(catalogue_ladder_brand(NULLIF(BTRIM(p_model_branding), '')),
+                              catalogue_ladder_brand(NULLIF(BTRIM(p_sku_branding), '')))$n$
 ]);
 
 -- What this migration made is what it was written to make.
