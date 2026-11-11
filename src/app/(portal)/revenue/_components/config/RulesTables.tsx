@@ -478,6 +478,26 @@ export function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData;
                 placeholder="ERP brandings"
               />
             </label>
+            {/* The Sales by Brand & Billing export (2026-11-11): the paper's
+                Ref No. prefix names the brand; HC is billed its sales × this %. */}
+            <label className="text-xs">
+              <span className="block mb-1 font-medium">Ref No. prefix</span>
+              <Field
+                name="ref_prefixes"
+                defaultValue={(activeBrand?.ref_prefixes ?? []).join(', ')}
+                placeholder="HC"
+                width="w-28"
+              />
+            </label>
+            <label className="text-xs">
+              <span className="block mb-1 font-medium">Bill to HC %</span>
+              <Field
+                name="hc_bill_pct"
+                defaultValue={activeBrand?.hc_bill_pct == null ? undefined : String(Math.round(activeBrand.hc_bill_pct * 10000) / 100)}
+                placeholder="14"
+                width="w-20"
+              />
+            </label>
             <SaveButton pending={pending} label={activeBrand ? 'Save brand' : 'Add brand'} />
           </div>
         )}

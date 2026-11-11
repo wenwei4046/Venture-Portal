@@ -171,7 +171,7 @@ describe('RulesView', () => {
   it('shows a brand’s sub-brands beside its prefixes on Brands & margin bands', () => {
     nav.params = new URLSearchParams('tab=brands')
     const brand = (id: string, code: string, name: string, prefixes: string[], subs: string[]) =>
-      ({ id, code, name, item_code_prefixes: prefixes, sub_brands: subs, note: null, is_active: true })
+      ({ id, code, name, item_code_prefixes: prefixes, sub_brands: subs, ref_prefixes: [] as string[], hc_bill_pct: null as number | null, note: null, is_active: true })
     renderView(true, { data: dataWith(true, { brands: [brand('a', 'AKEMI', 'Akemi', ['AK-', 'AKE'], ['HAPPI SLEEP']), brand('z', 'ZANOTTI', 'Zanotti', [], [])] }) })
     // Field names each box by its form name.
     expect(screen.getByRole('textbox', { name: 'item_code_prefixes' })).toHaveValue('AK-, AKE')
@@ -179,6 +179,19 @@ describe('RulesView', () => {
     expect(screen.getByText('Sub-brands (comma separated)')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Zanotti/ }))
     expect(screen.getByRole('textbox', { name: 'sub_brands' })).toHaveValue('')
+  })
+
+  // 2026-11-11 (the Sales by Brand & Billing export): the paper's Ref No. prefix
+  // and the Bill to HC % sit on the brand's form, the % keyed as 0–100.
+  it('shows a brand’s Ref No. prefix and Bill to HC % on Brands & margin bands', () => {
+    nav.params = new URLSearchParams('tab=brands')
+    const akemi = { id: 'a', code: 'AKEMI', name: 'Akemi', item_code_prefixes: [], sub_brands: [], ref_prefixes: ['HC'], hc_bill_pct: 0.14, note: null, is_active: true }
+    const zanotti = { ...akemi, id: 'z', code: 'ZANOTTI', name: 'Zanotti', ref_prefixes: [], hc_bill_pct: null }
+    renderView(true, { data: dataWith(true, { brands: [akemi, zanotti] }) })
+    expect(screen.getByRole('textbox', { name: 'ref_prefixes' })).toHaveValue('HC')
+    expect(screen.getByRole('textbox', { name: 'hc_bill_pct' })).toHaveValue('14')
+    fireEvent.click(screen.getByRole('button', { name: /Zanotti/ }))
+    expect(screen.getByRole('textbox', { name: 'hc_bill_pct' })).toHaveValue('')
   })
 
   it('says so when the sub-department has no scheme yet', () => {

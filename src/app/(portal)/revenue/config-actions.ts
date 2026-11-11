@@ -47,6 +47,13 @@ function pct(formData: FormData, key: string): number | null {
   return n / 100
 }
 
+/** The brand's Bill to HC %: keyed 0–100, stored 0–1, blank = not set. */
+function hcBillPct(formData: FormData): number | null {
+  const p = pct(formData, 'hc_bill_pct')
+  if (p !== null && p < 0) throw new Error('Bill to HC % must be between 0 and 100')
+  return p
+}
+
 function text(formData: FormData, key: string): string {
   return ((formData.get(key) as string | null) ?? '').trim()
 }
@@ -241,7 +248,7 @@ async function cloneSchemeChildren(
 
   const { data: brands } = await supabase
     .from('comm_brands')
-    .select('id, code, name, item_code_prefixes, sub_brands, note, is_active')
+    .select('id, code, name, item_code_prefixes, sub_brands, ref_prefixes, hc_bill_pct, note, is_active')
     .eq('scheme_id', fromSchemeId)
 
   for (const brand of (brands ?? []) as Array<Record<string, unknown>>) {
@@ -253,6 +260,8 @@ async function cloneSchemeChildren(
         name: brand.name,
         item_code_prefixes: brand.item_code_prefixes,
         sub_brands: brand.sub_brands ?? [],
+        ref_prefixes: brand.ref_prefixes ?? [],
+        hc_bill_pct: brand.hc_bill_pct ?? null,
         note: brand.note,
         is_active: brand.is_active,
       })
@@ -755,6 +764,13 @@ export async function upsertBrand(formData: FormData) {
   // Active box, and a save wrote null over the note and true over the switch.
   if (formData.has('note')) row.note = text(formData, 'note') || null
   if (formData.has('is_active')) row.is_active = formData.get('is_active') !== 'off'
+  // The Sales by Brand & Billing export (2026-11-11): the paper's Ref No.
+  // prefixes (HC, ZNT …) say which brand a bill counts under, and Houzs
+  // Venture bills Houzs Century the brand's sales × its %.
+  if (formData.has('ref_prefixes')) {
+    row.ref_prefixes = text(formData, 'ref_prefixes').split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+  }
+  if (formData.has('hc_bill_pct')) row.hc_bill_pct = hcBillPct(formData)
   // The ERP brandings that ARE this brand (HAPPI SLEEP is Akemi's) — never
   // another brand's word. A page opened before the box existed sends none and
   // leaves them as they are.
