@@ -96,6 +96,15 @@ export default function AmendTermsForm(p: AmendTermsFormProps) {
   const fromMode = mode === 'from'
   const [effectiveFrom, setEffectiveFrom] = useState(laterYM(p.nextMonth, w.earliestYM))
   const [rate, setRate] = useState(p.ratePct)
+  // The rate per month or per year (2026-11-13, "要可以年息" → A): opens on the deal's own; a year's is charged ÷ 12.
+  const [rateBasis, setRateBasis] = useState<'month' | 'year'>(p.rateBasis ?? 'month')
+  const switchRateBasis = (next: 'month' | 'year') => {
+    if (next === rateBasis) return
+    // The same rate said the other way: 4 a month is 48 a year, never another rate.
+    const v = Number(rate)
+    if (rate.trim() !== '' && Number.isFinite(v)) setRate(String(Math.round((next === 'year' ? v * 12 : v / 12) * 10000) / 10000))
+    setRateBasis(next)
+  }
   const [compounding, setCompounding] = useState(p.compound)
   // What the interest from the month is on (2026-10-23 / 24): the principal owed then, the original, or the amount in force.
   const [basis, setBasis] = useState<InterestBasis>('owed')
@@ -130,7 +139,8 @@ export default function AmendTermsForm(p: AmendTermsFormProps) {
   // What the terms make, beside the form.
   const startYM = fromMode ? effectiveFrom : w.termsFromYM
   const owed = fromMode ? owedAtStart(facts, effectiveFrom) : w.changed ? owedAtStart(facts, w.termsFromYM) : facts.principal
-  const rateN = rate.trim() === '' ? NaN : Number(rate) / 100
+  // The month's rate, whichever way it is typed.
+  const rateN = rate.trim() === '' ? NaN : Number(rate) / (rateBasis === 'year' ? 1200 : 100)
   const base = fromMode ? (basis === 'original' ? facts.principal : basis === 'kept' ? facts.currentBase : owed) : owed
   const interest = compounding || !Number.isFinite(rateN) ? null : Math.round(base * rateN * 100) / 100
   const read = choice === 'amount' ? readRepayment('amount', amount, owed) : choice === 'months' ? readRepayment('months', monthsBox, owed) : null
@@ -220,13 +230,28 @@ export default function AmendTermsForm(p: AmendTermsFormProps) {
           )}
         </AmendSection>
 
-        <AmendSection no={2} title="Rate" note={fromMode ? 'The rate a month from the effective month.' : 'The rate a month of the terms recalculated.'}>
+        <AmendSection no={2} title="Rate" note={fromMode ? 'The rate from the effective month — a month’s or a year’s.' : 'The rate of the terms recalculated — a month’s or a year’s.'}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
             <div>
               <label htmlFor={cfg.rateName} className={AMEND_LABEL}>
-                {p.rateBasis === 'year' ? 'Rate (% a year)' : 'Rate (% a month)'}
+                {rateBasis === 'year' ? 'Rate (% a year)' : 'Rate (% a month)'}
               </label>
-              <input id={cfg.rateName} name={cfg.rateName} type="number" step="0.001" min="0" value={rate} onChange={(e) => setRate(e.target.value)} className={AMEND_FIELD} />
+              <div className="flex gap-2">
+                <input id={cfg.rateName} name={cfg.rateName} type="number" step="0.001" min="0" value={rate} onChange={(e) => setRate(e.target.value)} className={AMEND_FIELD} />
+                <select
+                  name="rate_basis_choice"
+                  value={rateBasis}
+                  onChange={(e) => switchRateBasis(e.target.value === 'year' ? 'year' : 'month')}
+                  aria-label="Rate per month or per year"
+                  className="shrink-0 px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-sans text-ink focus:outline-none focus:border-accent-border"
+                >
+                  <option value="month">Per month</option>
+                  <option value="year">Per year</option>
+                </select>
+              </div>
+              {rateBasis === 'year' && Number.isFinite(rateN) ? (
+                <p className="font-serif italic text-muted text-xs mt-1.5">= {(rateN * 100).toFixed(3)}% a month — a year’s rate is charged monthly (÷ 12).</p>
+              ) : null}
             </div>
             <div className="sm:pt-7">
               <AmendCheck name="compound_interest" label="Compound interest" note="Unpaid interest is added to what is owed and earns interest too." checked={compounding} onChange={setCompounding} />
