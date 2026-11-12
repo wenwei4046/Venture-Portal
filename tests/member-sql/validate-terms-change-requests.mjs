@@ -546,4 +546,32 @@ check(await q(`select tenure_months, repayment_terms from loans where id = $1`, 
   'the months it already holds, asked: fixed')
 await as(null)
 
+// ── 2026-11-13 ("要可以年息" → A): a rate amended per year — the deal is said per year from then on ──
+await as(null)
+await db.exec(`alter table public.loans add column if not exists rate_basis text not null default 'month';
+  alter table public.fund_sources add column if not exists rate_basis text not null default 'month';`)
+const basisSql = await text(new URL('20261113130000_amend_rate_basis.sql', migrations))
+await db.exec(basisSql)
+await db.exec(basisSql)
+// The Principal's own change.
+await as(FINANCE)
+await refuses(`select public.set_deal_rate_basis('fund_source', $1, 'year')`, [MK], /Treasury · Approve/, 'Finance does not set it alone')
+await as(PRINCIPAL)
+await q(`select public.set_deal_rate_basis('fund_source', $1, 'year')`, [MK])
+check((await q(`select rate_basis from fund_sources where id = $1`, [MK]))[0].rate_basis, 'year', 'the Principal: per year from now on')
+await refuses(`select public.set_deal_rate_basis('fund_source', $1, 'week')`, [MK], /per month or per year/, 'a month or a year only')
+// Filed by Finance: the request says it, the approval writes it.
+await as(FINANCE)
+const [{ id: yr }] = await fileOne({ kind: 'loan', id: L6, whole: true, rate: 0.01 })
+await q(`select public.set_terms_request_rate_basis('loan', $1, 'year')`, [yr])
+await as(null)
+check((await q(`select rate_basis from treasury_terms_requests where id = $1`, [yr]))[0].rate_basis, 'year', 'the request says per year')
+check((await q(`select rate_basis from loans where id = $1`, [L6]))[0].rate_basis, 'month', 'the deal waits for the approval')
+const [{ approval_id: yrAp }] = await q(`select approval_id from treasury_terms_requests where id = $1`, [yr])
+await as(PRINCIPAL)
+await refuses(`select public.set_terms_request_rate_basis('loan', $1, 'month')`, [yr], /not yours/, 'only the one who filed it')
+await q(`select public.approve_terms_change($1)`, [yrAp])
+await as(null)
+check(await q(`select effective_rate::text r, rate_basis from loans where id = $1`, [L6]), [{ r: '0.010000', rate_basis: 'year' }], 'approved: 1% a month, said per year')
+
 console.log(`validate-terms-change-requests: ${checks} checks passed`)

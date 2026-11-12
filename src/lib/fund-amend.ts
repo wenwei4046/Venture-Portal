@@ -47,6 +47,8 @@ export interface AmendDraft {
   ratePct: string
   /** From a month: the months left from it ('' = the maturity month stays). */
   remaining: string
+  /** The rate as typed — per month or per year (2026-11-13); absent — the deal's own. */
+  rateBasis?: 'month' | 'year'
   /** From a month: no monthly principal from it on — repaid in any size. */
   noFixedTerm: boolean
   /** From a month: the interest is on the original principal, not on what is still owed then. */
@@ -106,10 +108,12 @@ export function amendFormData(side: DealSide, id: string, was: AmendTerms, d: Am
   const n = NAMES[side]
   const fd = new FormData()
   fd.set(n.id, id)
-  if (!sameRate(d.ratePct, was.ratePct)) {
+  // The rate as typed — per month or per year; the action keeps it as the month's (2026-11-04) and, when the basis
+  // changed (2026-11-13, "要可以年息"), says the deal that way from then on. A change of basis alone sends the rate too.
+  const basis = d.rateBasis ?? was.rateBasis ?? 'month'
+  if (basis !== (was.rateBasis ?? 'month') || !sameRate(d.ratePct, was.ratePct)) {
     fd.set(n.rate, d.ratePct.trim())
-    // The rate is typed in the deal's own basis; the action keeps it as the month's (2026-11-04).
-    fd.set('rate_basis', was.rateBasis ?? 'month')
+    fd.set('rate_basis', basis)
   }
   if (d.compound !== was.compound) fd.set('compound_interest', d.compound ? 'on' : 'off')
   if (d.mode === 'from') {
@@ -257,6 +261,7 @@ export function draftOfForm(side: DealSide, fd: FormData, mode: AmendMode, was: 
     mode,
     effectiveFrom: s('effective_from'),
     ratePct: s(n.rate),
+    rateBasis: s('rate_basis_choice') === 'year' ? 'year' : s('rate_basis_choice') === 'month' ? 'month' : was.rateBasis,
     remaining: s('remaining_months'),
     noFixedTerm: repayment ? repayment === 'none' : fd.get('no_fixed_term') === 'on',
     interestOnOriginal: fd.get('interest_on_original') === 'on',

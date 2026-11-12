@@ -184,4 +184,15 @@ describe('Amend terms — a rate per year', () => {
     const sent = entries(amendFormData('out', 'l1', was, { ...amendDraftOf(was), ratePct: '9' }))
     expect(sent).toMatchObject({ effective_rate_percent: '9', rate_basis: 'year' })
   })
+
+  // 2026-11-13 — "要可以年息": a deal agreed per month may be amended per year, and the other way.
+  it('a change of basis sends the rate in it, even the same rate', () => {
+    const was = { ...LOAN, rateBasis: 'month' as const, ratePct: '1' }
+    expect(entries(amendFormData('out', 'l1', was, { ...amendDraftOf(was), ratePct: '12', rateBasis: 'year' }))).toMatchObject({ effective_rate_percent: '12', rate_basis: 'year' })
+    expect(entries(amendFormData('out', 'l1', was, { ...amendDraftOf(was), ratePct: '1', rateBasis: 'month' }))).not.toHaveProperty('rate_basis')
+    const fd = new FormData()
+    fd.set('effective_rate_percent', '12')
+    fd.set('rate_basis_choice', 'year')
+    expect(draftOfForm('out', fd, 'whole', was).rateBasis).toBe('year')
+  })
 })

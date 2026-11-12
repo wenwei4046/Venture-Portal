@@ -70,6 +70,13 @@ describe('the terms once the change is applied', () => {
   })
 })
 
+describe('a rate typed per year (2026-11-13, "要可以年息")', () => {
+  it('says the year first, then the month', () => {
+    expect(askWords({ ...OCTOBER, noFixedTerm: false, interestKeepsBase: false, rate: 0.01, wholeDeal: true, rateBasis: 'year' })).toBe('Whole deal from Oct 2026 · 12.000% /yr · 1.000% /mo')
+    expect(askOf(row({ rate: 0.01, rate_basis: 'year' })).rateBasis).toBe('year')
+  })
+})
+
 describe('what the Principal is shown', () => {
   it('BI#7 now and as asked: 42 months at 1,424.83 → no fixed term at 424.83 on 51,000 as before', () => {
     const view = termsAskView('fund_source', BI7, BY_MONTH, OCTOBER, 'pending')
