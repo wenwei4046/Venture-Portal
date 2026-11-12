@@ -31,7 +31,13 @@ export interface RequestShare {
   companyId: string | null
   companyName: string | null
   amount: number
-  /** Finance's answer: Yes drafts the invoice when the PV is made; null until answered. */
+  /** Typed as a percent of the total (its amount worked out from it), else null. */
+  percent: number | null
+  /** A department's share is borne by its pool (`dept_pool_<segment>`, Venture's `venture_pool`) — never billed. */
+  pool: string | null
+  /** The share is Venture's own (Venture Office). */
+  venture: boolean
+  /** A company's share: Finance's answer — Yes drafts the invoice when the PV is made; null until answered. */
   billBack: boolean | null
   invoiceId: string | null
   invoiceNo: string | null
@@ -110,7 +116,8 @@ export interface RequestContext {
   pool: string | null
   /** The salary account HR holds: its bank and last four — or none on file. */
   salaryAccount: { bank: string; last4: string } | null
-  departments: Array<{ id: string; name: string }>
+  /** Who may bear a share: every other department with a pool, and Venture itself (`venture`). */
+  departments: Array<{ id: string; name: string; venture: boolean }>
   companies: Array<{ id: string; name: string }>
   /** Who approves a sent request first (PR ③); null — it goes straight to Finance. */
   reviewers: string[] | null
@@ -176,6 +183,9 @@ export function parseRequest(raw: unknown): PaymentRequest | null {
       companyId: str(s.companyId),
       companyName: str(s.companyName),
       amount: n(s.amount),
+      percent: s.percent == null || s.percent === '' ? null : n(s.percent),
+      pool: str(s.pool),
+      venture: s.venture === true,
       billBack: typeof s.billBack === 'boolean' ? s.billBack : null,
       invoiceId: str(s.invoiceId),
       invoiceNo: str(s.invoiceNo),
@@ -211,7 +221,9 @@ export function parseContext(raw: unknown): RequestContext | null {
     departmentName: str(c.departmentName) ?? '',
     pool: str(c.pool),
     salaryAccount: str(acct.bank) && str(acct.last4) ? { bank: str(acct.bank)!, last4: str(acct.last4)! } : null,
-    departments: named(c.departments),
+    departments: list(c.departments)
+      .map((x) => ({ id: str(x.id) ?? '', name: str(x.name) ?? '', venture: x.venture === true }))
+      .filter((x) => x.id && x.name),
     companies: named(c.companies),
     reviewers: names(c.reviewers)?.length ? names(c.reviewers) : null,
   }
@@ -250,14 +262,23 @@ export function payToWords(r: PaymentRequest): string {
 /** Which pool pays: the department's, and any split ("Marketing · Dream Crafter RM 100.00"). */
 export function whoPaysWords(r: PaymentRequest): string {
   if (r.shares.length === 0) return r.departmentName
-  return [r.departmentName, ...r.shares.map((s) => `${s.party === 'company' ? s.companyName : s.departmentName} ${rmOf(s.amount)}`)].join(' · ')
+  const own = ownPart(r)
+  return [...(own > 0 ? [r.departmentName] : []), ...r.shares.map((s) => `${shareWho(s)} ${rmOf(s.amount)}`)].join(' · ')
 }
+
+/** Who a share is: the company, the department, or Venture. */
+export const shareWho = (s: RequestShare): string =>
+  (s.party === 'company' ? s.companyName : s.venture ? 'Venture' : s.departmentName) ?? (s.party === 'company' ? 'Company' : 'Department')
+
+/** A share as typed: "30%", else its amount. */
+export const shareTyped = (s: RequestShare): string => (s.percent != null ? `${s.percent}% · ${rmOf(s.amount)}` : rmOf(s.amount))
 
 /** What the department's own pool bears: the total, less every share. */
 export const ownPart = (r: PaymentRequest): number => Math.round((r.total - r.shares.reduce((t, s) => t + s.amount, 0)) * 100) / 100
 
 /** A share's Bill back, as it stands. */
 export function billBackWords(s: RequestShare): string {
+  if (s.party === 'department') return 'No — borne by its pool'
   if (s.invoiceNo && s.invoiceStatus !== 'voided') return `Yes · ${s.invoiceNo} (${s.invoiceStatus === 'draft' ? 'draft' : s.invoiceStatus ?? 'draft'})`
   if (s.billBack === false) return 'No — the department pays it'
   // Answered in the Create PV window, with the voucher.
@@ -420,11 +441,16 @@ export interface DraftItem {
 }
 
 export interface DraftShare {
-  party: 'department' | 'company' | ''
-  /** The department's or the company's id. */
+  /** Venture is a department too (Venture Office) — picked on its own. */
+  party: 'department' | 'venture' | 'company' | ''
+  /** The department's (Venture Office's) or the company's id. */
   partyId: string
+  /** As typed: ringgit, or a percent when the split is by percent. */
   amount: string
 }
+
+/** Who bears it: the sender's department, another department whole, or split. */
+export type BearChoice = 'own' | 'other' | 'split'
 
 /** What the window holds. Nothing is chosen until it is picked (the user, 2026-10-27: pre-choose nothing). */
 export interface RequestDraft {
@@ -440,8 +466,12 @@ export interface RequestDraft {
   accountNo: string
   supplier: string
   items: DraftItem[]
-  /** The department pays it all (false), or it is split (true). */
-  split: boolean | null
+  /** Who bears it — nothing picked until it is. */
+  bears: BearChoice | null
+  /** Another department bearing all of it: its id (Venture Office's for Venture). */
+  other: string
+  /** A split's shares typed in ringgit or as percents. */
+  by: 'amount' | 'percent' | null
   shares: DraftShare[]
 }
 
@@ -449,7 +479,7 @@ export const emptyItem = (): DraftItem => ({ description: '', amount: '' })
 export const emptyShare = (): DraftShare => ({ party: '', partyId: '', amount: '' })
 
 export function emptyDraft(): RequestDraft {
-  return { kind: null, payToName: null, payToStaffId: null, salary: null, bank: '', accountNo: '', supplier: '', items: [emptyItem()], split: null, shares: [] }
+  return { kind: null, payToName: null, payToStaffId: null, salary: null, bank: '', accountNo: '', supplier: '', items: [emptyItem()], bears: null, other: '', by: null, shares: [] }
 }
 
 const amountText = (v: number) => (v > 0 ? v.toFixed(2) : '')
@@ -467,8 +497,30 @@ export function draftOf(r: PaymentRequest): RequestDraft {
     accountNo: other ? r.payeeAccount ?? '' : '',
     supplier: r.kind === 'direct_pay' ? r.payeeName ?? '' : '',
     items: r.items.length > 0 ? r.items.map((i) => ({ description: i.description, amount: amountText(i.amount) })) : [emptyItem()],
-    split: r.shares.length > 0 ? true : r.requestNo || r.items.length > 0 ? false : null,
-    shares: r.shares.map((s) => ({ party: s.party, partyId: (s.party === 'company' ? s.companyId : s.departmentId) ?? '', amount: amountText(s.amount) })),
+    ...bearsOf(r),
+  }
+}
+
+/** A department bearing the whole of it: one department's share, typed in ringgit, the total. */
+const wholeShare = (r: PaymentRequest) => {
+  const s = r.shares.length === 1 ? r.shares[0] : null
+  return s && s.party === 'department' && s.percent == null && r.total > 0 && s.amount === r.total ? s : null
+}
+
+function bearsOf(r: PaymentRequest): Pick<RequestDraft, 'bears' | 'other' | 'by' | 'shares'> {
+  if (r.shares.length === 0) return { bears: r.requestNo || r.items.length > 0 ? 'own' : null, other: '', by: null, shares: [] }
+  const whole = wholeShare(r)
+  if (whole) return { bears: 'other', other: whole.departmentId ?? '', by: null, shares: [] }
+  const byPercent = r.shares.some((s) => s.percent != null)
+  return {
+    bears: 'split',
+    other: '',
+    by: byPercent ? 'percent' : 'amount',
+    shares: r.shares.map((s) => ({
+      party: s.party === 'company' ? 'company' : s.venture ? 'venture' : 'department',
+      partyId: (s.party === 'company' ? s.companyId : s.departmentId) ?? '',
+      amount: byPercent ? (s.percent != null && s.percent > 0 ? String(s.percent) : '') : amountText(s.amount),
+    })),
   }
 }
 
@@ -479,11 +531,31 @@ export function amountOf(text: string): number {
   return /^\d{1,12}(\.\d{1,2})?$/.test(t) ? Number(t) : NaN
 }
 
-const round = (v: number) => Math.round(v * 100) / 100
+/** A typed percent — NaN when it is not one up to 100 (30, 33.33). */
+export function percentOf(text: string): number {
+  const t = text.replace(/%/g, '').trim()
+  if (t === '') return 0
+  return /^\d{1,3}(\.\d{1,2})?$/.test(t) && Number(t) <= 100 ? Number(t) : NaN
+}
 
-export const draftTotal = (d: RequestDraft) => round(d.items.reduce((t, i) => t + (Number.isFinite(amountOf(i.amount)) ? amountOf(i.amount) : 0), 0))
+const round = (v: number) => Math.round(v * 100) / 100
+const ok = (v: number) => (Number.isFinite(v) ? v : 0)
+
+export const draftTotal = (d: RequestDraft) => round(d.items.reduce((t, i) => t + ok(amountOf(i.amount)), 0))
+
+/** A share's ringgit: as typed, or its percent of the total cut down to the sen (as payment_request_save works it out). */
+export function shareRinggit(d: RequestDraft, s: DraftShare): number {
+  if (d.by !== 'percent') return ok(amountOf(s.amount))
+  const cents = Math.round(draftTotal(d) * 100)
+  return Math.floor((cents * Math.round(ok(percentOf(s.amount)) * 100)) / 10000) / 100
+}
+
+/** What the shares put on others: none, the whole of it, or the split's shares. */
 export const draftShared = (d: RequestDraft) =>
-  d.split ? round(d.shares.reduce((t, s) => t + (Number.isFinite(amountOf(s.amount)) ? amountOf(s.amount) : 0), 0)) : 0
+  d.bears === 'other' ? draftTotal(d) : d.bears === 'split' ? round(d.shares.reduce((t, s) => t + shareRinggit(d, s), 0)) : 0
+
+/** The split's percents added up. */
+export const draftPercent = (d: RequestDraft) => round(d.shares.reduce((t, s) => t + ok(percentOf(s.amount)), 0))
 
 /** A file going up from the window: where it is in the bucket, as payment_request_save files it. */
 export interface UploadedFile {
@@ -500,7 +572,7 @@ export interface SavePayload {
   payTo?: { staffId?: string; name?: string } & ({ salary: true } | { salary: false; bank: string; accountNo: string })
   supplier?: { name: string; bank: string; accountNo: string }
   items: Array<{ description: string; amount: string }>
-  shares: Array<{ party: 'department' | 'company'; departmentId?: string; companyId?: string; amount: string }>
+  shares: Array<{ party: 'department' | 'company'; departmentId?: string; companyId?: string; amount: string; percent?: string }>
   files: UploadedFile[]
   removeFiles: string[]
 }
@@ -522,15 +594,18 @@ export function draftPayload(d: RequestDraft, files: UploadedFile[], removeFiles
     items: d.items
       .filter((i) => i.description.trim() || i.amount.trim())
       .map((i) => ({ description: i.description.trim(), amount: i.amount.replace(/,/g, '').trim() })),
-    shares: d.split
-      ? d.shares
-          .filter((s) => s.party || s.partyId || s.amount.trim())
-          .map((s) => ({
-            party: s.party === 'company' ? ('company' as const) : ('department' as const),
-            ...(s.party === 'company' ? { companyId: s.partyId } : { departmentId: s.partyId }),
-            amount: s.amount.replace(/,/g, '').trim(),
-          }))
-      : [],
+    shares:
+      d.bears === 'other'
+        ? [{ party: 'department' as const, departmentId: d.other, amount: draftTotal(d).toFixed(2) }]
+        : d.bears === 'split' && d.by
+          ? d.shares
+              .filter((s) => s.party || s.partyId || s.amount.trim())
+              .map((s) => ({
+                party: s.party === 'company' ? ('company' as const) : ('department' as const),
+                ...(s.party === 'company' ? { companyId: s.partyId } : { departmentId: s.partyId }),
+                ...(d.by === 'percent' ? { amount: '', percent: s.amount.replace(/%/g, '').trim() } : { amount: s.amount.replace(/,/g, '').trim() }),
+              }))
+          : [],
     files,
     removeFiles,
   }
@@ -557,8 +632,10 @@ export function payeePatch(d: RequestDraft, name: string, staffId: string, ctx: 
 /** What stops Save as draft — or null. A draft keeps what was typed; only what it is must be picked. */
 export function saveProblem(d: RequestDraft): string | null {
   if (!d.kind) return 'Pick what it is first.'
-  const bad = [...d.items.map((i) => i.amount), ...(d.split ? d.shares.map((s) => s.amount) : [])].find((a) => Number.isNaN(amountOf(a)))
+  const bad = [...d.items.map((i) => i.amount), ...(d.bears === 'split' && d.by === 'amount' ? d.shares.map((s) => s.amount) : [])].find((a) => Number.isNaN(amountOf(a)))
   if (bad !== undefined) return `“${bad}” is not an amount — write it like 99.90.`
+  const badPct = d.bears === 'split' && d.by === 'percent' ? d.shares.map((s) => s.amount).find((a) => Number.isNaN(percentOf(a))) : undefined
+  if (badPct !== undefined) return `“${badPct}” is not a percent — write it like 33.33, up to 100.`
   if (d.items.length > PR_LIMITS.items) return `Up to ${PR_LIMITS.items} items on one request.`
   return null
 }
@@ -582,10 +659,15 @@ export function submitProblem(d: RequestDraft, files: number, ctx: RequestContex
   const items = d.items.filter((i) => i.description.trim() || i.amount.trim())
   if (items.length === 0 || items.some((i) => !i.description.trim() || !(amountOf(i.amount) > 0))) need.push('each item’s words and amount')
   if (files === 0) need.push('the receipts or invoices')
-  if (d.split === null) need.push('which pool pays')
-  if (d.split) {
-    if (d.shares.length === 0 || d.shares.some((s) => !s.party || !s.partyId || !(amountOf(s.amount) > 0))) need.push('each share’s who and amount')
-    else if (draftShared(d) >= draftTotal(d)) return `The shares come to ${rmOf(draftShared(d))} — your department pays the rest, so they must be less than the ${rmOf(draftTotal(d))} total.`
+  if (d.bears === null) need.push('who bears it')
+  if (d.bears === 'other' && !d.other) need.push('which department bears it')
+  if (d.bears === 'split') {
+    const pct = d.by === 'percent'
+    if (!d.by) need.push('how to split it — by amount or by percent')
+    else if (d.shares.length === 0 || d.shares.some((s) => !s.party || !s.partyId || !((pct ? percentOf(s.amount) : amountOf(s.amount)) > 0)))
+      need.push(`each share’s who and ${pct ? 'percent' : 'amount'}`)
+    else if (pct && draftPercent(d) > 100) return `The shares come to ${draftPercent(d)}% — more than 100%.`
+    else if (draftShared(d) > draftTotal(d)) return `The shares come to ${rmOf(draftShared(d))} — more than the ${rmOf(draftTotal(d))} total.`
   }
   if (need.length === 0) return null
   const last = need.pop()!
@@ -677,6 +759,22 @@ export interface RequestVoucherStart {
   files: Array<{ id: string; name: string; size: number | null }>
 }
 
+/**
+ * A request's lines on its PV: its items under the requester's department's pool — or, when other departments (or
+ * Venture) bear shares of it, one line for each bearer under its own pool, the department's line the rest (a company's
+ * share stays in it, billed back or not as Finance says).
+ */
+function requestLines(r: PaymentRequest): RequestLine[] {
+  const borne = r.shares.filter((s) => s.party === 'department' && s.amount > 0)
+  if (borne.length === 0) return r.items.map((i) => ({ requestId: r.id, description: i.description, pool: r.pool ?? '', amount: i.amount }))
+  const what = whatOf(r)
+  const rest = Math.round((r.total - borne.reduce((t, s) => t + s.amount, 0)) * 100) / 100
+  return [
+    ...(rest > 0 ? [{ requestId: r.id, description: what.slice(0, 200), pool: r.pool ?? '', amount: rest }] : []),
+    ...borne.map((s) => ({ requestId: r.id, description: `${what} · ${shareWho(s)}’s share`.slice(0, 200), pool: s.pool ?? '', amount: s.amount })),
+  ]
+}
+
 /** What Create PV fills in from the requests (oldest first), every field Finance's to change. */
 export function voucherStart(requests: readonly PaymentRequest[]): RequestVoucherStart {
   const rs = [...requests].sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? '') || a.id.localeCompare(b.id))
@@ -688,12 +786,10 @@ export function voucherStart(requests: readonly PaymentRequest[]): RequestVouche
     payee: first ? payeeOf(first) ?? '' : '',
     payInto: where ? `Pay into ${where}${first?.kind === 'claim' && first.payToSalary ? ' · salary account' : ''}` : '',
     description: rs.length === 1 ? `${first.kind === 'claim' ? 'Claim' : 'Payment'} · ${whatOf(first)}`.slice(0, 200) : `${rs.length} requests · ${(first?.kind === 'claim' ? payeeOf(first) : first?.requesterName) ?? ''}`.slice(0, 200),
-    lines: rs.flatMap((r) =>
-      r.items.map((i) => ({ requestId: r.id, description: i.description, pool: r.pool ?? '', amount: i.amount })),
-    ),
+    lines: rs.flatMap(requestLines),
     notes: `From Payment request · ${nos.join(', ')}`.slice(0, 500),
     splits: rs.flatMap((r) =>
-      r.shares.map((s) => ({
+      r.shares.filter((s) => s.party === 'company').map((s) => ({
         shareId: s.id,
         requestId: r.id,
         requestNo: r.requestNo ?? 'Request',

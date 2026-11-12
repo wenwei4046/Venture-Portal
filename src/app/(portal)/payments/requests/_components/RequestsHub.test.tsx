@@ -196,7 +196,7 @@ const LI = staff({
   id: '44444444-4444-4444-8444-444444444444', requestNo: 'PRQ-2610-0001', requesterName: 'LI SEAN', departmentId: 'hr', departmentName: 'HR',
   pool: 'dept_pool_hr', payToSalary: false, payeeName: 'LI SEAN', payeeBank: 'Public Bank', payeeAccount: '•••• 0210', description: 'Canva team plan · Oct',
   total: 250, items: [{ id: 'i9', description: 'Canva team plan · Oct', amount: 250 }],
-  shares: [{ id: '55555555-5555-4555-8555-555555555555', party: 'department', departmentId: 'mk', departmentName: 'Marketing', amount: 80, billBack: null }],
+  shares: [{ id: '55555555-5555-4555-8555-555555555555', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 80, billBack: null }],
 })
 const withStaff = (...requests: PaymentRequest[]) => ({ rows: sortRequests([...data().rows, ...requests.map((r) => staffRequestRow(r, DEPTS))]) })
 const OPTIONS = {
@@ -360,13 +360,13 @@ describe('several at once', () => {
     const win = screen.getByRole('dialog', { name: 'Create payments' })
     expect(win).toHaveTextContent('2 requests → 2 payment vouchers · HV-PV-202610')
     expect(within(win).getByRole('region', { name: 'PV 1 · KHO WEI JIE' })).toHaveTextContent('Hong Leong Bank •••• 4821 · salary account · 1 request')
-    expect(within(win).getByRole('region', { name: 'PV 2 · LI SEAN' })).toHaveTextContent('Bill back Marketing · RM 80.00?')
+    expect(within(win).getByRole('region', { name: 'PV 2 · LI SEAN' })).toHaveTextContent('Bill back Dream Crafter · RM 80.00?')
     const submit = within(win).getByRole('button', { name: 'Submit 2 for approval' })
     expect(submit).toHaveAttribute('data-off', 'true')
     fireEvent.change(within(win).getByLabelText('PV 1 line 1 category'), { target: { value: '9087' } })
     fireEvent.change(within(win).getByLabelText('PV 2 line 1 category'), { target: { value: '9087' } })
     expect(win).toHaveTextContent('LI SEAN: Each split’s Bill back is needed.')
-    fireEvent.click(within(within(win).getByRole('group', { name: 'Bill back Marketing?' })).getByRole('button', { name: 'No' }))
+    fireEvent.click(within(within(win).getByRole('group', { name: 'Bill back Dream Crafter?' })).getByRole('button', { name: 'No' }))
     expect(submit).not.toHaveAttribute('data-off')
     await act(async () => {
       fireEvent.click(submit)

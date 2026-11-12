@@ -61,10 +61,10 @@ const CTX: RequestContext = {
   people: [],
   name: 'KHO WEI JIE', departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
   salaryAccount: { bank: 'Hong Leong Bank', last4: '4821' },
-  departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
+  departments: [{ id: 'hr', name: 'HR', venture: false }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
 }
 const draft = (over: Partial<RequestDraft> = {}): RequestDraft => ({
-  ...emptyDraft(), kind: 'claim', salary: true, items: [{ description: 'Claude · Oct', amount: '453.79' }], split: false, ...over,
+  ...emptyDraft(), kind: 'claim', salary: true, items: [{ description: 'Claude · Oct', amount: '453.79' }], bears: 'own', ...over,
 })
 
 describe('what the database hands', () => {
@@ -120,8 +120,8 @@ describe('the New request window', () => {
   it('asks for what is still missing, in one sentence', () => {
     expect(submitProblem(emptyDraft(), 0, CTX)).toBe('Pick what it is first.')
     expect(submitProblem(draft(), 0, CTX)).toBe('Add the receipts or invoices.')
-    expect(submitProblem(draft({ salary: null, split: null, items: [{ description: '', amount: '5' }] }), 1, CTX)).toBe(
-      'Add where to pay you, each item’s words and amount and which pool pays.',
+    expect(submitProblem(draft({ salary: null, bears: null, items: [{ description: '', amount: '5' }] }), 1, CTX)).toBe(
+      'Add where to pay you, each item’s words and amount and who bears it.',
     )
     expect(submitProblem(draft({ kind: 'direct_pay', salary: null }), 1, CTX)).toBe('Add the supplier’s name, the bank and the account number.')
     expect(submitProblem(draft(), 1, CTX)).toBeNull()
@@ -132,9 +132,16 @@ describe('the New request window', () => {
     expect(submitProblem(draft({ salary: false, bank: 'Public Bank', accountNo: '3-1874502-10' }), 1, { ...CTX, salaryAccount: null })).toBeNull()
   })
 
-  it('a split leaves the department its part, and each share needs who and how much', () => {
-    expect(submitProblem(draft({ split: true, shares: [{ party: 'company', partyId: '', amount: '10' }] }), 1, CTX)).toBe('Add each share’s who and amount.')
-    expect(submitProblem(draft({ split: true, shares: [{ party: 'company', partyId: 'dc', amount: '453.79' }] }), 1, CTX)).toMatch(/must be less than the RM 453.79 total/)
+  it('a split asks how first, then each share’s who and how much — never more than the total', () => {
+    expect(submitProblem(draft({ bears: 'split', shares: [{ party: 'company', partyId: 'dc', amount: '10' }] }), 1, CTX)).toBe('Add how to split it — by amount or by percent.')
+    expect(submitProblem(draft({ bears: 'split', by: 'amount', shares: [{ party: 'company', partyId: '', amount: '10' }] }), 1, CTX)).toBe('Add each share’s who and amount.')
+    expect(submitProblem(draft({ bears: 'split', by: 'amount', shares: [{ party: 'company', partyId: 'dc', amount: '453.79' }] }), 1, CTX)).toBeNull()
+    expect(submitProblem(draft({ bears: 'split', by: 'amount', shares: [{ party: 'company', partyId: 'dc', amount: '453.80' }] }), 1, CTX)).toMatch(/more than the RM 453.79 total/)
+    expect(submitProblem(draft({ bears: 'split', by: 'percent', shares: [{ party: 'venture', partyId: 'vo', amount: '' }] }), 1, CTX)).toBe('Add each share’s who and percent.')
+    expect(submitProblem(draft({ bears: 'split', by: 'percent', shares: [{ party: 'venture', partyId: 'vo', amount: '60' }, { party: 'department', partyId: 'hr', amount: '50' }] }), 1, CTX)).toBe('The shares come to 110% — more than 100%.')
+    expect(submitProblem(draft({ bears: 'split', by: 'percent', shares: [{ party: 'venture', partyId: 'vo', amount: '120' }] }), 1, CTX)).toMatch(/is not a percent/)
+    expect(submitProblem(draft({ bears: 'other' }), 1, CTX)).toBe('Add which department bears it.')
+    expect(submitProblem(draft({ bears: 'other', other: 'hr' }), 1, CTX)).toBeNull()
     expect(submitProblem(draft({ items: [{ description: 'x', amount: 'RM12' }] }), 1, CTX)).toMatch(/is not an amount/)
   })
 
@@ -148,13 +155,24 @@ describe('the New request window', () => {
       files,
       removeFiles: ['f9'],
     })
-    expect(draftPayload(draft({ split: true, shares: [{ party: 'company', partyId: 'dc', amount: '1,000.50' }] }), [], [])?.shares).toEqual([{ party: 'company', companyId: 'dc', amount: '1000.50' }])
+    expect(draftPayload(draft({ bears: 'split', by: 'amount', shares: [{ party: 'company', partyId: 'dc', amount: '1,000.50' }] }), [], [])?.shares).toEqual([{ party: 'company', companyId: 'dc', amount: '1000.50' }])
+    // By percent: the percent goes, the database works out the ringgit; Venture is a department (Venture Office).
+    expect(draftPayload(draft({ bears: 'split', by: 'percent', shares: [{ party: 'venture', partyId: 'vo', amount: '33.33%' }] }), [], [])?.shares).toEqual([
+      { party: 'department', departmentId: 'vo', amount: '', percent: '33.33' },
+    ])
+    // Another department bears all of it: its share is the whole total.
+    expect(draftPayload(draft({ bears: 'other', other: 'hr' }), [], [])?.shares).toEqual([{ party: 'department', departmentId: 'hr', amount: '453.79' }])
     expect(draftPayload(emptyDraft(), [], [])).toBeNull()
   })
 
   it('a saved request comes back into the window as it was sent', () => {
     const d = draftOf(req({ kind: 'direct_pay', payToSalary: false, payeeName: 'Canva', payeeBank: 'CIMB', payeeAccount: '8001234', shares: [{ id: 's', party: 'company', companyId: 'dc', amount: 100 }] }))
-    expect([d.kind, d.supplier, d.bank, d.accountNo, d.items.length, d.split, d.shares]).toEqual(['direct_pay', 'Canva', 'CIMB', '8001234', 2, true, [{ party: 'company', partyId: 'dc', amount: '100.00' }]])
+    expect([d.kind, d.supplier, d.bank, d.accountNo, d.items.length, d.bears, d.by, d.shares]).toEqual(['direct_pay', 'Canva', 'CIMB', '8001234', 2, 'split', 'amount', [{ party: 'company', partyId: 'dc', amount: '100.00' }]])
+    const whole = draftOf(req({ shares: [{ id: 's', party: 'department', departmentId: 'hr', amount: 779.58 }] }))
+    expect([whole.bears, whole.other, whole.shares]).toEqual(['other', 'hr', []])
+    const pct = draftOf(req({ shares: [{ id: 's', party: 'department', departmentId: 'vo', venture: true, amount: 259.83, percent: 33.33 }] }))
+    expect([pct.bears, pct.by, pct.shares]).toEqual(['split', 'percent', [{ party: 'venture', partyId: 'vo', amount: '33.33' }]])
+    expect(draftOf(req({ shares: [] })).bears).toBe('own')
   })
 
   it('files: what a voucher takes, up to 25 MB, into the uploader’s own folder', () => {
@@ -175,19 +193,19 @@ describe('Create PV', () => {
   })
 
   it('starts the voucher from them: a line per item on the department’s pool, the account under Pay to, the notes, the files, every split to answer', () => {
-    const a = req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: null }, { id: 's2', party: 'department', departmentId: 'hr', departmentName: 'HR', amount: 20, billBack: null }] })
+    const a = req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: null }, { id: 's2', party: 'department', departmentId: 'hr', departmentName: 'HR', pool: 'dept_pool_hr', amount: 20, billBack: null }] })
     const b = req({ id: 'r2', requestNo: 'PRQ-2610-0002', submittedAt: '2026-10-29T03:00:00Z', items: [{ id: 'i3', description: 'Canva', amount: 50 }], files: [] })
     const start = voucherStart([b, a])
     expect(start.requestIds).toEqual(['r1', 'r2'])
     expect([start.payee, start.payInto, start.description, start.notes, start.department]).toEqual([
       'KHO WEI JIE', 'Pay into Hong Leong Bank •••• 4821 · salary account', '2 requests · KHO WEI JIE', 'From Payment request · PRQ-2610-0001, PRQ-2610-0002', 'Marketing',
     ])
+    // HR bears 20 of r1 on its own line (its pool, no invoice); the rest of r1 is Marketing's; Dream Crafter's stays in it.
     expect(start.lines.map((l) => [l.requestId, l.description, l.pool, l.amount])).toEqual([
-      ['r1', 'Claude · Oct', 'dept_pool_marketing', 453.79], ['r1', 'Jian Ying', 'dept_pool_marketing', 325.79], ['r2', 'Canva', 'dept_pool_marketing', 50],
+      ['r1', 'Claude · Oct · Jian Ying', 'dept_pool_marketing', 759.58], ['r1', 'Claude · Oct · Jian Ying · HR’s share', 'dept_pool_hr', 20],
+      ['r2', 'Canva', 'dept_pool_marketing', 50],
     ])
-    expect(start.splits.map((s) => [s.shareId, s.requestNo, s.who, s.amount, s.invoiceNo])).toEqual([
-      ['s1', 'PRQ-2610-0001', 'Dream Crafter', 100, null], ['s2', 'PRQ-2610-0001', 'HR', 20, null],
-    ])
+    expect(start.splits.map((s) => [s.shareId, s.requestNo, s.who, s.amount, s.invoiceNo])).toEqual([['s1', 'PRQ-2610-0001', 'Dream Crafter', 100, null]])
     expect(start.files.map((f) => f.name)).toEqual(['Receipt-2932.pdf'])
   })
 
@@ -198,9 +216,10 @@ describe('Create PV', () => {
       { id: 's2', party: 'department', departmentId: 'hr', departmentName: 'HR', amount: 20, billBack: null },
     ] })])
     const lines = [{ requestId: 'r1', account: '' }, { requestId: 'r1', account: '9087' }]
-    expect(billBackAnswers(start.splits, { s1: true, s2: false }, lines)).toEqual([{ share: 's1', billBack: true, category: '9087' }, { share: 's2', billBack: false }])
+    expect(billBackAnswers(start.splits, { s1: true, s2: false }, lines)).toEqual([{ share: 's1', billBack: true, category: '9087' }])
     // Not answered yet: nothing sent for it (the window asks first).
-    expect(billBackAnswers(start.splits, { s2: false }, lines)).toEqual([{ share: 's2', billBack: false }])
+    expect(billBackAnswers(start.splits, { s1: false }, lines)).toEqual([{ share: 's1', billBack: false }])
+    expect(billBackAnswers(start.splits, {}, lines)).toEqual([])
     // A Yes whose request has no line left has no category (the window says so first).
     expect(billBackAnswers(start.splits, { s1: true }, [])).toEqual([{ share: 's1', billBack: true, category: '' }])
   })
@@ -213,10 +232,11 @@ describe('Create PV', () => {
   })
 
   it('says each split’s Bill back as Finance reads it', () => {
-    const share = { id: 's', party: 'company' as const, departmentId: null, departmentName: null, companyId: 'dc', companyName: 'Dream Crafter', amount: 10, invoiceId: null }
+    const share = { id: 's', party: 'company' as 'company' | 'department', departmentId: null, departmentName: null, companyId: 'dc', companyName: 'Dream Crafter', amount: 10, percent: null, pool: null, venture: false, invoiceId: null }
     expect(billBackWords({ ...share, billBack: null, invoiceNo: null, invoiceStatus: null })).toBe('Decided when the PV is made')
     expect(billBackWords({ ...share, billBack: false, invoiceNo: null, invoiceStatus: null })).toBe('No — the department pays it')
     expect(billBackWords({ ...share, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'draft' })).toBe('Yes · HV-INV-202610-0091 (draft)')
+    expect(billBackWords({ ...share, party: 'department', billBack: null, invoiceNo: null, invoiceStatus: null })).toBe('No — borne by its pool')
   })
 })
 
@@ -313,7 +333,7 @@ describe('a claim’s Pay to', () => {
       { id: 'li', name: 'LI SEAN', department: 'HR', hasSalary: false },
     ],
   } as RequestContext
-  const claim = (over: Partial<RequestDraft> = {}): RequestDraft => ({ ...emptyDraft(), kind: 'claim', split: false, items: [{ description: 'Grab', amount: '10' }], ...over })
+  const claim = (over: Partial<RequestDraft> = {}): RequestDraft => ({ ...emptyDraft(), kind: 'claim', bears: 'own', items: [{ description: 'Grab', amount: '10' }], ...over })
 
   it('oneself until changed: the payload names nobody, as the code before it did', () => {
     expect(draftPayload(claim({ salary: true }), [], [])?.payTo).toEqual({ salary: true })

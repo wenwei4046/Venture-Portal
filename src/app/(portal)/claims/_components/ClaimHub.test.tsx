@@ -37,7 +37,7 @@ const CTX: RequestContext = {
   ],
   departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
   salaryAccount: { bank: 'Hong Leong Bank', last4: '4821' },
-  departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
+  departments: [{ id: 'hr', name: 'HR', venture: false }, { id: 'vo', name: 'Venture Office', venture: true }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
 }
 const req = (over: Record<string, unknown> = {}): PaymentRequest =>
   parseRequest({
@@ -147,7 +147,7 @@ describe('New request', () => {
     fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
     expect(within(w).getByRole('radio', { name: /My salary account/ })).toHaveAccessibleName(/Hong Leong Bank •••• 4821/)
     expect(within(w).getByText('2 · What was it for?')).toBeInTheDocument()
-    expect(within(w).getByText('3 · Which pool pays?')).toBeInTheDocument()
+    expect(within(w).getByText('3 · Who bears it?')).toBeInTheDocument()
     // Each item is its Description and its amount (the user: "确定他们放的那个是description").
     expect(within(w).getByText('Description')).toBeInTheDocument()
     expect(within(w).getByText('Amount (RM)')).toBeInTheDocument()
@@ -198,13 +198,13 @@ describe('New request', () => {
     fireEvent.click(within(w).getByRole('radio', { name: /My salary account/ }))
     fireEvent.change(within(w).getByLabelText('Item 1 description'), { target: { value: 'Claude · Oct' } })
     fireEvent.change(within(w).getByLabelText('Item 1 amount'), { target: { value: '453.79' } })
-    expect(w).toHaveTextContent('Add the receipts or invoices and which pool pays.')
+    expect(w).toHaveTextContent('Add the receipts or invoices and who bears it.')
     const input = w.querySelector('input[type="file"]') as HTMLInputElement
     await act(async () => {
       fireEvent.change(input, { target: { files: [new File(['x'], 'Receipt.pdf', { type: 'application/pdf' })] } })
     })
     expect(mocks.upload).toHaveBeenCalled()
-    fireEvent.click(within(w).getByRole('radio', { name: /Marketing pays all of it/ }))
+    fireEvent.click(within(w).getByRole('radio', { name: /Marketing bears all of it/ }))
     await act(async () => {
       fireEvent.click(within(w).getByRole('button', { name: 'Submit' }))
     })
@@ -215,17 +215,47 @@ describe('New request', () => {
     expect(mocks.flash).toHaveBeenCalledWith('PRQ-2610-0004 sent to Finance')
   })
 
-  it('a direct pay asks for the supplier’s name, bank and account; a split, who and how much — the department pays the rest', async () => {
+  it('a direct pay asks for the supplier’s name, bank and account; a split, who and how much — the department bears the rest', async () => {
     const w = await open()
     fireEvent.click(within(w).getByRole('radio', { name: /Pay a supplier directly/ }))
     expect(within(w).getByLabelText('Supplier')).toBeInTheDocument()
     fireEvent.change(within(w).getByLabelText('Item 1 amount'), { target: { value: '300' } })
     fireEvent.click(within(w).getByRole('radio', { name: /Split it/ }))
-    fireEvent.change(within(w).getByLabelText('Share 1: a department or a company'), { target: { value: 'company' } })
+    expect(within(w).queryByLabelText('Share 1: who')).toBeNull()
+    fireEvent.click(within(w).getByRole('radio', { name: 'Amount (RM)' }))
+    fireEvent.change(within(w).getByLabelText('Share 1: who'), { target: { value: 'company' } })
     fireEvent.change(within(w).getByLabelText('Share 1: which'), { target: { value: 'dc' } })
     fireEvent.change(within(w).getByLabelText('Share 1 amount'), { target: { value: '100' } })
-    expect(w).toHaveTextContent('Marketing pays RM 200.00')
+    expect(w).toHaveTextContent('Marketing bears RM 200.00')
     expect(w).toHaveTextContent('Add the supplier’s name, the bank, the account number, each item’s words and amount and the receipts or invoices.')
+  })
+
+  it('another department bears all of it — sent as its share of the whole total', async () => {
+    mocks.upload.mockResolvedValue({ ok: true, file: { path: 'kho/k1/Receipt.pdf', name: 'Receipt.pdf', contentType: 'application/pdf', size: 900 } })
+    mocks.save.mockResolvedValue({ ok: true, data: req({ status: 'with_finance' }) })
+    const w = await open()
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
+    fireEvent.change(within(w).getByLabelText('Item 1 description'), { target: { value: 'Team lunch' } })
+    fireEvent.change(within(w).getByLabelText('Item 1 amount'), { target: { value: '120' } })
+    fireEvent.click(within(w).getByRole('radio', { name: /Another department bears all of it/ }))
+    expect(within(w).getByRole('option', { name: 'Venture (Venture Office)' })).toBeInTheDocument()
+    fireEvent.change(within(w).getByLabelText('Which department bears it'), { target: { value: 'hr' } })
+    expect(w).toHaveTextContent('Add where to pay you and the receipts or invoices.')
+  })
+
+  it('a split by percent: each share’s ringgit worked out, Venture picked on its own', async () => {
+    const w = await open()
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
+    fireEvent.change(within(w).getByLabelText('Item 1 amount'), { target: { value: '10' } })
+    fireEvent.click(within(w).getByRole('radio', { name: /Split it/ }))
+    fireEvent.click(within(w).getByRole('radio', { name: /Percent/ }))
+    fireEvent.change(within(w).getByLabelText('Share 1: who'), { target: { value: 'venture' } })
+    expect(w).toHaveTextContent('Venture Office')
+    fireEvent.change(within(w).getByLabelText('Share 1 percent'), { target: { value: '33.33' } })
+    expect(w).toHaveTextContent('RM 3.33')
+    expect(w).toHaveTextContent('Marketing bears 66.67% · RM 6.67')
+    fireEvent.change(within(w).getByLabelText('Share 1 percent'), { target: { value: '120' } })
+    expect(w).toHaveTextContent('“120” is not a percent')
   })
 
   it('Save as draft keeps what was typed', async () => {

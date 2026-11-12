@@ -5,7 +5,7 @@ import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { fileSize } from '@/components/finv/form-words'
 import { officeDay } from '@/lib/office-time'
-import { billBackWords, intoWords, ownPart, payeeOf, requestDay, rmOf, type PaymentRequest } from '@/lib/payment-requests/model'
+import { billBackWords, intoWords, ownPart, payeeOf, requestDay, rmOf, shareTyped, shareWho, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // A payment request in a hub's drawer (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the dark hero as a
 // voucher's, then the request's numbered groups — what it was for, the receipts, who is paid, which pool pays. The
@@ -112,7 +112,7 @@ export function RequestGroups({
         <Line label="Into" value={intoWords(r)} mono={!r.payToSalary || r.kind === 'direct_pay'} />
       </Group>
 
-      <Group n="IV." title="Which pool pays" foot={r.shares.length > 0 ? { l: `${r.departmentName} pays`, v: rmOf(ownPart(r)) } : undefined}>
+      <Group n="IV." title="Who bears it" foot={r.shares.length > 0 && ownPart(r) > 0 ? { l: `${r.departmentName} bears`, v: rmOf(ownPart(r)) } : undefined}>
         <Line label="From" value={r.requesterName} sub={r.departmentName} />
         {r.requestNo ? <Line label="Request" value={r.requestNo} mono sub={r.submittedAt ? `Sent ${fd(requestDay(r))}` : undefined} /> : null}
         {r.approvedByName ? (
@@ -122,10 +122,10 @@ export function RequestGroups({
         {r.shares.map((s) => (
           <Line
             key={s.id}
-            label={s.party === 'company' ? s.companyName ?? 'Company' : s.departmentName ?? 'Department'}
-            value={rmOf(s.amount)}
+            label={shareWho(s)}
+            value={shareTyped(s)}
             mono
-            sub={billBack ? `Bill back: ${billBackWords(s)}` : undefined}
+            sub={s.party === 'department' ? 'Charged to its pool — not billed' : billBack ? `Bill back: ${billBackWords(s)}` : undefined}
           />
         ))}
       </Group>

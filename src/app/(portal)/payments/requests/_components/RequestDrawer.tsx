@@ -198,7 +198,7 @@ export function useRequestView(
           note={
             !waiting
               ? `In ${q.pvNo ?? 'its payment voucher'}.`
-              : q.shares.length > 0
+              : q.shares.some((s) => s.party === 'company')
                 ? 'Create its payment voucher — each split’s Bill back is decided there — or reject it back with a reason.'
                 : 'Create its payment voucher, or reject it back with a reason.'
           }

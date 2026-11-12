@@ -74,3 +74,19 @@
   line-height: 1.5;
   color: rgb(var(--hvs-muted));
 }
+
+/* Who bears it › Split it: by amount or by percent, picked before the rows open (2026-11-12). */
+.splitBy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12.5px; color: rgb(var(--hvs-muted)); }
+.splitBy > span { margin-right: 4px; }
+.splitBy label {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--ds-border); background: var(--ds-surface); color: rgb(var(--hvs-ink));
+}
+.splitBy label[data-on='true'] { border-color: var(--ds-accent-soft-border); background: var(--ds-accent-soft); color: var(--ds-accent-soft-ink); font-weight: 600; }
+.splitBy input { margin: 0; }
+.shareRow[data-by='percent'] { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) 80px 104px 28px; }
+.shareFixed { font-size: 13px; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shareCalc { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12px; text-align: right; color: rgb(var(--hvs-muted)); white-space: nowrap; }
+@media (max-width: 560px) {
+  .shareRow[data-by='percent'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
