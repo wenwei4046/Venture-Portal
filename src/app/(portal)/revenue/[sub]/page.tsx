@@ -13,14 +13,17 @@ import { loadErpLinkView, receiverUrlFor } from '../_lib/erp-link'
 import { loadClosedMonthsOrNone, loadCutoverOrNone, settledByHand } from '../_lib/erp-feed-month'
 import { loadDoubleClaims } from '../_lib/double-claims'
 import { loadSwitcherData } from '../_lib/switcher'
+import { loadTally } from '../_lib/tally'
 import { openClaimsByMonth } from '@/lib/commission/double-claims'
 import { formatAgo } from '@/lib/erp-sync/format'
+import { startRead } from '@/lib/start-read'
 import SubDeptSwitcher from '../_components/SubDeptSwitcher'
-import CommCalBody, { type CommCalCard, type CommCalMonth } from '../_components/commcal/CommCalBody'
+import CommCalBody, { type CommCalCard, type CommCalMonth, type CommCalTab } from '../_components/commcal/CommCalBody'
 import s from '../_components/commcal/CommCal.module.css'
 
 interface PageProps {
   params: Promise<{ sub: string }>
+  searchParams: Promise<{ tab?: string | string[] }>
 }
 
 /** A sub-department with no month yet (the handoff's IR). */
@@ -58,11 +61,16 @@ function monthOnly(period: string): string {
  *
  * Batches and runs both belong to this sub-department. Membership in more
  * than one programme never makes an order pay through several programmes.
+ *
+ * `?tab=tally` (2026-11-12) is the same page's second tab — each month by SO
+ * date (what Houzs pays) beside by fair date (what we pay salespeople on) —
+ * and the only time its bills are read.
  */
-export default async function CommissionCalculationPage({ params }: PageProps) {
+export default async function CommissionCalculationPage({ params, searchParams }: PageProps) {
   await requirePage('/revenue/[sub]')
   const user = await requirePermission('revenue')
-  const { sub } = await params
+  const [{ sub }, query] = await Promise.all([params, searchParams])
+  const tab: CommCalTab = query.tab === 'tally' ? 'tally' : 'months'
   const subDept = await requireSubDepartment(sub, 'comm_cal')
   const supabase = (await createClient()) as unknown as SupabaseClient
 
@@ -93,10 +101,17 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
 
   // Months closed to the feed, what it has held for each, and the bills that
   // may be claimed twice (2026-09-26) — each month says so in its own row.
-  const [closedMonths, doubleClaims, cutover] = await Promise.all([
+  // The Tally reads its months' bills beside them, from the first month the
+  // portal pays — only when its tab is the one open.
+  const cutoverRead = startRead(loadCutoverOrNone(supabase, subDept.id))
+  const periods = ((batches ?? []) as Array<{ period_month: string }>).map(b => b.period_month)
+  const [closedMonths, doubleClaims, cutover, tally] = await Promise.all([
     sync ? loadClosedMonthsOrNone(supabase, subDept.id) : Promise.resolve(new Map<string, never>()),
     loadDoubleClaims(supabase, subDept.id),
-    loadCutoverOrNone(supabase, subDept.id),
+    cutoverRead,
+    tab === 'tally' && periods.length > 0
+      ? cutoverRead.then(c => loadTally(supabase, subDept, periods, c?.firstPaidMonth ?? null))
+      : Promise.resolve(null),
   ])
   const heldByMonth = new Map((sync?.held ?? []).map(h => [h.period, h.count]))
   const claimsByMonth = openClaimsByMonth(doubleClaims.groups)
@@ -251,6 +266,8 @@ export default async function CommissionCalculationPage({ params }: PageProps) {
             canManage: canDo(user, 'revenue', 'manage'),
             canEdit: canDo(user, 'revenue', 'edit'),
           }}
+          tab={tab}
+          tally={tally}
           empty={rows.length === 0 ? <NoSalesData period={thisPeriod} importHref={canImport ? importHref : null} /> : null}
         />
       ) : (

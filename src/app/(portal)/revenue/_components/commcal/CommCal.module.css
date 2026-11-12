@@ -70,6 +70,10 @@
 .source[data-open='true'] { background: rgb(var(--hv-panel-3)); }
 .sourceChev { display: flex; transition: transform 0.15s; }
 
+/* A tab's content (2026-11-12): dimmed while the other tab's page is on its way. */
+.pane { transition: opacity 0.15s; }
+.pane[data-opening='true'] { opacity: 0.5; pointer-events: none; }
+
 /* The months table. */
 .monthLabel { font-weight: 500; }
 .claims {

@@ -3,11 +3,14 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney, formatDate, formatIntlDate } from '@/lib/utils'
+import { revenuePath } from '@/lib/revenue'
 import { formatAgo, ignoreOutcomeNote, matchOutcomeNote } from '@/lib/erp-sync/format'
 import { cancelWarmIntent, warmOnIntent } from '@/lib/nav-warm'
+import type { TallyCommission, TallyReport } from '@/lib/commission/tally'
 import { Chevron } from '@/components/hrv/icons'
 import { Card, Cards, Chip, GridHead, GridRow, GridTable, SectHead, btn, hv, type ChipTone } from '@/components/hrv/kit'
 import { Drawer, Window } from '@/components/hrv/overlay'
+import { Tabs } from '@/components/hrv/tabs'
 import { flash } from '@/components/hrv/toast'
 import { clearFirstPaidMonth, setFirstPaidMonth } from '../../cutover-actions'
 import { linkErpKey, setErpFeedWindow, unlinkErpKey } from '../../link-actions'
@@ -16,6 +19,7 @@ import type { ErpSyncPanelData } from '../../_lib/erp-sync-panel'
 import type { ErpLinkView } from '../../_lib/erp-link'
 import s from './CommCal.module.css'
 import { Select } from '@/components/hrv/select'
+import TallyPanel from './TallyPanel'
 
 // Comm Cal (2026-10-10, the HR revamp handoff): the status strip (ERP
 // receiving · Pays from … · Change · Data source ›), five cards, and the
@@ -23,6 +27,13 @@ import { Select } from '@/components/hrv/select'
 // and Change opens the first month the portal pays. Everything the old
 // panels could do is still in the drawer: paste / replace / unlink the key,
 // the feed window, match a name, Not ours / Put back, replay what was held.
+//
+// Two tabs under the strip since 2026-11-12: Months (the cards and the
+// months) and Tally (`TallyPanel` — by SO date beside by fair date). The tab
+// is the page's `?tab=`: the Tally's bills are read by the server only when it
+// is the one open, so a tab is a navigation, not a client-side switch.
+
+export type CommCalTab = 'months' | 'tally'
 
 export interface CommCalMonth {
   period: string
@@ -90,13 +101,36 @@ function runChip(run: CommCalMonth['run']) {
   return <Chip tone={tone}>{run.status}</Chip>
 }
 
-export default function CommCalBody({ data, empty = null }: { data: CommCalData; empty?: React.ReactNode }) {
+export default function CommCalBody({
+  data,
+  empty = null,
+  tab = 'months',
+  tally = null,
+}: {
+  data: CommCalData
+  empty?: React.ReactNode
+  /** The tab the page was asked for (`?tab=`). */
+  tab?: CommCalTab
+  /** The Tally and what each month pays its salespeople, read only when its tab is the one open. */
+  tally?: { report: TallyReport; commission: TallyCommission } | null
+}) {
   const router = useRouter()
   const now = useNow()
   const [sourceOpen, setSourceOpen] = useState(false)
   const [paysOpen, setPaysOpen] = useState(false)
   const feed = data.link && data.sync ? { link: data.link, sync: data.sync } : null
   const erpState = !feed ? null : !feed.link.linked ? 'off' : feed.sync.lastEventAt ? 'on' : 'waiting'
+
+  // The tab pressed lights at once; the page behind it arrives with the server's answer.
+  const [opening, startOpening] = useTransition()
+  const [target, setTarget] = useState<CommCalTab>(tab)
+  const shownTab = opening ? target : tab
+  function openTab(next: CommCalTab) {
+    if (next === shownTab) return
+    setTarget(next)
+    const path = revenuePath(data.sub.slug)
+    startOpening(() => router.push(next === 'tally' ? `${path}?tab=tally` : path))
+  }
 
   return (
     <>
@@ -138,8 +172,26 @@ export default function CommCalBody({ data, empty = null }: { data: CommCalData;
         ) : null}
       </div>
 
-      {data.months.length === 0 ? empty : (
-        <>
+      {data.months.length === 0 ? null : (
+        <Tabs
+          label="Commission Calculation"
+          items={[
+            { key: 'months', label: 'Months', count: data.months.length },
+            { key: 'tally', label: 'Tally' },
+          ]}
+          active={shownTab}
+          onSelect={key => openTab(key === 'tally' ? 'tally' : 'months')}
+          style={{ marginBottom: 20 }}
+        />
+      )}
+
+      {data.months.length === 0 ? empty : tab === 'tally' && tally ? (
+        // Dimmed while the other tab is on its way: the tab already says where the page is going.
+        <div className={s.pane} data-opening={opening ? 'true' : undefined} aria-busy={opening}>
+          <TallyPanel report={tally.report} commission={tally.commission} sub={data.sub} />
+        </div>
+      ) : (
+        <div className={s.pane} data-opening={opening ? 'true' : undefined} aria-busy={opening}>
           <Cards label={`Commission Calculation for ${data.sub.name}`} style={{ marginBottom: 26 }}>
             {data.cards.map(c => (
               <Card
@@ -173,7 +225,7 @@ export default function CommCalBody({ data, empty = null }: { data: CommCalData;
               <MonthRow key={m.period} m={m} zebra={i % 2 === 1} />
             ))}
           </GridTable>
-        </>
+        </div>
       )}
 
       {feed ? <DataSourceDrawer open={sourceOpen} onClose={() => setSourceOpen(false)} data={data} link={feed.link} sync={feed.sync} now={now} /> : null}

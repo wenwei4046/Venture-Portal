@@ -1722,6 +1722,36 @@ and the share — taken, given back on an undo, a move on and the move back, kep
 out where there is no room or nobody — and the database's refusals; the closes
 and the team are the Server Action's).
 
+### 4.21 The Tally — a month by SO date beside by fair date (2026-11-12)
+
+Two calendars count the same bill. **Houzs pays Houzs Venture by the day the
+order was opened in the ERP** — its SO date (the ERP's Event Commission, *by SO
+date*). **Houzs Venture pays the salesperson by the day of the fair** — the month
+the portal counts the bill in (§4.19: the sale day sets the month). A bill sold
+at a fair on 8 Nov and keyed on 1 Dec is November's to its salesperson and
+December's to Houzs: Houzs Venture has paid out a month before it is paid. The
+user: *"我需要有一个 tab 能 list 出来：House entry 那边跟着 Sales Order creation date
+去 payout；我 payout to Sales Person 是跟着 fair date 去 payout；然后我要对出中间的
+那个 gap，要不然可能就会漏掉钱 for houzs venture tank cash flow"*.
+
+| | |
+|---|---|
+| Where | Comm Cal's front page, the tab **Tally** beside **Months** (`/revenue/<sub>?tab=tally`). Read-only; the page's own gates |
+| Our month | `sales_orders.period_month` |
+| Houzs's month | the month of `order_date` (the ERP's `so_date`). An old bill topped up (§4.19) is in ONE month on both sides — the month its top-up landed in |
+| The amount | one on both sides, so the gap is the calendar's alone: **Sales** = what the rate is paid on (§4.0, `revenue_month_orders.commissionable` — the bill's commissionable lines, less its KPI items' amounts while KPI is on); **Bill to HC** = Sales × the brand's Bill to HC % (Rules › Brands & margin bands), the brand read as the month's export reads it — own scheme, else the Ref No. prefix, else the bill's own |
+| Counted | a bill of a committed batch, not cancelled, not taken out (§4.10). An upsell or a drop is no bill and is not in it |
+| A month's row | by SO date — bills, Sales, Bill to HC; by fair date — the same, and **Commission**, what the month's closed salespeople are paid (§4.11's closes, summed); **Gap** = fair − SO; **Carried** = as the month ends, the bills we have counted that Houzs has not yet, less the ones Houzs has and we have not |
+| The month picked | its bills in two months, in two lists — *Fair date in {Mon} · SO date in another month*, *SO date in {Mon} · fair date in another month* — each with its fair day, SO date, Sales, %, Bill to HC and when the other side pays |
+| From | the first month the portal pays (`comm_cutovers`), a year of months at most |
+
+A month's gap is exactly its bills in two months. It is the portal's own bills
+in Houzs's calendar, **not the ERP's Event Commission report**: that pays an
+order's goods × its fair's brand rate once its payments reach 30%, on every
+order with a fair whoever sold it, with Finance's marks and a closed month's
+adjustments. The rates agree; the totals need not. Pure
+`lib/commission/tally.ts`; the read `revenue/_lib/tally.ts`; no migration.
+
 ## 5. Tax — Withholding instead of PCB
 
 Revenue salespeople have **no PCB**. They pay **Withholding Tax at 2% of total
