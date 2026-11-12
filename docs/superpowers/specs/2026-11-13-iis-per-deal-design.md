@@ -10,7 +10,10 @@ The user's method (memory `iis-method-decided`, confirmed 2026-10-26 / 11-03 / 1
   3400-3499), a fund source's under its `40xx Amount Due to - <party>` (in suspense 4300-4599, not 4600-4699).
   Interest-bearing deals also get an IIS account under the counterparty's interest-in-suspense account (loans 3500-3899,
   fund sources 4700-4999; new IIS counterparty accounts 3066 for CMI, 4065-4067 for The Cont / Chai Meng Keat / Loo Wen Wei).
-  The accounts are made parked (no parent) — a header refuses postings — and reparented after the go-live's catch-up.
+  The accounts are made parked (no parent) for the catch-up. The chart refuses a sub-account under an account with
+  postings, and every counterparty account has history, so after the catch-up each deal account sits BESIDE its
+  counterparty under the same group (3020 / 4100 / 4200) and each IIS account under 3060 / 4060 (mig 20261113150000;
+  go-live 2026-11-13: 44 deals, 3063's 750.13 to 5027, 4062 and 4052 untouched).
 - The deal's account holds principal + interest put in suspense; every receipt / payment (principal AND interest) is
   taken off it whole. Penalty stays straight to income (7010 / 9096), as today.
 - Interest into suspense ("accrual"): a fixed, non-compounding terms segment puts all of its interest in at its start
