@@ -162,6 +162,8 @@
 .msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 6px; background: rgb(var(--lv-surface-hover)); }
 .msgs[data-desk] { padding: 16px 20px; }
 .spacer { flex: 1; }
+/* A long chat scrolls; its pictures, files and bubbles keep their own heights instead of being squeezed to a line (2026-11-12 — the user: "在预览不会呈现图片？"). */
+.msgs > :not(.spacer) { flex-shrink: 0; }
 .cust { align-self: flex-end; max-width: 80%; padding: 8px 12px; border-radius: 16px 16px 4px 16px; background: rgb(var(--lv-sel)); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bot { align-self: flex-start; max-width: 85%; display: flex; flex-direction: column; gap: 3px; }
 .botText { padding: 10px 12px; border-radius: 16px 16px 16px 4px; background: rgb(var(--lv-surface)); border: 1px solid rgb(var(--lv-line)); font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }

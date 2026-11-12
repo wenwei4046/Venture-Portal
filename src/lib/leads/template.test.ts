@@ -275,3 +275,21 @@ describe('English and Chinese, several files a step', () => {
     expect([up.text, up.textZh, up.files?.length, up.endMsgZh, up.lib?.ver]).toEqual(['Promo!', '优惠！', 1, '再见', 2])
   })
 })
+
+// 2026-11-12 — the user: Welcome's "Talk to Person" button handed the chat to CS instead of sending its step.
+describe('an option worded as asking for a person', () => {
+  const t2 = { endMsg: '', steps: [
+    { id: 'w', kind: 'question', text: 'Hi!', buttons: [{ label: 'Talk to Person', labelZh: '找客服', next: 'p' }, { label: 'Sofa', next: '' }] },
+    { id: 'p', kind: 'phone', text: 'Happy to help! Your number?', next: '' },
+  ] as TemplateStep[] }
+  it('tapped, it goes to its own step', () => {
+    expect(walkAnswer(t2, walkFrom(t2, 'w'), 'Talk to Person').said.at(-1)).toMatchObject({ text: 'Happy to help! Your number?' })
+    expect(walkAnswer(t2, walkFrom(t2, 'w'), '找客服').said.at(-1)).toMatchObject({ text: 'Happy to help! Your number?' })
+  })
+  it('the same words typed where they are no option still go to a person', () => {
+    const w = walkAnswer(t2, walkFrom(t2, 'w'), 'Sofa')
+    expect(w.ended).toBe('done')
+    const p = walkAnswer(t2, walkFrom(t2, 'p'), 'can I talk to a real person?')
+    expect(p.ended).toBe('person')
+  })
+})
