@@ -50,7 +50,7 @@ interface OrderRow {
   excluded_reason: string | null
   deposit_met: boolean
   reached_on: string | null
-  has_fair: boolean
+  has_fair: boolean | null
   fair_date: string | null
   released_month: string | null
 }
@@ -102,7 +102,8 @@ export async function loadTallyOrders(db: SupabaseClient, subDepartmentId: strin
     excludedReason: r.excluded_reason,
     depositMet: r.deposit_met,
     reachedOn: r.reached_on,
-    hasFair: r.has_fair,
+    // False only when the ERP says the order has no fair.
+    hasFair: r.has_fair !== false,
     fairDate: r.fair_date,
     releasedMonth: r.released_month,
   }))

@@ -125,6 +125,14 @@ await bill('S-SEP', SEP, '2026-09-01', '2026-10-10', 3888, 3888, { pay: [paid('2
 await bill('T-AUG', AUG, '2026-08-01', '2026-08-20', 1000, 1000, { pay: [paid('2026-08-20', 100000)], raw: fair('2026-08-20') })
 await bill('U-DRAFT', DRAFT, '2026-10-01', '2026-10-18', 1000, 1000, { pay: [paid('2026-10-18', 100000)], raw: fair('2026-10-18') })
 await bill('V-FILE', FILE, '2026-11-01', '2026-11-02', 1200, 1200, { source: 'file', raw: {} })
+// An ERP delivery from before the ERP sent fairs: no "fair" key at all.
+await bill('X-OLDRAW', FILE, '2026-11-01', '2026-11-03', 700, 700, { pay: [paid('2026-11-03', 70000)], raw: {} })
+// A bill with no document kept at all.
+await db.query(
+  `INSERT INTO sales_orders(id, batch_id, period_month, order_no, order_date, agent_name, order_total, paid_amount, source, raw)
+   VALUES ($1, $2, '2026-11-01', 'Y-NORAW', '2026-11-04', 'KIM', 300, 300, 'erp_sync', NULL)`,
+  [id(999), FILE],
+)
 await bill('W-IR', IR_OCT, '2026-10-01', '2026-10-19', 9000, 0, { pay: [], raw: fair(null) })
 
 // The closes that paid them: A in October, S (September's, keyed in October) in September; B's top-up in November.
@@ -143,7 +151,7 @@ const by = Object.fromEntries(rows.map(r => [r.order_no, r]))
 const day = v => (v === null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
 
 // ── Which bills ──
-check(rows.map(r => r.order_no), ['A-FULL', 'B-TOPUP', 'C-BELOW', 'D-EXACT', 'F-MIXED', 'S-SEP', 'G-TOTAL', 'H-NOPAY', 'I-ZERO', 'J-NOFAIR', 'K-LINES', 'L-CANCEL', 'M-OUT', 'N-UNDATED', 'O-NONE', 'P-ZEROPAID', 'E-STAMP', 'V-FILE'],
+check(rows.map(r => r.order_no), ['A-FULL', 'B-TOPUP', 'C-BELOW', 'D-EXACT', 'F-MIXED', 'S-SEP', 'G-TOTAL', 'H-NOPAY', 'I-ZERO', 'J-NOFAIR', 'K-LINES', 'L-CANCEL', 'M-OUT', 'N-UNDATED', 'O-NONE', 'P-ZEROPAID', 'E-STAMP', 'V-FILE', 'X-OLDRAW', 'Y-NORAW'],
   'this sub-department, committed batches, the months p_from … p_to, by order date')
 check(rows.some(r => ['T-AUG', 'U-DRAFT', 'W-IR'].includes(r.order_no)), false, 'not an earlier month, a superseded batch, another sub-department')
 const numbers = async (from, to) => (await q(`SELECT order_no FROM revenue_tally_orders($1, $2, $3)`, [FAIR, from, to])).map(r => r.order_no)
@@ -175,6 +183,8 @@ check(day(by['V-FILE'].reached_on), '2026-11-02', 'a file’s bill: its order da
 check(Number(by['K-LINES'].goods), 2000, 'only the commissionable group — matched whatever its case and spaces')
 check(Number(by['A-FULL'].goods), 5000, 'the goods of an ordinary bill')
 check([by['A-FULL'].has_fair, by['J-NOFAIR'].has_fair, by['V-FILE'].has_fair], [true, false, true], 'the ERP names a fair or does not; a file cannot say')
+check([by['X-OLDRAW'].has_fair, by['Y-NORAW'].has_fair], [true, true], 'a delivery from before the ERP sent fairs, or no document at all: taken to have one — never unknown')
+check([day(by['X-OLDRAW'].reached_on), day(by['Y-NORAW'].reached_on), Number(by['Y-NORAW'].goods)], ['2026-11-03', '2026-11-04', 0], 'and each is read as any bill')
 check([day(by['A-FULL'].fair_date), day(by['D-EXACT'].fair_date), day(by['J-NOFAIR'].fair_date)], ['2026-10-04', null, null], 'the fair day, when the ERP names one')
 check(by['G-TOTAL'].ref_no, 'HC777', 'the paper’s Ref No.')
 check([by['A-FULL'].salesperson, by['B-TOPUP'].salesperson], ['ANTHONY', 'KIM'], 'the roster’s name, else the ERP’s')

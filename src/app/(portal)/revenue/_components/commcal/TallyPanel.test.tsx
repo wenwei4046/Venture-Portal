@@ -108,16 +108,16 @@ describe('Comm Cal › Tally', () => {
 
     const ours = screen.getByRole('table', { name: 'We pay in Oct 2026 · Houzs does not' })
     const late = within(ours).getByRole('row', { name: /HC-SO-2611-022/ })
+    // Bill · Salesperson · Fair day · SO date · Deposit · Sales · Bill to HC (its brand and % under it) · Houzs.
     expect(within(late).getAllByRole('cell').map(c => c.textContent)).toEqual(
-      ['HC-SO-2611-022ZNT6389', 'STANLEY', 'Zanotti', '30 Oct 2026', '2 Nov 2026', '30 Oct 2026', '9,500.00', '1,235.00', 'Houzs pays Nov 2026Not closed yet'],
+      ['HC-SO-2611-022ZNT6389', 'STANLEY', '30 Oct 2026', '2 Nov 2026', '30 Oct 2026', '9,500.00', '1,235.00Zanotti · 13%', 'Houzs pays Nov 2026Not closed yet'],
     )
-    expect(within(late).getByText('1,235.00')).toHaveAttribute('title', '13% of its sales')
     expect(within(late).getByText('Houzs pays Nov 2026')).toHaveAttribute('title', 'SO date 2 Nov 2026')
 
     const theirs = screen.getByRole('table', { name: 'Houzs pays in Oct 2026 · we do not' })
     const september = within(theirs).getByRole('row', { name: /HC-SO-2610-145/ })
     expect(within(september).getAllByRole('cell').map(c => c.textContent)).toEqual(
-      ['HC-SO-2610-145HC13509', 'SALLY', 'Akemi', '19 Sep 2026', '10 Oct 2026', '19 Sep 2026', '3,888.00', '544.32', 'We paid Sep 2026'],
+      ['HC-SO-2610-145HC13509', 'SALLY', '19 Sep 2026', '10 Oct 2026', '19 Sep 2026', '3,888.00', '544.32Akemi · 14%', 'We paid Sep 2026'],
     )
   })
 
@@ -127,7 +127,7 @@ describe('Comm Cal › Tally', () => {
     const held = screen.getByRole('table', { name: 'Below deposit in Oct 2026 · neither pays' })
     const row = within(held).getByRole('row', { name: /HC-SO-2610-077/ })
     expect(within(row).getAllByRole('cell').map(c => c.textContent)).toEqual(
-      ['HC-SO-2610-077HC1400', 'WEI PIN', 'Akemi', '—', '7 Oct 2026', '—', '18,400.00', '2,576.00', 'Below deposit'],
+      ['HC-SO-2610-077HC1400', 'WEI PIN', '—', '7 Oct 2026', '—', '18,400.00', '2,576.00Akemi · 14%', 'Below deposit'],
     )
     // Its total is the list's own: it is in neither side's figures above.
     expect(within(held).getByText('1 bill')).toBeInTheDocument()
@@ -160,7 +160,12 @@ describe('Comm Cal › Tally', () => {
 
   it('says a bill the ERP names no fair on: we pay it, Houzs never does', () => {
     const withNoFair = buildTally(
-      [...ORDERS, order({ orderId: 'f1', orderNo: 'HC-SO-2610-090', refNo: 'HC1500', orderDate: '2026-10-14', goods: 1780, hasFair: false, releasedMonth: '2026-10-01' })],
+      [
+        ...ORDERS,
+        order({ orderId: 'f1', orderNo: 'HC-SO-2610-090', refNo: 'HC1500', orderDate: '2026-10-14', goods: 1780, hasFair: false, releasedMonth: '2026-10-01' }),
+        // …and one of a brand with no Bill to HC % set.
+        order({ orderId: 'f2', orderNo: '2990-SO-2610-009', refNo: 'TNN0209', brandCode: '2990S', orderDate: '2026-10-20', goods: 2990, hasFair: false, releasedMonth: '2026-10-01' }),
+      ],
       BRANDS,
       OPTS,
     )
@@ -169,6 +174,7 @@ describe('Comm Cal › Tally', () => {
     const ours = screen.getByRole('table', { name: 'We pay in Oct 2026 · Houzs does not' })
     const row = within(ours).getByRole('row', { name: /HC-SO-2610-090/ })
     expect(within(row).getByText('No fair in ERP')).toHaveAttribute('title', 'The ERP names no fair on this order — its Event Commission counts it in neither report')
+    expect(within(within(ours).getByRole('row', { name: /2990-SO-2610-009/ })).getAllByRole('cell').at(-2)).toHaveTextContent('—2990s · no %')
     // Still carried a month on: nothing clears it.
     const nov = within(screen.getByRole('table', { name: 'Tally by month' })).getByRole('row', { name: /November 2026/ })
     expect(within(nov).getAllByRole('cell').at(-1)).toHaveTextContent('249.20')

@@ -38,6 +38,12 @@
 -- one; the 15 that carry no payment are 11 bills of RM 0 and 4 nobody has paid
 -- anything on.)
 --
+-- WHETHER THE ERP NAMES A FAIR — false only when the delivery says so: it carries
+-- "fair" and it is null (23 of those 864; each has no project in the ERP, checked
+-- there). A delivery from before the ERP sent fairs carries no "fair" key at all
+-- (June and July 2026, months frozen before the portal paid) and a claim form's
+-- row never did: the portal cannot tell, and such a bill is taken to have one.
+--
 -- SECURITY INVOKER: every table answers by the caller's own row policies, as
 -- revenue_month_orders does. No table changes; nothing is written.
 
@@ -118,8 +124,10 @@ AS $fn$
             -- Nothing to measure it by: read off the portal's gate.
             WHEN gate.met THEN o.order_date
         END,
-        -- The ERP names the fair on its delivery; a bill from a file cannot say.
-        (o.source IS DISTINCT FROM 'erp_sync' OR jsonb_typeof(o.raw -> 'fair') = 'object'),
+        -- The ERP's delivery names the fair ("fair": {…}) or says there is none
+        -- ("fair": null). A bill from a file cannot say, nor can a delivery from
+        -- before the ERP sent fairs (no "fair" key): taken to have one.
+        COALESCE(o.source IS DISTINCT FROM 'erp_sync' OR jsonb_typeof(o.raw -> 'fair') = 'object', true),
         CASE WHEN o.raw -> 'fair' ->> 'fairDate' ~ '^\d{4}-\d{2}-\d{2}$'
              THEN (o.raw -> 'fair' ->> 'fairDate')::date END,
         rel.period_month

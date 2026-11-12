@@ -40,6 +40,13 @@
   color: rgb(var(--hv-brown));
   margin-top: 3px;
 }
+/* Under a bill's Bill to HC: the brand and the % it is a share by. */
+.brand {
+  font-size: 11px;
+  color: rgb(var(--hv-brown));
+  margin-top: 3px;
+  white-space: nowrap;
+}
 .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .total {
   display: grid;

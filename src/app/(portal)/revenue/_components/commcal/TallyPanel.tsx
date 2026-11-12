@@ -22,9 +22,14 @@ import t from './Tally.module.css'
 // month picked (`?month=`), the bills the gap is made of and the ones under
 // their deposit, which nobody pays. Read-only.
 
-const MONTH_COLS = 'minmax(130px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 64px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
-const BILL_COLS = 'minmax(128px,1.2fr) minmax(88px,1fr) minmax(64px,.7fr) 106px 106px 106px minmax(84px,.8fr) minmax(92px,.8fr) minmax(176px,1.25fr)'
+// Ten columns in 952px (a 1280px screen): the figures stand closer than the kit's 14px.
+const MONTH_COLS = 'minmax(128px,1.1fr) 44px minmax(112px,1.1fr) minmax(96px,1fr) 66px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(96px,1fr)'
+const BILL_COLS = 'minmax(136px,1.2fr) minmax(104px,1fr) 108px 108px 108px minmax(88px,.8fr) minmax(108px,.9fr) minmax(184px,1.3fr)'
 const PAD = { padding: '11px 14px' }
+const CHIP_PAD = { padding: '11px 12px 11px 16px' }
+const CHIP_CELL = { padding: '9px 12px 9px 16px' }
+const NUM_PAD = { padding: '11px 10px' }
+const RIGHT = { textAlign: 'right' as const, ...NUM_PAD }
 
 const bills = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
 const pctWord = (p: number) => `${Math.round(p * 1000) / 10}%`
@@ -115,15 +120,15 @@ export default function TallyPanel({
           cellStyle={PAD}
           cells={[
             'Month',
-            { label: <span title="Bills whose deposit is reached, by SO date — or by the day the deposit came, when that is later">Bills</span>, style: { textAlign: 'right' } },
-            { label: 'Sales', style: { textAlign: 'right' } },
-            { label: 'Bill to HC', style: { textAlign: 'right' } },
-            { label: <span title="Bills the month's closes paid, and the ones waiting for their salesperson's close">Bills</span>, style: { textAlign: 'right' } },
-            { label: 'Sales', style: { textAlign: 'right' } },
-            { label: 'Bill to HC', style: { textAlign: 'right' } },
-            { label: <span title="What the month's closed salespeople are paid">Commission</span>, style: { textAlign: 'right' } },
-            { label: <span title="We pay less Houzs pays, in Bill to HC">Gap</span>, style: { textAlign: 'right' } },
-            { label: <span title="As the month ends: bills we have paid that Houzs has not, less the ones Houzs has paid and we have not — in Bill to HC">Carried</span>, style: { textAlign: 'right' } },
+            { label: <span title="Bills whose deposit is reached, by SO date — or by the day the deposit came, when that is later">Bills</span>, style: RIGHT },
+            { label: 'Sales', style: RIGHT },
+            { label: 'Bill to HC', style: RIGHT },
+            { label: <span title="Bills the month's closes paid, and the ones waiting for their salesperson's close">Bills</span>, style: RIGHT },
+            { label: 'Sales', style: RIGHT },
+            { label: 'Bill to HC', style: RIGHT },
+            { label: <span title="What the month's closed salespeople are paid">Commission</span>, style: RIGHT },
+            { label: <span title="We pay less Houzs pays, in Bill to HC">Gap</span>, style: RIGHT },
+            { label: <span title="As the month ends: bills we have paid that Houzs has not, less the ones Houzs has paid and we have not — in Bill to HC">Carried</span>, style: RIGHT },
           ]}
         />
         {report.months.map((m, i) => (
@@ -186,10 +191,10 @@ function MonthRow({
   return (
     <GridRow cols={MONTH_COLS} zebra={zebra} selected={selected} onClick={onPick} title={`Show ${tallyMonthLong(m.month)}'s bills paid apart`}>
       <span role="cell" className={t.month} style={PAD}>{tallyMonthLong(m.month)}</span>
-      <span role="cell" className={`${num} ${t.edge}`} style={PAD}>{m.houzs.bills}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.houzs.sales)}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.houzs.bill)}</span>
-      <div role="cell" className={`${num} ${t.edge}`} style={PAD}>
+      <span role="cell" className={`${num} ${t.edge}`} style={NUM_PAD}>{m.houzs.bills}</span>
+      <span role="cell" className={num} style={NUM_PAD}>{formatMoneyBare(m.houzs.sales)}</span>
+      <span role="cell" className={num} style={NUM_PAD}>{formatMoneyBare(m.houzs.bill)}</span>
+      <div role="cell" className={`${num} ${t.edge}`} style={NUM_PAD}>
         <div>{m.we.bills}</div>
         {m.open.bills > 0 ? (
           <div className={t.sub} title={m.open.bills === 1 ? "1 bill waits for its salesperson's close" : `${m.open.bills} bills wait for their salesperson's close`}>
@@ -197,13 +202,13 @@ function MonthRow({
           </div>
         ) : null}
       </div>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.we.sales)}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.we.bill)}</span>
-      <span role="cell" className={num} style={PAD} title={paid ? `${paid.closed} salespeople closed` : 'Nobody closed yet'}>
+      <span role="cell" className={num} style={NUM_PAD}>{formatMoneyBare(m.we.sales)}</span>
+      <span role="cell" className={num} style={NUM_PAD}>{formatMoneyBare(m.we.bill)}</span>
+      <span role="cell" className={num} style={NUM_PAD} title={paid ? `${paid.closed} salespeople closed` : 'Nobody closed yet'}>
         {paid ? formatMoneyBare(paid.total) : '—'}
       </span>
-      <span role="cell" className={`${num} ${t.edge} ${t.strong}`} style={PAD}><Amount value={m.gap.bill} /></span>
-      <span role="cell" className={`${num} ${t.strong}`} style={PAD}><Amount value={m.carried.bill} /></span>
+      <span role="cell" className={`${num} ${t.edge} ${t.strong}`} style={NUM_PAD}><Amount value={m.gap.bill} /></span>
+      <span role="cell" className={`${num} ${t.strong}`} style={NUM_PAD}><Amount value={m.carried.bill} /></span>
     </GridRow>
   )
 }
@@ -225,13 +230,12 @@ function BillList({ title, rows, list, sub }: { title: string; rows: TallyBill[]
           cells={[
             'Bill',
             'Salesperson',
-            'Brand',
             'Fair day',
             'SO date',
             { label: <span title="The day its payments reached the deposit">Deposit</span> },
             { label: 'Sales', style: { textAlign: 'right' } },
-            { label: 'Bill to HC', style: { textAlign: 'right' } },
-            { label: OTHER_SIDE[list], style: { padding: '11px 14px 11px 22px' } },
+            { label: <span title="Sales × its brand's Bill to HC %">Bill to HC</span>, style: { textAlign: 'right' } },
+            { label: OTHER_SIDE[list], style: CHIP_PAD },
           ]}
         />
         {rows.length === 0 ? <GridEmpty>None</GridEmpty> : null}
@@ -248,15 +252,16 @@ function BillList({ title, rows, list, sub }: { title: string; rows: TallyBill[]
               {b.refNo && b.refNo !== b.orderNo ? <div className={t.ref}>{b.refNo}</div> : null}
             </div>
             <span role="cell" style={PAD}>{b.salesperson}</span>
-            <span role="cell" style={PAD}>{b.brandName}</span>
             <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{b.fairDate ? tallyDay(b.fairDate) : '—'}</span>
             <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{tallyDay(b.soDate)}</span>
             <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{b.reachedOn ? tallyDay(b.reachedOn) : '—'}</span>
             <span role="cell" className={num} style={PAD}>{formatMoneyBare(b.sales)}</span>
-            <span role="cell" className={num} style={PAD} title={b.pct === null ? 'No Bill to HC % set for its brand' : `${pctWord(b.pct)} of its sales`}>
-              {b.bill === null ? '—' : formatMoneyBare(b.bill)}
-            </span>
-            <span role="cell" className={t.chips} style={{ padding: '9px 14px 9px 22px' }}>
+            {/* What it is a share of: the brand and its Bill to HC %. */}
+            <div role="cell" className={hv.right} style={PAD}>
+              <div className={hv.mono}>{b.bill === null ? '—' : formatMoneyBare(b.bill)}</div>
+              <div className={t.brand}>{b.brandName} · {b.pct === null ? 'no %' : pctWord(b.pct)}</div>
+            </div>
+            <span role="cell" className={t.chips} style={CHIP_CELL}>
               {tallyChips(b, list).map(chip => (
                 <Chip key={chip.text} tone={chip.tone} title={chip.title}>{chip.text}</Chip>
               ))}
@@ -265,7 +270,7 @@ function BillList({ title, rows, list, sub }: { title: string; rows: TallyBill[]
         ))}
         {rows.length > 0 ? (
           <div className={t.total} style={{ gridTemplateColumns: BILL_COLS }} role="row">
-            <span role="cell" style={{ ...PAD, gridColumn: 'span 6' }}>{bills(rows.length)}</span>
+            <span role="cell" style={{ ...PAD, gridColumn: 'span 5' }}>{bills(rows.length)}</span>
             <span role="cell" className={num} style={PAD}>{formatMoneyBare(sales)}</span>
             <span role="cell" className={num} style={PAD}>{formatMoneyBare(bill)}</span>
             <span role="cell" style={PAD} />
