@@ -263,3 +263,15 @@
 .iExtraHead { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 9px; }
 .iExtra { display: flex; min-width: 0; font-size: .96em; }
 .iExtra > * { flex: 1; min-width: 0; }
+/* Delete from the right-click menu (2026-11-13): red; asked in place; a product once on sale says to retire it. */
+.ctxDel { color: rgb(var(--mk-red)); }
+.ctxOff { cursor: default; color: rgb(var(--mk-faint)); }
+.ctxOff:hover { background: transparent; }
+.ctxHint { font-size: .86em; font-weight: 400; color: rgb(var(--mk-faint)); }
+.ctxAsk { display: flex; flex-direction: column; gap: 8px; padding: 6px 9px 4px; }
+.ctxAskText { font-size: .86em; line-height: 1.35; color: rgb(var(--mk-text-2)); }
+.ctxAskBtns { display: flex; gap: 6px; }
+.ctxDanger, .ctxKeep { height: 28px; padding: 0 12px; border-radius: 7px; font: inherit; font-size: .86em; font-weight: 600; cursor: pointer; }
+.ctxDanger { border: 0; background: rgb(var(--mk-red)); color: rgb(var(--mk-white)); }
+.ctxDanger:disabled { opacity: .5; cursor: default; }
+.ctxKeep { border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); }

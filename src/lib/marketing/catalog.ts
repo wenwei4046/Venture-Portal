@@ -185,3 +185,19 @@ export function factsPayload(f: ItemFacts): Record<string, unknown> {
   if (f.extra && Object.keys(f.extra).length) p.extra = Object.fromEntries(Object.entries(f.extra).map(([k, v]) => [k, v === '' || v === false ? null : v]))
   return p
 }
+
+/**
+ * A product's internal cost from its items (the user, 2026-11-13: "加了物品后，internal cost 没自动跳出"): each item's
+ * cost on the Product List × its quantity. `missing` counts items with a quantity and no cost on the list (left out).
+ */
+export function itemsCost(groups: readonly ProductGroup[], items: readonly CatalogItem[]): { cost: number; missing: number } {
+  let cost = 0
+  let missing = 0
+  for (const it of groups.flatMap(g => g.items)) {
+    if (!it.qty || !it.name.trim()) continue
+    const x = itemNamed(items, it.name)
+    if (x?.cost == null) missing++
+    else cost += x.cost * it.qty
+  }
+  return { cost: Math.round(cost * 100) / 100, missing }
+}

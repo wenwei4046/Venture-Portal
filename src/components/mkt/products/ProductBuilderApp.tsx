@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { duplicateMktQuote, readMktQuoteBook, saveMktItem, saveMktQuote } from '@/lib/marketing/quote-actions'
 import { factsPayload, mergeFacts, norm, withFacts, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
@@ -30,7 +29,6 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
   quote: string | null
   assign: boolean
 }) {
-  const router = useRouter()
   const [tab, setTab] = useState<BuilderTab>(firstTab)
   const [products, setProducts] = useState<ProductBook>(initialProducts)
   const [qbook, setQbook] = useState<QuoteBook>(initialQuotes)
@@ -53,15 +51,18 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
     if (popTimer.current) clearTimeout(popTimer.current)
   }, [])
 
-  // The address follows: the tab, the product or quotation open.
+  // The address follows: the tab, the product or quotation open — written in place (`history.replaceState`), never
+  // through the router: a router navigation renders the page again on the server, which cuts off a save still on its way
+  // and leaves the router a five-minute copy of the page with the lists as they were (2026-11-13, the user: "product list
+  // 加了东西后没得储存").
   useEffect(() => {
     const sp = new URLSearchParams()
     if (tab !== 'catalog') sp.set('tab', tab)
     if (tab === 'products' && productId) sp.set('p', productId)
     if (tab === 'quotes' && quoteId) sp.set('q', quoteId)
     const next = `${window.location.pathname}${sp.size ? `?${sp}` : ''}`
-    if (`${window.location.pathname}${window.location.search}` !== next) router.replace(next, { scroll: false })
-  }, [tab, productId, quoteId, router])
+    if (`${window.location.pathname}${window.location.search}` !== next) window.history.replaceState(window.history.state, '', next)
+  }, [tab, productId, quoteId])
 
   const scrollTop = () => document.querySelector<HTMLElement>('[data-mkt-own]')?.scrollTo({ top: 0 })
   const go = (t: BuilderTab) => {
@@ -211,7 +212,9 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
   ]
 
   return (
-    <div className={pb.page}>
+    // Marketing's tokens wherever the page is drawn: in the Principal's (or any non-Marketing) view the page sits outside
+    // MktShell, so every rgb(var(--mk-…)) was empty — menus and floats came out transparent over the rows (2026-11-13).
+    <div className={`mkt-shell ${pb.page}`} style={{ background: 'transparent' }}>
       <div className={qs.appTabs} role="tablist" aria-label="Product Builder">
         {tabs.map(([k, emoji, label, n]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={`${qs.appTab}${tab === k ? ` ${qs.appTabOn}` : ''}`} onClick={() => go(k)}>

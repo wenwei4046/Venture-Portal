@@ -60,7 +60,8 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
       if (!now || !before) return
       const patch = itemPatch(before, now)
       if (!patch) return
-      const r = await saveMktItem(id, patch)
+      pending.current++
+      const r = await saveMktItem(id, patch).finally(() => { pending.current-- })
       if (!r.ok) {
         flash(r.reason)
         return
@@ -75,6 +76,22 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     return () => {
       for (const id of [...ts.keys()]) flushItem(id)
     }
+    // flushItem reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // A row left (its box blurred) saves at once, not 700 ms later; and while anything is still unsaved the browser asks
+  // before the page is closed or reloaded (2026-11-13, the user: "product list 加了东西后没得储存" — a name typed and
+  // the page left at once was lost).
+  const pending = useRef(0)
+  useEffect(() => {
+    const ask = (e: BeforeUnloadEvent) => {
+      if (!timers.current.size && !pending.current) return
+      for (const id of [...timers.current.keys()]) flushItem(id)
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', ask)
+    return () => window.removeEventListener('beforeunload', ask)
     // flushItem reads refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -273,7 +290,7 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
               {g.rows.map(x => {
                 const u = usedIn(x, products, quotes)
                 return (
-                  <div key={x.id} className={qs.cRow} style={grid}>
+                  <div key={x.id} className={qs.cRow} style={grid} onBlur={() => { if (timers.current.has(x.id)) flushItem(x.id) }}>
                     <input className={`${qs.flat} ${qs.flatName}`} value={x.name} maxLength={60} placeholder="Item name" aria-label="Item name" onChange={e => setItem(x.id, { name: e.target.value })} />
                     <input className={qs.flat} value={x.desc} maxLength={200} placeholder="What the client gets" aria-label="Description" onChange={e => setItem(x.id, { desc: e.target.value })} />
                     <span className={qs.rmBox}>

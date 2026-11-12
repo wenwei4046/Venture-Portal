@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extrasOf, extraText, factsPayload, itemPatch, mergeFacts, pickerGroups, usedIn, withFacts, type CatalogItem, type ItemColumn } from './catalog'
+import { extrasOf, extraText, factsPayload, itemPatch, itemsCost, mergeFacts, pickerGroups, usedIn, withFacts, type CatalogItem, type ItemColumn } from './catalog'
 import {
   addDays, buildTasks, coreOf, dmy, extrasWords, includedOf, itemLine, lineCalc, lineExtrasWords, packageLine, quoteCsv, quoteFromRow, quoteTotals, rm, sameCore,
   teamOf, termOf, withExtras,
@@ -162,5 +162,17 @@ describe('an item changed from a product is the Product List’s (two-way)', () 
     expect([after.days, after.extra]).toEqual([9, { c1: 'TikTok' }])
     expect(factsPayload(f)).toEqual({ days: 9, extra: { c1: 'TikTok', c2: null } })
     expect(factsPayload({ extra: { c3: false } })).toEqual({ extra: { c3: null } })
+  })
+})
+
+describe('a product’s internal cost from its items (2026-11-13)', () => {
+  it('each item’s Product List cost × its quantity; an item with no cost is counted as missing', () => {
+    const groups = [{ key: 'g', name: 'Video', items: [
+      { key: 'a', name: 'reel', qty: 2, price: 800, workflow: null },
+      { key: 'b', name: 'Image post', qty: 3, price: 120, workflow: null },
+      { key: 'c', name: 'Not listed', qty: 1, price: 50, workflow: null },
+      { key: 'd', name: 'reel', qty: 0, price: 800, workflow: null },
+    ] }]
+    expect(itemsCost(groups, [REEL, POST])).toEqual({ cost: 600, missing: 2 })
   })
 })
