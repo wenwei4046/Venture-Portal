@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatMoneyBare } from '@/lib/utils'
 import { valueKey } from '@/lib/catalogue/keys'
-import { isFabricSeriesPool, kpiItemKind, toUnitTiers, type KpiOptionPool } from '@/lib/commission/kpi'
+import { isFabricSeriesPool, kpiItemKind, type KpiOptionPool } from '@/lib/commission/kpi'
 import { validateKpiItems } from '@/lib/catalogue/rule-edits'
 import {
   amountDiffers,
@@ -32,6 +32,7 @@ import { createClient } from '@/lib/supabase/client'
 import { searchSkuMaster, type KpiSkuHit } from '@/lib/commission/kpi-sku-search'
 import { deleteKpiThreshold, upsertKpiThreshold } from '../../config-actions'
 import { ActionButton, Field, Hidden, RowForm, SaveButton, SectionHead, toPct } from '@/components/RowForm'
+import BrandKpiItems from './BrandKpiItems'
 import type { CommissionSettingsData, KpiItemRow, SchemeRow } from './types'
 
 type PickSource = 'sku' | KpiOptionPool
@@ -541,63 +542,8 @@ export default function KpiItemsSection({
       </div>
 
       <ThresholdLadder data={data} scheme={scheme} />
-      <BrandKpiItems data={data} />
+      <BrandKpiItems data={data} scheme={scheme} canManage={canManage} />
     </section>
-  )
-}
-
-/**
- * The KPI items of a brand on its own commission scheme (2026-11-12 — 2990s; the user: "这个 KPI item 是独立的，属于
- * 2990 专属的 KPI item"): a sofa special of the brand's, found on its bills where the bill charges for it — what it
- * charged off the bill's sales, the bonus a unit paid, at the tier the month's units reach. Paid whatever the
- * sub-department's KPI switch above says, so the head says *Always paid*. Listed here; they are not the tab's draft.
- */
-function BrandKpiItems({ data }: { data: CommissionSettingsData }) {
-  const items = data.brandKpiItems ?? []
-  const brands = data.brands.filter(b => b.own_scheme && items.some(i => i.brand_id === b.id))
-  if (brands.length === 0) return null
-  return (
-    <>
-      {brands.map(brand => {
-        const own = items.filter(i => i.brand_id === brand.id)
-        return (
-          <div key={brand.id} className="mt-10">
-            <SectionHead title={`${brand.name} · KPI items`} count={`${own.length} ITEM${own.length === 1 ? '' : 'S'} · ALWAYS PAID`} />
-            <div className="overflow-x-auto">
-              <table className="ledger-table" aria-label={`${brand.name} KPI items`}>
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Counted</th>
-                    <th className="right">Bonus a unit · RM</th>
-                    <th>By the month&apos;s units</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {own.map(item => {
-                    const tiers = toUnitTiers(item.unit_tiers)
-                    return (
-                      <tr key={item.id}>
-                        <td>
-                          <div className="font-medium">{item.product_name ?? item.option_value}</div>
-                          {/* The ERP's own name of the special the item is found by. */}
-                          {item.product_name ? <div className="text-[11px] mt-0.5">{item.option_value}</div> : null}
-                        </td>
-                        <td>{kpiItemKind({ source: 'option', optionPool: item.option_pool, brandCode: brand.code }).counted}</td>
-                        <td className="num">{formatMoneyBare(Number(item.kpi_amount))}</td>
-                        <td className="whitespace-nowrap">
-                          {tiers.length === 0 ? '—' : tiers.map(t => `${t.minQty}+ · ${formatMoneyBare(t.amount)}`).join('  ·  ')}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })}
-    </>
   )
 }
 

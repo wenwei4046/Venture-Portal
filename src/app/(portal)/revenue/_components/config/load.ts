@@ -232,7 +232,10 @@ export async function loadCommissionSettings(
   // what each is paid here. And which KPI SKUs the ERP has since removed.
   const subDepartmentId = (scheme.data as SchemeRow | null)?.sub_department_id ?? null
   const kpiSkuIds = [...new Set(rows<KpiItemRow>(kpiItems.data).map(k => k.erp_product_id).filter((id): id is string => !!id))]
-  const [directorRows, payRows, kpiSkus] = await Promise.all([
+  // A brand on its own commission scheme picks its own KPI items from its own ERP company's sofa specials (2026-11-12).
+  const brandCompanies = [...new Set(rows<{ own_scheme?: boolean | null; erp_company_id?: number | null }>(brands.data)
+    .filter(b => b.own_scheme && b.erp_company_id != null).map(b => Number(b.erp_company_id)))]
+  const [directorRows, payRows, kpiSkus, brandSpecials] = await Promise.all([
     subDepartmentId
       ? supabase.from('comm_sub_department_directors')
         .select('staff_id, hr_staff_costs (employee_name, employee_code, titles (name))')
@@ -245,6 +248,10 @@ export async function loadCommissionSettings(
       : Promise.resolve({ data: [] }),
     kpiSkuIds.length > 0
       ? supabase.from('erp_products').select('erp_id, removed_at').in('erp_id', kpiSkuIds)
+      : Promise.resolve({ data: [] }),
+    brandCompanies.length > 0
+      ? supabase.from('erp_maintenance_options').select('erp_company_id, value, label, sort_order, removed_at')
+        .in('erp_company_id', brandCompanies).eq('pool', 'sofa_specials').order('erp_company_id').order('sort_order').order('value')
       : Promise.resolve({ data: [] }),
   ])
   const payByStaff = new Map(rows<{ staff_id: string; fixed_amount: number | string; sales_threshold: number | string | null; incentive_amount: number | string }>(payRows.data)
@@ -276,6 +283,14 @@ export async function loadCommissionSettings(
     // The sub-department's own items are what the tab edits; a brand's own (2026-11-12) are listed under them.
     kpiItems: rows<KpiItemRow>(kpiItems.data).filter(k => !k.brand_id),
     brandKpiItems: rows<KpiItemRow>(kpiItems.data).filter(k => !!k.brand_id),
+    brandKpiSpecials: rows<{ erp_company_id: number | string; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(brandSpecials.data)
+      .map(o => ({
+        companyId: Number(o.erp_company_id),
+        value: o.value,
+        label: o.label ?? o.value,
+        sort_order: Number(o.sort_order ?? 0),
+        removed: o.removed_at !== null && o.removed_at !== undefined,
+      })),
     kpiThresholds: rows(kpiThresholds.data),
     kpiSpecials: rows<{ pool: KpiSpecialRow['pool']; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(kpiSpecials.data)
       .map(o => ({
