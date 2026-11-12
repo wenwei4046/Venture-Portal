@@ -124,11 +124,11 @@ describe('Rules › KPI items', () => {
 
   it('says when KPI is switched off, and opens Scheme rules where the switch is', () => {
     const { onSchemeRules, rerender } = renderSection()
-    expect(screen.getByText(/nothing below comes off a bill or is paid until it/)).toBeInTheDocument()
+    expect(screen.getByText(/none of its own items below comes off a bill or is paid until it/)).toBeInTheDocument()
     click('Scheme rules')
     expect(onSchemeRules).toHaveBeenCalledOnce()
     rerender(<KpiItemsSection data={dataWith()} scheme={{ ...scheme, enable_kpi: true }} subName="Fair" onSchemeRules={onSchemeRules} />)
-    expect(screen.queryByText(/nothing below comes off a bill/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/none of its own items below comes off a bill/)).not.toBeInTheDocument()
   })
 
   it("picks a bed frame special at the picker's amount and saves it in one go", async () => {
@@ -289,5 +289,45 @@ describe('Rules › KPI items', () => {
     expect(within(ladder).getByRole('textbox', { name: 'Tier 1 label' })).toHaveValue('Tier 1')
     expect(within(ladder).getByRole('spinbutton', { name: 'Tier 1 minimum units' })).toHaveValue(10)
     expect(within(ladder).getByRole('spinbutton', { name: 'Tier 1 bonus percent' })).toHaveValue(20)
+  })
+
+  // 2026-11-12 — a brand on its own commission scheme has KPI items of its own (2990s): listed under the
+  // sub-department's, by its brand, never among them.
+  describe("a brand's own KPI items", () => {
+    const BRAND_2990S = {
+      id: 'brand-2990', code: '2990S', name: '2990s', item_code_prefixes: [], sub_brands: [], ref_prefixes: [], hc_bill_pct: null,
+      note: null, is_active: true, own_scheme: true, erp_company_id: 2,
+    }
+    const AKEMI = { ...BRAND_2990S, id: 'brand-akemi', code: 'AKEMI', name: 'Akemi', own_scheme: false, erp_company_id: null }
+    const brandRow = (id: string, name: string, special: string, unit_tiers: unknown): KpiItemRow => ({
+      id, source: 'option', product_code: null, product_name: name, erp_product_id: null, option_pool: 'sofa_specials', option_value: special,
+      kpi_amount: 50, effective_from: '2026-11-01', effective_to: null, brand_id: 'brand-2990', unit_tiers,
+    })
+    const ITEMS = [
+      brandRow('b-fabric', 'Upgrade fabric', 'Sofa Full Fabric', []),
+      brandRow('b-latex', 'Upgrade latex seat', 'Latex Seat', [{ min_qty: 10, amount: 100 }, { min_qty: 5, amount: 70 }]),
+    ]
+
+    it('lists them under the brand’s name — the special, a unit a sofa set, the bonus and its tiers — and says they are always paid', () => {
+      renderSection({ brands: [AKEMI, BRAND_2990S], brandKpiItems: ITEMS })
+      const table = screen.getByRole('table', { name: '2990s KPI items' })
+      const rows = within(table).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell').map(c => c.textContent))
+      expect(rows).toEqual([
+        ['Upgrade fabricSofa Full Fabric', 'Once per sofa set', '50.00', '—'],
+        ['Upgrade latex seatLatex Seat', 'Once per sofa set', '50.00', '5+ · 70.00  ·  10+ · 100.00'],
+      ])
+      expect(screen.getByText('2 ITEMS · ALWAYS PAID')).toBeInTheDocument()
+      // The sub-department's own list is its own: none of the brand's rows, no amount of theirs to edit.
+      expect(firstCells().map(cells => cells[0])).toEqual(['HB Straight', 'AK-CS PIL'])
+      expect(screen.queryByRole('textbox', { name: 'Latex Seat KPI amount' })).not.toBeInTheDocument()
+    })
+
+    it('shows nothing of it while no brand has an item, or the brand is not on its own scheme', () => {
+      renderSection({ brands: [AKEMI, BRAND_2990S] })
+      expect(screen.queryByRole('table', { name: '2990s KPI items' })).not.toBeInTheDocument()
+      cleanup()
+      renderSection({ brands: [{ ...BRAND_2990S, own_scheme: false }], brandKpiItems: ITEMS })
+      expect(screen.queryByRole('table', { name: '2990s KPI items' })).not.toBeInTheDocument()
+    })
   })
 })

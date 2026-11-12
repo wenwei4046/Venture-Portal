@@ -136,6 +136,10 @@ export interface KpiItemRow {
   kpi_amount: number
   effective_from: string
   effective_to: string | null
+  /** The brand whose own item this is (a brand on its own commission scheme, 2026-11-12); null = the sub-department's own. */
+  brand_id?: string | null
+  /** A brand's own item alone: `[{min_qty, amount}]` — from min_qty units in a month every unit pays amount. */
+  unit_tiers?: unknown
 }
 
 /** A special of the Bedframe or Sofa Maintenance pool — what Rules › KPI items picks from. */
@@ -319,8 +323,13 @@ export interface CommissionSettingsData {
    */
   titles: TitleRow[]
   itemGroups: ItemGroupRow[]
-  /** In force today or later — Rules › KPI items sets them (2026-10-08). */
+  /** In force today or later — Rules › KPI items sets them (2026-10-08). The sub-department's own. */
   kpiItems: KpiItemRow[]
+  /**
+   * The KPI items of the brands on their own commission scheme (2026-11-12 — 2990s), in force today or later:
+   * listed under the sub-department's own, never among them. Absent in older fixtures = none.
+   */
+  brandKpiItems?: KpiItemRow[]
   kpiThresholds: KpiThresholdRow[]
   /** The Bedframe and Sofa specials pools, for the KPI items picker. */
   kpiSpecials: KpiSpecialRow[]

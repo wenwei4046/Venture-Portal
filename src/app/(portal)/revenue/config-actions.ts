@@ -242,7 +242,10 @@ async function cloneSchemeChildren(
   ]
 
   for (const [table, columns] of simple) {
-    const { data } = await supabase.from(table).select(columns.join(',')).eq('scheme_id', fromSchemeId)
+    const read = supabase.from(table).select(columns.join(',')).eq('scheme_id', fromSchemeId)
+    // A brand's own KPI items (2026-11-12) name their brand by id: copied once the new scheme has its brands, below
+    // — never here, where they would become the sub-department's own.
+    const { data } = await (table === 'comm_kpi_items' ? read.is('brand_id', null) : read)
     if (!data?.length) continue
     const rows = (data as unknown as Array<Record<string, unknown>>).map(r => ({
       ...r,
@@ -309,6 +312,20 @@ async function cloneSchemeChildren(
       (await supabase.from('comm_rank_defs').update({ brand_rates: rates }).eq('id', rankDefId)).error,
       "Could not clone a rank's brand rates",
     )
+  }
+
+  // A brand's own KPI items (2026-11-12 — a brand on its own scheme), under the
+  // copied brands' ids, tiers and all.
+  const { data: brandItems, error: brandItemsError } = await supabase.from('comm_kpi_items')
+    .select('brand_id, source, product_code, product_name, erp_product_id, option_pool, option_value, kpi_amount, unit_tiers, effective_from, effective_to')
+    .eq('scheme_id', fromSchemeId).not('brand_id', 'is', null)
+  check(brandItemsError, "Could not read the brands' KPI items to clone")
+  const brandItemCopies = ((brandItems ?? []) as unknown as Array<Record<string, unknown>>).flatMap(item => {
+    const brandId = brandIds.get(String(item.brand_id).toLowerCase())
+    return brandId ? [{ ...item, scheme_id: toSchemeId, brand_id: brandId }] : []
+  })
+  if (brandItemCopies.length) {
+    check((await supabase.from('comm_kpi_items').insert(brandItemCopies)).error, "Could not clone the brands' KPI items")
   }
 
   // A rider SKU's ratio for a brand (Costing Setting, 2026-11-07), once the

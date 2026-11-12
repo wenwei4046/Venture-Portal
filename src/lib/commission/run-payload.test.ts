@@ -3,6 +3,7 @@ import { computeCommissionRun } from './engine'
 import {
   ownSchemeBrandsOf,
   releasedOrders,
+  specialMoneyByLine,
   toBrandRates,
   toEngineInput,
   toRunPayload,
@@ -719,5 +720,72 @@ describe('a brand with its own scheme — 2990s', () => {
     const input = toEngineInput(baseRows({ ranks, brands: BRANDS, orders: [bill(' 2990s ')] }))
     const released = releasedOrders(input, computeCommissionRun(input))
     expect(released.map(r => [r.order_no, r.product_revenue])).toEqual([['SO-001', 10100]])
+  })
+
+  it('reads a brand switched off as no brand on its own scheme — as the database’s readers do', () => {
+    expect(ownSchemeBrandsOf([{ id: 'brand-2990', code: '2990S', own_scheme: true, is_active: false }]).size).toBe(0)
+    expect([...ownSchemeBrandsOf([{ id: 'brand-2990', code: '2990S', own_scheme: true, is_active: true }])]).toEqual([['brand-2990', '2990S']])
+  })
+
+  // 2026-11-12 — the brand's own KPI items (the user: "这个 KPI item 是独立的，属于 2990 专属的 KPI item"; "升级的钱只拿 bonus").
+  describe('its own KPI items', () => {
+    const KPI: RunSourceRows['kpiItems'] = [
+      { source: 'option', product_code: null, product_name: 'Upgrade fabric', option_pool: 'sofa_specials', option_value: 'Sofa Full Fabric', kpi_amount: '50.00', brand_id: 'brand-2990', unit_tiers: [] },
+      {
+        source: 'option', product_code: null, product_name: 'Upgrade latex seat', option_pool: 'sofa_specials', option_value: 'Latex Seat', kpi_amount: '50.00',
+        brand_id: 'BRAND-2990', unit_tiers: [{ min_qty: 10, amount: 100 }, { min_qty: 5, amount: 70 }],
+      },
+      // The sub-department's own, and one of a brand that is not on its own scheme.
+      { source: 'sku', product_code: 'PIL-01', product_name: 'Pillow', kpi_amount: '50.00', brand_id: null },
+      { source: 'option', product_code: null, product_name: 'Stray', option_pool: 'sofa_specials', option_value: 'Latex Seat', kpi_amount: '9.00', brand_id: 'brand-akemi' },
+    ]
+    // 2990-SO-2611-022 as production holds it: a sofa of two pieces at RM 3,240, Sofa Full Fabric RM 250 on both; delivery RM 250.
+    const sofa: RunSourceRows['orders'][number]['sales_order_lines'] = [
+      { id: 'sofa-1', item_group: 'SOFA', product_code: 'TELLUC-2A(LHF)', product_name: 'TELLUC', qty: '1.000', line_amount: '1620.00', brand_code: '2990S', cost_amount: null, variants: { specials: ['Sofa Full Fabric'] } },
+      { id: 'sofa-2', item_group: 'SOFA', product_code: 'TELLUC-L(RHF)', product_name: 'TELLUC', qty: '1.000', line_amount: '1620.00', brand_code: '2990S', cost_amount: null, variants: { specials: ['Sofa Full Fabric'] } },
+      { id: 'svc', item_group: 'TRANS', product_code: 'SVC-DELIVERY', product_name: 'Delivery', qty: '1.000', line_amount: '250.00', brand_code: '2990S', cost_amount: null },
+    ]
+    const MONEY: RunSourceRows['specialMoney'] = [
+      { line_id: 'sofa-1', special_key: 'sofa full fabric', amount: '250.00' },
+      { line_id: 'sofa-2', special_key: 'sofa full fabric', amount: '250.00' },
+      { line_id: 'sofa-2', special_key: 'miscellaneous', amount: 10 },
+      { line_id: 'sofa-1', special_key: 'given away', amount: 0 },
+      { line_id: '', special_key: 'sofa full fabric', amount: 250 },
+    ]
+    const rows = () => baseRows({
+      ranks, brands: BRANDS, kpiItems: KPI, specialMoney: MONEY,
+      itemGroups: [{ item_group: 'SOFA', commissionable: true }, { item_group: 'TRANS', commissionable: false }],
+      scheme: { ...SCHEME, enable_kpi: false },
+      orders: [order({ brand_code: '2990S', order_total: '3490.00', paid_amount: '3490.00', sales_order_lines: sofa })],
+    })
+
+    it('reads the items with their brand’s code and their tiers lowest first; one of a brand not on its own scheme is nobody’s', () => {
+      expect(toEngineInput(rows()).kpiItems).toEqual([
+        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S' },
+        {
+          source: 'option', optionPool: 'sofa_specials', optionValue: 'Latex Seat', label: 'Upgrade latex seat', kpiAmount: 50, brandCode: '2990S',
+          unitTiers: [{ minQty: 5, amount: 70 }, { minQty: 10, amount: 100 }],
+        },
+        { source: 'sku', productCode: 'PIL-01', label: 'Pillow', kpiAmount: 50 },
+      ])
+    })
+
+    it('puts on each line what its special order charges, by the special’s name', () => {
+      const [first, second, delivery] = toEngineInput(rows()).orders[0].lines
+      expect(first.specialMoney).toEqual({ 'sofa full fabric': 250 })
+      expect(second.specialMoney).toEqual({ 'sofa full fabric': 250, miscellaneous: 10 })
+      expect(delivery).not.toHaveProperty('specialMoney')
+      expect([...specialMoneyByLine(undefined)]).toEqual([])
+    })
+
+    it('pays the bill 4% of 2,990 and the RM 50 bonus — RM 169.60 — with the sub-department’s KPI switched off', () => {
+      const input = toEngineInput(rows())
+      const result = computeCommissionRun(input)
+      const statement = result.statements.find(s => s.staffId === 'staff-a')!
+      expect([statement.productRevenue, statement.productCommission, statement.kpiCommission, statement.totalCommission]).toEqual([2_990, 119.6, 50, 169.6])
+      expect(result.warnings).toEqual([])
+      // …and releases it on what earned commission.
+      expect(releasedOrders(input, result).map(r => [r.order_no, r.product_revenue])).toEqual([['SO-001', 2_990]])
+    })
   })
 })
