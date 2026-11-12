@@ -13,6 +13,7 @@ import {
   PR_LIMITS,
   draftOf,
   draftPayload,
+  draftPercent,
   draftShared,
   draftTotal,
   emptyDraft,
@@ -22,7 +23,9 @@ import {
   payeePerson,
   routeWords,
   saveProblem,
+  shareRinggit,
   submitProblem,
+  type DraftShare,
   type PaymentRequest,
   type RequestContext,
   type RequestDraft,
@@ -34,8 +37,8 @@ import c from './claim.module.css'
 // parts, nothing chosen until it is picked (the user, 2026-10-27) — What is it? (A claim — Pay to oneself unless changed,
 // a person from People or a name typed, into the salary account HR holds or another this time · Pay a supplier directly, its name, bank and account typed: no reading of
 // invoices for now, "不要开key 先 … 暂时就让他们填"), What was it for? (items and their total; the receipts, required —
-// each up the moment it is picked), Which pool pays? (the department's, or split with other departments and
-// companies, the amounts typed by the requester). Save as draft keeps what was typed; Submit sends it to Finance. The
+// each up the moment it is picked), Who bears it? (the department, another department whole — paid on its behalf, no
+// invoice — or split with departments, Venture and companies, in ringgit or percents; 2026-11-12). Save as draft keeps what was typed; Submit sends it to Finance. The
 // same window fixes a draft or a request Finance sent back.
 
 export default function NewRequestDialog({
@@ -146,7 +149,14 @@ export default function NewRequestDialog({
     .sort((a, b) => Number(b.short_code === 'You') - Number(a.short_code === 'You'))
   const title = !request ? 'New request' : request.status === 'rejected' ? 'Fix and send again' : 'Edit request'
   const sub = ctx ? `${ctx.name} · ${ctx.departmentName}` : request?.requestNo ?? ' '
-  const partyOptions = (party: string) => (party === 'company' ? ctx?.companies ?? [] : party === 'department' ? ctx?.departments ?? [] : [])
+  // Who may bear a share: the other departments with a pool, and Venture itself (Venture Office) — picked on its own.
+  const bearers = ctx?.departments ?? []
+  const venture = bearers.find((d) => d.venture) ?? null
+  const partyOptions = (party: string) =>
+    party === 'company' ? ctx?.companies ?? [] : party === 'department' ? bearers.filter((d) => !d.venture) : []
+  // Split by amount or percent: the rows open once it is picked; a change keeps who, not what was typed.
+  const pickBy = (by: 'amount' | 'percent') =>
+    setDraft((d) => ({ ...d, by, shares: d.shares.length ? (d.by === by ? d.shares : d.shares.map((x) => ({ ...x, amount: '' }))) : [emptyShare()] }))
   const problem = loadError ?? error ?? (draft.kind ? sendProblem : null)
 
   return (
@@ -371,97 +381,139 @@ export default function NewRequestDialog({
               </button>
             </Field>
 
-            {/* ── 3. Which pool pays? ── */}
-            <div className={df.typeLabel}>3 · Which pool pays?</div>
-            <div role="radiogroup" aria-label="Which pool pays?">
-              <div className={df.type} data-on={draft.split === false ? 'true' : undefined}>
+            {/* ── 3. Who bears it? ── */}
+            <div className={df.typeLabel}>3 · Who bears it?</div>
+            <div role="radiogroup" aria-label="Who bears it?">
+              <div className={df.type} data-on={draft.bears === 'own' ? 'true' : undefined}>
                 <label className={df.typeHead}>
-                  <input type="radio" name="pr-split" checked={draft.split === false} onChange={() => set({ split: false })} />
+                  <input type="radio" name="pr-bears" checked={draft.bears === 'own'} onChange={() => set({ bears: 'own' })} />
                   <span>
-                    {ctx ? `${ctx.departmentName} pays all of it` : 'My department pays all of it'}
+                    {ctx ? `${ctx.departmentName} bears all of it` : 'My department bears all of it'}
                     <span className={df.typeNote}>From your department’s pool.</span>
                   </span>
                 </label>
               </div>
-              <div className={df.type} data-on={draft.split === true ? 'true' : undefined}>
+              <div className={df.type} data-on={draft.bears === 'other' ? 'true' : undefined}>
                 <label className={df.typeHead}>
-                  <input
-                    type="radio"
-                    name="pr-split"
-                    checked={draft.split === true}
-                    onChange={() => setDraft((d) => ({ ...d, split: true, shares: d.shares.length ? d.shares : [emptyShare()] }))}
-                  />
+                  <input type="radio" name="pr-bears" checked={draft.bears === 'other'} onChange={() => set({ bears: 'other' })} />
                   <span>
-                    Split it
-                    <span className={df.typeNote}>Part of it is another department’s or a company’s — Finance decides whether to bill it back.</span>
+                    Another department bears all of it
+                    <span className={df.typeNote}>Paid on its behalf — charged to its pool, not billed.</span>
                   </span>
                 </label>
-                {draft.split ? (
+                {draft.bears === 'other' ? (
                   <div className={df.typeBody}>
-                    <div className={fm.lines}>
-                      {draft.shares.map((s, i) => (
-                        <div key={i} className={fm.lineWrap}>
-                          <div className={c.shareRow}>
-                            <Select
-                              round={12}
-                              className={fm.lineSelect}
-                              value={s.party}
-                              onChange={(e) => setShare(i, { party: e.target.value as 'department' | 'company' | '', partyId: '' })}
-                              aria-label={`Share ${i + 1}: a department or a company`}
-                            >
-                              <option value="">Who</option>
-                              <option value="department">A department</option>
-                              <option value="company">A company</option>
-                            </Select>
-                            <Select
-                              round={12}
-                              className={fm.lineSelect}
-                              value={s.partyId}
-                              disabled={!s.party}
-                              onChange={(e) => setShare(i, { partyId: e.target.value })}
-                              aria-label={`Share ${i + 1}: which`}
-                            >
-                              <option value="">{s.party === 'company' ? 'Which company' : 'Which department'}</option>
-                              {partyOptions(s.party).map((o) => (
-                                <option key={o.id} value={o.id}>
-                                  {o.name}
-                                </option>
-                              ))}
-                            </Select>
-                            <input
-                              className={fm.lineAmount}
-                              inputMode="decimal"
-                              value={s.amount}
-                              onChange={(e) => setShare(i, { amount: e.target.value })}
-                              placeholder="0.00"
-                              aria-label={`Share ${i + 1} amount`}
-                            />
-                            <button
-                              type="button"
-                              className={fm.remove}
-                              disabled={draft.shares.length === 1}
-                              onClick={() => setDraft((d) => ({ ...d, shares: d.shares.filter((_, j) => j !== i) }))}
-                              aria-label={`Remove share ${i + 1}`}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
+                    <Select round={12} className={fm.lineSelect} value={draft.other} onChange={(e) => set({ other: e.target.value })} aria-label="Which department bears it">
+                      <option value="">Which department</option>
+                      {bearers.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.venture ? `Venture (${o.name})` : o.name}
+                        </option>
                       ))}
-                      <div className={fm.linesFoot}>
-                        <button
-                          type="button"
-                          className={fm.addLine}
-                          disabled={draft.shares.length >= PR_LIMITS.shares}
-                          onClick={() => setDraft((d) => ({ ...d, shares: [...d.shares, emptyShare()] }))}
-                        >
-                          + Add a share
-                        </button>
-                        <span className={fm.linesTotal} data-off={shared >= total && shared > 0 ? 'true' : undefined}>
-                          {ctx?.departmentName ?? 'Yours'} pays RM {money(Math.max(0, Math.round((total - shared) * 100) / 100))}
-                        </span>
-                      </div>
+                    </Select>
+                  </div>
+                ) : null}
+              </div>
+              <div className={df.type} data-on={draft.bears === 'split' ? 'true' : undefined}>
+                <label className={df.typeHead}>
+                  <input type="radio" name="pr-bears" checked={draft.bears === 'split'} onChange={() => set({ bears: 'split' })} />
+                  <span>
+                    Split it
+                    <span className={df.typeNote}>
+                      Part of it is another department’s, Venture’s or a company’s. A department’s share comes out of its pool; Finance decides whether to bill a company
+                      back.
+                    </span>
+                  </span>
+                </label>
+                {draft.bears === 'split' ? (
+                  <div className={df.typeBody}>
+                    <div className={c.splitBy} role="radiogroup" aria-label="Split by">
+                      <span>Split by</span>
+                      <label data-on={draft.by === 'amount' ? 'true' : undefined}>
+                        <input type="radio" name="pr-by" checked={draft.by === 'amount'} onChange={() => pickBy('amount')} />
+                        Amount (RM)
+                      </label>
+                      <label data-on={draft.by === 'percent' ? 'true' : undefined}>
+                        <input type="radio" name="pr-by" checked={draft.by === 'percent'} onChange={() => pickBy('percent')} />
+                        Percent (%)
+                      </label>
                     </div>
+                    {draft.by ? (
+                      <div className={fm.lines}>
+                        {draft.shares.map((s, i) => (
+                          <div key={i} className={fm.lineWrap}>
+                            <div className={c.shareRow} data-by={draft.by ?? undefined}>
+                              <Select
+                                round={12}
+                                className={fm.lineSelect}
+                                value={s.party}
+                                onChange={(e) => {
+                                  const party = e.target.value as DraftShare['party']
+                                  setShare(i, { party, partyId: party === 'venture' ? venture?.id ?? '' : '' })
+                                }}
+                                aria-label={`Share ${i + 1}: who`}
+                              >
+                                <option value="">Who</option>
+                                <option value="department">A department</option>
+                                {venture ? <option value="venture">Venture</option> : null}
+                                <option value="company">A company</option>
+                              </Select>
+                              {s.party === 'venture' ? (
+                                <span className={c.shareFixed}>{venture?.name ?? 'Venture Office'}</span>
+                              ) : (
+                                <Select
+                                  round={12}
+                                  className={fm.lineSelect}
+                                  value={s.partyId}
+                                  disabled={!s.party}
+                                  onChange={(e) => setShare(i, { partyId: e.target.value })}
+                                  aria-label={`Share ${i + 1}: which`}
+                                >
+                                  <option value="">{s.party === 'company' ? 'Which company' : 'Which department'}</option>
+                                  {partyOptions(s.party).map((o) => (
+                                    <option key={o.id} value={o.id}>
+                                      {o.name}
+                                    </option>
+                                  ))}
+                                </Select>
+                              )}
+                              <input
+                                className={fm.lineAmount}
+                                inputMode="decimal"
+                                value={s.amount}
+                                onChange={(e) => setShare(i, { amount: e.target.value })}
+                                placeholder={draft.by === 'percent' ? '0 %' : '0.00'}
+                                aria-label={`Share ${i + 1} ${draft.by === 'percent' ? 'percent' : 'amount'}`}
+                              />
+                              {draft.by === 'percent' ? <span className={c.shareCalc}>RM {money(shareRinggit(draft, s))}</span> : null}
+                              <button
+                                type="button"
+                                className={fm.remove}
+                                disabled={draft.shares.length === 1}
+                                onClick={() => setDraft((d) => ({ ...d, shares: d.shares.filter((_, j) => j !== i) }))}
+                                aria-label={`Remove share ${i + 1}`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <div className={fm.linesFoot}>
+                          <button
+                            type="button"
+                            className={fm.addLine}
+                            disabled={draft.shares.length >= PR_LIMITS.shares}
+                            onClick={() => setDraft((d) => ({ ...d, shares: [...d.shares, emptyShare()] }))}
+                          >
+                            + Add a share
+                          </button>
+                          <span className={fm.linesTotal} data-off={shared > total ? 'true' : undefined}>
+                            {ctx?.departmentName ?? 'Yours'} bears {draft.by === 'percent' ? `${Math.max(0, Math.round((100 - draftPercent(draft)) * 100) / 100)}% · ` : ''}RM{' '}
+                            {money(Math.max(0, Math.round((total - shared) * 100) / 100))}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

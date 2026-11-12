@@ -462,6 +462,77 @@ try {
   await as(null, null)
   await q(`UPDATE hr_staff_costs SET status = 'active' WHERE id = $1`, [joeyStaff])
 
+  // ── Who bears it (mig 20261112210000): any other department with a pool, Director and Venture too, borne — not billed —
+  // typed in ringgit or percents, the whole of it allowed ──
+  await as(null, null)
+  const VO = id(50), DIRECTOR = id(51), LEAD = id(52), DREAM = id(53), PV3 = id(54), PV4 = id(55)
+  await q(`INSERT INTO departments(id, name, segment_key, billing_mode_key, is_internal) VALUES
+    ($1, 'Venture Office', NULL, NULL, true), ($2, 'Director', 'director', NULL, false), ($3, 'Lead Department', NULL, NULL, false)`, [VO, DIRECTOR, LEAD])
+  await q(`INSERT INTO companies(id, name) VALUES ($1, 'Dream Crafter')`, [DREAM])
+  await q(`INSERT INTO payment_vouchers VALUES ($1, 'HV-PV-202611-0001', 'draft', 'debit'), ($2, 'HV-PV-202611-0002', 'draft', 'debit')`, [PV3, PV4])
+  const bearsSql = await migrationText('20261112210000_claim_who_bears')
+  await db.exec(bearsSql)
+  await db.exec(bearsSql)
+
+  await as(LI)
+  const bearCtx = await one('SELECT payment_request_context()')
+  check(bearCtx.departments.map(d => [d.name, d.venture]), [['Finance', false], ['Marketing', false], ['Director', false], ['Venture Office', true]],
+    'a share may go to any other department with a pool — Director’s too — and to Venture; never one’s own, nor one with no pool')
+  const bearSave = async (items, shares, submit = true) => {
+    const file = await upload(LI, 'Receipt.pdf')
+    await as(LI)
+    return one('SELECT payment_request_save(NULL, $1::jsonb, $2)', [JSON.stringify({
+      kind: 'claim', payTo: { salary: false, bank: 'Public Bank', accountNo: '3187450210' }, items, shares, files: [file] }), submit])
+  }
+  const hundred = [{ description: 'Team lunch', amount: '100' }]
+  const shareOf = s => [s.departmentName ?? s.companyName, s.amount, s.percent, s.pool, s.venture]
+
+  // Another department bears all of it: its share is the whole total.
+  let borne = await bearSave(hundred, [{ party: 'department', departmentId: MKT, amount: '100.00' }])
+  check([borne.status, borne.shares.map(shareOf)], ['with_finance', [['Marketing', 100, null, 'dept_pool_marketing', false]]],
+    'paid on Marketing’s behalf: the whole of it on its pool')
+
+  // Percents: worked out to the sen, cut down; Venture's pool and Director's.
+  borne = await bearSave([{ description: 'Dinner', amount: '10' }], [
+    { party: 'department', departmentId: VO, amount: '', percent: '33.33' },
+    { party: 'department', departmentId: DIRECTOR, amount: '', percent: '50' },
+  ])
+  check(borne.shares.map(shareOf), [['Venture Office', 3.33, 33.33, 'venture_pool', true], ['Director', 5, 50, 'dept_pool_director', false]],
+    'a percent of the total, its ringgit cut down to the sen; Venture bears it from the venture pool')
+  const pctReq = borne.id
+
+  await reject('SELECT payment_request_save(NULL, $1::jsonb, true)', [JSON.stringify({ kind: 'claim', payTo: { salary: false, bank: 'B', accountNo: '1234' }, items: hundred,
+    shares: [{ party: 'department', departmentId: VO, percent: '30', amount: '' }, { party: 'department', departmentId: MKT, amount: '10' }], files: [] })],
+    /not both/, 'one request is split one way')
+  await reject('SELECT payment_request_save(NULL, $1::jsonb, true)', [JSON.stringify({ kind: 'claim', payTo: { salary: false, bank: 'B', accountNo: '1234' }, items: hundred,
+    shares: [{ party: 'department', departmentId: VO, percent: '60', amount: '' }, { party: 'department', departmentId: MKT, percent: '50', amount: '' }], files: [] })],
+    /more than 100/, 'percents over 100')
+  await reject('SELECT payment_request_save(NULL, $1::jsonb, true)', [JSON.stringify({ kind: 'claim', payTo: { salary: false, bank: 'B', accountNo: '1234' }, items: hundred,
+    shares: [{ party: 'department', departmentId: VO, percent: '120', amount: '' }], files: [] })],
+    /a number up to 100/, 'a percent over 100')
+  await expectShares(hundred, [{ party: 'department', departmentId: MKT, amount: '100.01' }], /more than the RM 100.00 total/, 'shares over the total')
+  await expectShares(hundred, [{ party: 'department', departmentId: HR, amount: '10' }], /your own bears the rest/, 'never one’s own department')
+  await expectShares(hundred, [{ party: 'department', departmentId: LEAD, amount: '10' }], /your own bears the rest/, 'nor a department with no pool')
+
+  // Finance: a department's share asks no Bill back; a company's still does.
+  await as(FIN)
+  check((await one('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[pctReq], PV3, '[]'])).invoices, [],
+    'borne shares: nothing to answer, nothing billed')
+  const mixed = await bearSave(hundred, [{ party: 'department', departmentId: VO, amount: '40' }, { party: 'company', companyId: DREAM, amount: '20' }])
+  await as(FIN)
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[mixed.id], PV4, '[]'], /Answer Bill back\? for each split/,
+    'a company’s share is still Finance’s to answer')
+  const dreamShare = mixed.shares.find(s => s.companyName === 'Dream Crafter').id
+  check((await one('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[mixed.id], PV4, JSON.stringify([{ share: dreamShare, billBack: false }])])).invoices, [],
+    'answered for the company alone')
+
+  async function expectShares(items, shares, pattern, what) {
+    const file = await upload(LI, 'Receipt.pdf')
+    await as(LI)
+    await reject('SELECT payment_request_save(NULL, $1::jsonb, true)', [JSON.stringify({ kind: 'claim', payTo: { salary: false, bank: 'B', accountNo: '1234' },
+      items, shares, files: [file] })], pattern, what)
+  }
+
   console.log(`Payment request approval checks passed: ${checks}`)
 } finally {
   await db.close()
