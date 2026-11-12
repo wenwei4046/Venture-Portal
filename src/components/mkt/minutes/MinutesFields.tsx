@@ -203,8 +203,8 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
                   <button
                     type="button"
                     className={m.fdel}
-                    disabled={f.lock}
-                    title={f.lock ? LOCKED : undefined}
+                    disabled={f.lock || isTitle}
+                    title={f.lock ? LOCKED : isTitle ? 'Every minutes has a title' : undefined}
                     onClick={() => {
                       onFields(fields.filter((_, k) => k !== i))
                       onSelect(null)

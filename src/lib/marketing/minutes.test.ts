@@ -27,6 +27,10 @@ const row = {
   folders: [{ id: 'fo1', name: 'Project minutes', parent: null, sort: 1 }, { id: '', name: 'bad' }],
 }
 
+/** A new template's fields without its title (most tests count the four the handoff starts with), and with it named. */
+const four = () => newMinutesFields().filter(f => f.type !== 'Title')
+const titled = () => newMinutesFields().map(f => (f.type === 'Title' ? { ...f, name: 'Kickoff' } : f))
+
 const field = (over: Partial<MinutesField>): MinutesField => ({ key: 'k', name: 'Notes', type: 'Short text', req: false, pic: true, lock: false, ...over })
 
 describe('what the builder reads', () => {
@@ -59,10 +63,10 @@ describe('what the builder reads', () => {
 })
 
 describe('making a template', () => {
-  it('starts with the project, the meeting’s date, the attendees and the signatures — the project and the attendees locked', () => {
+  it('starts with its title (to be written), the project, the meeting’s date, the attendees and the signatures — the project and the attendees locked', () => {
     const f = newMinutesFields()
     expect(f.map(x => [x.name, x.type, x.lock])).toEqual([
-      ['Project (from Projects)', 'Project link', true], ['Meeting date', 'Date', false], ['Attendees', 'People', true], ['Signatures', 'Signature', false],
+      ['', 'Title', false], ['Project (from Projects)', 'Project link', true], ['Meeting date', 'Date', false], ['Attendees', 'People', true], ['Signatures', 'Signature', false],
     ])
     expect(NEW_RULES).toEqual({ sign: false, pic: false, picAll: false, project: true, file: true, lock: true })
   })
@@ -80,7 +84,7 @@ describe('making a template', () => {
 })
 
 describe('adding a field', () => {
-  const base = newMinutesFields()
+  const base = four()
 
   it('goes after the field picked, else before the signatures; signatures always last', () => {
     expect(insertAt(base, null)).toBe(3)
@@ -100,7 +104,7 @@ describe('adding a field', () => {
 })
 
 describe('a field changed after it was made', () => {
-  const base = newMinutesFields()
+  const base = four()
 
   it('its kind changes; a table gets columns the first time', () => {
     const f = retype(field({ name: 'Plan' }), 'Table')
@@ -141,7 +145,7 @@ describe('a field changed after it was made', () => {
 })
 
 describe('a table’s starting rows stay aligned with its columns', () => {
-  const t = addField(newMinutesFields(), 'Table', null).fields[3]
+  const t = addField(four(), 'Table', null).fields[3]
   const filled = setStartCell(setStartCell(t, 0, 0, 'A'), 0, 2, 'C')
 
   it('a column added: an empty cell on every row; at most eight', () => {
@@ -185,10 +189,10 @@ describe('a table’s starting rows stay aligned with its columns', () => {
 })
 
 describe('the foot', () => {
-  const base = newMinutesFields()
+  const base = titled()
 
   it('sums up what it asks', () => {
-    expect(minutesSummary(base)).toBe('4 fields · 4 required · 4 visible to PIC')
+    expect(minutesSummary(base)).toBe('5 fields · 4 required · 5 visible to PIC')
   })
 
   it('warns as the handoff does — each opening its tab', () => {
@@ -204,11 +208,13 @@ describe('the foot', () => {
     expect(minutesProblems([...base, field({ key: 't', name: 'Plan', type: 'Table', cols: [{ name: '', type: 'Text' }] })])).toEqual([{ text: 'A table column has no name', key: 't' }])
     expect(minutesProblems([...base, field({ key: 's2', name: 'More', type: 'Signature' })])).toEqual([{ text: 'Only one Signature field allowed', key: 's2' }])
     expect(minutesProblems(base.filter(f => f.type !== 'Project link')).map(p => p.text)).toEqual(['Minutes keep their project and attendees'])
+    // Every template has a title (2026-11-12, the user's answer A): without one, a Fix that opens the type cards.
+    expect(minutesProblems(four())).toEqual([{ text: 'Add a Title', key: null }])
   })
 })
 
 describe('only what changed is saved', () => {
-  const now: MinutesEdit = { name: 'Kickoff', fields: newMinutesFields(), rules: NEW_RULES }
+  const now: MinutesEdit = { name: 'Kickoff', fields: four(), rules: NEW_RULES }
 
   it('each field is sent with its id; a table with its rows and what the staff may add', () => {
     const t = addField(now.fields, 'Table', null).fields[3]
@@ -230,7 +236,7 @@ describe('only what changed is saved', () => {
 })
 
 describe('changes since the version published', () => {
-  const pub: MinutesEdit = { name: 'Kickoff', fields: newMinutesFields(), rules: NEW_RULES }
+  const pub: MinutesEdit = { name: 'Kickoff', fields: four(), rules: NEW_RULES }
 
   it('none never published; none when nothing changed', () => {
     expect(countChanges(pub, null)).toBeNull()
@@ -250,7 +256,7 @@ describe('changes since the version published', () => {
 
 describe('the rail', () => {
   const tpl = (id: string, name: string, folder: string | null, over: Partial<MinutesTemplate> = {}): MinutesTemplate => ({
-    id, name, folder, fields: newMinutesFields(), rules: NEW_RULES, rev: 1, version: 0, changed: true, sort: 0, published: null, usedBy: [],
+    id, name, folder, fields: four(), rules: NEW_RULES, rev: 1, version: 0, changed: true, sort: 0, published: null, usedBy: [],
     open: 0, openOnLive: 0, publishedAt: null, publishedBy: null, updatedAt: null, updatedBy: null, ...over,
   })
   const folders: MinutesFolder[] = [{ id: 'a', name: 'Project minutes', parent: null, sort: 1 }, { id: 'b', name: 'Recurring', parent: 'a', sort: 1 },
@@ -295,7 +301,7 @@ describe('the rail', () => {
 describe('kinds kept once', () => {
   it('the project link, a campaign period and the signatures', () => {
     expect(ONCE_TYPES).toEqual(['Project link', 'Campaign period', 'Signature', 'Title'])
-    const one = addField(newMinutesFields(), 'Campaign period', null).fields
+    const one = addField(titled(), 'Campaign period', null).fields
     expect(minutesProblems(one).map(p => p.text)).toEqual(['A field has no name'])
     expect(minutesProblems(addField(one, 'Campaign period', null).fields).map(p => p.text)).toContain('Only one Campaign period field allowed')
     expect(minutesWarnings(one, { ...NEW_RULES, pic: true })).toEqual([{ text: 'PIC signs off but can’t see any content field', tab: 'fields' }])

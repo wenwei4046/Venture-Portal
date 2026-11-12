@@ -313,4 +313,14 @@ const tr = await save(null, null, { name: 'Title asked', fields: [F('ti', 'Kicko
 check((await row(tr.id)).fields[0], { id: 'ti', name: 'Kickoff', type: 'Title', help: 'What we agreed', req: false, pic: true, lock: false }, 'a Title sent required is kept not required')
 check(await one(`SELECT public.mkt_minutes_missing($1::jsonb, '{}'::jsonb)`, [JSON.stringify([{ name: 'Kickoff', type: 'Title', req: false }])]), [], 'a Title is never missing')
 
+// ── Every template has a Title (the user's answer A): publishing needs one; once there, it stays ──────────────
+const nt = await save(null, null, { name: 'No title yet', fields: BASE, rules: {} })
+await refuses(`SELECT public.mkt_minutes_publish($1, $2)`, [nt.id, nt.rev], /Minutes have a title/, 'a template is published only with a Title')
+let ntRev = (await save(nt.id, nt.rev, { fields: [F('ti2', 'Kickoff', 'Title'), ...BASE] })).rev
+ntRev = (await save(nt.id, ntRev, { fields: [F('ti2', 'Year-end kickoff', 'Title', { help: 'Showroom' }), ...BASE] })).rev
+check((await row(nt.id)).fields[0].name, 'Year-end kickoff', 'its sentence and description change freely')
+await assert.rejects(save(nt.id, ntRev, { fields: BASE }), err => /Every minutes has a title/.test(String(err.message)), 'a Title is not removed'); checks++
+await assert.rejects(save(nt.id, ntRev, { fields: [F('ti2', 'Year-end kickoff', 'Short text'), ...BASE] }), err => /Every minutes has a title/.test(String(err.message)), 'nor retyped'); checks++
+check((await publish(nt.id, ntRev)).version, 1, 'with its Title, published')
+
 console.log(`marketing minutes builder v2: ${checks} checks passed`)

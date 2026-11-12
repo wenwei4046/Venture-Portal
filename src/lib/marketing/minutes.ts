@@ -181,9 +181,11 @@ export function minutesFoldersFromRow(v: unknown): MinutesFolder[] {
   return list.filter(isObj).map(f => ({ id: str(f.id), name: str(f.name), parent: strOrNull(f.parent), sort: int(f.sort) ?? 0 })).filter(f => f.id)
 }
 
-/** A new template (the handoff's): the project it is for, the meeting's date, the attendees, the signatures. */
+/** A new template (the handoff's): its title (2026-11-12 — every template has one, the user's answer A), the project it is
+ * for, the meeting's date, the attendees, the signatures. */
 export function newMinutesFields(): MinutesField[] {
   return [
+    { key: fieldKey(), name: '', type: 'Title', req: false, pic: true, lock: false },
     { key: fieldKey(), name: 'Project (from Projects)', type: 'Project link', req: true, pic: true, lock: true },
     { key: fieldKey(), name: 'Meeting date', type: 'Date', req: true, pic: true, lock: false },
     { key: fieldKey(), name: 'Attendees', type: 'People', req: true, pic: true, lock: true },
@@ -355,6 +357,8 @@ export function minutesProblems(fields: readonly MinutesField[]): MinutesProblem
   if (!fields.some(f => f.type === 'Project link') || !fields.some(f => f.type === 'People' && f.lock)) {
     out.push({ text: 'Minutes keep their project and attendees', key: null })
   }
+  // Every template has a title (2026-11-12, the user's answer A).
+  if (!fields.some(f => f.type === 'Title')) out.push({ text: 'Add a Title', key: null })
   return out
 }
 
