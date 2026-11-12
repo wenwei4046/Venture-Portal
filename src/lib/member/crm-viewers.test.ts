@@ -26,3 +26,12 @@ describe('the CRM’s cross-team viewers', () => {
     expect(crmDataFromRows(rows()).viewers).toEqual([])
   })
 })
+
+describe('who reads the ads’ figures', () => {
+  it('is CRM · Manage, or View at All read-only', async () => {
+    const { readsAds } = await import('./crm-data')
+    expect(readsAds({ viewAll: true, editOwn: false, editAll: false, manage: false })).toBe(true)
+    expect(readsAds({ viewAll: false, editOwn: true, editAll: false, manage: true })).toBe(true)
+    expect(readsAds({ viewAll: false, editOwn: true, editAll: false, manage: false })).toBe(false)
+  })
+})

@@ -317,6 +317,13 @@ export function canFromRole(role: CrmRole | null): CrmCan {
   return { viewAll: false, editOwn: !!role, editAll: false, manage: false };
 }
 
+/**
+ * Who reads the ads' figures — Ads Performance, Insight's Ads, Reports — and Meta's numbers behind them: CRM · Manage, or
+ * CRM · View at All, read-only (2026-11-12 — the owner, of Marketing's managers given CRM · View · All: "看不到CRM的ads 功能").
+ * Every change to an ad (its name, hiding it, adding one, its split) stays CRM · Manage's.
+ */
+export const readsAds = (can: CrmCan): boolean => can.manage || can.viewAll;
+
 export function canFrom(value: unknown, role: CrmRole | null): CrmCan {
   if (!value || typeof value !== "object") return canFromRole(role);
   const v = value as Record<string, unknown>;
