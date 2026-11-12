@@ -56,7 +56,11 @@ export interface TallyOrder {
   depositMet: boolean
   /** The day its payments reached the deposit (the ERP's rule); null while they have not. */
   reachedOn: string | null
-  /** Whether the ERP names a fair on it — an order with none is in neither of the ERP's reports. */
+  /**
+   * False only when the ERP says the order has no fair — such an order is in
+   * neither of the ERP's reports. A bill the portal cannot tell of (a claim
+   * form's, a delivery from before the ERP sent fairs) is taken to have one.
+   */
   hasFair: boolean
   /** The day of the fair the ERP says it was sold on; null when it named none. */
   fairDate: string | null

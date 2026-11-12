@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
@@ -25,6 +26,9 @@ import t from './Tally.module.css'
 // Ten columns in 952px (a 1280px screen): the figures stand closer than the kit's 14px.
 const MONTH_COLS = 'minmax(128px,1.1fr) 44px minmax(112px,1.1fr) minmax(96px,1fr) 66px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(96px,1fr)'
 const BILL_COLS = 'minmax(136px,1.2fr) minmax(104px,1fr) 108px 108px 108px minmax(88px,.8fr) minmax(108px,.9fr) minmax(184px,1.3fr)'
+/** What those columns need at their narrowest, the frame's rules included. */
+const MONTH_MIN = 944
+const BILL_MIN = 946
 const PAD = { padding: '11px 14px' }
 const CHIP_PAD = { padding: '11px 12px 11px 16px' }
 const CHIP_CELL = { padding: '9px 12px 9px 16px' }
@@ -35,6 +39,18 @@ const bills = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
 const pctWord = (p: number) => `${Math.round(p * 1000) / 10}%`
 
 type BillListKind = 'ours' | 'theirs' | 'held'
+
+/**
+ * The Tally's grids are wider than the kit's 720px: on a narrower screen they
+ * scroll inside their frame — the kit's own frame would cut their last columns off.
+ */
+function WideTable({ label, min, children }: { label: string; min: number; children: ReactNode }) {
+  return (
+    <div className={t.scroll}>
+      <GridTable label={label} scroll={false} style={{ minWidth: min }}>{children}</GridTable>
+    </div>
+  )
+}
 
 /** A figure, red in parentheses when it is below nothing. */
 function Amount({ value }: { value: number }) {
@@ -102,7 +118,7 @@ export default function TallyPanel({
       </Cards>
 
       <SectHead title="Tally by month" count={`${report.months.length} PERIOD${report.months.length === 1 ? '' : 'S'}`} />
-      <GridTable label="Tally by month">
+      <WideTable label="Tally by month" min={MONTH_MIN}>
         <div className={`${hv.gtHead} ${t.groups}`} style={{ gridTemplateColumns: MONTH_COLS }} role="row">
           <span role="columnheader" aria-hidden="true" />
           <span role="columnheader" aria-colspan={3} className={t.group} style={{ gridColumn: 'span 3' }}>
@@ -141,7 +157,7 @@ export default function TallyPanel({
             onPick={() => pick(m.month.slice(0, 7))}
           />
         ))}
-      </GridTable>
+      </WideTable>
       {report.noPctBills > 0 ? (
         <div className={t.flags}>
           <a href={`${revenuePath(sub.slug, 'rules')}?tab=brands`} className={t.flag}>
@@ -223,7 +239,7 @@ function BillList({ title, rows, list, sub }: { title: string; rows: TallyBill[]
   return (
     <section className={t.list} aria-label={title}>
       <SecLabel style={{ marginBottom: 8 }}>{title}</SecLabel>
-      <GridTable label={title}>
+      <WideTable label={title} min={BILL_MIN}>
         <GridHead
           cols={BILL_COLS}
           cellStyle={PAD}
@@ -276,7 +292,7 @@ function BillList({ title, rows, list, sub }: { title: string; rows: TallyBill[]
             <span role="cell" style={PAD} />
           </div>
         ) : null}
-      </GridTable>
+      </WideTable>
     </section>
   )
 }
