@@ -1,6 +1,10 @@
-/* Comm Cal › Tally (2026-11-12): the months in their two calendars, and the
-   bills that sit in two months. The kit's grid tables; these are the few
-   things they do not have. */
+/* Comm Cal › Tally (2026-11-12): the months on their two sides, and the bills
+   the two sides pay apart. The kit's grid tables; these are the few things
+   they do not have. */
+
+/* Ten and eight columns: wider than the kit's 720px frame, so on a narrower
+   screen a grid scrolls inside its own frame and keeps every column. */
+.scroll { overflow-x: auto; }
 
 /* The band over the head: which three columns are Houzs's, which are ours. */
 .groups { border-bottom: 1px solid rgb(var(--hv-head-rule)); }
@@ -16,11 +20,18 @@
 .month { font-weight: 500; white-space: nowrap; }
 .strong { font-weight: 500; }
 .neg { color: rgb(var(--hv-danger)); }
+/* Under a month's count: how many of its bills wait for their salesperson's close. */
+.sub {
+  font-size: 10.5px;
+  color: rgb(var(--hv-brown));
+  margin-top: 2px;
+  white-space: nowrap;
+}
 
 .flags { display: flex; gap: 8px; margin-top: 10px; }
 .flag { text-decoration: none; }
 
-/* The month picked: its bills in two months. */
+/* The month picked: the bills its two sides pay apart, and the ones neither pays. */
 .detail { margin-top: 30px; }
 /* Its Export, right under the heading's rule. */
 .tools { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
@@ -32,6 +43,13 @@
   font-size: 10.5px;
   color: rgb(var(--hv-brown));
   margin-top: 3px;
+}
+/* Under a bill's Bill to HC: the brand and the % it is a share by. */
+.brand {
+  font-size: 11px;
+  color: rgb(var(--hv-brown));
+  margin-top: 3px;
+  white-space: nowrap;
 }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .total {
