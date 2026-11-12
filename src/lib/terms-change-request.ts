@@ -118,15 +118,13 @@ export function askWords(a: TermsAsk): string {
  * The deal's terms once the change is applied — the amend's arithmetic: the terms now close the month before; from
  * the month on the record carries the rate, months and compounding asked. Months left not asked keep the end month;
  * a loan without a fixed term stays so unless a number of months (or an amount a month) is asked — then it is fixed
- * (2026-11-13, "填月数就转"; amend_loan / amend_loan_from take its words' 未定 out). The whole terms re-sending the
- * months the loan already holds leave it as it is.
+ * (2026-11-13, "填月数就转"; amend_loan / amend_loan_from take its words' 未定 out), the months it already holds too
+ * (LO#7's 51: the form sends months only when A number of months was picked).
  */
 export function termsAfterAsk(kind: TermsRecordKind, t: PositionTerms, ask: TermsAsk): PositionTerms {
-  // A loan without a fixed term stays so unless months other than the ones it holds, or an amount a month, are asked;
-  // otherwise an amount a month asked, or — neither months nor no fixed term asked — the one the terms had.
-  const asksFixed =
-    ask.principalPerMonth != null ||
-    (ask.remainingMonths != null && (!ask.wholeDeal || ask.remainingMonths !== (t.current.heldMonths ?? null)))
+  // A loan without a fixed term stays so unless months, or an amount a month, are asked; otherwise an amount a month
+  // asked, or — neither months nor no fixed term asked — the one the terms had.
+  const asksFixed = ask.principalPerMonth != null || ask.remainingMonths != null
   const open = ask.noFixedTerm || (kind === 'loan' && t.current.months == null && !asksFixed)
   const fixed = open || ask.remainingMonths != null ? null : (ask.principalPerMonth ?? t.current.principalPerMonth ?? null)
   if (ask.wholeDeal) {

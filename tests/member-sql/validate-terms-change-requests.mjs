@@ -509,7 +509,7 @@ await db.exec(`
     ('${L7}', 'active', 40000, 0.04, 0.003, 0.037, 1, '2026-10-07', '利滚利挂账(未定还款) · 利息从放款日起算 · 资金来源: HV', '${CONT}'),
     ('${L8}', 'active', 60000, 0.04, 0.003, 0.037, 51, '2025-04-05', 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)', '${CONT}');
 `)
-const fixedSql = await text(new URL('20261113100000_amend_months_makes_fixed.sql', migrations))
+const fixedSql = await text(new URL('20261113101000_amend_months_makes_fixed.sql', migrations))
 await db.exec(fixedSql)
 await db.exec(fixedSql)
 check((await q(`select public.terms_words_fixed('新增 · 利息/期数/方式未定 · [LO-NEW]') w`))[0].w, '新增 · 利息/期数/方式已定 · [LO-NEW]', 'any other 未定 reads 已定')
@@ -517,9 +517,9 @@ await as(PRINCIPAL)
 await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "tenure_months": 60, "compound_interest": true}')`, [L6])
 check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L6]), [{ tenure_months: 60, repayment_terms: '无息垫款 · 0% · [LO#6] · 资金来源: LOO' }],
   'LO#6: 60 months over the whole terms — fixed, its words without 原表无还款方式')
-await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "tenure_months": 1, "compound_interest": true}')`, [L7])
+await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "compound_interest": true}')`, [L7])
 check((await q(`select repayment_terms from loans where id = $1`, [L7]))[0].repayment_terms, '利滚利挂账(未定还款) · 利息从放款日起算 · 资金来源: HV',
-  'the months it holds re-sent: still without a fixed term')
+  'no months asked: still without a fixed term')
 await q(`select public.amend_loan($1, '{"tenure_months": 12, "repayment_terms": "未定 · kept as typed"}')`, [L7])
 check((await q(`select repayment_terms from loans where id = $1`, [L7]))[0].repayment_terms, '未定 · kept as typed', 'words sent are kept as sent')
 await q(`select public.amend_loan_from($1, '2026-12-01', null, 24, null, 'fixed from December')`, [L8])
@@ -530,6 +530,20 @@ check((await q(`select was_repayment_terms w, months from treasury_terms_history
 await q(`select public.revert_terms_change('loan', $1)`, [L8])
 check((await q(`select repayment_terms from loans where id = $1`, [L8]))[0].repayment_terms, 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)',
   'undone: its words back')
+await as(null)
+
+// 2026-11-13 ("这个还是一样？"): LO#7 asked the 51 months it already holds — fixed all the same.
+const L9 = '00000000-0000-4000-8000-0000000000c9'
+await as(null)
+await db.exec(`insert into public.loans (id, status, principal, effective_rate, base_rate, risk_premium, tenure_months, disbursement_date, repayment_terms, company_id) values
+  ('${L9}', 'active', 60000, 0.04, 0.003, 0.037, 51, '2025-04-05', 'EMI 分期 · [LO#7] · 未定还款(自 2026-01 起)', '${CONT}')`)
+const alwaysSql = await text(new URL('20261113110000_amend_months_always_fixed.sql', migrations))
+await db.exec(alwaysSql)
+await db.exec(alwaysSql)
+await as(PRINCIPAL)
+await q(`select public.amend_loan($1, '{"tenure_months": 51}')`, [L9])
+check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L9]), [{ tenure_months: 51, repayment_terms: 'EMI 分期 · [LO#7]' }],
+  'the months it already holds, asked: fixed')
 await as(null)
 
 console.log(`validate-terms-change-requests: ${checks} checks passed`)
