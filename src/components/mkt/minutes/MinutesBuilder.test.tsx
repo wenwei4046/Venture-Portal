@@ -348,6 +348,9 @@ describe('the live preview', () => {
     builder([withTable])
     const pv = within(preview())
     expect((pv.getByRole('textbox', { name: 'Shot list row 1, Shot' }) as HTMLInputElement).value).toBe('Wide')
+    // 2026-11-12, the user: its rows numbered as the builder numbers them; no placeholder project title over the minutes.
+    expect([...preview().querySelectorAll('[data-field="s"] tbody tr')].map(tr => tr.firstElementChild?.textContent)).toEqual(['1', '2'])
+    expect(pv.queryByText('Subsidiary · Project')).toBeNull()
     expect(pv.getByText('One shot a line')).toBeTruthy()
     expect(pv.queryByRole('button', { name: '+ Add row' })).toBeNull()
     fireEvent.click(pv.getByRole('button', { name: '+ Column' }))

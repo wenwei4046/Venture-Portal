@@ -112,6 +112,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
           <table className={m.grid}>
             <thead>
               <tr>
+                <th className={m.gNum} aria-hidden="true" />
                 {cols.map((c, ci) => {
                   const own = isTable && ci < (f.cols ?? []).length
                   return (
@@ -155,6 +156,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
             <tbody>
               {rows.map((r, ri) => (
                 <tr key={ri}>
+                  <td className={m.gNum}>{ri + 1}</td>
                   {r.map((x, ci) => (
                     <td key={ci}>
                       <input
@@ -207,7 +209,6 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
           <div className={m.sheetHead}>
             <div className={m.sheetWords}>
               <div className={m.sheetEyebrow}>Meeting minutes · {name || 'Untitled'}</div>
-              <div className={m.sheetTitle}>Subsidiary · Project</div>
               <div className={m.sheetMono}>Track ID · {version}</div>
             </div>
             <span className={`${m.status} ${tone}`}>{status}</span>
