@@ -13,7 +13,7 @@
 
 /* The first column of a group: the rule the band begins. */
 .edge { border-left: 1px solid rgb(var(--hv-hairline)); }
-.month { font-weight: 500; }
+.month { font-weight: 500; white-space: nowrap; }
 .strong { font-weight: 500; }
 .neg { color: rgb(var(--hv-danger)); }
 

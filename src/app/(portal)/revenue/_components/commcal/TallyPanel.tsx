@@ -19,8 +19,8 @@ import t from './Tally.module.css'
 // between them, what is carried when the month ends, and, for the month
 // picked (`?month=`), the bills the gap is made of. Read-only.
 
-const MONTH_COLS = 'minmax(118px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
-const BILL_COLS = 'minmax(136px,1.2fr) minmax(92px,1fr) minmax(72px,.7fr) 110px 110px minmax(84px,.8fr) 50px minmax(84px,.8fr) minmax(192px,1.25fr)'
+const MONTH_COLS = 'minmax(130px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
+const BILL_COLS = 'minmax(136px,1.2fr) minmax(92px,1fr) minmax(72px,.7fr) 110px 110px minmax(84px,.8fr) 50px minmax(98px,.8fr) minmax(192px,1.25fr)'
 const PAD = { padding: '11px 14px' }
 
 const bills = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
