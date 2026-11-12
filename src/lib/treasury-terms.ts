@@ -84,9 +84,6 @@ export interface PositionTerms {
     reason?: string | null
     /** A fixed principal a month (2026-10-27); null = equal parts of `months`. */
     principalPerMonth?: number | null
-    /** A loan without a fixed term: the months its row still holds (tenure_months is never null) — months asked other
-     *  than these make it fixed (2026-11-13, "填月数就转"); undefined elsewhere. */
-    heldMonths?: number | null
   }
   history: TermsHistoryRow[]
 }

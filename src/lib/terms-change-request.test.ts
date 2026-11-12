@@ -57,14 +57,14 @@ describe('the terms once the change is applied', () => {
   })
 
   // 2026-11-13 — The Cont LO#6, 60 months asked of a loan whose words said 原表无还款方式: "填月数就转".
-  it('a loan without a fixed term takes the months asked — the whole terms only when they differ from the ones it holds', () => {
-    const open: PositionTerms = { ...BI7, current: { ...BI7.current, months: null, heldMonths: 1 } }
+  it('a loan without a fixed term takes the months asked — the ones it already holds too (LO#7)', () => {
+    const open: PositionTerms = { ...BI7, current: { ...BI7.current, months: null } }
     expect(termsAfterAsk('loan', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: 12 }).current.months).toBe(12)
     expect(termsAfterAsk('loan', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: null, rate: 0.04 }).current.months).toBeNull()
     const whole = { ...OCTOBER, noFixedTerm: false, interestKeepsBase: false, wholeDeal: true }
     expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: 60 }).current.months).toBe(60)
-    // The form re-sends the months the row holds: nothing asked, it stays without a fixed term.
-    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: 1, rate: 0.04 }).current.months).toBeNull()
+    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: 51 }).current.months).toBe(51)
+    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: null, rate: 0.04 }).current.months).toBeNull()
     expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: null, principalPerMonth: 500 }).current.principalPerMonth).toBe(500)
     expect(termsAfterAsk('fund_source', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: 12 }).current.months).toBe(12)
   })
