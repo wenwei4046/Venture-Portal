@@ -63,6 +63,12 @@ describe("incomeVM", () => {
       expect(sub(m)).toBe("Held · Akemi has a bill without cost");
       expect(incomeVM(data(m), false).held?.strong).toBe("Akemi has a bill without cost.");
     });
+    // 2026-11-12: a month of 2990s bills — sold, in no margin — read "No sales yet" under the incentive.
+    it("says Own scheme of a month whose bills are a brand's on its own scheme, and No sales yet of one with none", () => {
+      expect(sub(month({ switches: on, brands: [], bills: [bill({ brand: "2990S", marginPct: null, ownScheme: true })] }))).toBe("Own scheme");
+      expect(sub(month({ switches: on, brands: [], bills: [] }))).toBe("No sales yet");
+      expect(sub(month({ switches: on, brands: [{ code: "AKEMI", marginPct: 0.3 }], bills: [bill(), bill({ orderId: "o3", brand: "2990S", ownScheme: true })] }))).toBe("No incentive tier reached yet");
+    });
   });
 });
 
@@ -181,5 +187,31 @@ describe("an old bill topped up in My income", () => {
     const row = vm.mine.rows.find(r => r.no === "ZNT4813")!;
     expect(row.meta).toBe("Mdm Lee · Akemi");
     expect(vm.sheets[row.id].meta).toBe("Mdm Lee · SUNWAY");
+  });
+});
+
+// 2026-11-12 — 2990s follows its own commission scheme: paid the rank's rate for the brand, in no margin (the user:
+// "唯一不同的是看不到 margin"). Its sheet says so — never *Cost pending*, in no tier's colour.
+describe("Commission by order — a bill of a brand on its own scheme", () => {
+  const own = bill({ orderId: "n1", no: "2990-SO-2611-017", brand: "2990S", marginPct: null, commissionable: 3990, orderTotal: 4240, personal: 159.6, pay: 159.6 });
+
+  it("says Own scheme on a live month, from the engine's row", () => {
+    const vm = incomeOrdersVM(data(month({ bills: [{ ...own, ownScheme: true }] })), null, [], false);
+    expect(vm.sheets[vm.mine.rows[0].id]).toMatchObject({ tag: "Own scheme", tone: "neutral", comm: "RM 159.60" });
+  });
+  it("and on a closed month, from the order book", () => {
+    const order: MemberBookOrder = {
+      id: "n1", number: "2990-SO-2611-017", ref: null, customer: "Mr Tan", date: "2026-11-03", sourceMonth: "2026-11", recognitionMonth: "2026-11",
+      brand: "2990S", booth: "2990S", venue: "PENANG WATERFRONT", fairStart: "2026-10-29", fairEnd: "2026-12-31", organiser: null, week: "2026-10-30",
+      revenue: 3990, margin: null, noSales: false, ownScheme: true, kpiQty: 0, cleared: true, carried: false, manual: false, total: 4240, paid: 4240,
+      depositNeeded: 1272, lines: [], own: true, share: null,
+    };
+    const book: MemberOrderBook = { from: "2026-11", through: "2026-11", asOf: "2026-11-12T02:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders: [order] };
+    const vm = incomeOrdersVM(data(month({ bills: [own] })), book, [], false);
+    expect(vm.sheets[vm.mine.rows[0].id]).toMatchObject({ tag: "Own scheme", tone: "neutral" });
+  });
+  it("a bill that only waits for a cost still says so", () => {
+    const vm = incomeOrdersVM(data(month({ bills: [bill({ marginPct: null })] })), null, [], false);
+    expect(vm.sheets[vm.mine.rows[0].id]).toMatchObject({ tag: "Cost pending", tone: "warn" });
   });
 });

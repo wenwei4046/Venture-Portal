@@ -103,7 +103,7 @@ export function Personal({ vm, actions, whole, person = false }: {
             <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
           </button>
         ))}
-        {!vm.brands.length && <p className={s.empty}>No counted sales yet.</p>}
+        {!vm.brands.length && !vm.ownOnly && <p className={s.empty}>No counted sales yet.</p>}
         {vm.notice && (
           <div className={s.notice}>
             <p className={s.noticeTitle}>{vm.notice.title}</p>

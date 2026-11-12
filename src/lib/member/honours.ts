@@ -1,4 +1,4 @@
-import { arenaMonthFridays, arenaRankings, type MemberArenaSnapshot } from "./arena";
+import { arenaMonthFridays, arenaRankings, marginBrandCodes, type MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import { championshipMonth, championshipStandings } from "./championship";
 
@@ -60,12 +60,13 @@ export function monthFinishes(input: {
   board("Sales", "Total sales", arenaRankings(people, "sales"));
   board("Margin", "Total margin", arenaRankings(people, "margin"));
   if (kpi.enabled) board("KPI", "KPI items", arenaRankings(people, "kpi"));
-  for (const { code } of snapshot.brands) {
+  for (const { code, ownScheme } of snapshot.brands) {
     board("Sales", `Sales · ${brandName(code)}`, arenaRankings(people, "sales", code));
-    board("Margin", `Margin · ${brandName(code)}`, arenaRankings(people, "margin", code));
+    // A brand on its own commission scheme (2990s, 2026-11-12) stands in no margin: no Margin board is its.
+    if (ownScheme !== true) board("Margin", `Margin · ${brandName(code)}`, arenaRankings(people, "margin", code));
   }
   const champ = championshipStandings([championshipMonth({
-    month, people, brands: snapshot.brands.map(b => b.code), tiers: snapshot.tiers, history, kpi,
+    month, people, brands: snapshot.brands.map(b => b.code), marginBrands: marginBrandCodes(snapshot.brands), tiers: snapshot.tiers, history, kpi,
   })]);
   board("Championship", "Championship", champ.map(s => ({ id: s.id, position: s.position })));
 

@@ -89,6 +89,35 @@ export function requestMeta(r: MemberRequest): string {
   return `${KIND_WORD[r.kind] ?? r.kind} · ${r.requestNo ?? r.id.slice(0, 8)}`;
 }
 
+export type StatusFilter = "all" | "pending" | "approved" | "withdrawn" | "rejected";
+
+/**
+ * The list's status filter (2026-11-12, the user: "filter of approved, pending, withdraw, reject").
+ * Pending = still to be decided (isOpen); Approved = every step after a yes — paid, on the
+ * waiting list, scheduled, completed; a failed or expired-and-closed request shows under All only.
+ */
+export const STATUS_FILTERS: ReadonlyArray<readonly [StatusFilter, string]> = [
+  ["all", "All statuses"],
+  ["pending", "Pending"],
+  ["approved", "Approved"],
+  ["withdrawn", "Withdrawn"],
+  ["rejected", "Rejected"],
+];
+
+const APPROVED_STATUSES = new Set(["approved", "paid", "waiting", "reserved", "accepted", "allocated", "executed", "scheduled"]);
+
+export function statusGroup(r: MemberRequest): StatusFilter | null {
+  if (isOpen(r)) return "pending";
+  if (APPROVED_STATUSES.has(r.status)) return "approved";
+  if (r.status === "withdrawn") return "withdrawn";
+  if (r.status === "rejected") return "rejected";
+  return null;
+}
+
+export function filterByStatus(requests: readonly MemberRequest[], status: StatusFilter): MemberRequest[] {
+  return status === "all" ? [...requests] : requests.filter(r => statusGroup(r) === status);
+}
+
 export function filterRequests(requests: readonly MemberRequest[], filter: RequestFilter): MemberRequest[] {
   return filter === "all" ? [...requests] : requests.filter(r => r.kind === filter);
 }

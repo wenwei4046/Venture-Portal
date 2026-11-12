@@ -11,7 +11,9 @@
 .card { position: sticky; top: 16px; display: flex; flex-direction: column; max-height: max(360px, calc(100vh - 284px)); }
 .listHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .listTitle { font-size: 15px; font-weight: 500; margin: 0; }
-.filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+/* The status filter (2026-11-12) sits after the kind pills, as tall as they are. */
+.statusFilter { width: auto; min-width: 128px; height: 30px; font-size: 12.5px; }
 .rows { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto; margin: -4px; padding: 4px; scrollbar-width: thin; }
 .row {
   display: flex;

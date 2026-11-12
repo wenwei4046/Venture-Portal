@@ -37,7 +37,12 @@ export interface MemberArenaSnapshot {
   principalView?: boolean; viewedStaffId?: string;
   membershipId: string; department: string; selfId: string;
   period: string; window: ArenaWindow; from: string; through: string; asOf: string; live: boolean;
-  people: ArenaPerson[]; brands: { code: string; name: string }[];
+  people: ArenaPerson[];
+  /**
+   * The scheme's brands. `ownScheme` (2026-11-12): a brand that follows its own commission scheme (2990s) — ranked on
+   * the Sales, Brand and KPI boards, on no Margin board: its bills stand in no margin. Absent from an older answer.
+   */
+  brands: { code: string; name: string; ownScheme?: boolean }[];
   /** The old pick store (empty; see ArenaWeekPicks) — a brand week is the history's `weeks` now. */
   brandWeeks: ArenaBrandWeeks | null;
   weekLocks?: ArenaWeekLock[];
@@ -54,6 +59,9 @@ export interface MemberArenaSnapshot {
   history?: ArenaHistorySnapshot;
   historyError?: string;
 }
+/** The brands a Margin board is kept for: every brand of the scheme but one on its own commission scheme (2990s). */
+export const marginBrandCodes = (brands: MemberArenaSnapshot["brands"]): string[] =>
+  brands.filter(b => b.ownScheme !== true).map(b => b.code);
 export interface ArenaRankedPerson {
   id: string; name: string; self: boolean; position: number | null; value: number | null;
   pending: boolean; hasActivity: boolean;
@@ -164,6 +172,18 @@ export interface ArenaIncentive {
   amount: number;
 }
 
+/** What puts a brand in a person's margin: goods revenue, a bill still waiting for its cost, or a gift's cost. */
+const inMargin = (score: ArenaScore): boolean => score.marginRevenue > 0 || score.blindOrders > 0 || score.marginCost > 0;
+
+/**
+ * Sold, and in no margin (2026-11-12): nothing of what they sold stands in a brand's margin, costs anything or waits
+ * for a cost — a month of bills of a brand on its own scheme (2990s), which the facts answer no margin and a no-sales
+ * cost of 0. Never somebody with no sales.
+ */
+export function arenaOwnOnly(person: ArenaPerson): boolean {
+  return person.sales > 0 && !Object.values(person.brands).some(inMargin);
+}
+
 /** A brand's blended margin, or null when a bill of it has no cost. */
 function brandMargin(score: ArenaScore): number | null {
   if (score.blindOrders > 0) return null;
@@ -192,7 +212,7 @@ export function arenaIncentive(person: ArenaPerson, tiers: readonly ArenaTier[])
   // or not, or a gift's cost with no sales — the same test the engine makes
   // before it tallies a bill.
   const active = Object.entries(person.brands)
-    .filter(([, score]) => score.marginRevenue > 0 || score.blindOrders > 0 || score.marginCost > 0)
+    .filter(([, score]) => inMargin(score))
     .sort(([a], [b]) => a.localeCompare(b));
 
   const brands: ArenaBrandStanding[] = active.map(([brand, score]) => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MemberCatalogue, MemberCatalogueModel, MemberData, MemberMembership, MemberOrgMap, MemberProduct, MemberReadContext, QuoteInput } from "@/lib/member/types";
 import type { ProductListAccess } from "@/lib/member/product-access";
+import type { ChangeViewRow } from "@/lib/marketing/change-view";
 import { NOTHING_CLOSED, requestPageOf, type AppClosed } from "@/lib/member/app-pages";
 import { allowedRoute, landing, requestPage, sends, shows } from "./app-access";
 import { setViewAs } from "@/components/layout/view-as-actions";
@@ -11,7 +12,7 @@ import PushAsk from "@/components/pwa/PushAsk";
 import { useStatusBar } from "@/components/pwa/status-bar";
 import { reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
-import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaRankings, marginBrandCodes, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
@@ -157,6 +158,9 @@ export interface RevenueAppProps {
    * `group` (PRINCIPAL, else MANAGEMENT); `edit` = notes and statuses. Absent: IT support is one's own only.
    */
   itDesk?: { group: string; edit: boolean } | null;
+  /** Change view (2026-11-11, lib/marketing/change-view.ts): a Marketing login the CRM was opened to — the CRM's
+   *  desktop module menu lists Marketing and the CRM, and goes back to Marketing. */
+  crossViews?: readonly ChangeViewRow[];
   /** A preview draws the prototype's device around the app. */
   device?: Device;
   /** Fixtures: a fixed "today" and the source the preview reads. */
@@ -224,7 +228,9 @@ const NO_NOTICES: Notices = { unread: 0, items: [] };
 /** The CRM's way back to the app — its house, a button the CRM draws itself (crm/sales/SalesInbox, crm/panel). */
 const CRM_HOUSE = '[aria-label="Back to Revenue app"], [title="Back to Revenue app"]';
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+const NO_CROSS_VIEWS: readonly ChangeViewRow[] = [];
+
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -820,7 +826,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // leader and points the Championship card names, as the Arena's does.
   const champ = useMemo(() => {
     if (!arenaToday) return null;
-    const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
+    const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), marginBrands: marginBrandCodes(arenaToday.brands), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
     const standings = championshipStandings([month]);
     return { rank: standings.find(s => s.id === selfId)?.position ?? null, standings };
   }, [arenaToday, kpiRule, selfId]);
@@ -1639,7 +1645,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         // The CRM's 4a frame draws this sidebar's rows itself (2026-10-18): the same screens, counts and switcher.
         hidden: hiddenScreens, crmUnread: crmUnread ?? 0,
         products: productList ? { group: productList.group, onOpen: openProducts } : null,
-        modules: principal ? { current: "revenue_member", onPick: id => pickModule(id as ModuleId) } : null,
+        modules: principal ? { current: "revenue_member", onPick: id => pickModule(id as ModuleId) }
+          : crossViews.length > 1 ? { current: "crm", label: "CRM", rows: crossViews.map(v => [v.key, v.label] as const),
+            onPick: id => { const to = crossViews.find(v => v.key === id); if (to && device === "live") window.location.assign(to.href); } }
+          : null,
       } : undefined} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;

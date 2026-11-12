@@ -97,7 +97,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
             <div role="menu" aria-label="Switch module" style={{ position: "absolute", left: 0, right: 0, bottom: "calc(100% - 8px)", zIndex: 8, padding: "6px", background: "#fff",
               borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "2px" }}>
               <span style={{ padding: "6px 8px 4px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>SWITCH MODULE</span>
-              {MODULE_ROWS.map(([id, label]) => { const on = id === f.modules!.current;
+              {(f.modules.rows ?? MODULE_ROWS).map(([id, label]) => { const on = id === f.modules!.current;
                 return <button key={id} type="button" role="menuitemradio" aria-checked={on} onClick={() => { setMods(false); if (!on) f.modules!.onPick(id); }}
                   style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 8px", borderRadius: "7px", font: "500 13px Inter, sans-serif",
                     color: "var(--crm-ink)", background: on ? "var(--crm-sel)" : "transparent" }}>
@@ -106,7 +106,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
           </>)}
           <button type="button" aria-label="Switch module" aria-expanded={mods} onClick={() => setMods(o => !o)} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px",
             height: "36px", padding: open ? "0 10px" : 0, justifyContent: open ? undefined : "center", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "var(--crm-sidebar-text)", border: "1px solid rgba(255,255,255,.12)" }}>
-            <Ic name="layout-grid" size={15} />{open && <>Revenue<span style={{ marginLeft: "auto", display: "flex" }}><Ic name="chevron-down" size={13} /></span></>}
+            <Ic name="layout-grid" size={15} />{open && <>{f.modules.label ?? "Revenue"}<span style={{ marginLeft: "auto", display: "flex" }}><Ic name="chevron-down" size={13} /></span></>}
           </button>
         </>)}
         {v.meMenuOpen && (<>
@@ -200,7 +200,7 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
 /** A page's head: its title, underline tabs, a muted line, CRM alerts and the page's one primary button. */
 export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   const h = f4.head;
-  const pickAt = useRef<HTMLButtonElement>(null);
+  const pickAt = useRef<HTMLButtonElement>(null), cmpAt = useRef<HTMLButtonElement>(null);
   // Calendar and Team activity draw their prototypes' own title rows (docs/design_handoff_crm, 2026-11-08).
   if (f4.ownHead) return f4.addCust ? <DeskAddCustomer v={f4.addCust} /> : null;
   return (<>
@@ -222,11 +222,20 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
               </button>)}
           </div>
           {h.sub && <span data-period-dates="" style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{h.sub}</span>}
-          {h.cmp && (
+          {h.cmp && (h.cmp.on && h.cmp.open ? (
+            // On: the dates open the picker for the range compared with (2026-11-11, the owner: it offered only Stop comparing);
+            // × beside them stops comparing.
+            <span style={{ display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
+              {h.cmp.pick && <DateRangePicker value={h.cmp.pick.value} onApply={h.cmp.pick.apply} onCancel={h.cmp.pick.cancel} anchor={cmpAt} />}
+              <button ref={cmpAt} type="button" onClick={h.cmp.open} aria-haspopup="dialog" aria-expanded={!!h.cmp.pick} title="Pick the dates to compare with"
+                style={{ ...BTN, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline dotted", textUnderlineOffset: "3px" }}>{h.cmp.label}</button>
+              <button type="button" onClick={h.cmp.toggle} aria-label="Stop comparing" title="Stop comparing" style={{ ...BTN, padding: 0, display: "flex", color: "inherit" }}><Ic name="x" size={13} /></button>
+            </span>
+          ) : (
             <button type="button" onClick={h.cmp.toggle} aria-pressed={h.cmp.on} title={h.cmp.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, padding: 0, display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
               {h.cmp.on ? <>{h.cmp.label}<Ic name="x" size={13} /></> : <><Ic name="plus" size={13} />Compare</>}
             </button>
-          )}
+          ))}
         </div>
       )}
       {!h.seg && h.tabs.length > 0 && (

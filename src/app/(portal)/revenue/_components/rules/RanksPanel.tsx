@@ -2,7 +2,8 @@
 
 import { Fragment, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { rankPayLabelOf } from '@/lib/commission/ranks'
+import { ratePct, rankPayLabelOf } from '@/lib/commission/ranks'
+import { BRAND_RATE_FIELD, brandRateOf, namesBrandRate, readBrandRates, type BrandRated } from '@/lib/commission/brand-rates'
 import { GridHead, GridRow, GridTable, hv } from '@/components/hrv/kit'
 import { flash } from '@/components/hrv/toast'
 import { removeRankDef, saveRankDef } from '../../config-actions'
@@ -17,6 +18,11 @@ import s from './rules.module.css'
 // the top, never typed. Whoever may manage the rules edits a rank in place
 // (rate, package, subsidy cap) and adds one under the list; a rank no title
 // sits on can be removed.
+//
+// A brand that follows its own scheme (2026-11-11 — 2990s) has a column of its
+// own, *2990s rate*: what each rank pays on that brand's bills. A rank that
+// names none shows, muted, the rate it follows (the nearest rank below that
+// has one — `brandRateOf`); its box in the editor is then empty.
 
 const pct = (n: number) => String(Math.round(Number(n) * 10000) / 100)
 
@@ -38,7 +44,16 @@ export default function RanksPanel({
   const [editing, setEditing] = useState<string | 'new' | null>(null)
   const [error, setError] = useState('')
   const [pending, start] = useTransition()
-  const cols = canManage ? '120px 140px minmax(0,1fr) 150px' : '120px 140px minmax(0,1fr)'
+  // The brands on their own scheme, and the catalogue as their rate rule reads it (rates keyed by the brand's id).
+  const ownBrands = data.brands.filter(b => b.own_scheme && b.is_active)
+  const rated = new Map<string, BrandRated>(data.rankDefs.map(d => [d.id, {
+    sortOrder: d.sort_order,
+    productRate: Number(d.product_rate),
+    brandRates: readBrandRates(d.brand_rates),
+  }]))
+  const ladder = [...rated.values()]
+  const brandCols = ownBrands.map(() => ' 130px').join('')
+  const cols = canManage ? `120px 140px${brandCols} minmax(0,1fr) 150px` : `120px 140px${brandCols} minmax(0,1fr)`
 
   function save(fd: FormData, label: string) {
     setError('')
@@ -91,6 +106,28 @@ export default function RanksPanel({
         Subsidy cap RM{' '}
         <input className={s.rankInput} name="group_subsidy_cap" type="number" step="0.01" defaultValue={d?.group_subsidy_cap ?? 0} aria-label="Subsidy cap RM" />
       </label>
+      {ownBrands.map(b => {
+        const rank = d?.id ? rated.get(d.id) : undefined
+        const own = rank?.brandRates?.[b.id.toLowerCase()]
+        return (
+          <label key={b.id}>
+            {b.name} rate{' '}
+            <input
+              className={s.rankInput}
+              name={`${BRAND_RATE_FIELD}${b.id}`}
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              defaultValue={own === undefined ? '' : pct(own)}
+              // An empty box: the rank names none, and pays the rate shown here.
+              placeholder={rank ? pct(brandRateOf(rank, b.id, ladder)) : ''}
+              aria-label={`${b.name} rate percent`}
+            />{' '}
+            %
+          </label>
+        )
+      })}
       <span style={{ flex: 1 }} />
       <button type="button" className={hv.linkBtn} onClick={() => setEditing(null)}>
         Cancel
@@ -109,15 +146,41 @@ export default function RanksPanel({
         <GridHead
           cols={cols}
           cellStyle={{ padding: '12px 14px' }}
-          cells={['Rank', { label: 'Product rate', style: { textAlign: 'right' } }, 'Held by (shown)', ...(canManage ? [''] : [])]}
+          cells={[
+            'Rank',
+            { label: 'Product rate', style: { textAlign: 'right' } },
+            ...ownBrands.map(b => ({ label: `${b.name} rate`, style: { textAlign: 'right' as const } })),
+            'Held by (shown)',
+            ...(canManage ? [''] : []),
+          ]}
         />
         {catalogue.map(d => {
           const label = `Rank ${letters.get(d.id) ?? '?'}`
+          const rank = rated.get(d.id)
           return (
             <Fragment key={d.id}>
               <GridRow cols={cols}>
                 <span role="cell" style={{ padding: '11px 14px', fontWeight: 500 }}>{label}</span>
                 <span role="cell" className={`${hv.right} ${hv.mono}`} style={{ padding: '11px 14px' }}>{rankPayLabelOf(d)}</span>
+                {ownBrands.map(b => {
+                  // A package rank pays its package, never a rate.
+                  if (!rank || Number(d.group_incentive_amount) > 0) {
+                    return <span key={b.id} role="cell" className={`${hv.right} ${hv.mono}`} style={{ padding: '11px 14px' }}>—</span>
+                  }
+                  const own = namesBrandRate(rank, b.id)
+                  return (
+                    <span
+                      key={b.id}
+                      role="cell"
+                      className={`${hv.right} ${hv.mono}`}
+                      style={{ padding: '11px 14px', color: own ? undefined : 'rgb(var(--hv-brown))' }}
+                      title={own ? undefined : `No ${b.name} rate of its own — it pays the nearest rank below that has one`}
+                      data-own={own ? 'yes' : 'no'}
+                    >
+                      {ratePct(brandRateOf(rank, b.id, ladder))}
+                    </span>
+                  )
+                })}
                 <span role="cell" style={{ padding: '11px 14px', color: 'rgb(var(--hv-body-2))' }}>{(holders[d.id] ?? []).join(', ') || '—'}</span>
                 {canManage ? (
                   <span role="cell" className={s.rowActions}>

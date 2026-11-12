@@ -23,10 +23,11 @@ import type { CrmData } from "@/lib/member/crm-data";
 import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
 import { officeStamp } from "../../shared/leave-cal-data";
 
-/** Up next's props on the desktop. View as (no viewAs on the ctx): that person's line, read-only. */
+/** Up next's props on the desktop. View as (no viewAs on the ctx): that person's line, read-only — everybody's when they
+ *  see everybody's (a cross-team viewer at View · All, 2026-11-12). */
 function deskUpNextProps(ctx: DeskCtx) {
   const own = !!ctx.viewAs;
-  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own ? null : ctx.me.id, canAct: own, today: leadsToday(ctx.data, ctx.now), lastAt: lastLeadAt(ctx.data.events), now: ctx.now };
+  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own || ctx.data.can.viewAll ? null : ctx.me.id, canAct: own, today: leadsToday(ctx.data, ctx.now), lastAt: lastLeadAt(ctx.data.events), now: ctx.now };
 }
 
 /** Each person's leads today (v4 D3a's "Leads today", the #1 card's "3 leads today"): the customers given to them today,

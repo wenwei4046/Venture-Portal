@@ -12,6 +12,18 @@ import type { CrmContactRow, CrmMessageRow, CrmPeopleRow } from "./crm-live";
 
 export type CrmChannel = "whatsapp" | "messenger";
 
+/**
+ * Somebody opened to the CRM across teams (2026-11-12 — the owner: "不能view as" Josiah and Wei Jie, Marketing's
+ * managers given CRM · View in People › Permissions): no CRM role, so never in `people` — no picker, team, split or
+ * count meets them — but View as lists them, read-only, with what their own cells give.
+ */
+export interface CrmViewer {
+  id: string;
+  name: string;
+  title: string;
+  can: CrmCan;
+}
+
 export interface CrmPerson {
   id: string;
   name: string;
@@ -305,6 +317,13 @@ export function canFromRole(role: CrmRole | null): CrmCan {
   return { viewAll: false, editOwn: !!role, editAll: false, manage: false };
 }
 
+/**
+ * Who reads the ads' figures — Ads Performance, Insight's Ads, Reports — and Meta's numbers behind them: CRM · Manage, or
+ * CRM · View at All, read-only (2026-11-12 — the owner, of Marketing's managers given CRM · View · All: "看不到CRM的ads 功能").
+ * Every change to an ad (its name, hiding it, adding one, its split) stays CRM · Manage's.
+ */
+export const readsAds = (can: CrmCan): boolean => can.manage || can.viewAll;
+
 export function canFrom(value: unknown, role: CrmRole | null): CrmCan {
   if (!value || typeof value !== "object") return canFromRole(role);
   const v = value as Record<string, unknown>;
@@ -317,6 +336,8 @@ export interface CrmData {
   can: CrmCan;
   setup: "not_linked" | "no_role" | null;
   people: CrmPerson[];
+  /** View as's cross-team viewers (CrmViewer) — only for whoever sees everybody's CRM; none before mig 20261112010000. */
+  viewers?: CrmViewer[];
   customers: CrmCustomer[];
   visits: CrmVisit[];
   rooms: CrmRoom[];
@@ -701,7 +722,7 @@ export function personName(name: string): string {
 
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
-  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true, startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}), ...(a.hidden_at ? { hidden: true } : {}) };
+  for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true } : {}), ...(a.starts_at || a.ends_at ? { startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}), ...(a.hidden_at ? { hidden: true } : {}) };
   const customerLabels: Record<string, string[]> = {};
   for (const cl of rows.contactLabels) (customerLabels[cl.contact_id] ??= []).push(cl.label_id);
   return {
@@ -709,6 +730,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
     people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "", login: p.login ?? true, paused: !!p.paused })),
+    viewers: (rows.people.viewers ?? []).map(v => ({ id: v.id, name: personName(v.name), title: v.title ?? "",
+      can: { viewAll: v.reach === "all", editOwn: !!v.editOwn, editAll: !!v.editAll, manage: !!v.manage } })),
     // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read
     // a customer's `ad` (the owner, 2026-10-16: "顯示廣告的名稱，不然業務也看不懂"); Meta's headline stays in adHeadline.
     customers: rows.contacts.map(c => {

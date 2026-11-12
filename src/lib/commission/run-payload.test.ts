@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { computeCommissionRun } from './engine'
 import {
+  ownSchemeBrandsOf,
   releasedOrders,
+  toBrandRates,
   toEngineInput,
   toRunPayload,
   type RunSourceRows,
@@ -643,5 +645,79 @@ describe('an old bill topped up', () => {
     const statement = result.statements.find(s => s.staffId === 'staff-a')!
     expect(statement.productCommission).toBe(500)
     expect(statement.productRevenue).toBe(0)
+  })
+})
+
+// ─── A brand with its own scheme — 2990s (2026-11-11) ───────────────────────
+
+describe('a brand with its own scheme — 2990s', () => {
+  const BRANDS: NonNullable<RunSourceRows['brands']> = [
+    { id: 'brand-2990', code: ' 2990s ', own_scheme: true },
+    { id: 'brand-akemi', code: 'AKEMI', own_scheme: false },
+    { id: 'brand-blank', code: ' ', own_scheme: true },
+  ]
+  // The rank catalogue keys a rank's rates by the brand's ID; the 5% rank pays 2990s 4%, the 6% one names none.
+  const ranks: RunSourceRows['ranks'] = [
+    { ...RANKS[0], comm_rank_defs: { brand_rates: { 'brand-2990': 0.04, 'brand-akemi': 0.03, 'brand-gone': 0.02 } } },
+    { ...RANKS[1], comm_rank_defs: [{ brand_rates: {} }] },
+  ]
+  // A mattress and a pillow that is one of the sub-department's KPI items (RM 50).
+  const lines: RunSourceRows['orders'][number]['sales_order_lines'] = [
+    { id: 'line-1', item_group: 'MATTRESS', product_code: 'MAT-01', product_name: 'Mattress', qty: '1.000', line_amount: '10000.00', brand_code: null, cost_amount: null },
+    { id: 'line-2', item_group: 'MATTRESS', product_code: 'PIL-01', product_name: 'Pillow', qty: '1.000', line_amount: '100.00', brand_code: null, cost_amount: null },
+  ]
+  const bill = (brand: string | null) =>
+    order({ brand_code: brand, order_total: '10100.00', paid_amount: '10100.00', sales_order_lines: lines })
+
+  it('knows which brands follow their own scheme: the code a bill carries, by the brand’s id', () => {
+    expect([...ownSchemeBrandsOf(BRANDS)]).toEqual([['brand-2990', '2990S']])
+    expect([ownSchemeBrandsOf(undefined).size, ownSchemeBrandsOf([{ id: 'b', code: 'AKEMI' }]).size]).toEqual([0, 0])
+  })
+
+  it('reads a rank’s rates by the brand’s code — only for a brand on its own scheme, only a rate from 0 to 1', () => {
+    const own = ownSchemeBrandsOf(BRANDS)
+    expect(toBrandRates({ 'brand-2990': 0.04, 'brand-akemi': 0.03, 'brand-gone': 0.02 }, own)).toEqual({ '2990S': 0.04 })
+    expect(toBrandRates({ 'brand-2990': '0.045' }, own)).toEqual({ '2990S': 0.045 })
+    expect(toBrandRates({ 'BRAND-2990': 0 }, own)).toEqual({ '2990S': 0 })
+    for (const bad of [{ 'brand-2990': 4 }, { 'brand-2990': -0.01 }, { 'brand-2990': 'x' }, { 'brand-2990': null }, {}, [0.04], null, 'x']) {
+      expect(toBrandRates(bad, own)).toBeUndefined()
+    }
+    expect(toBrandRates({ 'brand-2990': 0.04 }, new Map())).toBeUndefined()
+  })
+
+  it('hands the engine the brands and each rung’s rates — and nothing at all while no brand follows its own scheme', () => {
+    const input = toEngineInput(baseRows({ ranks, brands: BRANDS }))
+    expect(input.ownSchemeBrands).toEqual(['2990S'])
+    expect(input.ranks[0].brandRates).toEqual({ '2990S': 0.04 })
+    expect(input.ranks[1]).not.toHaveProperty('brandRates')
+
+    const plain = toEngineInput(baseRows({ ranks }))
+    expect(plain).not.toHaveProperty('ownSchemeBrands')
+    expect(plain.ranks[0]).not.toHaveProperty('brandRates')
+  })
+
+  it('pays its bill the rank’s rate for the brand, on all of it: the sub-department’s KPI item is not found there', () => {
+    const input = toEngineInput(baseRows({ ranks, brands: BRANDS, orders: [bill('2990S')] }))
+    const result = computeCommissionRun(input)
+    const statement = result.statements.find(s => s.staffId === 'staff-a')!
+    // 4% of RM 10,100 — the pillow's RM 100 with it, no RM 50 KPI carved out.
+    expect([statement.productCommission, statement.totalCommission]).toEqual([404, 404])
+    expect(statement.lines.map(l => l.component)).toEqual(['product_revenue'])
+    expect(statement.marginPct).toBeNull()
+    expect(result.warnings).toEqual([])
+  })
+
+  it('pays the same bill under any other brand as ever: the rank’s own rate, the KPI item paid flat', () => {
+    const input = toEngineInput(baseRows({ ranks, brands: BRANDS, orders: [bill('AKEMI')] }))
+    const statement = computeCommissionRun(input).statements.find(s => s.staffId === 'staff-a')!
+    // 5% of RM 10,050, and the pillow's RM 50.
+    expect(statement.productCommission).toBe(502.5)
+    expect(statement.lines.map(l => l.component).sort()).toEqual(['kpi_item', 'product_revenue'])
+  })
+
+  it('releases the bill on its whole commissionable value', () => {
+    const input = toEngineInput(baseRows({ ranks, brands: BRANDS, orders: [bill(' 2990s ')] }))
+    const released = releasedOrders(input, computeCommissionRun(input))
+    expect(released.map(r => [r.order_no, r.product_revenue])).toEqual([['SO-001', 10100]])
   })
 })

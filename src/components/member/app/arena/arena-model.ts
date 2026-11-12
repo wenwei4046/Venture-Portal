@@ -1,8 +1,9 @@
-import { arenaIncentive, arenaRankings, type ArenaMetric, type ArenaPerson, type ArenaRankedPerson, type ArenaTier, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaIncentive, arenaOwnOnly, arenaRankings, type ArenaMetric, type ArenaPerson, type ArenaRankedPerson, type ArenaTier, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { arenaFairRecords, type ArenaHistorySnapshot } from "@/lib/member/arena-history";
 import { CHAMP_ITEMS, type ChampItem, type ChampStanding } from "@/lib/member/championship";
 import type { Board } from "../route";
 import type { InsightPeriod } from "../insight/period";
+import { OWN_SCHEME_PILL } from "../insight/insight-model";
 import { dayRange, firstName, initials, monthName, ordinal, ordinalSuffix, rm } from "../format";
 
 /**
@@ -58,6 +59,11 @@ export interface BoardRow {
   value: number | null;
   pending: boolean;
   active: boolean;
+  /**
+   * The Margin board only (2026-11-12): placed nowhere because what they sold is a brand's on its own scheme (2990s)
+   * — in no margin, and waiting for no cost.
+   */
+  own?: boolean;
 }
 
 function fromRankings(rows: ArenaRankedPerson[], board: Board): BoardRow[] {
@@ -86,7 +92,7 @@ const EMPTY_CHASE: Record<Board, string> = {
 export function chaseLine(board: Board, rows: readonly BoardRow[]): { line: string; aboveId: string | null } {
   const me = rows.find(r => r.self);
   if (!me || me.position === null || me.value === null) {
-    return { line: me?.pending ? "Waiting for complete cost data" : EMPTY_CHASE[board], aboveId: null };
+    return { line: me?.pending ? "Waiting for complete cost data" : me?.own ? OWN_SCHEME_PILL : EMPTY_CHASE[board], aboveId: null };
   }
   const placed = rows.filter(r => r.position !== null && r.value !== null);
   const above = placed.filter(r => r.value! > me.value!).sort((a, b) => a.value! - b.value!)[0];
@@ -361,10 +367,14 @@ export interface ArenaInput {
   director?: boolean;
 }
 
-/** The scheme's brands, in the prototype's order. */
-export function boardBrands(snapshot: MemberArenaSnapshot | null): { code: string; label: string }[] {
+/**
+ * The scheme's brands, in the prototype's order. `margin`: the brands a margin is read on — never one that follows
+ * its own commission scheme (2990s, 2026-11-12; the user: "他唯一不会出现的，只是所谓的 margin arena，但他会出现到 sales
+ * arena、brand arena"): its bills stand in no margin, so no Margin board is its.
+ */
+export function boardBrands(snapshot: MemberArenaSnapshot | null, margin = false): { code: string; label: string }[] {
   const names = new Map((snapshot?.brands ?? []).map(b => [b.code, b.name]));
-  return (snapshot?.brands ?? []).map(b => b.code)
+  return (snapshot?.brands ?? []).filter(b => !(margin && b.ownScheme === true)).map(b => b.code)
     .sort((a, b) => (BRAND_ORDER.indexOf(a) + 99) % 99 - (BRAND_ORDER.indexOf(b) + 99) % 99 || a.localeCompare(b))
     .map(code => ({ code, label: brandLabel(code, names) }));
 }
@@ -397,6 +407,8 @@ const listOf = (items: readonly string[]) => (items.length > 1 ? `${items.slice(
 function footSub(person: ArenaPerson | undefined, tiers: readonly ArenaTier[], period: InsightPeriod, names: Map<string, string>): string {
   if (period.kind !== "monthly") return "Paid month by month · see Insight";
   if (!person) return "No costed sales yet";
+  // A month of a brand on its own scheme: sold, and on no ladder — never "Below Tier 1".
+  if (arenaOwnOnly(person)) return OWN_SCHEME_PILL;
   const inc = arenaIncentive(person, tiers);
   // A brand given away and never sold clears no tier (2026-10-30), so it is in the intersection too.
   const costed = inc.brands.filter(b => b.marginPct !== null || b.noSales);
@@ -419,7 +431,7 @@ function footSub(person: ArenaPerson | undefined, tiers: readonly ArenaTier[], p
 
 export function boardModel(input: ArenaInput): BoardVM {
   const { board, snapshot, period } = input;
-  const brands = board === "sales" || board === "margin" ? boardBrands(snapshot) : [];
+  const brands = board === "sales" || board === "margin" ? boardBrands(snapshot, board === "margin") : [];
   const hasSub = board === "sales" || board === "margin";
   const sub: ArenaSub = !hasSub ? "total" : board === "margin" && input.sub === "fair" ? "total" : input.sub;
   const brand = sub === "brand" ? (brands.find(b => b.code === input.brand)?.code ?? brands[0]?.code ?? "") : "";
@@ -443,7 +455,10 @@ export function boardModel(input: ArenaInput): BoardVM {
   } else {
     const metric = METRIC[board];
     const enabled = board !== "kpi" || input.kpiEnabled;
-    const rows = enabled ? fromRankings(arenaRankings(people, metric, brand || undefined), board)
+    // On the Margin board, somebody whose month is a brand's on its own scheme is placed nowhere — and it says why.
+    const own = board === "margin" ? new Set(people.filter(arenaOwnOnly).map(p => p.id)) : null;
+    const rows: BoardRow[] = enabled
+      ? fromRankings(arenaRankings(people, metric, brand || undefined), board).map(r => (own?.has(r.id) && r.position === null ? { ...r, own: true } : r))
       : people.map(p => ({ id: p.id, name: p.name, self: p.self, position: null, value: null, pending: false, active: false }));
     rank = rankView(board, rows, count, director);
     if (!enabled) {

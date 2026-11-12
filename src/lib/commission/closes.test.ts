@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  closeDrift, closeSnapshots, closeSummary, nextOpenPerson, parseCloseSummary, salespersonFigures,
+  closeDrift, closeSnapshots, closeSummary, nextOpenPerson, noMarginNote, parseCloseSummary, salespersonFigures,
   splitSelection, totalsThatMoved, type SalespersonClose,
 } from './closes'
 import { upsalesToOrders } from './upsales'
@@ -76,6 +76,57 @@ describe('the salesperson row', () => {
       // 6% of 1,000 + 2,000 − 500; the held bill earns nothing yet.
       personal: 150, overriding: 0, total: 150,
     })
+  })
+})
+
+// 2026-11-12 — once 2990s followed its own scheme, the list still read "Cost incomplete" under the margin of
+// somebody whose whole month was 2990s bills (ETHAN's November: 6 bills, RM 21,200) — and no cost was waited for.
+describe('a month that reads no margin', () => {
+  const ownRanks: Rank[] = [
+    { ...rank('agent', 0.06, 1), brandRates: { '2990S': 0.04 } },
+    { ...rank('leader', 0.09, 2), brandRates: { '2990S': 0.06 } },
+  ]
+  const ownMonth = (orders: SalesOrder[]) => input({ ownSchemeBrands: ['2990S'], ranks: ownRanks, orders })
+  const figuresOf = (source: EngineInput, staffId = 'agent') => salespersonFigures(board(source).people.find(p => p.staffId === staffId)!)
+
+  it('is on its own scheme when its bills are a brand’s on its own scheme: no cost is waited for', () => {
+    const figures = figuresOf(ownMonth([sale('own', 1_000, { brandCode: '2990S' })]))
+    // 4% of the RM 1,000, the rung's rate for the brand.
+    expect(figures).toMatchObject({ orders: 1, salesValue: 1_000, marginPct: null, noMargin: 'own', personal: 40 })
+    expect(noMarginNote(figures)).toBe('Own scheme')
+  })
+
+  it('says nothing for somebody with no bill in a margin', () => {
+    const figures = figuresOf(input(), 'leader')
+    expect(figures).toMatchObject({ orders: 0, marginPct: null, noMargin: 'none' })
+    expect(noMarginNote(figures)).toBeNull()
+  })
+
+  it('still waits for a cost while a bill has none — beside the brand’s bills too', () => {
+    const bare = sale('bare')
+    bare.lines = bare.lines.map(line => ({ ...line, costAmount: undefined }))
+    const figures = figuresOf(ownMonth([bare, sale('own', 1_000, { brandCode: '2990S' })]))
+    expect(figures.marginPct).toBeNull()
+    expect(figures.noMargin).toBeUndefined()
+    expect(noMarginNote(figures)).toBe('Cost incomplete')
+  })
+
+  it('reads the other bills’ margin beside the brand’s', () => {
+    const figures = figuresOf(ownMonth([sale('one'), sale('own', 1_000, { brandCode: '2990S' })]))
+    // The RM 1,000 Akemi bill alone: (1,000 − 600) ÷ 1,000.
+    expect(figures).toMatchObject({ orders: 2, salesValue: 2_000, marginRevenue: 1_000, marginCost: 600 })
+    expect(figures.marginPct).toBeCloseTo(0.4)
+    expect(figures.noMargin).toBeUndefined()
+  })
+
+  it('is kept with the close, and a close from before reads as it did', () => {
+    const source = ownMonth([sale('own', 1_000, { brandCode: '2990S' })])
+    expect(closeOf(source, 'agent').summary.noMargin).toBe('own')
+    expect(closeOf(source, 'leader').summary.noMargin).toBe('none')
+    const before = parseCloseSummary({ total: 40, marginPct: null, marginRevenue: 0, marginCost: 0 }, 'ETHAN')
+    expect(before.noMargin).toBeUndefined()
+    expect(noMarginNote(before)).toBe('Cost incomplete')
+    expect(parseCloseSummary({ noMargin: 'yes' }, 'ETHAN').noMargin).toBeUndefined()
   })
 })
 

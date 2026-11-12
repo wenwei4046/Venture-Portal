@@ -72,10 +72,14 @@ function newness(rows: Row[]): (firstSeen: string | null) => boolean {
 export type BrandRef = BrandWords
 
 async function loadBrands(sb: SupabaseClient): Promise<BrandRef[]> {
+  // A brand on its own commission scheme (2990s, 2026-11-12) has no margin ladder and
+  // no calculator, so no model sells under it here: the ERP's 2990s models read as they
+  // did before the brand existed — no brand — as `catalogue_ladder_brand` reads them.
   const data = await all((from, to) => sb
     .from('comm_brands')
     .select('code, name, sub_brands, is_active, created_at')
     .eq('is_active', true)
+    .eq('own_scheme', false)
     .order('created_at')
     .order('id')
     .range(from, to))
@@ -890,7 +894,10 @@ export interface SchemeBrand {
   name: string
 }
 
-/** The sub-department's own brands with a ladder (`comm_brands`, active), by name. */
+/**
+ * The sub-department's own brands with a ladder (`comm_brands`, active), by name —
+ * never one on its own scheme (2990s): its bills are in no margin, so no ratio is read for it.
+ */
 export async function loadSchemeBrands(schemeId: string): Promise<SchemeBrand[]> {
   const sb = await untyped()
   const rows = await all((f, t) =>
@@ -899,6 +906,7 @@ export async function loadSchemeBrands(schemeId: string): Promise<SchemeBrand[]>
       .select('code, name')
       .eq('scheme_id', schemeId)
       .eq('is_active', true)
+      .eq('own_scheme', false)
       .order('name')
       .order('code')
       .range(f, t),

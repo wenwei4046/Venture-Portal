@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MemberReadContext } from "@/lib/member/types";
-import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
+import { marginBrandCodes, type ArenaWindow, type MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ArenaHistorySnapshot } from "@/lib/member/arena-history";
 import { championshipMonth, championshipStandings, type ChampMonth, type ChampStanding } from "@/lib/member/championship";
 import { ask, untracked, type Outcome, type RevenueSource, type TrackRead } from "../source";
@@ -123,7 +123,7 @@ export function useArenaData({ source, membershipId, context, readable, period, 
   const champ = useMemo(() => {
     if (!monthSnaps) return null;
     const months = monthSnaps.map(snap => championshipMonth({
-      month: snap.period, people: snap.people, brands: snap.brands.map(b => b.code), tiers: snap.tiers, history, kpi,
+      month: snap.period, people: snap.people, brands: snap.brands.map(b => b.code), marginBrands: marginBrandCodes(snap.brands), tiers: snap.tiers, history, kpi,
     }));
     return { months, standings: championshipStandings(months) };
   }, [monthSnaps, history, kpi]);

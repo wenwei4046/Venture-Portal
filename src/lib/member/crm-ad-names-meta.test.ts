@@ -74,10 +74,35 @@ describe('ad statuses from Ads Manager', () => {
     const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
       if (fn === 'crm_ads_to_check') return { data: ids, error: null }
       if (fn === 'crm_meta_ad_status') { kept.push(args as { p_ad: string; p_status: string }); return { data: true, error: null } }
+      if (fn === 'crm_meta_ad_run') { runs.push(args); return missingRun ? { data: null, error: { message: 'function does not exist' } } : { data: true, error: null } }
       return { data: null, error: { message: 'unknown' } }
     })
-    return { client: { rpc } as unknown as SupabaseClient, kept }
+    return { client: { rpc } as unknown as SupabaseClient, kept, runs }
   }
+  const runs: Record<string, unknown>[] = []
+  let missingRun = false
+  beforeEach(() => { runs.length = 0; missingRun = false })
+
+  // 2026-11-11: Reports › Overview's Start date / End date — the ad set's run kept with the status, for every ad.
+  it("keeps the ad set's start and end with the status; an ad with no start keeps none", async () => {
+    const d = statusDb(['111111', '222222'])
+    const f = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      expect(u).toContain('fields=name,effective_status,adset{start_time,end_time}')
+      if (u.includes('/111111?')) return new Response(JSON.stringify({ name: 'A', effective_status: 'ACTIVE', adset: { start_time: '2026-10-20T09:00:00+0800', end_time: '2026-11-30T23:59:00+0800' } }), { status: 200 })
+      return new Response(JSON.stringify({ name: 'B', effective_status: 'PAUSED', adset: {} }), { status: 200 })
+    }) as unknown as typeof fetch
+    expect(await refreshAdStatuses(d.client, 'T', f)).toBe(2)
+    expect(runs).toEqual([{ p_ad: '111111', p_start: '2026-10-20T09:00:00+0800', p_end: '2026-11-30T23:59:00+0800' }])
+  })
+
+  it('a database without crm_meta_ad_run yet still keeps every status', async () => {
+    missingRun = true
+    const d = statusDb(['111111'])
+    const f = vi.fn(async () => new Response(JSON.stringify({ name: 'A', effective_status: 'ACTIVE', adset: { start_time: '2026-10-20T09:00:00+0800' } }), { status: 200 })) as unknown as typeof fetch
+    expect(await refreshAdStatuses(d.client, 'T', f)).toBe(1)
+    expect(runs).toEqual([{ p_ad: '111111', p_start: '2026-10-20T09:00:00+0800', p_end: null }])
+  })
 
   it('asks each ad and keeps its status, skipping the ad Graph cannot see', async () => {
     const d = statusDb(['111111', '222222', '333333'])

@@ -173,7 +173,7 @@ function lineOf(
       date: '',
       venue: '',
       customer: '',
-      brandCode: brandOfRef(ref, brands) ?? '',
+      brandCode: row.ownBrand ?? brandOfRef(ref, brands) ?? '',
       wholeTotal: null,
       sharePct: null,
       source: fact?.erpDocNo ? 'ERP' : '人手',
@@ -221,8 +221,10 @@ function lineOf(
   }
 
   const ref = row.refNo ?? ''
-  const brandCode = brandOfRef(ref, brands) ?? ctx.billBrandOf(row.orderId) ?? row.brands[0] ?? ''
-  if (!brandOfRef(ref, brands) && brandCode) {
+  // A bill of a brand on its own scheme (2990s, 2026-11-11) is that brand's whatever paper it was written on: its
+  // ERP company decides, never a Ref No. that happens to start like another brand's.
+  const brandCode = row.ownBrand ?? brandOfRef(ref, brands) ?? ctx.billBrandOf(row.orderId) ?? row.brands[0] ?? ''
+  if (!row.ownBrand && !brandOfRef(ref, brands) && brandCode) {
     notes.push(ref ? `Ref No. 没有对上品牌，品牌用 ERP 的 ${brandCode}` : `没有纸单号，品牌用 ERP 的 ${brandCode}`)
   }
 

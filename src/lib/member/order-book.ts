@@ -51,6 +51,12 @@ export interface MemberBookOrder {
    * answer the server gave before it knew.
    */
   noSales?: boolean;
+  /**
+   * A bill of a brand that follows its own commission scheme (2990s, 2026-11-12): the member's sale like any other —
+   * their sales, target, the Sales, Brand and KPI boards — and in no margin: `margin` is null for good, it waits for no
+   * cost and its brand is on no ladder. Absent on every other bill.
+   */
+  ownScheme?: true;
   kpiQty: number;
   /** Deposit met (or released by a close). */
   cleared: boolean;
@@ -207,6 +213,7 @@ function readOrder(value: unknown): MemberBookOrder | null {
     organiser: text(value.organiser),
     week, revenue, margin, kpiQty,
     ...(typeof value.noSales === "boolean" ? { noSales: value.noSales } : {}),
+    ...(value.ownScheme === true ? { ownScheme: true as const } : {}),
     cleared: value.cleared,
     carried: value.carried,
     manual: value.manual === true,

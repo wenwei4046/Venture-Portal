@@ -18,10 +18,11 @@ import { auditWhen, type AuditLine } from "../../shared/audit-timeline";
 import { customerLog } from "../../shared/customer-audit";
 import { alertsUnreadN } from "./inbox";
 import { rangeLine } from "./frame4a";
-import { isoOf } from "./adsperf";
+import { isoOf, metaFigures } from "./adsperf";
+import { adStatusOf } from "@/lib/member/crm-ad-running";
 import {
   overviewReport, appointmentsReport, pctLabel, periodRange, RP_PERIODS, waitLabel, replyState, needsReply, waitWords, readReportCols, reportColumns,
-  RP_PICKS, colValue, sortByCol, type ApptVisit, type Part, type OverviewFigs, type OverviewPerson, type RpColKey, type ReplyKind,
+  RP_PICKS, colValue, sortByCol, pickGroup, type AdFacts, type ApptVisit, type Part, type OverviewFigs, type OverviewPerson, type RpColKey, type ReplyKind,
 } from "./reports";
 
 export type RpCat = "overview" | "ads" | "lba" | "sales" | "appt" | "src";
@@ -85,18 +86,34 @@ export function reportsVM(ctx: DeskCtx) {
   const lateMin = (data.settings ?? DEFAULT_CRM_SETTINGS).replyUrgentH * 60;
   // Spend: Meta's figure for the ad over this period, when Ads performance has read it (ui.apMeta, keyed "from|to").
   const rkey = `${isoOf(Math.max(range[0], 0))}|${isoOf(Math.min(range[1], now.getTime()))}`;
-  const spendOf = (key: string): number | null => { const f = ui.apMeta?.[rkey]?.[key]; return f ? f.spend : null; };
-  const cell = (f: OverviewFigs, k: RpColKey, spend: number | null) => {
-    const v = colValue(f, k, spend);
-    const text = v == null ? "—" : k === "avg" ? fmt(v) : k === "spend" ? `RM ${Math.round(v).toLocaleString("en-MY")}` : k === "perLead" ? `RM ${v.toFixed(2)}` : k === "wonRate" ? pctLabel(v) : String(v);
-    return { k, text, grey: v == null || v === 0, late: k === "avg" && v != null && v >= lateMin };
+  // …and (2026-11-11) every other figure Meta gives for it, its status and its run's dates: an ad's own facts.
+  const lastLead = (key: string) => data.customers.filter(c => c.adId === key).map(c => c.createdAt).sort().at(-1) ?? null;
+  const time = (iso: string | null | undefined) => { const t = iso ? Date.parse(iso) : NaN; return Number.isFinite(t) ? t : null; };
+  const factsOf = (key: string): AdFacts => {
+    const f = ui.apMeta?.[rkey]?.[key], an = data.adNames?.[key], real = /^\d{5,32}$/.test(key);
+    return { meta: f ? metaFigures([f], {}) : {}, status: real ? adStatusOf(an, lastLead(key), now) : null, start: time(an?.startAt), end: time(an?.endAt) };
   };
-  const cellsOf = (f: OverviewFigs, spend: number | null) => cols.map(([k]) => cell(f, k, spend));
+  const rm2 = (v: number) => `RM ${v.toFixed(2)}`, whole = (v: number) => Math.round(v).toLocaleString("en-MY");
+  const cell = (f: OverviewFigs, k: RpColKey, facts: AdFacts | null) => {
+    const v = colValue(f, k, facts);
+    const text = v == null ? "—" : k === "avg" ? fmt(v) : k === "spend" || k === "wonAmt" ? `RM ${whole(v)}` : ["perLead", "cpc", "cpm", "cpmsg", "cpappt"].includes(k) ? rm2(v)
+      : k === "wonRate" || k === "apptRate" || k === "showRate" ? pctLabel(v) : k === "ctr" ? `${v.toFixed(2)}%` : k === "roas" ? `${v.toFixed(2)}×`
+        : k === "status" ? (v ? "Running" : "Paused") : k === "start" || k === "end" ? new Date(v).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit", timeZone: "Asia/Kuala_Lumpur" })
+          : ["impr", "reach", "clicks", "msgconv"].includes(k) ? whole(v) : String(v);
+    return { k, text, grey: v == null || (v === 0 && k !== "status"), late: k === "avg" && v != null && v >= lateMin };
+  };
+  const cellsOf = (f: OverviewFigs, facts: AdFacts | null) => cols.map(([k]) => cell(f, k, facts));
+  // Meta's figures for the period, asked by DeskScreens (fetchAdInsights, CRM · Manage) when a column needs them (2026-11-11:
+  // Spend read "—" on Reports until Ads performance had been opened for the same days).
+  const META_COLS = new Set<string>(["spend", "perLead", "cpappt", "roas", "impr", "reach", "clicks", "ctr", "cpc", "cpm", "msgconv", "cpmsg"]);
+  const metaIds = cat === "overview" && cols.some(([k]) => META_COLS.has(k)) ? allAds.map(a => a.key).filter(k => /^\d{5,32}$/.test(k) && !(k in (ui.apMeta?.[rkey] ?? {}))) : [];
+  const [since, until] = rkey.split("|");
+  const rpNeed = metaIds.length ? [{ key: rkey, since, until, ids: metaIds }] : [];
   const pickPerson = (ad: string, id: string) => () => patch({ rpPick: ui.rpPick === id && (ui.rpPickAd ?? "all") === ad ? null : id, rpPickAd: ad, rpLead: null });
   const personRow = (p: OverviewPerson, ad: string) => ({ key: p.id || "none", name: p.name, none: !p.id, need: p.need ? `${p.need} need${p.need === 1 ? "s" : ""} a reply` : "",
     on: !!p.id && ui.rpPick === p.id && (ui.rpPickAd ?? "all") === ad, cells: cellsOf(p, null), pick: p.id ? pickPerson(ad, p.id) : null, v: (k: RpColKey) => colValue(p, k, null) });
-  const ads = sortByCol(ov.byAd.map(a => ({ ...a, v: (k: RpColKey) => colValue(a, k, spendOf(a.key)) })), sort.k, sort.dir).map(a => ({
-    key: a.key, name: a.name, wa: a.channel === "whatsapp", cells: cellsOf(a, spendOf(a.key)),
+  const ads = sortByCol(ov.byAd.map(a => ({ ...a, facts: factsOf(a.key) })).map(a => ({ ...a, v: (k: RpColKey) => colValue(a, k, a.facts) })), sort.k, sort.dir).map(a => ({
+    key: a.key, name: a.name, wa: a.channel === "whatsapp", cells: cellsOf(a, a.facts),
     people: sortByCol(a.people.map(p => personRow(p, a.key)), sort.k, sort.dir),
   }));
   const people = sortByCol(ov.byRep.map(p => personRow(p, "all")), sort.k, sort.dir);
@@ -144,7 +161,7 @@ export function reportsVM(ctx: DeskCtx) {
       pick: () => set(u => ({ ...u, rpSort: !u.rpSort || u.rpSort.k !== k ? { k, dir: "desc" } : u.rpSort.dir === "desc" ? { k, dir: "asc" } : null })) })),
     ads, people, panel,
     // Columns (notes/25): the picker's choices, ticked or not; each tick saved for this user on the server.
-    picker: RP_PICKS.map(([k, label]) => ({ k, label, on: picks.includes(k), group: k.startsWith("st:") ? "Statuses" : k === "channel" ? "Channel" : "Figures",
+    picker: RP_PICKS.map(([k, label]) => ({ k, label, on: picks.includes(k), group: pickGroup(k),
       toggle: () => ctx.deskAct.saveUiPref("reportCols", picks.includes(k) ? picks.filter(x => x !== k) : RP_PICKS.map(p => p[0]).filter(x => x === k || picks.includes(x))) })),
   };
 
@@ -163,6 +180,7 @@ export function reportsVM(ctx: DeskCtx) {
   const alertsN = alertsUnreadN(ctx);
   return {
     kReports: ui.tab === "reports" || ui.tab === "workspace",
+    rpNeed: ui.tab === "reports" ? rpNeed : [],
     reports: {
       cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k, rpPick: null, rpLead: null }) })),
       periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per || (k === "custom" && (per === "last" || per === "all")), pick: () => patch(k === "custom" ? { rpDates: true } : { rpPer: k, rpDates: false }) })),

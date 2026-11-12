@@ -1,4 +1,4 @@
-// v4 D5a (notes/24): the Inbox's list head — Search + Brand, People / Status opening the 2c·2 picker (several at once,
+// v4 D5a (notes/24): the Inbox's list head — Search + Brand, People / Status each opening its own picker (several at once,
 // "Show N chats"), the picked ones as tags, "N chats of M"; each row the same three lines.
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -17,17 +17,31 @@ const row = { id: "c1", name: "Rajesh Kumar", ini: "RK", avBg: "x", avFg: "y", c
 const brandOpts = [{ label: "All", title: "All brands", n: 0, on: true, pick: vi.fn() }, { label: "The Conts", title: "The Conts", n: 2, on: false, pick: vi.fn() }];
 
 describe("the Inbox's list (D5a)", () => {
-  it("picks people and statuses together and shows them", () => {
-    const f = filter();
+  // 2026-11-11 (the owner: People and Status filtered separately): each button opens its own picker, and applying one
+  // keeps what the other has applied.
+  it("People opens the people picker alone and keeps the statuses applied", () => {
+    const f = filter({ st: ["Attention"], statusN: 1 });
     render(<DeskInboxList4a v={{ brandOpts, list4: { q: "", setQ: () => {}, filter: f, rows: [row] } }} />);
-    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
-    const dlg = screen.getByRole("dialog", { name: "Filter chats" });
+    fireEvent.click(screen.getByRole("button", { name: /^People/ }));
+    const dlg = screen.getByRole("dialog", { name: "Filter by people" });
+    expect(within(dlg).queryByRole("button", { name: /Follow up/ })).toBeNull();
     fireEvent.click(within(dlg).getByRole("button", { name: /Team Cyrus/ }));
-    fireEvent.click(within(dlg).getByRole("button", { name: /Follow up/ }));
     // The team's people show under it once it is picked; a person narrows it to them.
     fireEvent.click(within(dlg).getByRole("button", { name: /Amanda Koh/ }));
     fireEvent.click(within(dlg).getByRole("button", { name: "Show 7 chats" }));
-    expect(f.apply).toHaveBeenCalledWith(["p2"], ["Follow up"]);
+    expect(f.apply).toHaveBeenCalledWith(["p2"], ["Attention"]);
+  });
+  it("Status opens the status picker alone; its Clear clears the statuses only", () => {
+    const f = filter({ who: ["p1"], st: ["Attention"], peopleN: 1, statusN: 1 });
+    render(<DeskInboxList4a v={{ brandOpts, list4: { q: "", setQ: () => {}, filter: f, rows: [row] } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
+    const dlg = screen.getByRole("dialog", { name: "Filter by status" });
+    expect(within(dlg).queryByRole("button", { name: /Team Cyrus/ })).toBeNull();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Clear" }));
+    fireEvent.click(within(dlg).getByRole("button", { name: /Follow up/ }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Show 7 chats" }));
+    expect(f.apply).toHaveBeenCalledWith(["p1"], ["Follow up"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
   it("Brand is a menu beside Search; the row has the wait, owner · ad, the message and unread", () => {
     render(<DeskInboxList4a v={{ brandOpts, list4: { q: "", setQ: () => {}, filter: filter({ chips: [{ key: "st:Follow up", label: "Follow up", dot: "x", round: false, remove: vi.fn() }], statusN: 1, shownN: 3 }), rows: [row] } }} />);

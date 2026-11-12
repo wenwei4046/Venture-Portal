@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { excludeOrder, includeOrder, moveOrder, setHalfComm, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
 import type { BillHalfCommAction, BillHalfCommResult } from '@/lib/commission/bill-half-comm'
-import type { BillBrandAction, BrandOption } from '@/lib/commission/bill-brand'
+import { pickableBrands, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
 import { moveProblem, type BillMoveAction, type BillMoveResult } from '@/lib/commission/bill-move'
 import {
   defaultPartFor, holdersLine, parsePart, partsAfter, shareProblem, sharePct,
@@ -729,7 +729,8 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
             Nothing on this bill names a brand. Pick the brand of the fair it was sold at: its margin is judged on
             that brand&apos;s ladder, and it stays through every ERP re-send.
           </p>
-          {brand.options.map(option => (
+          {/* Only a brand with a margin ladder: one on its own scheme (2990s) has none to follow. */}
+          {pickableBrands(brand.options).map(option => (
             <button key={option.code} type="button" disabled={pending || option.code === brand.action.picked}
               onClick={() => runBrand(option.code)}>
               {option.name}{option.code === brand.action.picked ? ' (picked)' : ''}

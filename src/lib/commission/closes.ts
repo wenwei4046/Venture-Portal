@@ -1,3 +1,4 @@
+import { OWN_SCHEME_LABEL } from './brand-rates'
 import { round2 } from './engine'
 import { toRunPayload, type ReleasedOrderDto, type StatementDto } from './run-payload'
 import type { DeferredOrder, EngineInput, PenalisedOrder } from './types'
@@ -47,6 +48,13 @@ export interface SalespersonFigures {
   marginPct: number | null
   marginRevenue: number | null
   marginCost: number | null
+  /**
+   * Why a month that reads no margin waits for no cost (2026-11-12): `'own'` — no bill of theirs stands in a margin
+   * and one of them is of a brand on its own scheme (2990s, judged on none); `'none'` — no bill of theirs stands in
+   * a margin at all (a month with no bills, or none that counts yet). Left out when a margin is read, and when a
+   * cost — or a bill's brand — is still missing; absent from a close written before it, which reads as it did.
+   */
+  noMargin?: 'own' | 'none'
   personal: number
   overriding: number
   /** A fixed group reward, paid as a month line of its own. */
@@ -62,6 +70,29 @@ export interface SalespersonFigures {
 const sum = <T,>(rows: readonly T[], get: (row: T) => number) => round2(rows.reduce((a, r) => a + get(r), 0))
 
 /**
+ * Whether the month reads no margin with nothing waited for (2026-11-12). The engine tallies a brand for every bill
+ * that stands in a margin — one whose cost is missing too, and one with no brand — so a month it tallied nothing
+ * for has no cost to wait for: its bills are a brand's on its own scheme, held, counted out, or there are none.
+ * Somebody the engine made no statement for is judged only when they have no bill at all.
+ */
+function noMarginOf(person: WorkbenchPerson, counted: WorkbenchPerson['personalRows']): 'own' | 'none' | undefined {
+  const tallied = person.statement ? person.statement.marginByBrand.length > 0 : person.personalRows.length > 0
+  if (tallied) return undefined
+  return counted.some(r => !!r.ownBrand) ? 'own' : 'none'
+}
+
+/** A month's margin cannot be read yet: one of its bills has a cost — or a brand — missing. */
+export const COST_INCOMPLETE_LABEL = 'Cost incomplete'
+
+/**
+ * What stands under a month's margin that reads none: the brand's own scheme, nothing (null) when no bill of theirs
+ * stands in a margin — or *Cost incomplete*, when a cost or a bill's brand is still missing.
+ */
+export function noMarginNote(figures: Pick<SalespersonFigures, 'noMargin'>): string | null {
+  return figures.noMargin === 'own' ? OWN_SCHEME_LABEL : figures.noMargin === 'none' ? null : COST_INCOMPLETE_LABEL
+}
+
+/**
  * The row of the salesperson table, from the live board. The same arithmetic
  * the table always did, moved here so a close stores exactly what was shown.
  */
@@ -69,6 +100,7 @@ export function salespersonFigures(person: WorkbenchPerson): SalespersonFigures 
   const counted = person.personalRows.filter(r => r.status !== 'excluded')
   // An old bill topped up pays them its commission (in `personal`) and is no sale of theirs (2026-11-07).
   const bills = counted.filter(r => !r.upsale && !r.commissionOnly)
+  const noMargin = noMarginOf(person, counted)
   return {
     name: person.name,
     titleLabel: person.titleLabel,
@@ -83,6 +115,7 @@ export function salespersonFigures(person: WorkbenchPerson): SalespersonFigures 
     marginPct: person.statement?.marginPct ?? null,
     marginRevenue: person.statement ? person.statement.marginRevenue : null,
     marginCost: person.statement ? person.statement.marginCost : null,
+    ...(noMargin ? { noMargin } : {}),
     personal: person.personalTotal,
     overriding: person.overrideTotal,
     groupIncentive: person.monthlyGroupIncentive,
@@ -225,6 +258,7 @@ export function parseCloseSummary(raw: unknown, fallbackName: string): CloseSumm
     marginPct: numOrNull(o.marginPct),
     marginRevenue: numOrNull(o.marginRevenue),
     marginCost: numOrNull(o.marginCost),
+    ...(o.noMargin === 'own' || o.noMargin === 'none' ? { noMargin: o.noMargin } : {}),
     personal: num(o.personal),
     overriding: num(o.overriding),
     groupIncentive: num(o.groupIncentive),
