@@ -53,7 +53,8 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
     <div className={m.list}>
       {fields.map((f, i) => {
         const on = f.key === selKey
-        const req = f.req || f.lock
+        const isTitle = f.type === 'Title'
+        const req = !isTitle && (f.req || f.lock)
         const cols = f.cols ?? []
         const sub = f.type === 'Table' ? `${f.type} · ${cols.map(c => c.name || '…').join(', ')}` : f.help ? `${f.type} · ${f.help}` : f.type
         const badText = bad.get(f.key)
@@ -103,7 +104,8 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
                 <div className={m.fsub}>{sub}</div>
               </div>
               <div className={m.pills}>
-                <button
+                {/* A Title is a fixed sentence — nothing to fill in, so never required (the user, 2026-11-12). */}
+                {isTitle ? null : <button
                   type="button"
                   className={`${m.pill} ${req ? m.reqOn : m.reqOff}${f.lock ? ` ${m.pillLocked}` : ''}`}
                   aria-pressed={req}
@@ -115,7 +117,7 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
                   }}
                 >
                   <Steady show={req ? 'Required' : 'Optional'} also={['Required', 'Optional']} bold />
-                </button>
+                </button>}
                 <button
                   type="button"
                   className={`${m.pill} ${f.pic ? m.picOn : m.picOff}`}
@@ -136,23 +138,24 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
               <div className={m.fset}>
                 <div className={m.fgrid}>
                   <label className={m.flabel}>
-                    <span className={m.flabelText}>Field name</span>
+                    <span className={m.flabelText}>{isTitle ? 'Title' : 'Field name'}</span>
                     <input
                       className={`${m.input}${!f.name.trim() || badText ? ` ${m.inputBad}` : ''}`}
                       value={f.name}
                       readOnly={f.lock}
                       maxLength={60}
-                      placeholder="e.g. Decisions"
+                      placeholder={isTitle ? 'e.g. Year-end Kickoff Meeting' : 'e.g. Decisions'}
                       title={f.lock ? LOCKED : undefined}
                       onChange={e => set(i, { ...f, name: e.target.value })}
                     />
                   </label>
                   <label className={m.flabel}>
-                    <span className={m.flabelText}>Hint for staff <span className={m.optional}>· optional</span></span>
-                    <input className={m.input} value={f.help ?? ''} maxLength={MAX_HELP} placeholder="Shown under the field name" onChange={e => set(i, { ...f, help: e.target.value })} />
+                    <span className={m.flabelText}>{isTitle ? 'Description' : 'Hint for staff'} <span className={m.optional}>· optional</span></span>
+                    <input className={m.input} value={f.help ?? ''} maxLength={MAX_HELP} placeholder={isTitle ? 'Shown under the title' : 'Shown under the field name'} onChange={e => set(i, { ...f, help: e.target.value })} />
                   </label>
                 </div>
-                <div className={m.kindBlock}>
+                {/* A Title asks no answer: no kinds to pick (the user, 2026-11-12 — "不需要再什么 long answer 之类的"). */}
+                {isTitle ? null : <div className={m.kindBlock}>
                   <span className={m.flabelText} id={`kind-${f.key}`}>Kind of answer</span>
                   <div className={m.kinds} role="radiogroup" aria-labelledby={`kind-${f.key}`}>
                     {TYPE_CARDS.map(c => {
@@ -175,7 +178,7 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
                       )
                     })}
                   </div>
-                </div>
+                </div>}
 
                 {f.type === 'Table' ? <MinutesTableEditor field={f} closeTick={closeTick} onChange={next => set(i, next)} /> : null}
 
@@ -200,8 +203,8 @@ export default function MinutesFields({ fields, selKey, reveal, problems, adding
                   <button
                     type="button"
                     className={m.fdel}
-                    disabled={f.lock}
-                    title={f.lock ? LOCKED : undefined}
+                    disabled={f.lock || isTitle}
+                    title={f.lock ? LOCKED : isTitle ? 'Every minutes has a title' : undefined}
                     onClick={() => {
                       onFields(fields.filter((_, k) => k !== i))
                       onSelect(null)

@@ -288,4 +288,39 @@ check(await missing([{ ...T, req: true }], {}), [], 'a required table whose star
 check(await missing([{ ...T, req: true, rows: [['', ''], ['', '']] }], {}), ['Actions'], '…blank starting rows are not')
 check(await missing([{ ...T, req: true }], { Actions: { rows: [['', ''], ['', '']] } }), ['Actions'], '…and an answer emptied is empty')
 
+
+// ── The Title field (20261112203000, 2026-11-12 — the user: "在 field 加一个 Title"), swapped into production's bodies — twice ──
+await asSystem()
+const titleSql = await sql('20261112203000_marketing_minutes_title_field.sql')
+await db.exec(titleSql)
+await db.exec(titleSql)
+await as(U.josiah, MANAGER)
+const tt = await save(null, null, { name: 'With a title', fields: [F('ti', 'Meeting title', 'Title'), ...BASE], rules: {} })
+check((await row(tt.id)).fields[0], { id: 'ti', name: 'Meeting title', type: 'Title', req: false, pic: true, lock: false }, 'a Title field kept as set')
+await assert.rejects(save(tt.id, tt.rev, { fields: [F('ti', 'Meeting title', 'Title'), F('t2', 'Another', 'Title'), ...BASE] }),
+  err => /Only one Title field allowed/.test(String(err.message)), 'a title once a template'); checks++
+check(await value({ name: 'Meeting title', type: 'Title' }, 'Year-end kickoff'), 'Year-end kickoff', 'a title is written as a short text is')
+await refuses(`SELECT public.mkt_minutes_value($1::jsonb, $2::jsonb)`, [JSON.stringify({ name: 'Meeting title', type: 'Title' }), JSON.stringify('x'.repeat(201))],
+  /at most 200 characters/, 'a title of 200 characters at most')
+
+// ── A Title is never required (20261112204000 — "title 就是一个句子"): nothing is filled in, so Complete never waits on it ──
+await asSystem()
+const neverReq = await sql('20261112204000_marketing_minutes_title_never_required.sql')
+await db.exec(neverReq)
+await db.exec(neverReq)
+await as(U.josiah, MANAGER)
+const tr = await save(null, null, { name: 'Title asked', fields: [F('ti', 'Kickoff', 'Title', { req: true, help: 'What we agreed' }), ...BASE], rules: {} })
+check((await row(tr.id)).fields[0], { id: 'ti', name: 'Kickoff', type: 'Title', help: 'What we agreed', req: false, pic: true, lock: false }, 'a Title sent required is kept not required')
+check(await one(`SELECT public.mkt_minutes_missing($1::jsonb, '{}'::jsonb)`, [JSON.stringify([{ name: 'Kickoff', type: 'Title', req: false }])]), [], 'a Title is never missing')
+
+// ── Every template has a Title (the user's answer A): publishing needs one; once there, it stays ──────────────
+const nt = await save(null, null, { name: 'No title yet', fields: BASE, rules: {} })
+await refuses(`SELECT public.mkt_minutes_publish($1, $2)`, [nt.id, nt.rev], /Minutes have a title/, 'a template is published only with a Title')
+let ntRev = (await save(nt.id, nt.rev, { fields: [F('ti2', 'Kickoff', 'Title'), ...BASE] })).rev
+ntRev = (await save(nt.id, ntRev, { fields: [F('ti2', 'Year-end kickoff', 'Title', { help: 'Showroom' }), ...BASE] })).rev
+check((await row(nt.id)).fields[0].name, 'Year-end kickoff', 'its sentence and description change freely')
+await assert.rejects(save(nt.id, ntRev, { fields: BASE }), err => /Every minutes has a title/.test(String(err.message)), 'a Title is not removed'); checks++
+await assert.rejects(save(nt.id, ntRev, { fields: [F('ti2', 'Year-end kickoff', 'Short text'), ...BASE] }), err => /Every minutes has a title/.test(String(err.message)), 'nor retyped'); checks++
+check((await publish(nt.id, ntRev)).version, 1, 'with its Title, published')
+
 console.log(`marketing minutes builder v2: ${checks} checks passed`)

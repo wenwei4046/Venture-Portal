@@ -4,10 +4,13 @@
 // what the foot sums up and warns of, what publishing refuses (as mkt_minutes_check does), what changed since the version
 // published, and only what changed, for the save; the templates' folders. Pure.
 
-export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature', 'Campaign period'] as const
+export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature', 'Campaign period', 'Title'] as const
 export type MinutesType = (typeof MINUTES_TYPES)[number]
-/** The kinds as the builder offers them (the handoff's TYPES): its glyph and what it is for. */
+/** The kinds as the builder offers them (the handoff's TYPES): its glyph and what it is for. Title (2026-11-12, the user:
+ * "在 field 加一个 Title, 放到这个位置" · "title 就是一个句子 … 最多放 description") is a fixed sentence that heads the minutes, with an
+ * optional description under it (its `help`): nothing to fill in, never required. */
 export const TYPE_CARDS: readonly { type: MinutesType; glyph: string; desc: string }[] = [
+  { type: 'Title', glyph: 'T', desc: 'A sentence at the top · once per template' },
   { type: 'Short text', glyph: 'Aa', desc: 'One-line answer' },
   { type: 'Long text', glyph: '¶', desc: 'Notes, objectives, decisions' },
   { type: 'Date', glyph: '▦', desc: 'A single day' },
@@ -20,8 +23,8 @@ export const TYPE_CARDS: readonly { type: MinutesType; glyph: string; desc: stri
   { type: 'Signature', glyph: '✍', desc: 'Each attendee signs · once per template' },
 ]
 export const TYPE_GLYPH = Object.fromEntries(TYPE_CARDS.map(c => [c.type, c.glyph])) as Record<MinutesType, string>
-/** The kinds a template keeps once: the project it is for, a campaign's run period (answer 13), the signatures. */
-export const ONCE_TYPES: readonly MinutesType[] = ['Project link', 'Campaign period', 'Signature']
+/** The kinds a template keeps once: the project it is for, a campaign's run period (answer 13), the signatures, its title. */
+export const ONCE_TYPES: readonly MinutesType[] = ['Project link', 'Campaign period', 'Signature', 'Title']
 export const MINUTES_COL_TYPES = ['Text', 'Number', 'Date', 'Person'] as const
 export type MinutesColType = (typeof MINUTES_COL_TYPES)[number]
 export const COL_GLYPH: Record<MinutesColType, string> = { Text: 'Aa', Number: '#', Date: '▦', Person: '◎' }
@@ -178,9 +181,11 @@ export function minutesFoldersFromRow(v: unknown): MinutesFolder[] {
   return list.filter(isObj).map(f => ({ id: str(f.id), name: str(f.name), parent: strOrNull(f.parent), sort: int(f.sort) ?? 0 })).filter(f => f.id)
 }
 
-/** A new template (the handoff's): the project it is for, the meeting's date, the attendees, the signatures. */
+/** A new template (the handoff's): its title (2026-11-12 — every template has one, the user's answer A), the project it is
+ * for, the meeting's date, the attendees, the signatures. */
 export function newMinutesFields(): MinutesField[] {
   return [
+    { key: fieldKey(), name: '', type: 'Title', req: false, pic: true, lock: false },
     { key: fieldKey(), name: 'Project (from Projects)', type: 'Project link', req: true, pic: true, lock: true },
     { key: fieldKey(), name: 'Meeting date', type: 'Date', req: true, pic: true, lock: false },
     { key: fieldKey(), name: 'Attendees', type: 'People', req: true, pic: true, lock: true },
@@ -318,7 +323,7 @@ export function tableAnswer(f: MinutesField, v: unknown): { cols: string[]; type
 
 /** "9 fields · 6 required · 7 visible to PIC". */
 export function minutesSummary(fields: readonly MinutesField[]): string {
-  const req = fields.filter(f => f.req || f.lock).length
+  const req = fields.filter(f => f.type !== 'Title' && (f.req || f.lock)).length
   const pic = fields.filter(f => f.pic).length
   return `${fields.length} field${fields.length === 1 ? '' : 's'} · ${req} required · ${pic} visible to PIC`
 }
@@ -328,7 +333,7 @@ export interface MinutesWarning { text: string; tab: 'fields' | 'rules' }
 export function minutesWarnings(fields: readonly MinutesField[], rules: MinutesRules): MinutesWarning[] {
   const out: MinutesWarning[] = []
   if (rules.sign && !fields.some(f => f.type === 'Signature')) out.push({ text: '“Every attendee signs” is on, but there is no Signatures field', tab: 'rules' })
-  if (rules.pic && !fields.some(f => f.pic && !['People', 'Project link', 'Date', 'Campaign period', 'Signature'].includes(f.type))) {
+  if (rules.pic && !fields.some(f => f.pic && !['People', 'Project link', 'Date', 'Campaign period', 'Signature', 'Title'].includes(f.type))) {
     out.push({ text: 'PIC signs off but can’t see any content field', tab: 'fields' })
   }
   return out
@@ -352,6 +357,8 @@ export function minutesProblems(fields: readonly MinutesField[]): MinutesProblem
   if (!fields.some(f => f.type === 'Project link') || !fields.some(f => f.type === 'People' && f.lock)) {
     out.push({ text: 'Minutes keep their project and attendees', key: null })
   }
+  // Every template has a title (2026-11-12, the user's answer A).
+  if (!fields.some(f => f.type === 'Title')) out.push({ text: 'Add a Title', key: null })
   return out
 }
 
@@ -363,7 +370,7 @@ export function minutesFieldsPayload(fields: readonly MinutesField[]): Record<st
       id: f.key,
       name: f.name,
       type: f.type,
-      req: f.req || f.lock,
+      req: f.type !== 'Title' && (f.req || f.lock), // a Title is a fixed sentence: nothing to fill in, never required
       pic: f.pic,
       lock: f.lock,
       ...(help ? { help } : {}),

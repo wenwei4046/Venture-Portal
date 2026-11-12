@@ -457,7 +457,7 @@ export default function MinutesBuilder({ initial, folders: firstFolders = [], fi
               title="Show me"
               onClick={() => {
                 setTab('fields')
-                setAdding(false)
+                setAdding(!p.key && p.text === 'Add a Title') // no title yet: the type cards open, Title first
                 if (p.key) pickFar(p.key)
               }}
             >

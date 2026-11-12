@@ -151,7 +151,7 @@ describe('the Minutes Builder', () => {
     await saved(1)
     expect(lastPatch().fields.map((f: { name: string; type: string }) => f.type)).toEqual(['Project link', 'Date', 'People', 'Long text', 'Long text', 'Table', 'Signature'])
     expect(row('Untitled field').getAttribute('aria-expanded')).toBe('true') // the new field, open to be named
-    expect(screen.getByText('Fix')).toBeTruthy()
+    expect(screen.getByText('A field has no name')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Publish v3' })).toHaveProperty('disabled', true)
   })
 
@@ -174,7 +174,8 @@ describe('the Minutes Builder', () => {
   })
 
   it('publishes the draft as saved', async () => {
-    builder()
+    const titledFields = [{ id: 'ti', name: 'Kickoff', type: 'Title', pic: true }, ...FIELDS]
+    builder([{ ...KICKOFF, fields: titledFields, published: { ...KICKOFF.published, fields: titledFields } }])
     fireEvent.click(screen.getByRole('button', { name: 'The PIC sees Objective' }))
     actions.publishMktMinutes.mockResolvedValue({ ok: true, version: 3 })
     await act(async () => {
@@ -201,7 +202,7 @@ describe('the Minutes Builder', () => {
     expect(screen.queryByRole('button', { name: 'Discard changes' })).toBeNull()
   })
 
-  it('a new template: the project, the date, the attendees, the signatures — the type cards open', async () => {
+  it('a new template: its title, the project, the date, the attendees, the signatures — the type cards open', async () => {
     builder()
     const made = { id: 't9', name: 'New minutes', rev: 1, version: 0, changed: true, rules: { project: true, file: true, lock: true },
       fields: [{ id: 'p', name: 'Project (from Projects)', type: 'Project link', lock: true }, { id: 'a', name: 'Attendees', type: 'People', lock: true }] }
@@ -210,7 +211,7 @@ describe('the Minutes Builder', () => {
       fireEvent.click(screen.getByRole('button', { name: '+ New minutes template' }))
     })
     const [id, rev, patch] = actions.saveMktMinutes.mock.calls[0]
-    expect([id, rev, patch.name, patch.fields.map((f: { type: string }) => f.type)]).toEqual([null, null, 'New minutes', ['Project link', 'Date', 'People', 'Signature']])
+    expect([id, rev, patch.name, patch.fields.map((f: { type: string }) => f.type)]).toEqual([null, null, 'New minutes', ['Title', 'Project link', 'Date', 'People', 'Signature']])
     expect(await screen.findByDisplayValue('New minutes')).toBeTruthy()
     expect(screen.getByText('Not used yet · publish to make it available')).toBeTruthy()
     expect(screen.getByText('Add a field before Signatures')).toBeTruthy()
@@ -355,5 +356,34 @@ describe('the live preview', () => {
     expect(pv.queryByRole('button', { name: '+ Add row' })).toBeNull()
     fireEvent.click(pv.getByRole('button', { name: '+ Column' }))
     expect(pv.getByRole('textbox', { name: 'Column 2 name' })).toBeTruthy()
+  })
+
+  // 2026-11-12 — the user: "在 field 加一个 Title, 放到这个位置": the Title field heads the minutes in the preview.
+  it('a Title field heads the minutes: its sentence and its description, nothing to fill in, never required', () => {
+    builder([{ ...KICKOFF, fields: [{ id: 'ti', name: 'Year-end Kickoff', type: 'Title', pic: true, help: 'Showroom, 12 Nov' }, ...FIELDS] }])
+    const pv = within(preview())
+    const head = preview().querySelector('[data-field="ti"]') as HTMLElement
+    expect(head.textContent).toBe('Year-end KickoffShowroom, 12 Nov')
+    expect(pv.queryByRole('textbox', { name: 'Year-end Kickoff' })).toBeNull() // no answer box
+    expect(screen.queryByRole('button', { name: 'Year-end Kickoff is required' })).toBeNull() // no Required pill
+    fireEvent.click(head)
+    expect(row('Year-end Kickoff').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Description')).toBeTruthy()
+    expect(screen.queryByText('Kind of answer')).toBeNull() // no kinds to pick
+    expect(actions.saveMktMinutes).not.toHaveBeenCalled()
+  })
+
+  it('every template has a Title (the user’s answer A): without one a Fix opens the cards; once there it is not removed', () => {
+    builder()
+    fireEvent.click(screen.getByText('Add a Title'))
+    expect(screen.getByRole('button', { name: /A sentence at the top/ })).toHaveProperty('disabled', false)
+    fireEvent.click(screen.getByRole('button', { name: /A sentence at the top/ }))
+    expect(screen.getByRole('button', { name: 'Remove field' })).toHaveProperty('disabled', true)
+    expect(screen.queryByText('Add a Title')).toBeNull()
+  })
+
+  it('with no Title field, nothing heads the minutes', () => {
+    builder()
+    expect(preview().querySelector('[class*=sheetTitle]')).toBeNull()
   })
 })
