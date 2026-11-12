@@ -9,6 +9,7 @@ import { notifsVM } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx, DeskTab, PaneKind, PaneMode } from "./ctx";
 import { first, initials } from "./data";
+import { readsAds } from "@/lib/member/crm-data";
 import { upNextOpen } from "../../shared/up-next-data";
 import { ICON, LEADER_TABS, LI, MANAGE_TABS, NAV, NAV_GROUPS, PANE_MODE, PANEL_TABS, PHONE_IC, SECTION_PICK, SHEET_COPY, SOLID, TINTS } from "./tokens";
 import { edgeDrag } from "./columns";
@@ -99,7 +100,8 @@ export function frameVM(ctx: DeskCtx) {
   const ibSpare = Math.max(0, dockW - 300);
   const manage = data.can.manage;
   const leads = upNextOpen(data, ctx.me.id);
-  const tabList = PANEL_TABS.filter(([id]) => LEADER_TABS.has(id) ? leads : manage || !MANAGE_TABS.has(id));
+  // Ads Performance and Reports read the ads' figures: open to View at All too, read-only (readsAds, 2026-11-12).
+  const tabList = PANEL_TABS.filter(([id]) => LEADER_TABS.has(id) ? leads : manage || !MANAGE_TABS.has(id) || (readsAds(data.can) && (id === "adsperf" || id === "reports")));
   // Entering Inbox always gives its columns their standard widths and shuts Chat progress (README › Navigation).
   const go = (id: DeskTab) => set(u => ({ ...u, tab: id, pane: PANE_MODE[id], toast: "", pick: null, stage: "op", // 4a: no right-hand menu — Assignment's sections are the head's tabs (frame 06)
     ...(id === "inbox" ? { ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null } : {}), adLog: false, mwtLog: false, meMenu: false,

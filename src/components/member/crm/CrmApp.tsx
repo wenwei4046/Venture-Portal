@@ -343,7 +343,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       data: pdata, me: panelFor, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
       directors: wide ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
-      openCrmOf, viewingAs: panelFor.id !== me.id, viewers: panelFor.id === me.id ? viewerList : [],
+      openCrmOf, viewingAs: panelFor.id !== me.id, viewers: panelFor.id === me.id ? viewerList : [], wideView: panelFor.id !== me.id && wide,
       // Mine: one's own CRM — or, viewing somebody, back to theirs — on `tab` (the phone's button: Mine's Inbox), else the
       // same page (the desktop).
       toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: sub ?? null })); }

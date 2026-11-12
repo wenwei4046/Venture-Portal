@@ -165,14 +165,16 @@ const session = async (): Promise<Db> => {
  * database refuses whatever these let through that it would not.
  */
 const NOT_IN_CRM = "The CRM is not part of your title's permissions. Ask your administrator.";
-async function crmAllows(need: "view" | "edit" | "manage"): Promise<boolean> {
+async function crmAllows(need: "view" | "edit" | "manage" | "ads"): Promise<boolean> {
   const account = await getAccountUser();
   if (!account?.is_active) return false;
   if (need === "manage") return canDo(account, "crm", "manage");
+  // Reading the ads' figures from Meta: Manage, or View at All (readsAds, crm-data.ts) — never a change to an ad.
+  if (need === "ads") return canDo(account, "crm", "manage") || canDo(account, "crm", "view", "all");
   if (need === "edit") return canDo(account, "crm", "edit", "own");
   return canDo(account, "crm", "view", "own");
 }
-const requireCrm = async (need: "view" | "edit" | "manage") => {
+const requireCrm = async (need: "view" | "edit" | "manage" | "ads") => {
   if (!(await crmAllows(need))) throw new Error(need === "view" ? NOT_IN_CRM : "You may not do that.");
 };
 
@@ -520,7 +522,7 @@ export async function refreshCrmTemplates(): Promise<{ ok: true; changed: number
 export async function fetchMetaAds(): Promise<{ ok: true; ads: MetaAdRow[] } | { ok: false; error: string }> {
   try {
     await session();
-    await requireCrm("manage");
+    await requireCrm("ads");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
     // Only the ads that send people to the CRM's ad number(s) — 018-358 0219 (crmAdNumbers), or to Messenger on the CRM's Pages (crmPages) — not every ad the system user sees.
@@ -538,7 +540,7 @@ export async function fetchMetaAds(): Promise<{ ok: true; ads: MetaAdRow[] } | {
 export async function fetchAdInsights(ids: string[], since: string, until: string): Promise<{ ok: true; figs: Record<string, MetaFig | null> } | { ok: false; error: string }> {
   try {
     await session();
-    await requireCrm("manage");
+    await requireCrm("ads");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
     const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40), figs: Record<string, MetaFig | null> = {};
@@ -558,7 +560,7 @@ export async function fetchAdInsights(ids: string[], since: string, until: strin
 export async function fetchAdThumbs(ids: string[]): Promise<{ ok: true; thumbs: Record<string, string> } | { ok: false; error: string }> {
   try {
     await session();
-    await requireCrm("manage");
+    await requireCrm("ads");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
     return { ok: true, thumbs: await metaAdThumbs(ids, token) };
@@ -575,7 +577,7 @@ export async function fetchAdThumbs(ids: string[]): Promise<{ ok: true; thumbs: 
 export async function fetchAdDaily(ids: string[], since: string, until: string): Promise<{ ok: true; days: Record<string, Record<string, MetaFig> | null> } | { ok: false; error: string }> {
   try {
     await session();
-    await requireCrm("manage");
+    await requireCrm("ads");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
     const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40), days: Record<string, Record<string, MetaFig> | null> = {};

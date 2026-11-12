@@ -5,6 +5,7 @@
  * the bottom bar, the customer form) every time.
  */
 import { headVM } from "./head";
+import { readsAds } from "@/lib/member/crm-data";
 import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
 import { leaveCalData } from "../../shared/leave-cal-data";
 import { peopleBook } from "../../shared/people-book";
@@ -45,7 +46,7 @@ const off = <T,>() => undefined as unknown as T;
 
 /** v3 T06 · the Team side's Profile: the avatar centred, View as, MANAGE (CRM · Manage) and ME. */
 function profile6(ctx: PanelCtx, house: boolean) {
-  const { me, patch, data } = ctx, boss = me.role === "boss";
+  const { me, patch, data } = ctx, boss = me.role === "boss" && !ctx.viewingAs;
   const n = (k: number) => (k ? String(k) : "");
   const notifs = notifsVM(ctx).notifUnread;
   return {
@@ -67,15 +68,16 @@ function profile6(ctx: PanelCtx, house: boolean) {
 }
 
 /** v3 T01 · Insight's head, on both of its sides. */
-function insightHead(ctx: PanelCtx, house: boolean, ads: boolean, up: boolean, act = false) {
-  const { me, patch } = ctx, boss = me.role === "boss";
+function insightHead(ctx: PanelCtx, house: boolean, adsOn: boolean, up: boolean, act = false) {
+  // "Principal" is the signed-in Boss's own word; viewing somebody (a cross-team viewer is a Boss too) names them.
+  const { me, patch } = ctx, boss = me.role === "boss" && !ctx.viewingAs, ads = readsAds(ctx.data.can);
   return {
     greet: `Hello, ${boss ? "Principal" : first(me.name)}`, // the owner, 2026-10-18: "改成 hello"
     sub: `${boss ? "Principal" : jobTitle(me)} · ${ctx.data.can.viewAll ? "All access" : teamName(teamOf(me.id, ctx.data.people)) || "My team"}`,
     ini: ini(me.name), house, exit: () => ctx.exitApp(),
     // Team · Activity · Ads · Up next — Activity is Team activity (the owner, 2026-11-09: "team activity 放到 insight 的 team 中，可以和
     // team performance 開多一個分頁"; it was the bottom bar's).
-    sw: ctx.data.can.manage || upNextOpen(ctx.data, me.id) ? { ads, up, act, canAds: ctx.data.can.manage, canUp: upNextOpen(ctx.data, me.id), canAct: upNextOpen(ctx.data, me.id),
+    sw: ads || upNextOpen(ctx.data, me.id) ? { ads: adsOn, up, act, canAds: ads, canUp: upNextOpen(ctx.data, me.id), canAct: upNextOpen(ctx.data, me.id),
       team: () => patch({ ovAds: false, ovUp: false, ovAct: false }), adsPick: () => patch({ ovAds: true, ovUp: false, ovAct: false }), upPick: () => patch({ ovUp: true, ovAds: false, ovAct: false }),
       actPick: () => patch({ ovAct: true, ovAds: false, ovUp: false }) } : null,
   };
@@ -84,7 +86,7 @@ function insightHead(ctx: PanelCtx, house: boolean, ads: boolean, up: boolean, a
 export function panelAppVM(ctx: PanelCtx) {
   const { ui, set, now } = ctx, tab = ui.tab, lead = !!ui.lead;
   // v3 T01: Insight's Ads performance side is the Ads Performance page under Insight's head (CRM · Manage, as that page).
-  const ovAds = tab === "overview" && !lead && ui.ovAds && ctx.data.can.manage;
+  const ovAds = tab === "overview" && !lead && ui.ovAds && readsAds(ctx.data.can);
   const ovUp = tab === "overview" && !lead && !!ui.ovUp && !ovAds && upNextOpen(ctx.data, ctx.me.id);
   const ovAct = tab === "overview" && !lead && !!ui.ovAct && !ovAds && !ovUp && upNextOpen(ctx.data, ctx.me.id);
   const show = { up: ovUp, ov: tab === "overview" && !lead && !ovAds && !ovUp && !ovAct, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: false, lc: tab === "calendar" && !lead, act: ovAct, pf: tab === "profile" };
@@ -129,11 +131,11 @@ export function panelAppVM(ctx: PanelCtx) {
       roleOf: (id: string) => { const p = ctx.data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
       // The chat opens over Insight, so Back comes to Team activity as it was left (the owner, 2026-11-09).
       openChat: (id: string) => set(u => ({ ...u, lead: id })) } : null,
-    upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs ? ctx.me.id : null, canAct: !ctx.viewingAs } : null,
+    upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs && !ctx.wideView ? ctx.me.id : null, canAct: !ctx.viewingAs } : null,
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
-    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: ctx.data.can.manage,
+    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: readsAds(ctx.data.can),
       // Insight's period and its sheet (the owner, 2026-10-24: "日曆顏色有點突兀，換成跟insight 一樣的 … 無法自定義要對比的時間段").
       range: periodRange(ui.period, ui.ovRange, now), cmp: ui.cmp,
       chips: (([["day", "Today"], ["week", "This week"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: ui.period === k, pick: () => set(u => ({ ...u, period: k, ovRange: null })) }))),
