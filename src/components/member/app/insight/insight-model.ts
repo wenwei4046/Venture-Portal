@@ -1,5 +1,5 @@
 import type { MemberBand, MemberDownlineRow, MemberScore, MemberTarget } from "@/lib/member/types";
-import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
+import { kpiLadderUnits, type MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { arenaMonthFridays } from "@/lib/member/arena";
 import { holdersLine, pctLabel } from "@/lib/member/share-requests";
@@ -332,14 +332,17 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const kpiEnabled = kpiOn(input);
   const kpiTotal = monthly && input.kpi ? input.kpi.total : done.reduce((s, o) => s + o.kpiQty, 0);
   const threshold = monthly ? input.kpi?.threshold ?? null : null;
+  // The threshold is the sub-department's own ladder, read against its own units: a brand's own item (2990s' upgrade,
+  // 2026-11-12) is counted in the total and is no part of it.
+  const ladder = monthly && input.kpi ? kpiLadderUnits(input.kpi) : kpiTotal;
   let kpiCard: InsightMainVM["personal"]["kpi"];
   if (!kpiEnabled) kpiCard = { value: "—", pill: "Not counted", pillTone: "none", sub: "KPI is off this month" };
   // Everybody's KPI items (2026-10-25 — "显示大家的 KPI 都卖了几个"): a threshold is a person's, never the whole's.
   else if (whole) kpiCard = { value: String(kpiTotal), pill: `All of ${whole}`, pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
   else if (threshold !== null) {
-    kpiCard = kpiTotal >= threshold
+    kpiCard = ladder >= threshold
       ? { value: String(kpiTotal), pill: `Hit · ${threshold} needed`, pillTone: "good", sub: kpiTopItems(book, input.kpi) }
-      : { value: String(kpiTotal), pill: `${threshold - kpiTotal} to go · ${threshold} needed`, pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
+      : { value: String(kpiTotal), pill: `${threshold - ladder} to go · ${threshold} needed`, pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
   } else kpiCard = { value: String(kpiTotal), pill: monthly ? "No threshold" : "Sum of months", pillTone: "neutral", sub: kpiTopItems(book, input.kpi) };
 
   // Team — the whole sub-department's is everybody, and nobody is "you".
@@ -673,22 +676,29 @@ export function kpiView(input: InsightInput, subName: string): KpiVM {
   const total = monthly && input.kpi ? input.kpi.total : done.reduce((s, o) => s + o.kpiQty, 0);
   // A threshold is a person's: a whole sub-department's items are only counted (2026-10-25).
   const threshold = monthly && !input.whole ? input.kpi?.threshold ?? null : null;
+  // What the threshold is read against: the sub-department's own units (2026-11-12 — a brand's own item, 2990s'
+  // upgrade, is counted in the total and is no part of that ladder).
+  const reach = threshold !== null && input.kpi ? kpiLadderUnits(input.kpi) : total;
   const byName = new Map<string, number>();
-  for (const o of done) for (const l of o.lines) if (l.kpiQty > 0) byName.set(l.name, (byName.get(l.name) ?? 0) + l.kpiQty);
+  // A brand's own item is counted on the sofa that carries it: a person's month names it by the item (*Upgrade
+  // fabric*), as the summary lists it — a line's name would be the sofa's.
+  const named = monthly && !input.whole && input.kpi?.items.some(i => i.brand) ? input.kpi.items : null;
+  if (named) for (const i of named) { if (i.quantity > 0) byName.set(i.label, (byName.get(i.label) ?? 0) + i.quantity); }
+  else for (const o of done) for (const l of o.lines) if (l.kpiQty > 0) byName.set(l.name, (byName.get(l.name) ?? 0) + l.kpiQty);
   const items = [...byName.entries()].sort((a, b) => b[1] - a[1]).map(([name, n], k) => ({ name, n, color: KPI_SHADES[k % KPI_SHADES.length] }));
-  const max = Math.max(total, threshold ?? 0, 1);
+  const max = Math.max(reach, threshold ?? 0, 1);
   const groups = billGroups(input).filter(g => g.key !== EARLIER);
   const picks = input.book?.brandWeeks ?? {};
   return {
     enabled,
     total: enabled ? String(total) : "—",
-    pill: !enabled ? "Not counted" : input.whole ? `All of ${input.whole}` : threshold === null ? (monthly ? "No threshold" : "Sum of months") : total >= threshold ? "Threshold hit" : `${threshold - total} to go`,
-    hit: enabled && threshold !== null && total >= threshold,
-    fill: enabled ? Math.round((total / max) * 100) : 0,
+    pill: !enabled ? "Not counted" : input.whole ? `All of ${input.whole}` : threshold === null ? (monthly ? "No threshold" : "Sum of months") : reach >= threshold ? "Threshold hit" : `${threshold - reach} to go`,
+    hit: enabled && threshold !== null && reach >= threshold,
+    fill: enabled ? Math.round((reach / max) * 100) : 0,
     marker: enabled && threshold !== null ? Math.round((threshold / max) * 1000) / 10 : null,
     need: !enabled ? `KPI pay is off for ${subName} this month` : input.whole ? `Every KPI item sold in ${input.whole}`
       : threshold === null ? "No threshold this month" : `${threshold} needed for the threshold`,
-    above: !enabled || threshold === null ? "" : total >= threshold ? `${total - threshold} above` : `${threshold - total} to go`,
+    above: !enabled || threshold === null ? "" : reach >= threshold ? `${reach - threshold} above` : `${threshold - reach} to go`,
     how: enabled && items.length ? {
       title: `How ${input.whole ?? input.of ?? "you"} reached ${total}`,
       threshold: threshold === null ? "" : `Threshold ${threshold}`,

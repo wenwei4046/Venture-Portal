@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ArenaPerson, ArenaScore, ArenaTier, MemberArenaSnapshot } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
-import { honourMonth, monthFinishes } from "./honours";
+import { honourMonth, kpiCountedIn, monthFinishes } from "./honours";
 
 const score = (s: Partial<ArenaScore> = {}): ArenaScore => ({ sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, ...s });
 const person = (id: string, total: Partial<ArenaScore>, brands: Record<string, Partial<ArenaScore>> = {}): ArenaPerson => ({
@@ -102,5 +102,32 @@ describe("monthFinishes — a final month's places, from the Arena's own boards"
     expect(titles("b", "Sales")).toEqual(["Total sales · 2", "Sales · 2990s · 2"]);
     expect(titles("a", "Margin")).toEqual(["Total margin · 1", "Margin · Akemi · 1"]);
     expect(own.some(f => f.title === "Margin · 2990s")).toBe(false);
+  });
+});
+
+// 2026-11-12 — 2990s' own KPI items are counted whatever the sub-department's KPI switch says: a month one was in
+// force keeps its KPI finishes, as the Arena showed them.
+describe("kpiCountedIn — whether a month's KPI board counted", () => {
+  const upgrades = [{ effective_from: "2026-11-01", effective_to: null }];
+  it("counts every month while the sub-department's own switch is on", () => {
+    expect(kpiCountedIn("2026-09", true, [])).toBe(true);
+  });
+  it("with the switch off, counts the months a brand's own item is in force on their last day", () => {
+    expect(kpiCountedIn("2026-11", false, upgrades)).toBe(true);
+    expect(kpiCountedIn("2027-02", false, upgrades)).toBe(true);
+    // October: before the items.
+    expect(kpiCountedIn("2026-10", false, upgrades)).toBe(false);
+    expect(kpiCountedIn("2026-11", false, [])).toBe(false);
+  });
+  it("reads an item ended inside a month by that month's last day", () => {
+    const ended = [{ effective_from: "2026-11-01", effective_to: "2026-12-15" }];
+    expect(kpiCountedIn("2026-11", false, ended)).toBe(true);
+    expect(kpiCountedIn("2026-12", false, ended)).toBe(false);
+    // February's last day in a leap year.
+    expect(kpiCountedIn("2028-02", false, [{ effective_from: "2028-02-29", effective_to: null }])).toBe(true);
+    expect(kpiCountedIn("2027-02", false, [{ effective_from: "2027-03-01", effective_to: null }])).toBe(false);
+  });
+  it("counts nothing for a month it cannot read", () => {
+    expect(kpiCountedIn("soon", false, upgrades)).toBe(false);
   });
 });

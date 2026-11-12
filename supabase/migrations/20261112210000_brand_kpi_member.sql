@@ -21,12 +21,15 @@
 --      in it) is ON: it lists the brand's own items, each with its brand, beside the sub-department's own while that
 --      switch is on. The threshold is the sub-department's ladder and is read against the sub-department's own units
 --      alone (`ladderTotal` — a brand's units are no part of that ladder, as in the run): none while the switch is off.
+--   3. The whole sub-department's reading (member_principal_department_insight — the Principal viewing nobody, a
+--      Revenue Director) says KPI counts while a brand's item is in force on the window's last day; its threshold is
+--      still the sub-department's, asked while its switch is on.
 --
--- Three functions have one statement swapped and one is written whole, each from PRODUCTION's body (2026-11-12, md5 of
+-- Four functions have one statement swapped and one is written whole, each from PRODUCTION's body (2026-11-12, md5 of
 -- prosrc; member_kpi_for_staff as 20261112200000 left it) and refused if production's body has changed since. No
 -- signature changes, so every grant stays.
 --
--- Rollback, in words: put the three gates back to the switch alone and re-apply the body 20261112200000 left for
+-- Rollback, in words: put the four statements back to the switch alone and re-apply the body 20261112200000 left for
 -- member_kpi_for_staff — or end the brand's items (effective_to): a brand with no item finds none.
 --
 -- PGlite: tests/member-sql/validate-brand-kpi-member.mjs (production's bodies, md5-checked; the migration verbatim,
@@ -39,7 +42,8 @@ INSERT INTO brand_kpi_member_fns VALUES
   ('public.member_order_facts_with_old_bills(uuid, date, date)',     'c839f5c6887b77dda97f86898e6f1da3', 'f99143e964e5c299515a24ab5063a6d3'),
   ('public.member_order_book_for_staff(uuid, uuid, date, date)',     '3a4b29f5ca1f1b674536cc4d606e9993', 'b9c724715bb62031799818b77cdbeead'),
   ('public.member_principal_department_order_book(uuid, text, text)', '59e5b8cc4abd4586fc02387ccf1d4d9c', '4dcf0bbe8a627107fa54c81fe866710e'),
-  ('public.member_kpi_for_staff(uuid, uuid, date)',                  '2c34201f1ed847022e3bc6b306b574f1', 'df98f7909cba2ad1bfad3a6c4b500d26');
+  ('public.member_principal_department_insight(uuid, text, text)',   '6cc446a75ff9a772c3c2c332db7f16da', 'a5ef71b6965f42a12cead545ca76132f'),
+  ('public.member_kpi_for_staff(uuid, uuid, date)',                  '2c34201f1ed847022e3bc6b306b574f1', '768efaf49b751da6731d3da1c38a7e93');
 
 -- A brand's own items are 20261112200000's.
 DO $$
@@ -135,6 +139,17 @@ SELECT pg_temp.remake('public.member_principal_department_order_book(uuid, text,
     OR EXISTS(SELECT 1 FROM public.comm_kpi_items bk WHERE bk.scheme_id=c.id AND bk.brand_id IS NOT NULL)) m$n$
 ]);
 
+-- The whole sub-department's reading: whether KPI counts. Its threshold stays the sub-department's own ladder's.
+SELECT pg_temp.remake('public.member_principal_department_insight(uuid, text, text)', ARRAY[
+    $o$'kpi',(SELECT jsonb_build_object('enabled',coalesce(c.enable_kpi,false),$o$,
+    $n$-- (20261112210000) … or a brand on its own scheme has KPI items of its own in force that day.
+  'kpi',(SELECT jsonb_build_object('enabled',coalesce(c.enable_kpi,false)
+     OR EXISTS(SELECT 1 FROM public.comm_kpi_items bk
+       JOIN public.comm_brands bb ON bb.id=bk.brand_id AND bb.scheme_id=bk.scheme_id
+       WHERE bk.scheme_id=c.id AND bb.own_scheme AND bb.is_active
+        AND bk.effective_from<=(upper(v_range)-1) AND (bk.effective_to IS NULL OR bk.effective_to>=(upper(v_range)-1))),$n$
+]);
+
 -- ── 2. The member's KPI summary ──────────────────────────────────────────────────────────────────────────────────────
 -- Production's body as 20261112200000 left it (md5 2c34201f…), with: a brand's own items counted whatever the switch
 -- says (v_brand); the summary off only when neither counts; the threshold the sub-department's ladder's, asked while
@@ -205,9 +220,11 @@ BEGIN
 
  WITH configured AS (
   -- A SKU (by its code) or a bed frame's / sofa's special (2026-09-27) — the sub-department's own while its switch
-  -- is on, and (20261112210000) a brand's own on its own scheme, named with the brand.
+  -- is on, and (20261112210000) a brand's own on its own scheme, named with the brand. Its code says the brand too:
+  -- the same special may be the sub-department's own item, and the app reads each code once.
   SELECT k.id,
-   CASE WHEN k.source='option' THEN btrim(k.option_value) ELSE upper(btrim(k.product_code)) END AS code,
+   CASE WHEN b.id IS NOT NULL THEN upper(btrim(b.code))||' · '||btrim(k.option_value)
+        WHEN k.source='option' THEN btrim(k.option_value) ELSE upper(btrim(k.product_code)) END AS code,
    coalesce(nullif(btrim(k.product_name),''),
     CASE WHEN k.source='option' THEN btrim(k.option_value) ELSE btrim(k.product_code) END) AS label,
    upper(btrim(b.code)) AS brand

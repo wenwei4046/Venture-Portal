@@ -203,12 +203,14 @@ try {
     facts: 'public.member_order_facts_with_old_bills(uuid, date, date)',
     book: 'public.member_order_book_for_staff(uuid, uuid, date, date)',
     pbook: 'public.member_principal_department_order_book(uuid, text, text)',
+    insight: 'public.member_principal_department_insight(uuid, text, text)',
     kpi: 'public.member_kpi_for_staff(uuid, uuid, date)',
   }
   const PRODUCTION = {
     facts: 'c839f5c6887b77dda97f86898e6f1da3',
     book: '3a4b29f5ca1f1b674536cc4d606e9993',
     pbook: '59e5b8cc4abd4586fc02387ccf1d4d9c',
+    insight: '6cc446a75ff9a772c3c2c332db7f16da',
     // What 20261112200000 makes of it.
     kpi: '2c34201f1ed847022e3bc6b306b574f1',
   }
@@ -216,6 +218,7 @@ try {
     check(await md5Of(SIG[name]), md5, `${name}: the fixture is production's body`)
   }
   check(await md5Of('public.member_order_facts(uuid, date, date)'), '987d328c0ec4087e4ce6f3e58346a382', "the facts' wrapper is production's")
+  check(await md5Of('public.member_scoreboard_range(uuid, date, date)'), '8a3ad7360a1a875436d84201aedbe114', "the scoreboard is production's")
   check(await md5Of('public.comm_kpi_hits(uuid, uuid[], date)'), '2f12a0cd2714f2bd831c71d310fcb66b', 'the hits are what 20261112200000 makes')
 
   // ── The bills ──────────────────────────────────────────────────────────────
@@ -316,6 +319,11 @@ try {
       ...('ladderTotal' in answer ? { ladderTotal: num(answer.ladderTotal) } : {}) }
   }
   const OFF = { schemeId: SCHEME, period: '2026-11', enabled: false, items: [], total: 0, threshold: null, hit: null }
+  /** The whole sub-department's month: [everybody's sales, everybody's KPI units, whether KPI counts and its threshold]. */
+  const whole = async (month = '2026-11') => {
+    const d = await one('SELECT member_principal_department_insight($1, $2, $2)', [FAIR, month])
+    return [num(d.team.sales), num(d.team.kpiQty), d.kpi]
+  }
 
   // ── Before: the switch is off, and the Revenue app asks for no KPI item ────
   const BEFORE = {
@@ -331,6 +339,8 @@ try {
   check(await summary(ETHAN), OFF, 'before: the KPI summary is off')
   check((await book(ETHAN)).N1, [3740, 0, [0, 0, 0]], "before: the member's book counts no unit on the bill")
   check((await wholeBook()).N1, [3740, 0, [0, 0, 0]], "before: the sub-department's book neither")
+  // Every cleared bill of the month: 3,200 + 3,740 + 3,250 + 2,990 + 3,240.
+  check(await whole(), [16420, 0, { enabled: false, threshold: null }], 'before: the whole sub-department says KPI is not counted')
   const restBefore = await rest()
 
   // ── The migration, verbatim — twice ────────────────────────────────────────
@@ -380,8 +390,8 @@ try {
     S1: [2990, 1, [1, 0]],
   }, "the sub-department's book: each bill whole")
 
-  const FABRIC = { productCode: 'Sofa Full Fabric', label: 'Upgrade fabric', brand: '2990S' }
-  const LATEX = { productCode: 'Latex Seat', label: 'Upgrade latex seat', brand: '2990S' }
+  const FABRIC = { productCode: '2990S · Sofa Full Fabric', label: 'Upgrade fabric', brand: '2990S' }
+  const LATEX = { productCode: '2990S · Latex Seat', label: 'Upgrade latex seat', brand: '2990S' }
   check(await summary(ETHAN), {
     schemeId: SCHEME, period: '2026-11', enabled: true,
     // N1's latex seat; half of S1's fabric. D1 is under its deposit; N3's upgrade was given away.
@@ -394,6 +404,9 @@ try {
     total: 1.5, ladderTotal: 0, threshold: null, hit: null,
   }, "a colleague's: their own bill and their half")
   check(await summary(ETHAN, OCT), { ...OFF, period: '2026-10' }, 'a month before the items: off, as it was')
+  // The upgrades' RM 500 + 250 + 250 off the month's sales; three units on the cleared bills (D1 is under its deposit).
+  check(await whole(), [15420, 3, { enabled: true, threshold: null }], 'the whole sub-department: KPI counts, with no ladder')
+  check(await whole('2026-10'), [3490, 0, { enabled: false, threshold: null }], 'the whole sub-department, a month before the items: not counted')
 
   // ── The switch on: the sub-department's own beside the brand's ─────────────
   await q('UPDATE comm_schemes SET enable_kpi = true WHERE id = $1', [SCHEME])
@@ -412,6 +425,8 @@ try {
     // 4.5 units in all, three of them the sub-department's own: a ladder of four is not reached.
     total: 4.5, ladderTotal: 3, threshold: 4, hit: false,
   }, "switch on: its own items first, then the brand's; the ladder reads its own units alone")
+  // Its own RM 100 off A1 too, and A1's three units.
+  check(await whole(), [15320, 6, { enabled: true, threshold: 4 }], "switch on: the whole sub-department reads its own ladder's first rung")
   await q('UPDATE comm_kpi_thresholds SET min_qty = 3 WHERE scheme_id = $1 AND min_qty = 4', [SCHEME])
   check((await summary(ETHAN)).hit, true, 'a ladder of three is reached by its own three')
   await q('UPDATE comm_kpi_thresholds SET min_qty = 4 WHERE scheme_id = $1 AND min_qty = 3', [SCHEME])
@@ -421,6 +436,7 @@ try {
   // ── The brand switched off: no brand of its own scheme, no item of its own ─
   await q('UPDATE comm_brands SET is_active = false WHERE id = $1', [OWN])
   check(await summary(ETHAN), OFF, 'the brand switched off: the summary is off')
+  check(await whole(), [16420, 0, { enabled: false, threshold: null }], 'the brand switched off: the whole sub-department as before')
   check((await facts())['N1 ETHAN'].slice(0, 2), [3740, 0], 'the brand switched off: the bill counts all it sold, no unit')
   await q('UPDATE comm_brands SET is_active = true WHERE id = $1', [OWN])
   check(await facts(), AFTER, 'the brand back on: as after the migration')

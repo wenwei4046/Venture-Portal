@@ -486,3 +486,84 @@ BEGIN
  ) INTO v_result;
  RETURN v_result;
 END $function$;
+
+-- member_scoreboard_range(p_scheme uuid, p_from date, p_until date)
+-- md5(prosrc) = 8a3ad7360a1a875436d84201aedbe114
+CREATE OR REPLACE FUNCTION public.member_scoreboard_range(p_scheme uuid, p_from date, p_until date)
+ RETURNS TABLE(staff_id uuid, order_count integer, sales numeric, held numeric, kpi_qty numeric, margin_revenue numeric, margin_cost numeric, blind_orders integer, last_order date)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+ SELECT f.staff_id,count(*) FILTER(WHERE f.cleared)::integer,
+  coalesce(sum(f.revenue) FILTER(WHERE f.cleared),0),
+  coalesce(sum(f.revenue) FILTER(WHERE NOT f.cleared),0),
+  coalesce(sum(f.kpi_qty) FILTER(WHERE f.cleared),0),  coalesce(sum(greatest(f.goods_revenue,0)) FILTER(WHERE f.cleared AND (f.margin_pct IS NOT NULL OR f.no_sales_cost>0)),0),
+  coalesce(sum(coalesce(f.goods_revenue*(1-f.margin_pct),f.no_sales_cost)) FILTER(WHERE f.cleared AND (f.margin_pct IS NOT NULL OR f.no_sales_cost>0)),0),
+  count(*) FILTER(WHERE f.cleared AND f.margin_pct IS NULL AND f.no_sales_cost IS NULL)::integer,
+  max(f.order_date) FILTER(WHERE f.cleared)
+ FROM public.member_order_facts(p_scheme,p_from,p_until) f
+ GROUP BY f.staff_id;
+$function$;
+
+-- member_principal_department_insight(p_sub_department uuid, p_from text, p_until text)
+-- md5(prosrc) = 6cc446a75ff9a772c3c2c332db7f16da
+CREATE OR REPLACE FUNCTION public.member_principal_department_insight(p_sub_department uuid, p_from text, p_until text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_scheme uuid:=public.member_principal_department_scheme(p_sub_department);
+ v_range daterange:=public.member_insight_window(p_from,p_until);
+ v_today date:=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date;
+ v_result jsonb;
+BEGIN
+ WITH board AS (
+  SELECT * FROM public.member_scoreboard_range(v_scheme,lower(v_range),upper(v_range))
+ ), seats AS (
+  -- Everybody who sits there today, by their seat's title.
+  SELECT DISTINCT ON (h.staff_id) h.staff_id,h.title_id,h.upline_staff_id
+  FROM public.comm_hierarchy h JOIN public.hr_staff_costs s ON s.id=h.staff_id
+  WHERE h.scheme_id=v_scheme AND s.status='active'
+   AND h.effective_from<=v_today AND (h.effective_to IS NULL OR h.effective_to>=v_today)
+  ORDER BY h.staff_id,h.effective_from DESC
+ ), people AS (
+  -- …and everybody who wrote a bill in the window (a director, somebody who has left), by their company title.
+  SELECT s.id AS staff_id,s.employee_name AS name,coalesce(ti.name,ct.name,'Title not configured') AS title,st.upline_staff_id,
+   coalesce(b.sales,0) AS sales,coalesce(b.held,0) AS held,coalesce(b.order_count,0) AS order_count,coalesce(b.kpi_qty,0) AS kpi_qty,
+   coalesce(b.margin_revenue,0) AS margin_revenue,coalesce(b.margin_cost,0) AS margin_cost,
+   coalesce(b.blind_orders,0) AS blind_orders,b.last_order
+  FROM (SELECT x.staff_id FROM seats x UNION SELECT y.staff_id FROM board y WHERE y.staff_id IS NOT NULL) who
+  JOIN public.hr_staff_costs s ON s.id=who.staff_id
+  LEFT JOIN seats st ON st.staff_id=who.staff_id
+  LEFT JOIN public.titles ti ON ti.id=st.title_id
+  LEFT JOIN public.titles ct ON ct.id=s.title_id
+  LEFT JOIN board b ON b.staff_id=who.staff_id
+ )
+ SELECT jsonb_build_object(
+  'membershipId',p_sub_department,
+  'schemeId',v_scheme,
+  'department',(SELECT d.name FROM public.comm_sub_departments d WHERE d.id=p_sub_department),
+  'from',to_char(lower(v_range),'YYYY-MM'),
+  'through',to_char((upper(v_range)-1),'YYYY-MM'),
+  'asOf',now(),
+  'live',upper(v_range)>date_trunc('month',v_today)::date,
+  -- Every bill, the directors' own and a salesperson the ERP named nobody for included.
+  'team',(SELECT jsonb_build_object('sales',coalesce(sum(b.sales),0),'held',coalesce(sum(b.held),0),
+    'orders',coalesce(sum(b.order_count),0),'kpiQty',coalesce(sum(b.kpi_qty),0),
+    'marginRevenue',coalesce(sum(b.margin_revenue),0),'marginCost',coalesce(sum(b.margin_cost),0),
+    'blindOrders',coalesce(sum(b.blind_orders),0)) FROM board b),
+  'people',coalesce((SELECT jsonb_agg(jsonb_build_object('staffId',p.staff_id,'name',p.name,'title',p.title,
+    'uplineId',p.upline_staff_id,'depth',1,'sales',p.sales,'held',p.held,'orders',p.order_count,'kpiQty',p.kpi_qty,
+    'marginRevenue',p.margin_revenue,'marginCost',p.margin_cost,'blindOrders',p.blind_orders,'lastOrder',p.last_order)
+    ORDER BY p.sales DESC,p.name,p.staff_id) FROM people p),'[]'::jsonb),
+  -- Whether KPI counts, and its threshold's first rung as at the window's last day (a person's, as on Insight).
+  'kpi',(SELECT jsonb_build_object('enabled',coalesce(c.enable_kpi,false),
+    'threshold',CASE WHEN c.enable_kpi THEN (SELECT min(k.min_qty) FROM public.comm_kpi_thresholds k
+      WHERE k.scheme_id=c.id AND k.effective_from<=(upper(v_range)-1)
+       AND (k.effective_to IS NULL OR k.effective_to>=(upper(v_range)-1))) END)
+    FROM public.comm_schemes c WHERE c.id=v_scheme)
+ ) INTO v_result;
+ RETURN v_result;
+END $function$;

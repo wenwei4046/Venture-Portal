@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadMemberKpiSummary, loadMemberTeamKpiSummary } from "./kpi-summary-server";
-import { readKpiSummary, type MemberKpiSummary } from "./kpi-summary";
+import { kpiLadderUnits, readKpiSummary, type MemberKpiSummary } from "./kpi-summary";
 
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), createClient: vi.fn(), rpc: vi.fn() }));
 vi.mock("server-only", () => ({}));
@@ -102,5 +102,42 @@ describe("authenticated KPI summary boundary", () => {
     expect(readKpiSummary({ ...summary, threshold: 12, hit: false }, schemeId)).toMatchObject({ total: 10, threshold: 12, hit: false });
     expect(readKpiSummary({ ...summary, threshold: null, hit: null }, schemeId)).toMatchObject({ total: 10, threshold: null, hit: null });
     expect(readKpiSummary({ ...summary, enabled: false, items: [], total: 0, threshold: null, hit: null }, schemeId)).toMatchObject({ enabled: false, total: 0, hit: null });
+  });
+
+  // 2026-11-12 — a brand on its own commission scheme (2990s) has KPI items of its own: counted whatever the
+  // sub-department's KPI switch says, and no part of its ladder (mig 20261112210000).
+  describe("a brand's own items", () => {
+    const own = { productCode: "AK-PILLOW", label: "AKEMI PILLOW", quantity: 3 };
+    const fabric = { productCode: "2990S · Sofa Full Fabric", label: "Upgrade fabric", quantity: 0.5, brand: "2990S" };
+    const latex = { productCode: "2990S · Latex Seat", label: "Upgrade latex seat", quantity: 1, brand: "2990S" };
+    const base = { schemeId, period: "2026-11", asOf: "2026-11-12T08:00:00Z", enabled: true };
+
+    it("reads the brand's items alone while the sub-department's KPI is off: no ladder, no threshold", () => {
+      const read = readKpiSummary({ ...base, items: [fabric, latex], total: 1.5, ladderTotal: 0, threshold: null, hit: null }, schemeId);
+      expect(read).toEqual({ ...base, items: [fabric, latex], total: 1.5, ladderTotal: 0, threshold: null, hit: null });
+      expect(kpiLadderUnits(read!)).toBe(0);
+    });
+
+    it("reads the threshold against the sub-department's own units, never a brand's", () => {
+      // 4.5 units in all, three of them its own: a ladder of four is not reached — and of three, is.
+      const all = { ...base, items: [own, fabric, latex], total: 4.5, ladderTotal: 3 };
+      expect(readKpiSummary({ ...all, threshold: 4, hit: false }, schemeId)).toMatchObject({ total: 4.5, ladderTotal: 3, hit: false });
+      expect(readKpiSummary({ ...all, threshold: 3, hit: true }, schemeId)).toMatchObject({ hit: true });
+      // What the total alone would say is refused.
+      expect(readKpiSummary({ ...all, threshold: 4, hit: true }, schemeId)).toBeNull();
+    });
+
+    it("refuses a ladder that is not its own items' units, and a brand that is no name", () => {
+      expect(readKpiSummary({ ...base, items: [own, fabric], total: 3.5, ladderTotal: 3.5, threshold: null, hit: null }, schemeId)).toBeNull();
+      expect(readKpiSummary({ ...base, items: [own, fabric], total: 3.5, ladderTotal: Number.NaN, threshold: null, hit: null }, schemeId)).toBeNull();
+      expect(readKpiSummary({ ...base, items: [{ ...fabric, brand: " " }], total: 0.5, ladderTotal: 0, threshold: null, hit: null }, schemeId)).toBeNull();
+      expect(readKpiSummary({ ...base, items: [{ ...fabric, brand: 2990 }], total: 0.5, ladderTotal: 0, threshold: null, hit: null }, schemeId)).toBeNull();
+    });
+
+    it("an answer from before the change reads as it did: the total is the ladder", () => {
+      const before = readKpiSummary(summary, schemeId)!;
+      expect(before).not.toHaveProperty("ladderTotal");
+      expect(kpiLadderUnits(before)).toBe(before.total);
+    });
   });
 });
