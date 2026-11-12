@@ -6,13 +6,14 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // the Data source drawer.
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => nav }))
+vi.mock('next/navigation', () => ({ useRouter: () => nav, useSearchParams: () => new URLSearchParams() }))
 vi.mock('../../cutover-actions', () => ({ setFirstPaidMonth: vi.fn(), clearFirstPaidMonth: vi.fn() }))
 vi.mock('../../link-actions', () => ({ linkErpKey: vi.fn(), setErpFeedWindow: vi.fn(), unlinkErpKey: vi.fn() }))
 vi.mock('../../sync-actions', () => ({ ignoreErpAgent: vi.fn(), matchErpSalesperson: vi.fn(), replayHeldErpEvents: vi.fn(), unignoreErpAgent: vi.fn() }))
 vi.mock('@/lib/nav-warm', () => ({ warmOnIntent: vi.fn(), cancelWarmIntent: vi.fn() }))
 
 import CommCalBody, { type CommCalData } from './CommCalBody'
+import type { TallyReport } from '@/lib/commission/tally'
 
 const recent = new Date(Date.now() - 15 * 60_000).toISOString()
 
@@ -98,5 +99,53 @@ describe('Comm Cal', () => {
     render(<CommCalBody data={data({ months: [], cards: [] })} empty={<p>No sales data yet.</p>} />)
     expect(screen.getByText('No sales data yet.')).toBeInTheDocument()
     expect(screen.queryByText('Months with sales data')).toBeNull()
+    // Nothing to tally either: no tabs.
+    expect(screen.queryByRole('tablist')).toBeNull()
+  })
+})
+
+// The Tally (2026-11-12): the page's second tab. Its bills are read by the
+// server only when it is open, so a tab is the page's `?tab=`.
+describe('Comm Cal — Months and Tally', () => {
+  const report: TallyReport = {
+    from: '2026-09-01',
+    twoMonthBills: 1,
+    noPctBills: 0,
+    months: [{
+      month: '2026-10-01',
+      so: { bills: 1, sales: 1000, bill: 140 },
+      fair: { bills: 2, sales: 6000, bill: 840 },
+      gap: { bills: 1, sales: 5000, bill: 700 },
+      carried: { bills: 1, sales: 5000, bill: 700 },
+      ours: [],
+      theirs: [],
+    }],
+  }
+
+  it('opens on Months, and Tally asks the page for ?tab=tally', () => {
+    render(<CommCalBody data={data()} />)
+    const months = screen.getByRole('tab', { name: /Months/ })
+    expect(months).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('table', { name: 'Months with sales data' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Tally' }))
+    expect(nav.push).toHaveBeenCalledWith('/revenue/fair?tab=tally')
+  })
+
+  it('shows the Tally in place of the cards and the months, and Months goes back to the bare page', () => {
+    render(<CommCalBody data={data()} tab="tally" tally={report} />)
+    expect(screen.getByRole('tab', { name: 'Tally' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('table', { name: 'Tally by month' })).toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Months with sales data' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Commission Calculation for Fair' })).toBeNull()
+    // The strip stays over both tabs.
+    expect(screen.getByText('ERP receiving')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /Months/ }))
+    expect(nav.push).toHaveBeenCalledWith('/revenue/fair')
+  })
+
+  it('pressing the tab already open asks for nothing', () => {
+    render(<CommCalBody data={data()} />)
+    fireEvent.click(screen.getByRole('tab', { name: /Months/ }))
+    expect(nav.push).not.toHaveBeenCalled()
   })
 })

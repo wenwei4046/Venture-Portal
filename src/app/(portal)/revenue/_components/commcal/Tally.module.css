@@ -1,0 +1,39 @@
+/* Comm Cal › Tally (2026-11-12): the months in their two calendars, and the
+   bills that sit in two months. The kit's grid tables; these are the few
+   things they do not have. */
+
+/* The band over the head: which three columns are Houzs's, which are ours. */
+.groups { border-bottom: 1px solid rgb(var(--hv-head-rule)); }
+.groups > * { padding: 9px 14px 8px; }
+.group {
+  text-align: center;
+  border-left: 1px solid rgb(var(--hv-head-rule));
+  color: rgb(var(--hv-brown));
+}
+
+/* The first column of a group: the rule the band begins. */
+.edge { border-left: 1px solid rgb(var(--hv-hairline)); }
+.month { font-weight: 500; }
+.strong { font-weight: 500; }
+.neg { color: rgb(var(--hv-danger)); }
+
+.flags { display: flex; gap: 8px; margin-top: 10px; }
+.flag { text-decoration: none; }
+
+/* The month picked: its bills in two months. */
+.detail { margin-top: 30px; }
+.list { margin-bottom: 22px; }
+.doc { font-size: 12px; }
+.ref {
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(var(--hv-brown));
+  margin-top: 3px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.total {
+  display: grid;
+  align-items: center;
+  background: rgb(var(--hv-panel));
+  font-weight: 500;
+}
