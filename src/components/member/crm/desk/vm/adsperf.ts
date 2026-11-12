@@ -227,7 +227,7 @@ export function adsPerfVM(ctx: DeskCtx) {
     const crm = crmFigures(cs, ctx, a, b);
     // Per lead is the whole cost a lead (the owner, 2026-11-12: "per lead 的价钱是 total cost / leads"): the spend with its
     // share of the month's marketing fee, ÷ leads — for the overview, every ad's row and the total; the month on screen
-    // gives exactly Total cost ÷ Leads.
+    // gives exactly the Total cost figure divided by Leads.
     if (k === "cpl") { const spend = metaFigures(metaOf(ids, a, b), crm).spend, rate = feeRate(a, b); return spend == null || rate == null || !crm.leads ? null : (spend * (1 + rate)) / crm.leads; }
     return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
   const cell = (cs: CrmCustomer[], m: (typeof ALL)[number], isTotal: boolean, adId: string, ids: string[]) => {
