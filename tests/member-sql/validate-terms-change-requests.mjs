@@ -498,4 +498,38 @@ check(await q(`select to_char(valid_from, 'YYYY-MM') vf, to_char(valid_to, 'YYYY
 check(await q(`select cost_rate::text, lock_in_months, principal_per_month, to_char(terms_effective_from, 'YYYY-MM') tef from fund_sources where id = $1`, [MK]),
   [{ cost_rate: '0.010000', lock_in_months: null, principal_per_month: null, tef: '2026-07' }], 'no fixed term from July')
 
+// ── 2026-11-13 ("填月数就转"): months asked of a loan without a fixed term make it fixed ──
+const L6 = '00000000-0000-4000-8000-0000000000c6'
+const L7 = '00000000-0000-4000-8000-0000000000c7'
+const L8 = '00000000-0000-4000-8000-0000000000c8'
+await as(null)
+await db.exec(`
+  insert into public.loans (id, status, principal, effective_rate, base_rate, risk_premium, tenure_months, disbursement_date, repayment_terms, company_id) values
+    ('${L6}', 'active', 10000, 0, 0, 0, 1, '2026-03-15', '无息垫款 · 0% · 原表无还款方式 · [LO#6] · 资金来源: LOO', '${CONT}'),
+    ('${L7}', 'active', 40000, 0.04, 0.003, 0.037, 1, '2026-10-07', '利滚利挂账(未定还款) · 利息从放款日起算 · 资金来源: HV', '${CONT}'),
+    ('${L8}', 'active', 60000, 0.04, 0.003, 0.037, 51, '2025-04-05', 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)', '${CONT}');
+`)
+const fixedSql = await text(new URL('20261113100000_amend_months_makes_fixed.sql', migrations))
+await db.exec(fixedSql)
+await db.exec(fixedSql)
+check((await q(`select public.terms_words_fixed('新增 · 利息/期数/方式未定 · [LO-NEW]') w`))[0].w, '新增 · 利息/期数/方式已定 · [LO-NEW]', 'any other 未定 reads 已定')
+await as(PRINCIPAL)
+await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "tenure_months": 60, "compound_interest": true}')`, [L6])
+check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L6]), [{ tenure_months: 60, repayment_terms: '无息垫款 · 0% · [LO#6] · 资金来源: LOO' }],
+  'LO#6: 60 months over the whole terms — fixed, its words without 原表无还款方式')
+await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "tenure_months": 1, "compound_interest": true}')`, [L7])
+check((await q(`select repayment_terms from loans where id = $1`, [L7]))[0].repayment_terms, '利滚利挂账(未定还款) · 利息从放款日起算 · 资金来源: HV',
+  'the months it holds re-sent: still without a fixed term')
+await q(`select public.amend_loan($1, '{"tenure_months": 12, "repayment_terms": "未定 · kept as typed"}')`, [L7])
+check((await q(`select repayment_terms from loans where id = $1`, [L7]))[0].repayment_terms, '未定 · kept as typed', 'words sent are kept as sent')
+await q(`select public.amend_loan_from($1, '2026-12-01', null, 24, null, 'fixed from December')`, [L8])
+check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L8]), [{ tenure_months: 24, repayment_terms: 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang' }],
+  'from a later month: fixed from December')
+check((await q(`select was_repayment_terms w, months from treasury_terms_history where record_id = $1 order by valid_from desc limit 1`, [L8]))[0],
+  { w: 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)', months: null }, 'the months before keep their words, no fixed term')
+await q(`select public.revert_terms_change('loan', $1)`, [L8])
+check((await q(`select repayment_terms from loans where id = $1`, [L8]))[0].repayment_terms, 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)',
+  'undone: its words back')
+await as(null)
+
 console.log(`validate-terms-change-requests: ${checks} checks passed`)

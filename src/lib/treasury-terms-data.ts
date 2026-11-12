@@ -163,6 +163,7 @@ export function termsForLoan(
       effectiveFrom: l.terms_effective_from ? ym(l.terms_effective_from) : null,
       // A loan whose words say no fixed term asks no principal, whatever amount it once had.
       principalPerMonth: unscheduled ? null : amountOrNull(l.principal_per_month),
+      ...(unscheduled ? { heldMonths: l.tenure_months == null ? null : Number(l.tenure_months) } : {}),
     },
     history,
   }

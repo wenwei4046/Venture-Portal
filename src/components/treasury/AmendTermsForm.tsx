@@ -294,7 +294,7 @@ export default function AmendTermsForm(p: AmendTermsFormProps) {
             <textarea id={cfg.textName} name={cfg.textName} rows={2} defaultValue={p.text} className={`${AMEND_FIELD} font-sans`} />
             {side === 'out' ? (
               <p className="font-serif italic text-muted text-xs mt-1.5">
-                Words with “未定” or “无还款方式” read as no fixed term (nothing falls due this month). Keep the [LO#…] tag to trace it; “· 资金来源: XXX” shows the SC badge in the loan list.
+                Words with “未定” or “无还款方式” read as no fixed term (nothing falls due this month); a number of months or an amount a month asked under Repayment type takes them out. Keep the [LO#…] tag to trace it; “· 资金来源: XXX” shows the SC badge in the loan list.
               </p>
             ) : null}
           </AmendSection>
