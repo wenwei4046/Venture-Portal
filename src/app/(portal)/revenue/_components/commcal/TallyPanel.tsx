@@ -5,7 +5,7 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { billHref } from '@/lib/commission/workbench-nav'
 import {
-  defaultTallyMonth, tallyDay, tallyMonthLong, tallyMonthShort, tallyOtherSide,
+  defaultTallyMonth, tallyChips, tallyDay, tallyMonthLong, tallyMonthShort,
   type TallyBill, type TallyCommission, type TallyMonth, type TallyReport,
 } from '@/lib/commission/tally'
 import { Card, Cards, Chip, GridEmpty, GridHead, GridRow, GridTable, SecLabel, SectHead, btn, hv } from '@/components/hrv/kit'
@@ -14,17 +14,22 @@ import t from './Tally.module.css'
 
 // Comm Cal › Tally (2026-11-12, the user: "House entry 那边跟着 Sales Order
 // creation date 去 payout；我 payout to Sales Person 是跟着 fair date 去 payout；
-// 然后我要对出中间的那个 gap"). Each month in its two calendars — by SO date
-// (what Houzs pays) and by fair date (what we pay salespeople on) — the gap
-// between them, what is carried when the month ends, and, for the month
-// picked (`?month=`), the bills the gap is made of. Read-only.
+// 然后我要对出中间的那个 gap"; then "need with the real commission payout, for
+// those below depo, houzs will not pay to venture as well"). Each month on its
+// two sides — what Houzs pays (once a bill's deposit is reached, by its SO
+// date) and what we pay salespeople (the month whose close released the bill) —
+// the gap between them, what is carried when the month ends, and, for the
+// month picked (`?month=`), the bills the gap is made of and the ones under
+// their deposit, which nobody pays. Read-only.
 
-const MONTH_COLS = 'minmax(130px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
-const BILL_COLS = 'minmax(136px,1.2fr) minmax(92px,1fr) minmax(72px,.7fr) 110px 110px minmax(84px,.8fr) 50px minmax(98px,.8fr) minmax(192px,1.25fr)'
+const MONTH_COLS = 'minmax(130px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 64px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
+const BILL_COLS = 'minmax(128px,1.2fr) minmax(88px,1fr) minmax(64px,.7fr) 106px 106px 106px minmax(84px,.8fr) minmax(92px,.8fr) minmax(176px,1.25fr)'
 const PAD = { padding: '11px 14px' }
 
 const bills = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
 const pctWord = (p: number) => `${Math.round(p * 1000) / 10}%`
+
+type BillListKind = 'ours' | 'theirs' | 'held'
 
 /** A figure, red in parentheses when it is below nothing. */
 function Amount({ value }: { value: number }) {
@@ -57,29 +62,30 @@ export default function TallyPanel({
   }
 
   const name = tallyMonthLong(month.month).split(' ')[0]
-  const twoMonth = month.ours.length + month.theirs.length
+  const short = tallyMonthShort(month.month)
+  const apart = month.ours.length + month.theirs.length
 
   return (
     <>
       <Cards label={`Tally for ${tallyMonthLong(month.month)}`} count={4} style={{ marginBottom: 26 }}>
         <Card
-          label={`${name} · by SO date`}
-          value={formatMoney(month.so.bill)}
-          note={`${bills(month.so.bills)} · Houzs pays`}
+          label={`${name} · Houzs pays`}
+          value={formatMoney(month.houzs.bill)}
+          note={bills(month.houzs.bills)}
           icon="receipt"
         />
         <Card
-          label={`${name} · by fair date`}
-          value={formatMoney(month.fair.bill)}
-          note={`${bills(month.fair.bills)} · we pay`}
+          label={`${name} · we pay`}
+          value={formatMoney(month.we.bill)}
+          note={month.open.bills > 0 ? `${bills(month.we.bills)} · ${month.open.bills} not closed` : bills(month.we.bills)}
           icon="calendar"
         />
         <Card
           label={`${name} gap`}
           value={formatMoney(month.gap.bill)}
-          note={`${bills(twoMonth)} in two months`}
+          note={`${bills(apart)} paid apart`}
           icon="fileAlert"
-          tone={twoMonth > 0 ? 'alert' : 'default'}
+          tone={apart > 0 ? 'alert' : 'default'}
         />
         <Card
           label={`Carried after ${name}`}
@@ -95,13 +101,13 @@ export default function TallyPanel({
         <div className={`${hv.gtHead} ${t.groups}`} style={{ gridTemplateColumns: MONTH_COLS }} role="row">
           <span role="columnheader" aria-hidden="true" />
           <span role="columnheader" aria-colspan={3} className={t.group} style={{ gridColumn: 'span 3' }}>
-            By SO date · Houzs pays
+            Houzs pays
           </span>
           <span role="columnheader" aria-colspan={4} className={t.group} style={{ gridColumn: 'span 4' }}>
-            By fair date · we pay
+            We pay
           </span>
           <span role="columnheader" aria-colspan={2} className={t.group} style={{ gridColumn: 'span 2' }}>
-            Fair − SO
+            We − Houzs
           </span>
         </div>
         <GridHead
@@ -109,15 +115,15 @@ export default function TallyPanel({
           cellStyle={PAD}
           cells={[
             'Month',
-            { label: 'Bills', style: { textAlign: 'right' } },
+            { label: <span title="Bills whose deposit is reached, by SO date — or by the day the deposit came, when that is later">Bills</span>, style: { textAlign: 'right' } },
             { label: 'Sales', style: { textAlign: 'right' } },
             { label: 'Bill to HC', style: { textAlign: 'right' } },
-            { label: 'Bills', style: { textAlign: 'right' } },
+            { label: <span title="Bills the month's closes paid, and the ones waiting for their salesperson's close">Bills</span>, style: { textAlign: 'right' } },
             { label: 'Sales', style: { textAlign: 'right' } },
             { label: 'Bill to HC', style: { textAlign: 'right' } },
             { label: <span title="What the month's closed salespeople are paid">Commission</span>, style: { textAlign: 'right' } },
-            { label: <span title="By fair date less by SO date, in Bill to HC">Gap</span>, style: { textAlign: 'right' } },
-            { label: <span title="As the month ends: bills we have counted that Houzs has not yet, in Bill to HC">Carried</span>, style: { textAlign: 'right' } },
+            { label: <span title="We pay less Houzs pays, in Bill to HC">Gap</span>, style: { textAlign: 'right' } },
+            { label: <span title="As the month ends: bills we have paid that Houzs has not, less the ones Houzs has paid and we have not — in Bill to HC">Carried</span>, style: { textAlign: 'right' } },
           ]}
         />
         {report.months.map((m, i) => (
@@ -140,7 +146,7 @@ export default function TallyPanel({
       ) : null}
 
       <div className={t.detail}>
-        <SectHead title={`${tallyMonthLong(month.month)} · bills in two months`} count={bills(twoMonth).toUpperCase()} />
+        <SectHead title={`${tallyMonthLong(month.month)} · bills paid apart`} count={bills(apart).toUpperCase()} />
         {canExport ? (
           // The month whole — every bill on each side — as an Excel workbook (`tally/export?month=`).
           <div className={t.tools}>
@@ -149,26 +155,15 @@ export default function TallyPanel({
               download
               className={btn('outline')}
               style={{ padding: '7px 13px', fontSize: 12.5 }}
-              title={`Every bill of ${tallyMonthLong(month.month)} by SO date and by fair date, as an Excel workbook`}
+              title={`Every bill Houzs pays and every bill we pay in ${tallyMonthLong(month.month)}, as an Excel workbook`}
             >
-              Export {tallyMonthShort(month.month)}
+              Export {short}
             </a>
           </div>
         ) : null}
-        <BillList
-          title={`Fair date in ${tallyMonthShort(month.month)} · SO date in another month`}
-          rows={month.ours}
-          side="ours"
-          from={report.from}
-          sub={sub.slug}
-        />
-        <BillList
-          title={`SO date in ${tallyMonthShort(month.month)} · fair date in another month`}
-          rows={month.theirs}
-          side="theirs"
-          from={report.from}
-          sub={sub.slug}
-        />
+        <BillList title={`We pay in ${short} · Houzs does not`} rows={month.ours} list="ours" sub={sub.slug} />
+        <BillList title={`Houzs pays in ${short} · we do not`} rows={month.theirs} list="theirs" sub={sub.slug} />
+        <BillList title={`Below deposit in ${short} · neither pays`} rows={month.held} list="held" sub={sub.slug} />
       </div>
     </>
   )
@@ -189,14 +184,21 @@ function MonthRow({
 }) {
   const num = `${hv.right} ${hv.mono}`
   return (
-    <GridRow cols={MONTH_COLS} zebra={zebra} selected={selected} onClick={onPick} title={`Show ${tallyMonthLong(m.month)}'s bills in two months`}>
+    <GridRow cols={MONTH_COLS} zebra={zebra} selected={selected} onClick={onPick} title={`Show ${tallyMonthLong(m.month)}'s bills paid apart`}>
       <span role="cell" className={t.month} style={PAD}>{tallyMonthLong(m.month)}</span>
-      <span role="cell" className={`${num} ${t.edge}`} style={PAD}>{m.so.bills}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.so.sales)}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.so.bill)}</span>
-      <span role="cell" className={`${num} ${t.edge}`} style={PAD}>{m.fair.bills}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.fair.sales)}</span>
-      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.fair.bill)}</span>
+      <span role="cell" className={`${num} ${t.edge}`} style={PAD}>{m.houzs.bills}</span>
+      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.houzs.sales)}</span>
+      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.houzs.bill)}</span>
+      <div role="cell" className={`${num} ${t.edge}`} style={PAD}>
+        <div>{m.we.bills}</div>
+        {m.open.bills > 0 ? (
+          <div className={t.sub} title={m.open.bills === 1 ? "1 bill waits for its salesperson's close" : `${m.open.bills} bills wait for their salesperson's close`}>
+            {m.open.bills} open
+          </div>
+        ) : null}
+      </div>
+      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.we.sales)}</span>
+      <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.we.bill)}</span>
       <span role="cell" className={num} style={PAD} title={paid ? `${paid.closed} salespeople closed` : 'Nobody closed yet'}>
         {paid ? formatMoneyBare(paid.total) : '—'}
       </span>
@@ -206,7 +208,9 @@ function MonthRow({
   )
 }
 
-function BillList({ title, rows, side, from, sub }: { title: string; rows: TallyBill[]; side: 'ours' | 'theirs'; from: string | null; sub: string }) {
+const OTHER_SIDE: Record<BillListKind, string> = { ours: 'Houzs', theirs: 'Us', held: 'Status' }
+
+function BillList({ title, rows, list, sub }: { title: string; rows: TallyBill[]; list: BillListKind; sub: string }) {
   const router = useRouter()
   const sales = rows.reduce((sum, b) => sum + b.sales, 0)
   const bill = rows.reduce((sum, b) => sum + (b.bill ?? 0), 0)
@@ -224,46 +228,45 @@ function BillList({ title, rows, side, from, sub }: { title: string; rows: Tally
             'Brand',
             'Fair day',
             'SO date',
+            { label: <span title="The day its payments reached the deposit">Deposit</span> },
             { label: 'Sales', style: { textAlign: 'right' } },
-            { label: '%', style: { textAlign: 'right' } },
             { label: 'Bill to HC', style: { textAlign: 'right' } },
-            { label: side === 'ours' ? 'Houzs' : 'Us', style: { padding: '11px 14px 11px 22px' } },
+            { label: OTHER_SIDE[list], style: { padding: '11px 14px 11px 22px' } },
           ]}
         />
         {rows.length === 0 ? <GridEmpty>None</GridEmpty> : null}
-        {rows.map((b, i) => {
-          const other = tallyOtherSide(b, side, from)
-          return (
-            <GridRow
-              key={b.orderId}
-              cols={BILL_COLS}
-              zebra={i % 2 === 1}
-              onClick={() => router.push(billHref(sub, b.ourMonth, b.orderId, null))}
-              title={`Open ${b.orderNo}`}
-            >
-              <div role="cell" style={PAD}>
-                <div className={`${hv.mono} ${t.doc}`}>{b.orderNo}</div>
-                {b.refNo && b.refNo !== b.orderNo ? <div className={t.ref}>{b.refNo}</div> : null}
-              </div>
-              <span role="cell" style={PAD}>{b.salesperson}</span>
-              <span role="cell" style={PAD}>{b.brandName}</span>
-              <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{b.fairDate ? tallyDay(b.fairDate) : '—'}</span>
-              <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{tallyDay(b.soDate)}</span>
-              <span role="cell" className={num} style={PAD}>{formatMoneyBare(b.sales)}</span>
-              <span role="cell" className={num} style={PAD}>{b.pct === null ? '—' : pctWord(b.pct)}</span>
-              <span role="cell" className={num} style={PAD}>{b.bill === null ? '—' : formatMoneyBare(b.bill)}</span>
-              <span role="cell" className={t.chips} style={{ padding: '9px 14px 9px 22px' }}>
-                <Chip tone={other.tone} title={other.title}>{other.text}</Chip>
-                {b.belowDeposit ? <Chip tone="plain">Below deposit</Chip> : null}
-              </span>
-            </GridRow>
-          )
-        })}
+        {rows.map((b, i) => (
+          <GridRow
+            key={b.orderId}
+            cols={BILL_COLS}
+            zebra={i % 2 === 1}
+            onClick={() => router.push(billHref(sub, b.saleMonth, b.orderId, null))}
+            title={`Open ${b.orderNo}`}
+          >
+            <div role="cell" style={PAD}>
+              <div className={`${hv.mono} ${t.doc}`}>{b.orderNo}</div>
+              {b.refNo && b.refNo !== b.orderNo ? <div className={t.ref}>{b.refNo}</div> : null}
+            </div>
+            <span role="cell" style={PAD}>{b.salesperson}</span>
+            <span role="cell" style={PAD}>{b.brandName}</span>
+            <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{b.fairDate ? tallyDay(b.fairDate) : '—'}</span>
+            <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{tallyDay(b.soDate)}</span>
+            <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{b.reachedOn ? tallyDay(b.reachedOn) : '—'}</span>
+            <span role="cell" className={num} style={PAD}>{formatMoneyBare(b.sales)}</span>
+            <span role="cell" className={num} style={PAD} title={b.pct === null ? 'No Bill to HC % set for its brand' : `${pctWord(b.pct)} of its sales`}>
+              {b.bill === null ? '—' : formatMoneyBare(b.bill)}
+            </span>
+            <span role="cell" className={t.chips} style={{ padding: '9px 14px 9px 22px' }}>
+              {tallyChips(b, list).map(chip => (
+                <Chip key={chip.text} tone={chip.tone} title={chip.title}>{chip.text}</Chip>
+              ))}
+            </span>
+          </GridRow>
+        ))}
         {rows.length > 0 ? (
           <div className={t.total} style={{ gridTemplateColumns: BILL_COLS }} role="row">
-            <span role="cell" style={{ ...PAD, gridColumn: 'span 5' }}>{bills(rows.length)}</span>
+            <span role="cell" style={{ ...PAD, gridColumn: 'span 6' }}>{bills(rows.length)}</span>
             <span role="cell" className={num} style={PAD}>{formatMoneyBare(sales)}</span>
-            <span role="cell" style={PAD} />
             <span role="cell" className={num} style={PAD}>{formatMoneyBare(bill)}</span>
             <span role="cell" style={PAD} />
           </div>

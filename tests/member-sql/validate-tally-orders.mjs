@@ -138,15 +138,19 @@ const sql = await readFile(MIGRATION, 'utf8')
 await db.exec(sql)
 await db.exec(sql) // CREATE OR REPLACE: twice is once
 
-const rows = await q(`SELECT * FROM revenue_tally_orders($1, $2)`, [FAIR, '2026-09-01'])
+const rows = await q(`SELECT * FROM revenue_tally_orders($1, $2, $3)`, [FAIR, '2026-09-01', '2026-11-01'])
 const by = Object.fromEntries(rows.map(r => [r.order_no, r]))
 const day = v => (v === null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
 
 // ── Which bills ──
 check(rows.map(r => r.order_no), ['A-FULL', 'B-TOPUP', 'C-BELOW', 'D-EXACT', 'F-MIXED', 'S-SEP', 'G-TOTAL', 'H-NOPAY', 'I-ZERO', 'J-NOFAIR', 'K-LINES', 'L-CANCEL', 'M-OUT', 'N-UNDATED', 'O-NONE', 'P-ZEROPAID', 'E-STAMP', 'V-FILE'],
-  'this sub-department, committed batches, months from p_from on, by order date')
+  'this sub-department, committed batches, the months p_from … p_to, by order date')
 check(rows.some(r => ['T-AUG', 'U-DRAFT', 'W-IR'].includes(r.order_no)), false, 'not an earlier month, a superseded batch, another sub-department')
-check((await q(`SELECT order_no FROM revenue_tally_orders($1, $2)`, [FAIR, '2026-08-01'])).some(r => r.order_no === 'T-AUG'), true, 'p_from decides how far back')
+const numbers = async (from, to) => (await q(`SELECT order_no FROM revenue_tally_orders($1, $2, $3)`, [FAIR, from, to])).map(r => r.order_no)
+check((await numbers('2026-08-01', '2026-11-01')).includes('T-AUG'), true, 'p_from decides how far back')
+check((await numbers('2026-09-01', '2026-10-01')).includes('V-FILE'), false, 'p_to decides how far on')
+check(await numbers('2026-09-01', '2026-09-01'), ['S-SEP'], 'one month alone: the bills counted in it, whenever they were keyed')
+check(await numbers('2026-12-01', '2026-12-01'), [], 'a month with no committed batch is nothing')
 
 // ── The day the deposit was reached ──
 check(day(by['A-FULL'].reached_on), '2026-10-04', 'paid in full: its payment day')
@@ -183,11 +187,11 @@ check([day(by['A-FULL'].released_month), day(by['S-SEP'].released_month), day(by
 check([day(by['S-SEP'].period_month), day(by['S-SEP'].order_date)], ['2026-09-01', '2026-10-10'], 'a September bill keyed in October keeps both dates')
 
 // ── No deposit gate: every bill is met, on its order date ──
-const ir = await q(`SELECT * FROM revenue_tally_orders($1, $2)`, [IR, '2026-01-01'])
+const ir = await q(`SELECT * FROM revenue_tally_orders($1, $2, $3)`, [IR, '2026-01-01', '2026-12-01'])
 check(ir.map(r => [r.order_no, r.deposit_met, day(r.reached_on)]), [['W-IR', true, '2026-10-19']], 'a scheme with no deposit')
 
 // ── Who may call it ──
-const may = role => one(`SELECT has_function_privilege($1, 'public.revenue_tally_orders(uuid, date)', 'EXECUTE')`, [role])
+const may = role => one(`SELECT has_function_privilege($1, 'public.revenue_tally_orders(uuid, date, date)', 'EXECUTE')`, [role])
 check([await may('anon'), await may('authenticated'), await may('service_role')], [false, true, true], 'signed-in sessions and the service role; never the publishable key')
 check(await one(`SELECT prosecdef FROM pg_proc WHERE proname = 'revenue_tally_orders'`), false, 'SECURITY INVOKER: the caller’s own row policies answer')
 check(await one(`SELECT provolatile FROM pg_proc WHERE proname = 'revenue_tally_orders'`), 's', 'STABLE: it writes nothing')

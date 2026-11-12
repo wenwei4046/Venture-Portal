@@ -9,9 +9,10 @@ import { loadTallyMonth } from '../../../_lib/tally'
 
 /**
  * Comm Cal › Tally's Export (2026-11-12) — `/revenue/<sub>/tally/export?month=YYYY-MM`:
- * one month whole, as an Excel workbook — every bill whose SO date is in it
- * (what Houzs pays), every bill counted in it by its fair date (what we pay
- * salespeople on), each brand on both sides, and the bills in two months.
+ * one month whole, as an Excel workbook — every bill Houzs pays in it (its
+ * deposit reached, by its SO date), every bill we pay salespeople in it (its
+ * closes', or waiting for them), each brand on both sides, the bills the two
+ * sides pay apart and the ones under their deposit, which neither pays.
  * Read-only: the page's own reads, under the viewer's session. No page lives
  * at `/tally` — the Tally is Comm Cal's `?tab=tally`.
  */

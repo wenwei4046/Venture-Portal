@@ -109,16 +109,18 @@ describe('Comm Cal', () => {
 describe('Comm Cal — Months and Tally', () => {
   const report: TallyReport = {
     from: '2026-09-01',
-    twoMonthBills: 1,
+    apartBills: 1,
     noPctBills: 0,
     months: [{
       month: '2026-10-01',
-      so: { bills: 1, sales: 1000, bill: 140 },
-      fair: { bills: 2, sales: 6000, bill: 840 },
+      houzs: { bills: 1, sales: 1000, bill: 140 },
+      we: { bills: 2, sales: 6000, bill: 840 },
+      open: { bills: 0, sales: 0, bill: 0 },
       gap: { bills: 1, sales: 5000, bill: 700 },
       carried: { bills: 1, sales: 5000, bill: 700 },
       ours: [],
       theirs: [],
+      held: [],
     }],
   }
 

@@ -15,11 +15,12 @@
 --          still open when it came in after its salesperson's close.
 --
 -- One read gives the Tally what both need for every bill of the sub-department's
--- committed months from p_from on: what earns on it (its lines in a commissionable
+-- committed months p_from … p_to: what earns on it (its lines in a commissionable
 -- group — the ERP's goods), whether the portal's deposit gate is met, the day its
 -- payments reached the deposit, whether the ERP names a fair, its fair day, and
--- the month a close released it. It replaces one revenue_month_orders call per
--- month (six round trips, each working out a margin nobody reads here).
+-- the month a close released it. The page asks it a month at a time, where it
+-- asked revenue_month_orders — which works out a margin nobody reads here and
+-- names neither the deposit's day nor the release.
 --
 -- THE DAY THE DEPOSIT WAS REACHED — the ERP's reachedOn(), on the payments the
 -- delivery carries (raw.payments: paid_at, amount_sen): payments in day order
@@ -32,11 +33,15 @@
 -- gate instead: met → its order date. A bill whose dated payments fall short of
 -- the ERP's total has reached nothing, whatever the portal's gate says of the
 -- bill's own total — that difference is exactly what the Tally is there to show.
+-- (Production, 2026-11-12, Fair's 864 counted bills since September: the ERP's
+-- total is the bill's own and its payments add up to the paid amount on every
+-- one; the 15 that carry no payment are 11 bills of RM 0 and 4 nobody has paid
+-- anything on.)
 --
 -- SECURITY INVOKER: every table answers by the caller's own row policies, as
 -- revenue_month_orders does. No table changes; nothing is written.
 
-CREATE OR REPLACE FUNCTION public.revenue_tally_orders(p_sub_department_id uuid, p_from date)
+CREATE OR REPLACE FUNCTION public.revenue_tally_orders(p_sub_department_id uuid, p_from date, p_to date)
 RETURNS TABLE (
     order_id uuid,
     order_no text,
@@ -76,6 +81,7 @@ AS $fn$
          WHERE b.sub_department_id = p_sub_department_id
            AND b.status = 'committed'
            AND b.period_month >= p_from
+           AND b.period_month <= p_to
     ), goods AS (
         -- What earns on each bill: every line in a commissionable group, read
         -- once for all of them (not once per bill).
@@ -121,6 +127,7 @@ AS $fn$
       LEFT JOIN scheme sc ON TRUE
       LEFT JOIN hr_staff_costs st ON st.id = o.staff_id
       LEFT JOIN goods g ON g.order_id = o.id
+      -- One release a bill (uq_comm_release_per_sub_order).
       LEFT JOIN comm_order_releases rel
              ON rel.sub_department_id = p_sub_department_id
             AND rel.order_no = o.order_no
@@ -128,7 +135,7 @@ AS $fn$
           SELECT
               -- The portal's own gate, as revenue_month_orders reads it.
               (sc.pct IS NULL OR COALESCE(o.paid_amount, 0) + 0.005 >= o.order_total * sc.pct) AS met,
-              -- The total the ERP measures 30% of.
+              -- The total the ERP measures the deposit on.
               COALESCE(
                   NULLIF(CASE WHEN o.raw -> 'header' ->> 'total_revenue_sen' ~ '^-?\d+(\.\d+)?$'
                               THEN (o.raw -> 'header' ->> 'total_revenue_sen')::numeric END, 0),
@@ -165,8 +172,8 @@ AS $fn$
      ORDER BY o.order_date, o.order_no, o.id;
 $fn$;
 
-COMMENT ON FUNCTION public.revenue_tally_orders(uuid, date) IS
-    'Comm Cal › Tally: every bill of a sub-department''s committed months from p_from on, with what earns on it, the portal''s deposit gate, the day its payments reached the deposit (the ERP''s rule), whether the ERP names a fair, its fair day and the month a close released it. SECURITY INVOKER: the caller''s own row policies answer.';
+COMMENT ON FUNCTION public.revenue_tally_orders(uuid, date, date) IS
+    'Comm Cal › Tally: every bill of a sub-department''s committed months p_from … p_to, with what earns on it, the portal''s deposit gate, the day its payments reached the deposit (the ERP''s rule), whether the ERP names a fair, its fair day and the month a close released it. SECURITY INVOKER: the caller''s own row policies answer.';
 
-REVOKE ALL ON FUNCTION public.revenue_tally_orders(uuid, date) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.revenue_tally_orders(uuid, date) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.revenue_tally_orders(uuid, date, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.revenue_tally_orders(uuid, date, date) TO authenticated, service_role;

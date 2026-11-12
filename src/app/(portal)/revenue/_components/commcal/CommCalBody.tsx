@@ -29,7 +29,7 @@ import TallyPanel from './TallyPanel'
 // the feed window, match a name, Not ours / Put back, replay what was held.
 //
 // Two tabs under the strip since 2026-11-12: Months (the cards and the
-// months) and Tally (`TallyPanel` — by SO date beside by fair date). The tab
+// months) and Tally (`TallyPanel` — what Houzs pays beside what we pay). The tab
 // is the page's `?tab=`: the Tally's bills are read by the server only when it
 // is the one open, so a tab is a navigation, not a client-side switch.
 
