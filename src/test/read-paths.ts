@@ -608,6 +608,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'approve_fund_contra', 'file_fund_contra', 'reject_fund_contra', 'undo_fund_contra', 'withdraw_fund_contra',
   // A login turned off or on from the person's page (mig 20261105010000): People · Edit or Permissions · Edit.
   'account_set_login',
+  // Interest in suspense, one account per deal (mig 20261113140000): a deal's own accounts made as it starts (Treasury /
+  // the approval), the month-end run's entries (Treasury · Approve), what it posted and the go-live (Treasury · View).
+  'ensure_deal_accounts', 'iis_post', 'iis_posted', 'iis_live_from',
 ])
 
 /**

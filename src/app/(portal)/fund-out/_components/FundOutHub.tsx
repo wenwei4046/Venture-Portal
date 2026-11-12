@@ -6,6 +6,7 @@ import { flash } from '@/components/hrv/toast'
 import { HeadButton } from '@/components/finv/Hub'
 import FundHub, { type FundCan } from '@/components/treasury/FundHub'
 import FundContraDialog from '@/components/treasury/FundContraDialog'
+import IisMonthDialog from '@/components/treasury/IisMonthDialog'
 import type { FundCardKey, FundRecord } from '@/lib/fund-hub'
 import { cancelPendingLoan } from '../actions'
 import CreateFundOutDialog from './CreateFundOutDialog'
@@ -43,6 +44,8 @@ export default function FundOutHub({
   const router = useRouter()
   const [creating, setCreating] = useState(false)
   const [contra, setContra] = useState(false)
+  // Month-end interest (IIS, 2026-11-13): Treasury · Approve.
+  const [iis, setIis] = useState(false)
   return (
     <>
       <FundHub
@@ -62,6 +65,7 @@ export default function FundOutHub({
               </HeadButton>
             ) : null}
             {canCreate ? <HeadButton onClick={() => setContra(true)}>Contra</HeadButton> : null}
+            {can.amend ? <HeadButton onClick={() => setIis(true)}>Month-end interest</HeadButton> : null}
             {canLoanAging ? <HeadButton href="/reports/loan-aging">Loan aging</HeadButton> : null}
             {canExport ? <ExportCSVButton /> : null}
           </>
@@ -82,6 +86,17 @@ export default function FundOutHub({
         <FundContraDialog
           open={contra}
           onClose={() => setContra(false)}
+          onSaved={(message) => {
+            flash(message)
+            router.refresh()
+          }}
+          today={today}
+        />
+      ) : null}
+      {can.amend ? (
+        <IisMonthDialog
+          open={iis}
+          onClose={() => setIis(false)}
           onSaved={(message) => {
             flash(message)
             router.refresh()

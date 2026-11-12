@@ -15,6 +15,7 @@ import { validateDisbursementAccount } from '@/lib/loan-disbursement'
 import {
   resolveLoansReceivableLeaf,
   resolveInterestSuspenseLeaf,
+  loanSuspenseCredit,
   INTEREST_INCOME_CODE,
   INTEREST_SUSPENSE_PARENT,
 } from '@/lib/loans-coa'
@@ -418,9 +419,13 @@ export async function recordRepayment(formData: FormData) {
     }
     interestCredit = acc.code
   }
+  // IIS (2026-11-13): once live, the deal has its own account (made at the go-live, or as its disbursement was
+  // approved); in suspense, its interest comes off it too (the month-end run moves the interest received into 5027).
+  const suspenseCredit = paymentType === 'interest' ? await loanSuspenseCredit(supabase, loanId) : null
   const creditAccount =
     paymentType === 'principal' ? await resolveLoansReceivableLeaf(supabase, loanId) :
     paymentType === 'penalty'   ? '7010' :
+    suspenseCredit              ? suspenseCredit :
                                   interestCredit   // interest + netting
 
   let journalEntryId: string

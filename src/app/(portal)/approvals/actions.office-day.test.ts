@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('@/lib/slack', () => ({ notifyApprovalDecision: vi.fn(async () => undefined), notifyNewApproval: vi.fn(async () => undefined) }))
-vi.mock('@/lib/loans-coa', () => ({ resolveLoansReceivableLeaf: vi.fn(async () => '3051') }))
+vi.mock('@/lib/loans-coa', () => ({ resolveLoansReceivableLeaf: vi.fn(async () => '3051'), ensureDealAccounts: vi.fn(async () => undefined) }))
 
 import { approveRequestGroup } from './actions'
 

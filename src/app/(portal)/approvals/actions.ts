@@ -10,7 +10,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeToday } from '@/lib/office-time'
 import { notifyApprovalDecision } from '@/lib/slack'
 import { postJournalEntry } from '@/lib/journal'
-import { resolveLoansReceivableLeaf } from '@/lib/loans-coa'
+import { ensureDealAccounts, resolveLoansReceivableLeaf } from '@/lib/loans-coa'
 import type { Database } from '@/lib/supabase/database.types'
 import type { User } from '@/types'
 
@@ -336,7 +336,10 @@ async function performApproval(
     // Skip for department_pool source_type because the dept transfer JE above already
     // covers that flow (dept→HV is an equity reclass, not a new liability).
     if (fundSource.source_type !== 'department_pool') {
-      const liabilityCode = fundSource.account_code ?? '4000'
+      // IIS (2026-11-13): once live, a new fund source gets its own account before its first entry.
+      await ensureDealAccounts(supabase, 'fund_source', fundSource.id)
+      const { data: ownAccount } = await supabase.from('fund_sources').select('account_code').eq('id', fundSource.id).maybeSingle()
+      const liabilityCode = (ownAccount as { account_code?: string | null } | null)?.account_code ?? fundSource.account_code ?? '4000'
       await postJournalEntry(supabase, {
         transactionDate: fundSource.effective_date ?? officeToday(),
         description: approval.description ?? `Fund source activated — ${fundSource.source_type}`,
@@ -1011,6 +1014,8 @@ async function performGroupApproval(
   // ...). Posting to the header silently disappeared from Trial Balance
   // (which filters to leaves only). Mig 256 added a DB trigger that
   // rejects header posts; this code now resolves the leaf per borrower.
+  // IIS (2026-11-13): once live, a new loan gets its own account before its first entry.
+  await ensureDealAccounts(supabase, 'loan', loanApproval.reference_id)
   const loansReceivableLeaf = await resolveLoansReceivableLeaf(supabase, loanApproval.reference_id)
   try {
     await postJournalEntry(supabase, {
