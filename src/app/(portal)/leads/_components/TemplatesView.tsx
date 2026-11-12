@@ -9,8 +9,8 @@ import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import { createClient } from '@/lib/supabase/client'
 import { wrapMark } from '@/lib/leads/rich'
 import {
-  ALSO_MAX, BACK_LABEL, OPTION_MAX, RETRY_PHONE, SAVE_AS, doneOf, freshId, fromLibrary, templateProblem, toLibrary, updateFromLibrary, usedBy, walkAnswer, walkFrom,
-  type LibraryItem, type ReplyRules, type ReplyTemplate, type StepFile, type StepKind, type TemplateStep, type Walk,
+  ALSO_MAX, FILES_MAX, OPTION_MAX, RETRY_PHONE, SAVE_AS, backLabel, doneOf, filesOf, freshId, fromLibrary, labelOf, templateProblem, toLibrary, tr, updateFromLibrary, usedBy, walkAnswer, walkFrom,
+  type Lang, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepFile, type StepKind, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
 import { ATTACH_ACCEPT, NODE, STEP_TYPES, edgePath, extOf, inPort, isImage, mapPlaced, mapRows, placeMissing, nodeHeight, rowPort, sizeLabel, typeOf } from '@/lib/leads/template-map'
 import Modal from './ui/Modal'
@@ -27,14 +27,20 @@ import s from './templates.module.css'
  * General info fields, picking more than one, an option's other replies, keeping an answer, the phone's retry,
  * closing messages; and on a template's right-click its description, closing message, Duplicate and Delete.
  * Saved as a whole (lead_save_template).
+ *
+ * 2026-11-11 (the user: "做中英对照的画面，内容由客服去写" / "可以多张图片，video, pdf file" / ‹ Back on by default; mig
+ * 20261111130000): every message, button, closing and retry has an English and a 中文 box side by side — the customer
+ * gets their language, an empty box the other one; a step sends up to ten photos, videos, PDFs or files, in their
+ * order, before its words; a new Buttons / Types an answer / Gives a phone step has ‹ Back ticked; the preview shows
+ * the files first and switches EN / 中文.
  */
 
-type Draft = Pick<ReplyTemplate, 'id' | 'name' | 'description' | 'endMsg' | 'steps'>
+type Draft = Pick<ReplyTemplate, 'id' | 'name' | 'description' | 'endMsg' | 'steps'> & { endMsgZh: string }
 const blank = (): Draft => ({
-  id: `new-${Date.now().toString(36)}`, name: 'New template', description: '', endMsg: '',
+  id: `new-${Date.now().toString(36)}`, name: 'New template', description: '', endMsg: '', endMsgZh: '',
   steps: mapPlaced([{ id: 's1', kind: 'question', name: 'Welcome', text: 'Hi {name}! What are you looking for today?', buttons: [{ label: 'Option 1', next: '' }] }]),
 })
-const draftOf = (t: ReplyTemplate): Draft => ({ id: t.id, name: t.name, description: t.description ?? '', endMsg: t.endMsg ?? '', steps: mapPlaced(t.steps) })
+const draftOf = (t: ReplyTemplate): Draft => ({ id: t.id, name: t.name, description: t.description ?? '', endMsg: t.endMsg ?? '', endMsgZh: t.endMsgZh ?? '', steps: mapPlaced(t.steps) })
 const tileStyle = (k: StepKind) => { const t = typeOf(k); return { ['--tint' as string]: `var(${t.tint})`, ['--fg' as string]: `var(${t.fg})` } as CSSProperties }
 const FILE_LIMIT = 25 * 1024 * 1024
 
@@ -94,7 +100,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
 
   // Photos and files: signed links for the saved ones (an hour), the browser's own for those just picked.
   const [links, setLinks] = useState<Record<string, string>>({})
-  const paths = useMemo(() => [...new Set(draft.steps.map(x => x.file?.path).filter((p): p is string => !!p))].sort().join('|'), [draft.steps])
+  const paths = useMemo(() => [...new Set(draft.steps.flatMap(x => filesOf(x).map(f => f.path)))].sort().join('|'), [draft.steps])
   useEffect(() => {
     const want = paths ? paths.split('|').filter(p => !links[p] && !localUrls[p]) : []
     if (!want.length) return
@@ -116,7 +122,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
     const problem = templateProblem(draft.steps)
     if (problem) { setError(problem); return }
     start(async () => {
-      const r = await saveTemplate(isNew ? null : draft.id, { name: draft.name, description: draft.description, endMsg: draft.endMsg, steps: draft.steps })
+      const r = await saveTemplate(isNew ? null : draft.id, { name: draft.name, description: draft.description, endMsg: draft.endMsg, endMsgZh: draft.endMsgZh, steps: draft.steps })
       if (!r.ok) { setError(r.reason); return }
       if (isNew) { setDraft(d => ({ ...d, id: r.data })); window.history.replaceState(null, '', `/leads/flows?t=${r.data}`) }
       setDirty(false)
@@ -181,7 +187,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
     if (item) added = fromLibrary(draft.steps, item, where).map(x => ({ ...x, name: x.name || item.name }))
     else {
       const k = kind ?? 'question'
-      added = [{ id: freshId(draft.steps), kind: k, name: typeOf(k).label, text: '', ...(k === 'question' ? { buttons: [{ label: 'Option 1', next: '' }] } : { next: '' }), ...(k === 'phone' ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}), pos: where }]
+      added = [{ id: freshId(draft.steps), kind: k, name: typeOf(k).label, text: '', ...(k === 'question' ? { buttons: [{ label: 'Option 1', next: '' }] } : { next: '' }), ...(k === 'phone' ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}), ...(['question', 'text', 'phone'].includes(k) ? { back: true } : {}), pos: where }]
     }
     const first = added[0]
     change(d => ({
@@ -295,9 +301,10 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
         <label className={s.field}>Description
           <input className={s.edInput} value={draft.description} maxLength={300} placeholder="When to use this template" onChange={e => change(d => ({ ...d, description: e.target.value }))} />
         </label>
-        <label className={s.field}>Closing message · sent when a chat reaches the end of a step that goes nowhere
-          <textarea className={s.edText} rows={3} value={draft.endMsg} maxLength={1000} placeholder="e.g. Thanks! We’ll be in touch soon 😊" onChange={e => change(d => ({ ...d, endMsg: e.target.value }))} />
-        </label>
+        <div className={s.field}>Closing message · sent when a chat reaches the end of a step that goes nowhere
+          <BiText rows={3} en={draft.endMsg} zh={draft.endMsgZh} disabled={!canEdit} label="Closing message" placeholder="e.g. Thanks! We’ll be in touch soon 😊" placeholderZh="例如：谢谢！我们会尽快联系您 😊"
+            onChange={(en, zh) => change(d => ({ ...d, endMsg: en, endMsgZh: zh }))} />
+        </div>
       </Modal>
     </div>
   )
@@ -348,10 +355,10 @@ function ListView({ steps, sel, editing, canEdit, library, libIds, urlOf, onPick
                     {st.lib && libIds.has(st.lib.id) ? <span className={s.libMark} title="From step library"><LeadIcon name="blocks" size={13} /></span> : null}
                     <span className={s.type}>{t.label}</span>
                   </div>
-                  <span className={s.text}>{st.text}</span>
-                  {st.file ? <FileChip file={st.file} url={urlOf(st.file)} /> : null}
+                  {filesOf(st).length ? <div className={s.chipFiles}>{filesOf(st).map(f => <FileChip key={f.path} file={f} url={urlOf(f)} />)}</div> : null}
+                  <span className={s.text}>{tr(st, 'text', 'en')}</span>
                   {st.kind === 'question' ? (
-                    <div className={s.opts}>{(st.buttons ?? []).map((b, j) => <span key={j} className={s.opt}><span>{b.label}</span><span className={s.optTo}>→ {nameOf(b.next)}</span></span>)}</div>
+                    <div className={s.opts}>{(st.buttons ?? []).map((b, j) => <span key={j} className={s.opt}><span>{labelOf(b)}</span><span className={s.optTo}>→ {nameOf(b.next)}</span></span>)}</div>
                   ) : null}
                   {['phone', 'message', 'text'].includes(st.kind) && st.next ? <span className={s.then}>Then → {nameOf(st.next)}</span> : null}
                 </>
@@ -369,7 +376,8 @@ function ListView({ steps, sel, editing, canEdit, library, libIds, urlOf, onPick
 function FileChip({ file, url }: { file: StepFile; url: string }) {
   return (
     <div className={s.chipFile}>
-      {isImage(file.mime) ? <span className={s.thumb} style={{ backgroundImage: url ? `url("${url}")` : undefined }} /> : <span className={s.ext}>{extOf(file.name)}</span>}
+      {isImage(file.mime) ? <span className={s.thumb} style={{ backgroundImage: url ? `url("${url}")` : undefined }} />
+        : file.mime.startsWith('video/') ? <span className={s.ext}><LeadIcon name="play" size={12} /></span> : <span className={s.ext}>{extOf(file.name)}</span>}
       <span>{file.name}</span>
     </div>
   )
@@ -431,6 +439,9 @@ function StepEditor({ step, steps, canEdit, setStep, setLocalUrls, urlOf, libByI
   const dis = !canEdit
   const set = (o: Partial<TemplateStep>) => setStep(step.id, o)
   const text = useRef<HTMLTextAreaElement>(null)
+  const textZh = useRef<HTMLTextAreaElement>(null)
+  // Bold, italic and General info go into the box last written in.
+  const lastBox = useRef<'text' | 'textZh'>('text')
   const [uploading, setUploading] = useState(false)
   const [more, setMore] = useState(false)
   const lib = step.lib ? libById.get(step.lib.id) ?? null : null
@@ -441,23 +452,36 @@ function StepEditor({ step, steps, canEdit, setStep, setLocalUrls, urlOf, libByI
       {targets.map(x => <option key={x.id} value={x.id}>{x.name || 'Untitled'}</option>)}
     </select>
   )
-  const pick = async (file: File | undefined) => {
-    if (!file) return
-    if (file.size > FILE_LIMIT) { onFlash('A photo or file is 25 MB at most.'); return }
+  // A step's files (2026-11-11): up to FILES_MAX, each 25 MB at most, sent in this order before the words. A step
+  // saved with the one `file` of before turns it into the first of its list when it is next changed.
+  const files = filesOf(step)
+  const setFiles = (list: StepFile[]) => set({ files: list, file: undefined })
+  const pick = async (picked: FileList | null) => {
+    const all = Array.from(picked ?? [])
+    if (!all.length) return
+    const room = FILES_MAX - files.length
+    if (room <= 0) { onFlash(`A step sends ${FILES_MAX} photos or files at most.`); return }
+    const big = all.filter(f => f.size > FILE_LIMIT)
+    const take = all.filter(f => f.size <= FILE_LIMIT).slice(0, room)
+    if (big.length) onFlash(`${big.map(f => f.name).join(', ')}: a photo or file is 25 MB at most.`)
+    else if (all.length > room) onFlash(`Only ${room} more fit — a step sends ${FILES_MAX} at most.`)
+    if (!take.length) return
     setUploading(true)
-    const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
-    const path = `chat/tpl/${crypto.randomUUID()}/${name}`
-    const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+    const added: StepFile[] = []
+    let failed = 0
+    for (const file of take) {
+      const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
+      const path = `chat/tpl/${crypto.randomUUID()}/${name}`
+      const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+      if (up.error) { failed++; continue }
+      setLocalUrls(u => ({ ...u, [path]: URL.createObjectURL(file) }))
+      added.push({ path, name, mime: file.type || 'application/octet-stream', size: file.size })
+    }
     setUploading(false)
-    if (up.error) { onFlash('The file could not be uploaded. Please try again.'); return }
-    setLocalUrls(u => ({ ...u, [path]: URL.createObjectURL(file) }))
-    set({ file: { path, name, mime: file.type || 'application/octet-stream', size: file.size } })
+    if (failed) onFlash(`${failed} file${failed === 1 ? '' : 's'} could not be uploaded. Please try again.`)
+    if (added.length) setStep(step.id, x => ({ files: [...filesOf(x), ...added].slice(0, FILES_MAX), file: undefined }))
   }
-  const attach = (label: string) => (
-    <label className={s.attachSm}><LeadIcon name="paperclip" size={13} />{label}
-      <input type="file" accept={ATTACH_ACCEPT} className={s.hidden} disabled={dis || uploading} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} />
-    </label>
-  )
+  const move = (i: number, by: -1 | 1) => { const list = [...files]; const [f] = list.splice(i, 1); list.splice(i + by, 0, f); setFiles(list) }
   const rows = mapRows(step)
   return (
     <div className={s.ed} onClick={e => e.stopPropagation()}>
@@ -466,26 +490,46 @@ function StepEditor({ step, steps, canEdit, setStep, setLocalUrls, urlOf, libByI
         <input className={s.edName} value={step.name ?? ''} maxLength={40} disabled={dis} placeholder="Step name" aria-label="Step name" onChange={e => set({ name: e.target.value })} />
         <span className={s.type}>{t.label}</span>
       </div>
-      <textarea ref={text} className={s.edText} rows={3} value={step.text ?? ''} maxLength={1000} disabled={dis} placeholder="Write the message…" aria-label="Message" onChange={e => set({ text: e.target.value })} />
-      {step.kind === 'message' || step.file ? (
-        step.file ? (
-          <div className={s.fileBox}>
-            {isImage(step.file.mime) ? <span className={s.thumb} data-size="40" style={{ backgroundImage: urlOf(step.file) ? `url("${urlOf(step.file)}")` : undefined }} /> : <span className={s.ext} data-size="40">{extOf(step.file.name)}</span>}
-            <div className={s.fileText}><span className={s.fileName}>{step.file.name}</span><span className={s.fileMeta}>{sizeLabel(step.file.size)}</span></div>
-            {canEdit ? (
-              <>
-                <label className={s.replace}>Replace<input type="file" accept={ATTACH_ACCEPT} className={s.hidden} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} /></label>
-                <button type="button" className={s.x} title="Remove" aria-label="Remove the file" onClick={() => set({ file: null })}><LeadIcon name="x" size={14} /></button>
-              </>
-            ) : null}
-          </div>
-        ) : canEdit ? attach(uploading ? 'Uploading…' : 'Attach photo or file') : null
+      {files.length ? (
+        <div className={s.files}>
+          {files.map((f, i) => (
+            <div key={f.path} className={s.fileBox}>
+              <span className={s.fileNo}>{i + 1}</span>
+              {isImage(f.mime) ? <span className={s.thumb} data-size="40" style={{ backgroundImage: urlOf(f) ? `url("${urlOf(f)}")` : undefined }} />
+                : f.mime.startsWith('video/') ? <span className={s.ext} data-size="40"><LeadIcon name="play" size={16} /></span>
+                : <span className={s.ext} data-size="40">{extOf(f.name)}</span>}
+              <div className={s.fileText}><span className={s.fileName}>{f.name}</span><span className={s.fileMeta}>{sizeLabel(f.size)}</span></div>
+              {canEdit ? (
+                <>
+                  <button type="button" className={s.x} title="Move up" aria-label={`Move ${f.name} up`} disabled={i === 0} onClick={() => move(i, -1)}><LeadIcon name="chevron-up" size={14} /></button>
+                  <button type="button" className={s.x} title="Move down" aria-label={`Move ${f.name} down`} disabled={i === files.length - 1} onClick={() => move(i, 1)}><LeadIcon name="chevron-down" size={14} /></button>
+                  <button type="button" className={s.x} title="Remove" aria-label={`Remove ${f.name}`} onClick={() => setFiles(files.filter((_, k) => k !== i))}><LeadIcon name="x" size={14} /></button>
+                </>
+              ) : null}
+            </div>
+          ))}
+        </div>
       ) : null}
+      {canEdit && files.length < FILES_MAX ? (
+        <label className={s.attachSm}><LeadIcon name="paperclip" size={13} />{uploading ? 'Uploading…' : files.length ? `Add more (${files.length} of ${FILES_MAX})` : 'Attach photos, videos or files'}
+          <input type="file" multiple accept={ATTACH_ACCEPT} className={s.hidden} disabled={dis || uploading} onChange={e => { void pick(e.target.files); e.target.value = '' }} />
+        </label>
+      ) : null}
+      <BiText rows={3} en={step.text ?? ''} zh={step.textZh ?? ''} disabled={dis} label="Message" placeholder="Write the message…" placeholderZh="写下消息…"
+        refEn={text} refZh={textZh} onFocus={k => { lastBox.current = k === 'en' ? 'text' : 'textZh' }}
+        onChange={(en, zh) => set({ text: en, textZh: zh })} />
       {rows.map(r => (
         <div key={String(r.slot)} className={s.edRow}>
-          {r.edit
-            ? <input className={s.edInput} value={r.label} maxLength={OPTION_MAX} disabled={dis} aria-label={`Button ${Number(r.slot) + 1}`} onChange={e => set({ buttons: (step.buttons ?? []).map((b, j) => (j === r.slot ? { ...b, label: e.target.value } : b)) })} />
-            : <span className={s.edFixed}>{r.label}</span>}
+          {r.edit ? (() => {
+            const b = (step.buttons ?? [])[Number(r.slot)]
+            const put = (o: Partial<typeof b>) => set({ buttons: (step.buttons ?? []).map((x, j) => (j === r.slot ? { ...x, ...o } : x)) })
+            return (
+              <span className={s.biRow}>
+                <input className={s.edInput} value={b.label} maxLength={OPTION_MAX} disabled={dis} placeholder="English" aria-label={`Button ${Number(r.slot) + 1}`} onChange={e => put({ label: e.target.value })} />
+                <input className={s.edInput} lang="zh" value={b.labelZh ?? ''} maxLength={OPTION_MAX} disabled={dis} placeholder={b.label ? `中文 · ${b.label}` : '中文'} aria-label={`Button ${Number(r.slot) + 1} in Chinese`} onChange={e => put({ labelZh: e.target.value })} />
+              </span>
+            )
+          })() : <span className={s.edFixed}>{r.label}</span>}
           <LeadIcon name="arrow-right" size={13} className={s.edArrow} />
           {target(r.to, v => set(r.slot === 'next' ? { next: v } : { buttons: (step.buttons ?? []).map((b, j) => (j === r.slot ? { ...b, next: v } : b)) }), `${r.label} goes to`)}
           {r.edit && canEdit ? (
@@ -503,13 +547,13 @@ function StepEditor({ step, steps, canEdit, setStep, setLocalUrls, urlOf, libByI
         <span className={s.fill} />
         <button type="button" className={s.done} onClick={e => { e.stopPropagation(); onDone() }}>Done</button>
       </div>
-      {more ? <MoreOptions step={step} steps={steps} canEdit={canEdit} set={set} setStep={setStep} lib={lib} info={info} today={today} text={text} /> : null}
+      {more ? <MoreOptions step={step} steps={steps} canEdit={canEdit} set={set} setStep={setStep} lib={lib} info={info} today={today} text={text} textZh={textZh} lastBox={lastBox} /> : null}
     </div>
   )
 }
 
 /** Kept, not drawn (the user's point 2): what the step can also do, behind "More". */
-function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, text }: {
+function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, text, textZh, lastBox }: {
   step: TemplateStep
   steps: TemplateStep[]
   canEdit: boolean
@@ -519,22 +563,25 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
   info: LeadInfo | null
   today: string
   text: React.RefObject<HTMLTextAreaElement | null>
+  textZh: React.RefObject<HTMLTextAreaElement | null>
+  lastBox: React.RefObject<'text' | 'textZh'>
 }) {
   const dis = !canEdit
+  const box = () => (lastBox.current === 'textZh' ? { el: textZh.current, key: 'textZh' as const } : { el: text.current, key: 'text' as const })
   const [infoOpen, setInfoOpen] = useState(false)
   const entries = info ? info.cards.flatMap(c => infoEntries({ ...info, cards: [c] }, c.brandId, today)) : []
   const mark = (m: '*' | '_') => {
-    const el = text.current
-    const v = step.text ?? ''
+    const { el, key } = box()
+    const v = step[key] ?? ''
     const r = wrapMark(v, el?.selectionStart ?? v.length, el?.selectionEnd ?? v.length, m)
-    set({ text: r.text.slice(0, 1000) })
+    set({ [key]: r.text.slice(0, 1000) })
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(r.caret, r.caret) })
   }
   const insert = (token: string) => {
-    const el = text.current
-    const v = step.text ?? ''
+    const { el, key } = box()
+    const v = step[key] ?? ''
     const at = el ? el.selectionStart ?? v.length : v.length
-    set({ text: v.slice(0, at) + token + v.slice(at) })
+    set({ [key]: v.slice(0, at) + token + v.slice(at) })
     setInfoOpen(false)
   }
   const goes = (value: string | null | undefined, onChange: (v: string) => void, label: string, extra: Array<{ v: string; l: string }> = []) => (
@@ -545,10 +592,10 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
     </select>
   )
   const named = (id: string) => steps.find(x => x.id === id)?.name || 'Message'
-  const closing = (value: string | undefined, onChange: (v: string) => void) => (
-    <label className={s.field}>Closing message when it ends here
-      <input className={s.edInput} value={value ?? ''} maxLength={1000} disabled={dis} placeholder="Empty: the template’s own" onChange={e => onChange(e.target.value)} />
-    </label>
+  const closing = (en: string | undefined, zh: string | undefined, onChange: (en: string, zh: string) => void) => (
+    <div className={s.field}>Closing message when it ends here
+      <BiInput en={en ?? ''} zh={zh ?? ''} max={1000} disabled={dis} label="Closing message" placeholder="Empty: the template’s own" placeholderZh="空白：用模板的" onChange={onChange} />
+    </div>
   )
   const setMulti = (on: boolean) => set(on
     ? { multi: true, buttons: (step.buttons ?? []).map(b => { const t = steps.find(x => x.id === b.next); return { ...b, next: '', also: [...(t?.kind === 'message' ? [t.id] : []), ...(b.also ?? [])].filter((id, k, a) => a.indexOf(id) === k).slice(0, ALSO_MAX) } }) }
@@ -585,7 +632,7 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
         <>
           <label className={s.check}><input type="checkbox" checked={!!step.multi} disabled={dis} onChange={e => setMulti(e.target.checked)} />Customer can pick more than one</label>
           {(step.buttons ?? []).map((b, j) => (
-            <div key={j} className={s.field}>{b.label || `Button ${j + 1}`} · {step.multi ? 'replies with' : 'also sends first'}
+            <div key={j} className={s.field}>{labelOf(b) || `Button ${j + 1}`} · {step.multi ? 'replies with' : 'also sends first'}
               {b.also?.length ? (
                 <span className={s.alsoChips}>{b.also.map(id => (
                   <span key={id} className={s.alsoChip}>{named(id)}
@@ -599,17 +646,20 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
                   {steps.filter(x => x.kind === 'message' && x.id !== step.id && !(b.also ?? []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{x.name || 'Message'}</option>)}
                 </select>
               ) : null}
-              {!step.multi && !b.next ? closing(b.endMsg, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, endMsg: v } : x)) })) : null}
+              {!step.multi && !b.next ? closing(b.endMsg, b.endMsgZh, (en, zh) => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, endMsg: en, endMsgZh: zh } : x)) })) : null}
             </div>
           ))}
           {step.multi ? (
             <>
-              <label className={s.field}>Finish button · 20 characters
-                <input className={s.edInput} value={step.doneLabel ?? ''} maxLength={20} disabled={dis} placeholder="That's all" onChange={e => set({ doneLabel: e.target.value })} />
-              </label>
-              <label className={s.field}>When it comes back, it says
-                <input className={s.edInput} value={step.againText ?? ''} maxLength={1000} disabled={dis} placeholder={`Anything else? Pick another, or tap "${doneOf(step)}".`} onChange={e => set({ againText: e.target.value })} />
-              </label>
+              <div className={s.field}>Finish button · 20 characters
+                <BiInput en={step.doneLabel ?? ''} zh={step.doneLabelZh ?? ''} max={20} disabled={dis} label="Finish button" placeholder="That's all" placeholderZh="就这些"
+                  onChange={(en, zh) => set({ doneLabel: en, doneLabelZh: zh })} />
+              </div>
+              <div className={s.field}>When it comes back, it says
+                <BiInput en={step.againText ?? ''} zh={step.againTextZh ?? ''} max={1000} disabled={dis} label="When it comes back"
+                  placeholder={`Anything else? Pick another, or tap "${doneOf(step)}".`} placeholderZh={`还有别的吗？再选一个，或点“${doneOf(step, 'zh')}”。`}
+                  onChange={(en, zh) => set({ againText: en, againTextZh: zh })} />
+              </div>
               <label className={s.field}>After “{doneOf(step)}”, goes to {goes(step.next, v => set({ next: v }), 'After the finish button, goes to')}</label>
             </>
           ) : null}
@@ -630,9 +680,10 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
       ) : null}
       {step.kind === 'phone' ? (
         <>
-          <label className={s.field}>If it’s not a phone, it says
-            <textarea className={s.edText} rows={2} value={step.retryText ?? ''} maxLength={1000} disabled={dis} placeholder="Empty: the template stops and CS takes over" onChange={e => set({ retryText: e.target.value })} />
-          </label>
+          <div className={s.field}>If it’s not a phone, it says
+            <BiText rows={2} en={step.retryText ?? ''} zh={step.retryTextZh ?? ''} disabled={dis} label="If it’s not a phone" placeholder="Empty: the template stops and CS takes over" placeholderZh="例如：这不是电话号码，请只回复数字。"
+              onChange={(en, zh) => set({ retryText: en, retryTextZh: zh })} />
+          </div>
           <label className={s.field}>Ask again up to
             <select className={s.edSelect} value={step.retryMax ?? ''} disabled={dis} onChange={e => set({ retryMax: e.target.value || null })}>
               {['1', '2', '3', '4', '5'].map(n => <option key={n} value={n}>{n} time{n === '1' ? '' : 's'}</option>)}
@@ -647,9 +698,56 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
           <input type="checkbox" checked={!!step.back} disabled={dis} onChange={e => set({ back: e.target.checked || undefined })} />Customer can go back (‹ Back button)
         </label>
       ) : null}
-      {['phone', 'message', 'text'].includes(step.kind) && !step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
-      {step.kind === 'question' && step.multi && !step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
+      {['phone', 'message', 'text'].includes(step.kind) && !step.next ? closing(step.endMsg, step.endMsgZh, (en, zh) => set({ endMsg: en, endMsgZh: zh })) : null}
+      {step.kind === 'question' && step.multi && !step.next ? closing(step.endMsg, step.endMsgZh, (en, zh) => set({ endMsg: en, endMsgZh: zh })) : null}
     </div>
+  )
+}
+
+/** An English and a 中文 box side by side (2026-11-11): the customer gets their language; an empty box, the other. */
+function BiText({ en, zh, rows, disabled, label, placeholder, placeholderZh, refEn, refZh, onFocus, onChange }: {
+  en: string
+  zh: string
+  rows: number
+  disabled: boolean
+  label: string
+  placeholder: string
+  placeholderZh: string
+  refEn?: React.Ref<HTMLTextAreaElement>
+  refZh?: React.Ref<HTMLTextAreaElement>
+  onFocus?: (k: 'en' | 'zh') => void
+  onChange: (en: string, zh: string) => void
+}) {
+  return (
+    <div className={s.bi}>
+      <label className={s.biBox}><span className={s.biTag}>EN</span>
+        <textarea ref={refEn} className={s.edText} rows={rows} value={en} maxLength={1000} disabled={disabled} placeholder={placeholder} aria-label={label}
+          onFocus={() => onFocus?.('en')} onChange={e => onChange(e.target.value, zh)} />
+      </label>
+      <label className={s.biBox}><span className={s.biTag}>中文</span>
+        <textarea ref={refZh} className={s.edText} lang="zh" rows={rows} value={zh} maxLength={1000} disabled={disabled} placeholder={placeholderZh} aria-label={`${label} in Chinese`}
+          onFocus={() => onFocus?.('zh')} onChange={e => onChange(en, e.target.value)} />
+      </label>
+    </div>
+  )
+}
+
+/** One line in English and 中文 side by side. */
+function BiInput({ en, zh, max, disabled, label, placeholder, placeholderZh, onChange }: {
+  en: string
+  zh: string
+  max: number
+  disabled: boolean
+  label: string
+  placeholder: string
+  placeholderZh: string
+  onChange: (en: string, zh: string) => void
+}) {
+  return (
+    <span className={s.biRow}>
+      <input className={s.edInput} value={en} maxLength={max} disabled={disabled} placeholder={placeholder} aria-label={label} onChange={e => onChange(e.target.value, zh)} />
+      <input className={s.edInput} lang="zh" value={zh} maxLength={max} disabled={disabled} placeholder={placeholderZh} aria-label={`${label} in Chinese`} onChange={e => onChange(en, e.target.value)} />
+    </span>
   )
 }
 
@@ -831,7 +929,7 @@ function FlowMap({ steps, sel, setSel, editing, setEditing, canEdit, library, li
 
 // ── The preview rail ──
 
-type PvLine = { k: 'cust' | 'bot' | 'img' | 'doc' | 'btns' | 'wait'; text: string; url?: string; btns?: string[] }
+type PvLine = { k: 'cust' | 'bot' | 'img' | 'vid' | 'doc' | 'btns' | 'wait'; text: string; url?: string; btns?: string[] }
 
 function Rail({ open, setOpen, draft, from, brand, urlOf }: {
   open: boolean
@@ -842,35 +940,38 @@ function Rail({ open, setOpen, draft, from, brand, urlOf }: {
   urlOf: (f: StepFile | null | undefined) => string
 }) {
   const [dev, setDev] = useState<'phone' | 'desk'>('phone')
+  const [lang, setLang] = useState<Lang>('en')
   const startId = from && draft.steps.some(x => x.id === from) ? from : draft.steps[0]?.id ?? null
-  const key = `${draft.id}|${startId}`
+  const key = `${draft.id}|${startId}|${lang}`
   const [run, setRun] = useState<{ key: string; picks: string[] }>({ key, picks: [] })
   const picks = useMemo(() => (run.key === key ? run.picks : []), [run, key])
   const add = (p: string) => setRun({ key, picks: [...picks, p] })
   const scroll = useRef<HTMLDivElement>(null)
   const lines = useMemo<PvLine[]>(() => {
     if (!startId) return []
-    const t = { steps: draft.steps, endMsg: draft.endMsg }
-    let w: Walk = walkFrom(t, startId)
+    const t = { steps: draft.steps, endMsg: draft.endMsg, endMsgZh: draft.endMsgZh }
+    let w: Walk = walkFrom(t, startId, [], [], lang)
     for (const p of picks) { if (!w.waiting) break; w = walkAnswer(t, w, p) }
     const out: PvLine[] = []
     for (const x of w.said) {
       if (x.from === 'customer') out.push({ k: 'cust', text: x.text })
       else if (x.from === 'system') out.push({ k: 'wait', text: x.text.startsWith('Goes to the AI') ? 'AI Agent takes over' : x.text.startsWith('Goes to a person') ? 'Handed to a person' : x.text })
-      else if (x.file) out.push(isImage(x.file.mime) ? { k: 'img', text: x.file.name, url: urlOf(x.file) } : { k: 'doc', text: x.file.name })
+      else if (x.file) out.push(isImage(x.file.mime) ? { k: 'img', text: x.file.name, url: urlOf(x.file) } : x.file.mime.startsWith('video/') ? { k: 'vid', text: x.file.name, url: urlOf(x.file) } : { k: 'doc', text: x.file.name })
       else out.push({ k: 'bot', text: x.text.replace(/\{name\}/g, 'Jason') })
     }
+    const sendNo = lang === 'zh' ? '发送我的电话' : 'Send my number'
+    const typeIt = lang === 'zh' ? '输入回答' : 'Type an answer'
     const waiting = w.waiting ? draft.steps.find(x => x.id === w.waiting) : undefined
     const lastBtns = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons
-    const back = waiting?.kind !== 'question' && lastBtns?.includes(BACK_LABEL) ? [BACK_LABEL] : []
+    const back = waiting?.kind !== 'question' && lastBtns?.includes(backLabel(lang)) ? [backLabel(lang)] : []
     if (waiting?.kind === 'question') {
-      const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (waiting.buttons ?? []).map(b => b.label)
-      if (shown.length) out.push({ k: 'btns', text: '', btns: waiting.multi ? [...shown, doneOf(waiting)] : shown })
-    } else if (waiting?.kind === 'phone') out.push({ k: 'btns', text: '', btns: ['Send my number', ...back] })
-    else if (waiting?.kind === 'text') out.push({ k: 'btns', text: '', btns: ['Type an answer', ...back] })
+      const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (waiting.buttons ?? []).map(b => labelOf(b, lang))
+      if (shown.length) out.push({ k: 'btns', text: '', btns: waiting.multi && !shown.includes(doneOf(waiting, lang)) ? [...shown, doneOf(waiting, lang)] : shown })
+    } else if (waiting?.kind === 'phone') out.push({ k: 'btns', text: '', btns: [sendNo, ...back] })
+    else if (waiting?.kind === 'text') out.push({ k: 'btns', text: '', btns: [typeIt, ...back] })
     return out
-  }, [draft.steps, draft.endMsg, startId, picks, urlOf])
-  const answer = (b: string) => add(b === 'Send my number' ? '012-338 4721' : b === 'Type an answer' ? 'Next Saturday afternoon' : b)
+  }, [draft.steps, draft.endMsg, draft.endMsgZh, startId, picks, urlOf, lang])
+  const answer = (b: string) => add(b === 'Send my number' || b === '发送我的电话' ? '012-338 4721' : b === 'Type an answer' ? 'Next Saturday afternoon' : b === '输入回答' ? '下个星期六下午' : b)
   useEffect(() => { scroll.current?.scrollTo({ top: scroll.current.scrollHeight }) }, [lines, dev])
 
   if (!open) {
@@ -884,6 +985,9 @@ function Rail({ open, setOpen, draft, from, brand, urlOf }: {
     const items = lines.map((m, i) => m.k === 'cust' ? <div key={i} className={s.cust}>{m.text}</div>
       : m.k === 'bot' ? <div key={i} className={s.bot}><RichText text={m.text} /></div>
       : m.k === 'img' ? <span key={i} className={s.img} style={{ backgroundImage: m.url ? `url("${m.url}")` : undefined }} role="img" aria-label={m.text} />
+      : m.k === 'vid' ? (m.url
+        ? <video key={i} className={s.vid} src={m.url} controls preload="metadata" aria-label={m.text} />
+        : <div key={i} className={s.doc}><span className={s.docExt}><LeadIcon name="play" size={12} /></span>{m.text}</div>)
       : m.k === 'doc' ? <div key={i} className={s.doc}><span className={s.docExt}>{extOf(m.text)}</span>{m.text}</div>
       : m.k === 'btns' ? <div key={i} className={s.btns}>{m.btns!.map(b => <button key={b} type="button" className={s.pBtn} onClick={() => answer(b)}>{b}</button>)}</div>
       : <span key={i} className={s.wait}>{m.text}</span>)
@@ -905,6 +1009,10 @@ function Rail({ open, setOpen, draft, from, brand, urlOf }: {
           <div className={s.devs} role="group" aria-label="Device">
             <button type="button" className={s.dev} title="Phone" aria-label="Phone" aria-pressed={dev === 'phone'} onClick={() => setDev('phone')}><LeadIcon name="smartphone" size={14} /></button>
             <button type="button" className={s.dev} title="Desktop" aria-label="Desktop" aria-pressed={dev === 'desk'} onClick={() => setDev('desk')}><LeadIcon name="monitor" size={14} /></button>
+          </div>
+          <div className={s.devs} role="group" aria-label="The customer’s language">
+            <button type="button" className={s.dev} data-lang="" aria-pressed={lang === 'en'} title="A customer writing English" onClick={() => setLang('en')}>EN</button>
+            <button type="button" className={s.dev} data-lang="" aria-pressed={lang === 'zh'} title="A customer writing Chinese" onClick={() => setLang('zh')}>中文</button>
           </div>
           <button type="button" className={s.restart} title="Restart" aria-label="Restart" onClick={() => setRun({ key, picks: [] })}><LeadIcon name="rotate-ccw" size={14} /></button>
         </div>

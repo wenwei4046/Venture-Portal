@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asksForPerson, clampSide, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
+import { answerPicks, asksForPerson, clampSide, doneOf, filesOf, langOf, tr, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
 
 // The same template tests/member-sql/validate-leads.mjs runs through the database's runner.
 const steps: TemplateStep[] = [
@@ -213,5 +213,65 @@ describe('the customer asks for a person (2026-11-02, mig 20261102190000)', () =
   it('stops the walk for a person', () => {
     const t = { endMsg: '', steps: [{ id: 'q', kind: 'question', text: 'Sofa?', buttons: [{ label: 'Yes', next: '' }] }] as TemplateStep[] }
     expect(walkAnswer(t, walkFrom(t, 'q'), 'customer service').ended).toBe('person')
+  })
+})
+
+// 2026-11-11, the same template validate-leads.mjs runs through the bilingual runner (mig 20261111130000).
+describe('English and Chinese, several files a step', () => {
+  const F = (n: string) => ({ path: 'chat/tpl/00000000-0000-4000-8000-0000000b1001/' + n, name: n, mime: n.endsWith('.jpg') ? 'image/jpeg' : 'application/pdf', size: 1 })
+  const bi: TemplateStep[] = [
+    { id: 'q1', kind: 'question', text: 'Sofa or bed?', textZh: '沙发还是床？', saveAs: 'interest', files: [F('sofa.jpg'), F('price.pdf')],
+      buttons: [{ label: 'Sofa', labelZh: '沙发', next: 'q2' }, { label: 'Bed', labelZh: '', next: 'q2' }] },
+    { id: 'q2', kind: 'question', text: 'Which ones?', multi: true, back: true, doneLabelZh: '好了', next: 'p',
+      buttons: [{ label: 'Fabric', labelZh: '布', next: '' }, { label: 'Leather', labelZh: '皮', next: '' }] },
+    { id: 'p', kind: 'phone', text: 'Your number?', textZh: '您的电话？', back: true, next: '' },
+  ]
+  const tb = { steps: bi, endMsg: 'Thanks!', endMsgZh: '谢谢！' }
+
+  it('an empty box is filled by the other language', () => {
+    expect([tr({ text: 'Hi', textZh: '' }, 'text', 'zh'), tr({ text: '', textZh: '你好' }, 'text', 'en'), tr({ text: 'Hi', textZh: '你好' }, 'text', 'zh')]).toEqual(['Hi', '你好', '你好'])
+  })
+  it('the language: the panel first, else the latest message with words in it', () => {
+    expect(langOf(['hello', '你好', '1', '[Photo]'])).toBe('zh')
+    expect(langOf(['你好', 'ok'])).toBe('en')
+    expect(langOf(['你好'], 'English')).toBe('en')
+    expect(langOf([])).toBe('en')
+  })
+  it('the files first, then the words in the customer’s language; ‹ 返回 in Chinese', () => {
+    let w = walkFrom(tb, 'q1', [], [], 'zh')
+    expect(w.said.map(x => x.file?.name ?? x.text)).toEqual(['sofa.jpg', 'price.pdf', '沙发还是床？'])
+    expect(w.said.at(-1)!.buttons).toEqual(['沙发', 'Bed'])
+    w = walkAnswer(tb, w, '沙发')
+    expect(w.said.at(-1)).toMatchObject({ text: 'Which ones?', buttons: ['布', '皮', '‹ 返回'] })
+    w = walkAnswer(tb, w, '1')
+    expect(w.said.at(-1)).toMatchObject({ text: '还有别的吗？再选一个，或点“好了”。', buttons: ['皮', '好了'] })
+    w = walkAnswer(tb, w, '好了')
+    expect(w.said.at(-1)).toMatchObject({ text: '您的电话？', buttons: ['‹ 返回'] })
+    w = walkAnswer(tb, w, '0123384721')
+    expect(bot(w).at(-1)).toBe('谢谢！')
+  })
+  it('an option matches either language', () => {
+    expect(answerPicks(bi[1], '皮', ['Fabric', 'Leather'])).toEqual({ picks: [1], finish: false })
+    expect(answerPicks({ ...bi[1], doneLabelZh: undefined }, "that's all", [])).toEqual({ picks: [], finish: true })
+    expect(answerPicks({ ...bi[1], doneLabelZh: undefined }, '就这些', [])).toEqual({ picks: [], finish: true })
+    expect(answerPicks(bi[1], '好了', [])).toEqual({ picks: [], finish: true })
+  })
+  it('the finish button: an empty box takes the other language’s, then the default (2026-11-12)', () => {
+    expect([doneOf({ doneLabel: 'Done' }, 'zh'), doneOf({ doneLabelZh: '好了' }, 'en'), doneOf({}, 'zh'), doneOf({}, 'en')]).toEqual(['Done', '好了', '就这些', "That's all"])
+    expect(answerPicks({ id: 'q', kind: 'question', text: 'x', multi: true, doneLabel: 'Done', buttons: [{ label: 'A', next: '' }] }, '就这些', [])).toBeNull()
+  })
+  it('a step from before keeps its one file', () => {
+    expect(filesOf({ file: F('a.jpg') }).map(f => f.name)).toEqual(['a.jpg'])
+    expect(filesOf({ file: F('a.jpg'), files: [F('b.jpg')] }).map(f => f.name)).toEqual(['b.jpg'])
+  })
+  it('what a save takes', () => {
+    expect(templateProblem([{ id: 'a', kind: 'question', text: '', textZh: '选一个', buttons: [{ label: '', labelZh: '沙发', next: '' }] }])).toBeNull()
+    expect(templateProblem([{ id: 'a', kind: 'message', text: 'x', files: Array.from({ length: 11 }, () => F('a.jpg')), next: '' }])).toMatch(/10 files/)
+    expect(templateProblem([{ id: 'a', kind: 'message', text: '', textZh: '', next: '' }])).toMatch(/says nothing/)
+  })
+  it('the library brings its Chinese words and files', () => {
+    const own: TemplateStep = { id: 'x', kind: 'message', text: 'old', endMsgZh: '再见', next: '', lib: { id: 'L', ver: 1 } }
+    const up = updateFromLibrary(own, { id: 'L', ver: 2, steps: [{ id: 's1', kind: 'message', text: 'Promo!', textZh: '优惠！', files: [F('a.jpg')], next: '' }] })
+    expect([up.text, up.textZh, up.files?.length, up.endMsgZh, up.lib?.ver]).toEqual(['Promo!', '优惠！', 1, '再见', 2])
   })
 })

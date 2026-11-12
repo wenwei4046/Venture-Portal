@@ -22,6 +22,10 @@ import s from './LeadShell.module.css'
  * it leaves (`NAV_REST_MS`), and a 64px header with the page's Georgia title, the search (Inbox and Leads only),
  * Test mode and the bell. The prototype has no view switch or Sign out; both live in the avatar's menu (the user,
  * 2026-11-02: keep every earlier feature), so the Principal can still leave Lead View.
+ *
+ * 2026-11-11 (the user: "增加 refresh & back to home screen button（因为客服只有lead view 的权限）"): Refresh (reads the page
+ * again, as the browser's reload) and Home (the portal's home page, `/` — the account's own) beside Test mode, where
+ * Customer Service sees them without opening the rail. Not in the prototype.
  */
 export const NAV_REST_MS = 120
 
@@ -121,6 +125,12 @@ export default function LeadShell({ user, children }: { user: User; children: Re
               <input name="q" placeholder="Search customers, phones or chats" aria-label="Search customers, phones or chats" />
             </form>
           ) : null}
+          <button type="button" className={s.barBtn} title="Refresh" aria-label="Refresh" onClick={() => window.location.reload()}>
+            <LeadIcon name="refresh-cw" size={16} />
+          </button>
+          <Link href="/" className={s.barBtn} title="Home" aria-label="Home">
+            <LeadIcon name="house" size={16} />
+          </Link>
           <span className={s.test} title="Meta is not connected for every Page yet: test conversations, and replies to them are recorded, not sent">
             <span className={s.testDot} aria-hidden="true" />Test mode
           </span>

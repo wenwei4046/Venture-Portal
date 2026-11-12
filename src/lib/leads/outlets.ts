@@ -51,6 +51,14 @@ export function outletMenu(outlets: LeadOutlet[], brands: Pick<LeadBrand, 'id' |
   return rows
 }
 
+/**
+ * The Inbox's Filters › OUTLET (2026-11-11 — the user: "筛选brand, outlet 的方式再容易看懂"): each brand's outlets under its
+ * name, brands in their order, then No outlet; with one brand picked in All brands, only that brand's.
+ */
+export function inboxOutletRows(outlets: LeadOutlet[], brands: Pick<LeadBrand, 'id' | 'name'>[], brand: string): OutletMenuRow[] {
+  return outletMenu(outlets, brand === 'all' ? brands : brands.filter(b => b.id === brand)).filter(r => !(r.kind === 'item' && r.value === 'all'))
+}
+
 /** How many of `items` sit at each outlet ('none' for those with none). */
 export function outletCounts<T>(items: T[], outletOf: (t: T) => string | null | undefined): Map<string, number> {
   const m = new Map<string, number>()

@@ -21,6 +21,7 @@ check
 chevron-down
 chevron-left
 chevron-right
+chevron-up
 chevrons-right
 circle-check
 circle-dot

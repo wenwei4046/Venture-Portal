@@ -21,7 +21,7 @@ import ForwardDialog from './ForwardDialog'
 import RichText from './RichText'
 import { VoiceNote } from '@/components/member/crm/shared/voice-note'
 import { VOICE_OURS, VOICE_THEIRS } from './voice-palette'
-import { passesOutlet, type LeadOutlet, type OutletFilter } from '@/lib/leads/outlets'
+import { inboxOutletRows, passesOutlet, type LeadOutlet, type OutletFilter } from '@/lib/leads/outlets'
 import { previewReplies, previewScope, previewSees, stopped, type TeamMember } from '@/lib/leads/team'
 import type { LeadBrand, LeadConfig, LeadContact, LeadLabel, LeadMessage, LeadThread } from '@/lib/leads/types'
 import { answeringNow, ruleReply, ruleSource, type RuleOf } from '@/lib/leads/rule-of'
@@ -229,6 +229,13 @@ export default function InboxView({
   }
   const contact = thread?.contact ?? contacts.find(c => c.id === selected) ?? null
   const brandOf = contact ? brands.get(contact.brandId) : undefined
+  // A brand picked: an outlet of another brand no longer filters (Filters shows only this brand's outlets).
+  const pickBrand = (id: string) => {
+    setBrand(id)
+    setBrandOpen(false)
+    if (id !== 'all' && outlet !== 'all' && outlet !== 'none' && !outlets.some(o => o.id === outlet && o.brandId === id)) setOutlet('all')
+  }
+  const outletRows = inboxOutletRows(outlets, config.brands, brand)
   const brandLabel = brand === 'all' ? 'All brands' : brands.get(brand)?.name ?? 'All brands'
   const filtering = !!q || unreadOnly || !!label || blockedOnly || outlet !== 'all'
 
@@ -243,9 +250,9 @@ export default function InboxView({
                 <LeadIcon name="store" size={15} className={s.muteIcon} /><span>{brandLabel}</span><LeadIcon name="chevron-down" size={15} className={s.muteIcon} />
               </button>
               <Popover open={brandOpen} onClose={() => setBrandOpen(false)} style={{ top: 36, left: 0, right: 0 }} label="Brand">
-                <MenuItem selected={brand === 'all'} count={perBrand.all ?? 0} onSelect={() => { setBrand('all'); setBrandOpen(false) }}>All brands</MenuItem>
+                <MenuItem selected={brand === 'all'} count={perBrand.all ?? 0} onSelect={() => pickBrand('all')}>All brands</MenuItem>
                 {config.brands.map(b => (
-                  <MenuItem key={b.id} selected={brand === b.id} count={perBrand[b.id] ?? 0} onSelect={() => { setBrand(b.id); setBrandOpen(false) }}>{b.name}</MenuItem>
+                  <MenuItem key={b.id} selected={brand === b.id} count={perBrand[b.id] ?? 0} onSelect={() => pickBrand(b.id)}>{b.name}</MenuItem>
                 ))}
               </Popover>
             </div>
@@ -258,20 +265,26 @@ export default function InboxView({
                   <LeadIcon name="search" size={14} />
                   <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Name, phone, message or ad" aria-label="Search conversations" autoFocus />
                 </label>
-                <div className={s.filterChips} role="group" aria-label="Quick filters">
+                <div className={s.filterChips} role="group" aria-label="Show">
+                  <span className={s.filterHead}>SHOW</span>
                   <button type="button" className={s.filterChip} aria-pressed={unreadOnly} onClick={() => setUnreadOnly(v => !v)}>Unread</button>
                   <button type="button" className={s.filterChip} aria-pressed={blockedOnly} onClick={() => setBlockedOnly(v => !v)}>Blocked</button>
-                  {labels.map(l => (
-                    <button key={l.id} type="button" className={s.filterChip} aria-pressed={label === l.id} onClick={() => setLabel(cur => (cur === l.id ? '' : l.id))}>{l.name}</button>
-                  ))}
                 </div>
+                {labels.length ? (
+                  <div className={s.filterChips} role="group" aria-label="Labels">
+                    <span className={s.filterHead}>LABELS</span>
+                    {labels.map(l => (
+                      <button key={l.id} type="button" className={s.filterChip} aria-pressed={label === l.id} onClick={() => setLabel(cur => (cur === l.id ? '' : l.id))}>{l.name}</button>
+                    ))}
+                  </div>
+                ) : null}
                 {outlets.length ? (
                   <div className={s.filterChips} role="group" aria-label="Outlet">
                     <span className={s.filterHead}>OUTLET</span>
-                    {outlets.map(o => (
-                      <button key={o.id} type="button" className={s.filterChip} aria-pressed={outlet === o.id} onClick={() => setOutlet(cur => (cur === o.id ? 'all' : o.id))}>{o.name}</button>
-                    ))}
-                    <button type="button" className={s.filterChip} aria-pressed={outlet === 'none'} onClick={() => setOutlet(cur => (cur === 'none' ? 'all' : 'none'))}>No outlet</button>
+                    {outletRows.map((r, i) => r.kind === 'head'
+                      ? <span key={'h' + i} className={s.filterSub}>{r.label}</span>
+                      : r.value === 'none' ? [<span key="br" className={s.filterBreak} />, <button key="none" type="button" className={s.filterChip} aria-pressed={outlet === 'none'} onClick={() => setOutlet(cur => (cur === 'none' ? 'all' : 'none'))}>No outlet</button>]
+                      : <button key={r.value} type="button" className={s.filterChip} aria-pressed={outlet === r.value} onClick={() => setOutlet(cur => (cur === r.value ? 'all' : r.value))}>{r.label}</button>)}
                   </div>
                 ) : null}
               </Popover>

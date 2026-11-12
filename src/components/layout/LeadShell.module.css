@@ -184,6 +184,10 @@
   color: rgb(var(--lv-fg-2));
   box-sizing: border-box;
 }
+/* Refresh and Home (2026-11-11): the bell's 36px white tile. */
+.barBtn { flex: none; width: 36px; height: 36px; border-radius: 10px; background: rgb(var(--lv-surface)); border: 1px solid rgb(var(--lv-line)); display: flex; align-items: center; justify-content: center; color: rgb(var(--lv-fg-2)); box-sizing: border-box; padding: 0; cursor: pointer; text-decoration: none; }
+.barBtn:hover { color: rgb(var(--lv-fg)); background: rgb(var(--lv-surface-hover)); }
+.barBtn svg { stroke-width: 2; }
 .bellDot { position: absolute; top: 8px; right: 9px; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--lv-accent)); }
 /* The memo bell (a personal login) drawn as the prototype's bell: a 36px white tile, a rust dot for anything new. */
 .bellSlot { display: contents; }

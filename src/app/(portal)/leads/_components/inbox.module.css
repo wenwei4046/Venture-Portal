@@ -44,7 +44,7 @@
   padding: 0;
 }
 .filterBtn[data-on] { background: rgb(var(--lv-sel)); border-color: rgb(var(--lv-sel-line)); color: rgb(var(--lv-fg)); }
-.filterPop { width: 280px; gap: 10px; padding: 12px; }
+.filterPop { width: 280px; gap: 10px; padding: 12px; max-height: min(560px, calc(100vh - 140px)); /* the grouped filters (2026-11-11) fit without scrolling */ }
 /* The popover is a flex column that scrolls; its rows keep their own heights instead of being squeezed (2026-11-10). */
 .filterPop > * { flex-shrink: 0; }
 .filterSearch {
@@ -63,6 +63,9 @@
 .filterSearch input::placeholder { color: rgb(var(--lv-fg-4)); opacity: 1; }
 .filterChips { display: flex; flex-wrap: wrap; gap: 6px; }
 .filterHead { flex-basis: 100%; font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-fg-4)); }
+/* A brand's name over its outlets; No outlet starts a line of its own (2026-11-11). */
+.filterSub { flex-basis: 100%; margin-top: 2px; font-size: 11px; font-weight: 600; color: rgb(var(--lv-fg-3)); }
+.filterBreak { flex-basis: 100%; height: 0; }
 .filterChip {
   cursor: pointer;
   height: 28px;
