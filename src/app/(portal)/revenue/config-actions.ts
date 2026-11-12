@@ -9,6 +9,7 @@ import { officeMonth, officeToday } from '@/lib/office-time'
 import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
 import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
 import { checkDirectorPay } from '@/lib/commission/director-pay'
+import { brandRateEdits, brandRatesChanged, remapBrandRates, withBrandRateEdits, type OwnSchemeBrand } from '@/lib/commission/brand-rates'
 import { parseSubBrands } from '@/lib/brand-code'
 
 /**
@@ -204,16 +205,20 @@ async function cloneSchemeChildren(
   toSchemeId: string,
 ) {
   const { data: sourceDefs, error: defsError } = await supabase.from('comm_rank_defs')
-    .select('id, product_rate, group_incentive_amount, group_subsidy_cap, label, sort_order')
+    .select('id, product_rate, group_incentive_amount, group_subsidy_cap, label, sort_order, brand_rates')
     .eq('scheme_id', fromSchemeId)
   check(defsError, 'Could not read the ranks to clone')
   const rankDefIds = new Map<string, string>()
+  // A rank's rates for the brands on their own scheme name those brands by id:
+  // written once the new scheme has its brands, below.
+  const brandRatesOfDef = new Map<string, unknown>()
   for (const sourceDef of (sourceDefs ?? []) as Array<Record<string, unknown>>) {
-    const { id: sourceId, ...values } = sourceDef
+    const { id: sourceId, brand_rates: sourceRates, ...values } = sourceDef
     const { data: cloned, error } = await supabase.from('comm_rank_defs')
       .insert({ ...values, scheme_id: toSchemeId }).select('id').single()
     check(error, 'Could not clone a rank')
     rankDefIds.set(String(sourceId), String(cloned!.id))
+    brandRatesOfDef.set(String(cloned!.id), sourceRates)
   }
   const { data: sourceRungs, error: rungsError } = await supabase.from('comm_ranks')
     .select('rank_def_id, title_id, rank_key, label, product_rate, group_incentive_amount, group_subsidy_cap, can_recruit, group_sales_threshold, personal_sales_threshold, consecutive_months, sort_order')
@@ -248,9 +253,10 @@ async function cloneSchemeChildren(
 
   const { data: brands } = await supabase
     .from('comm_brands')
-    .select('id, code, name, item_code_prefixes, sub_brands, ref_prefixes, hc_bill_pct, note, is_active')
+    .select('id, code, name, item_code_prefixes, sub_brands, ref_prefixes, hc_bill_pct, note, is_active, own_scheme, erp_company_id')
     .eq('scheme_id', fromSchemeId)
 
+  const brandIds = new Map<string, string>()
   for (const brand of (brands ?? []) as Array<Record<string, unknown>>) {
     const { data: newBrand, error } = await supabase
       .from('comm_brands')
@@ -264,10 +270,15 @@ async function cloneSchemeChildren(
         hc_bill_pct: brand.hc_bill_pct ?? null,
         note: brand.note,
         is_active: brand.is_active,
+        // A brand on its own scheme (2990s, 2026-11-11) stays one in the copy,
+        // the ERP company it stands for with it.
+        own_scheme: brand.own_scheme ?? false,
+        erp_company_id: brand.erp_company_id ?? null,
       })
       .select('id')
       .single()
     check(error, 'Could not clone a brand')
+    brandIds.set(String(brand.id).toLowerCase(), String(newBrand!.id))
 
     const { data: bands } = await supabase
       .from('comm_margin_bands')
@@ -286,6 +297,17 @@ async function cloneSchemeChildren(
         )
       ).error,
       'Could not clone the margin bands',
+    )
+  }
+
+  // Each copied rank's rates for the brands on their own scheme, under the
+  // copied brands' ids.
+  for (const [rankDefId, sourceRates] of brandRatesOfDef) {
+    const rates = remapBrandRates(sourceRates, brandIds)
+    if (Object.keys(rates).length === 0) continue
+    check(
+      (await supabase.from('comm_rank_defs').update({ brand_rates: rates }).eq('id', rankDefId)).error,
+      "Could not clone a rank's brand rates",
     )
   }
 
@@ -404,6 +426,11 @@ export async function upsertRankDef(formData: FormData) {
   if (error) throw new Error(error)
   const pay = { product_rate: rate, group_incentive_amount: incentive, group_subsidy_cap: subsidy }
 
+  // The rank's rate for each brand that follows its own scheme (2026-11-11 —
+  // 2990s): only the brands the form carries a box for, a blank box clearing
+  // the rank's own rate (it then pays the nearest rank below that has one).
+  const rateEdits = brandRateEdits(formData, await loadOwnSchemeBrands(supabase, schemeId))
+
   const catalogue = await loadRankDefs(supabase, schemeId)
   const clash = catalogue.find(d => d.id !== id
     && Math.abs(Number(d.product_rate) - rate) < 1e-9
@@ -414,8 +441,13 @@ export async function upsertRankDef(formData: FormData) {
   }
 
   if (id) {
+    const stored = catalogue.find(d => d.id === id)?.brand_rates
+    const row: Record<string, unknown> = { ...pay }
+    // Written only when a rate moved: a save of the rank's own rate from a
+    // page that never saw the brand leaves its brand rates as they are.
+    if (brandRatesChanged(stored, rateEdits)) row.brand_rates = withBrandRateEdits(stored, rateEdits)
     check(
-      (await supabase.from('comm_rank_defs').update(pay).eq('id', id).eq('scheme_id', schemeId)).error,
+      (await supabase.from('comm_rank_defs').update(row).eq('id', id).eq('scheme_id', schemeId)).error,
       'Could not save the rank',
     )
   } else {
@@ -424,7 +456,7 @@ export async function upsertRankDef(formData: FormData) {
     const bottom = catalogue.reduce((max, d) => Math.max(max, d.sort_order), 0) + 10
     const { error } = await supabase
       .from('comm_rank_defs')
-      .insert({ scheme_id: schemeId, ...pay, label: rankName('?'), sort_order: bottom })
+      .insert({ scheme_id: schemeId, ...pay, label: rankName('?'), sort_order: bottom, brand_rates: withBrandRateEdits({}, rateEdits) })
     check(error, 'Could not add the rank')
   }
 
@@ -584,15 +616,30 @@ interface RankDefLite {
   group_incentive_amount: number | string
   group_subsidy_cap: number | string
   sort_order: number
+  /** Brand id → the rank's rate for a brand on its own scheme (`lib/commission/brand-rates.ts`). */
+  brand_rates?: unknown
 }
 
 async function loadRankDefs(supabase: SupabaseClient, schemeId: string): Promise<RankDefLite[]> {
   const { data, error } = await supabase
     .from('comm_rank_defs')
-    .select('id, label, product_rate, group_incentive_amount, group_subsidy_cap, sort_order')
+    .select('id, label, product_rate, group_incentive_amount, group_subsidy_cap, sort_order, brand_rates')
     .eq('scheme_id', schemeId)
   check(error, 'Could not read the ranks')
   return (data ?? []) as RankDefLite[]
+}
+
+/** The scheme's brands that follow their own scheme — the ones a rank names a rate for. */
+async function loadOwnSchemeBrands(supabase: SupabaseClient, schemeId: string): Promise<OwnSchemeBrand[]> {
+  const { data, error } = await supabase
+    .from('comm_brands')
+    .select('id, name')
+    .eq('scheme_id', schemeId)
+    .eq('own_scheme', true)
+    .eq('is_active', true)
+    .order('code')
+  check(error, 'Could not read the brands')
+  return (data ?? []) as OwnSchemeBrand[]
 }
 
 interface LadderRow {

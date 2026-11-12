@@ -14,6 +14,9 @@ let errors: Record<string, string>
 let reads: Read[]
 const rpc = vi.fn()
 
+/** What the database holds in a column a fixture row leaves out: its DEFAULT (comm_brands.own_scheme is NOT NULL DEFAULT FALSE). */
+const COLUMN_DEFAULTS: Record<string, Row> = { comm_brands: { own_scheme: false } }
+
 /** Emulate PostgREST's cap and independent pages, including unstable tied rows. */
 class Query implements PromiseLike<Result> {
   private columns = '*'
@@ -47,7 +50,9 @@ class Query implements PromiseLike<Result> {
     reads.push({ table: this.table, from: this.from, to: this.to, orders: this.orders.map(order => order.column) })
     const failure = errors[`${this.table}:${this.from}`] ?? errors[this.table]
     if (failure) return { data: null, error: { message: failure } }
-    const source = (tables[this.table] ?? []).filter(row => this.filters.every(filter => filter(row)))
+    const source = (tables[this.table] ?? [])
+      .map(row => ({ ...COLUMN_DEFAULTS[this.table], ...row }))
+      .filter(row => this.filters.every(filter => filter(row)))
     const rows = source.map((row, index) => ({ row, index })).sort((a, b) => {
       for (const { column, ascending } of this.orders) {
         const left = a.row[column] ?? ''
@@ -181,6 +186,45 @@ describe('Product List readers', () => {
     expect((await loadSkus()).map(s => [s.code, s.brand])).toEqual([
       ['HAPPI SLEEP EASE COOL MATT (Q)', 'AKEMI'], ['HAPPI SLEEP FRESH COOL MATT (Q)', 'AKEMI'], ['MYLATEX LUXE MATT (K)', null],
     ])
+  })
+
+  // 2026-11-12 — 2990s, a brand on its own commission scheme (the user: "因为不需要算它的 margin，所以不会有它的
+  // product list"). The ERP's catalogue brands 31 models "2990s Sofa" / "2990s Mattress", and those words are the
+  // brand's sub-brands (a booth and a bill's line read them). A catalogue model sells under a brand with a ladder
+  // only, so they stay what they were before the brand existed — as catalogue_ladder_brand reads them.
+  it('reads no model under a brand on its own scheme — the ERP’s 2990s models stay brandless', async () => {
+    tables.erp_products = [
+      product(0, { item_code: '2990-SF-01-1S', category: 'SOFA', branding: '2990s Sofa' }),
+      product(1, { item_code: '2990-MT-01 (Q)', category: 'MATTRESS', branding: '2990s Mattress' }),
+      product(2, { item_code: 'AK-APEX (Q)', category: 'MATTRESS', branding: 'AKEMI' }),
+    ]
+    tables.erp_product_models = [
+      model(0, { model_code: '2990-SF-01', name: '2990-SF-01', category: 'SOFA', branding: '2990s Sofa' }),
+      model(1, { model_code: '2990-MT-01', name: '2990-MT-01', category: 'MATTRESS', branding: '2990s Mattress' }),
+      model(2, { model_code: 'APEX', name: 'APEX', category: 'MATTRESS', branding: 'AKEMI' }),
+    ]
+    tables.catalogue_models = [
+      { erp_model_id: 'model-00000', offered: false, brand_code: null },
+      // A ladder picked for one on Modular is read, as for any mattress or sofa the ERP gives no brand.
+      { erp_model_id: 'model-00001', offered: true, brand_code: 'AKEMI' },
+      { erp_model_id: 'model-00002', offered: true, brand_code: null },
+    ]
+    tables.comm_brands = [
+      { id: 'a', code: 'AKEMI', name: 'Akemi', sub_brands: [], is_active: true, created_at: '2026-08-31' },
+      { id: 'n', code: '2990S', name: '2990s', sub_brands: ['2990S SOFA', '2990S MATTRESS'], is_active: true, own_scheme: true, created_at: '2026-11-12' },
+    ]
+    const { models, brands } = await loadModels()
+    expect(models.map(m => [m.code, m.derivedBrand, m.brand, m.brandOverride])).toEqual([
+      ['2990-MT-01', null, 'AKEMI', 'AKEMI'],
+      ['2990-SF-01', null, null, null],
+      ['APEX', 'AKEMI', 'AKEMI', null],
+    ])
+    // Nor is it a ladder Modular offers to pick.
+    expect(brands).toEqual([{ code: 'AKEMI', name: 'Akemi', subBrands: [] }])
+    // SKU Master names the ERP's brand alone (never a pick): none for either.
+    expect(new Map((await loadSkus()).map(s => [s.code, s.brand]))).toEqual(new Map([
+      ['2990-SF-01-1S', null], ['2990-MT-01 (Q)', null], ['AK-APEX (Q)', 'AKEMI'],
+    ]))
   })
 
   // 2026-10-19 (user: "sofa category same as mattress have the model name … then it can be add and edit"): the

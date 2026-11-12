@@ -157,3 +157,41 @@ describe('exportLines — each ledger row as the file lists it', () => {
     expect(mine.at(-1)?.[10]).toBe(report.people[0].total)
   })
 })
+
+describe('a bill of a brand on its own scheme — 2990s (2026-11-11)', () => {
+  const brands: BrandDef[] = [...BRANDS, { code: '2990S', name: '2990s', refPrefixes: [], hcBillPct: null }]
+  const nov = { periodMonth: '2026-11-01', orderDate: '2026-11-03', eventDate: '2026-11-03' }
+  const people = [
+    person('s1', 'SHELDON TAN', [
+      // Written on a Houzs Century pad: the paper starts like Akemi's.
+      row({ ...nov, orderId: 'own', orderNo: '2990-SO-2611-021', refNo: 'HC14501', commissionableValue: 3240, productRate: 0.04,
+        totalCommission: 129.6, ownBrand: '2990S', brands: ['2990S'] }),
+      row({ ...nov, orderId: 'ownup', upsale: true, orderTotal: 500, commissionableValue: 500, productRate: 0.04, totalCommission: 20, ownBrand: '2990S' }),
+      row({ ...nov, orderId: 'hc', orderNo: 'HC-SO-2611-500', refNo: 'HC14502', commissionableValue: 5000 }),
+    ]),
+  ]
+  const lines = exportLines(people, '2026-11-01', brands, {
+    ...ctx,
+    originOf: r => rowOrigin(r, '2026-11-01', { upsale: r.orderId === 'ownup' ? { kind: 'upsale', originalPeriod: '2026-11-01' } : null }),
+    upsaleOf: r => (r.orderId === 'ownup' ? { originalRef: 'HC14501', erpDocNo: '2990-SO-2611-021' } : null),
+  })
+
+  it('is that brand’s whatever paper it was written on, at the rank’s rate for the brand — and nothing is said of its Ref No.', () => {
+    const own = lines.find(l => l.erpNo === '2990-SO-2611-021' && l.type === 'sales')!
+    expect([own.brandCode, own.rate, own.commission, own.note]).toEqual(['2990S', 0.04, 129.6, ''])
+  })
+
+  it('and so is an upsell on it', () => {
+    expect(lines.find(l => l.type === 'upsell')).toMatchObject({ brandCode: '2990S', sales: 500 })
+  })
+
+  it('every other bill still reads its paper', () => {
+    expect(lines.find(l => l.erpNo === 'HC-SO-2611-500')?.brandCode).toBe('AKEMI')
+  })
+
+  it('is a brand of its own in the Summary, with no bill to Houzs Century while no % is set', () => {
+    const report = brandBillingReport(lines, brands, '2026-11-01', 'Fair')
+    expect(report.brandTotals.find(b => b.code === '2990S')).toMatchObject({ name: '2990s', total: 3740, bill: null })
+    expect(report.brandTotals.find(b => b.code === 'AKEMI')?.total).toBe(5000)
+  })
+})

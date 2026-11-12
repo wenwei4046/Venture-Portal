@@ -1,6 +1,6 @@
 import {
-  billMargin, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, HALF_COMM, indexItemGroups,
-  indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, penaltyBandFor, round2,
+  billMargin, brandRateOf, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, HALF_COMM, indexItemGroups,
+  indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, ownSchemesOf, penaltyBandFor, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf } from './kpi'
 import type { BillShare, EngineInput, EngineResult, MarginSource, SalesOrder, Statement } from './types'
@@ -97,6 +97,12 @@ export interface CommissionOrderRow {
    * margin to read, its cost (`marginCost`) counted against the month.
    */
   noSales?: boolean
+  /**
+   * The bill is of a brand that follows its own scheme (2026-11-11 — 2990s): paid at that brand's rate for the rung
+   * (`productRate` is it), in no margin — `marginPct` null is no cost waiting, there is no margin to read — and its
+   * override is its brand's. The brand's code; absent on every other bill.
+   */
+  ownBrand?: string
   status: CommissionOrderStatus
   productRate: number
   productCommission: number
@@ -284,8 +290,11 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const personMeta = new Map((options.people ?? []).map(person => [person.staffId, person]))
   const orderMeta = new Map((options.orders ?? []).map(order => [order.orderId, order]))
   const hierarchy = new Map(input.hierarchy.map(node => [node.staffId, node]))
-  const configuredKpiIndex = indexKpiItems(input.kpiItems)
-  const kpiIndex = input.scheme.enableKpi ? configuredKpiIndex : EMPTY_KPI_INDEX
+  // The KPI items a bill may carry, as the engine reads them: none of the sub-department's on a bill of a brand with
+  // its own scheme (2026-11-11) — every configured one for what was SOLD, those the scheme pays for what is PAID.
+  const configuredKpi = ownSchemesOf(input, indexKpiItems(input.kpiItems))
+  const paidKpi = ownSchemesOf(input, input.scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX)
+  const ownBrandOf = paidKpi.brandOf
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
   const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios, input.scheme.costRatiosByBrand)
   const nameOf = (staffId: string) => personMeta.get(staffId)?.name ?? staffId
@@ -318,9 +327,12 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const personalRows: CommissionOrderRow[] = input.orders.map(order => {
     const statement = statements.get(order.staffId)
     const meta = orderMeta.get(order.id)
+    const kpiIndex = paidKpi.kpiIndexFor(order)
+    // A brand with its own scheme (2026-11-11): no margin to read, whatever its lines cost.
+    const ownBrand = ownBrandOf(order)
     const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
-    const margin = billMargin(order, base)
-    const giftCost = noSalesCost(order.lines, base, groupIndex)
+    const margin = ownBrand ? { pct: null, source: 'none' as const, cost: 0 } : billMargin(order, base)
+    const giftCost = ownBrand ? undefined : noSalesCost(order.lines, base, groupIndex)
     const noSales = typeof giftCost === 'number' && margin.pct === null
     const split = orderRevenueSplit(order, kpiIndex, groupIndex)
     const productRevenue = split.main
@@ -356,10 +368,15 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       upsale: !!order.upsale, commissionOnly, ...(order.halfComm ? { halfComm: true } : {}), orderTotal: order.orderTotal,
       commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
-      productRevenue, marginRevenue: base.revenue,
+      productRevenue, marginRevenue: ownBrand ? 0 : base.revenue,
       marginCost: noSales && typeof giftCost === 'number' ? giftCost : margin.source === 'none' ? null : margin.cost,
-      marginPct: margin.pct, marginSource: margin.source, ...(noSales ? { noSales: true } : {}), status,
-      productRate: statement?.productRate ?? rankOf(order.staffId)?.productRate ?? 0,
+      marginPct: margin.pct, marginSource: margin.source, ...(noSales ? { noSales: true } : {}),
+      ...(ownBrand ? { ownBrand } : {}), status,
+      // What the bill is paid at: the rung's rate — the rung's rate for the brand, on a bill of a brand with its own
+      // scheme. A package holder's own bills are paid no percentage on any brand.
+      productRate: ownBrand
+        ? ((rankOf(order.staffId)?.groupIncentiveAmount ?? 0) > 0 ? 0 : brandRateOf(rankOf(order.staffId), ownBrand, input.ranks))
+        : statement?.productRate ?? rankOf(order.staffId)?.productRate ?? 0,
       productCommission: component('product_revenue'),
       kpiQty: sourceLines.filter(line => line.component === 'kpi_item').reduce((qty, line) => qty + (line.qty ?? 0), 0),
       kpiBase: component('kpi_item'), kpiBonus: 0,
@@ -378,8 +395,9 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const rows = personalRows.filter(row => row.staffId === staffId)
     const kpiBonus = sum((statement?.lines ?? []).filter(line => line.component === 'kpi_threshold').map(line => line.amount))
     const bonuses = allocateCommissionAmount(kpiBonus, rows.map(row => row.kpiBase))
-    // An old bill topped up is in no margin (2026-11-07): none of the month's incentive rides on it.
-    const inMargin = (row: CommissionOrderRow) => row.status === 'eligible' && !row.commissionOnly
+    // An old bill topped up is in no margin (2026-11-07): none of the month's incentive rides on it. Nor is a bill of
+    // a brand with its own scheme (2026-11-11).
+    const inMargin = (row: CommissionOrderRow) => row.status === 'eligible' && !row.commissionOnly && !row.ownBrand
     const margins = allocateCommissionAmount(statement?.marginIncentive ?? 0, rows.map(row => inMargin(row) ? Math.max(0, row.marginRevenue) : 0))
     rows.forEach((row, index) => {
       row.kpiBonus = bonuses[index]
@@ -392,7 +410,10 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       .filter(line => line.component === 'override' && line.sourceStaffId)
       .flatMap(line => {
         const downline = line.sourceStaffId!
-        const sourceRows = personalRows.filter(row => row.staffId === downline && row.status === 'eligible' && (overrideBases.get(row.key) ?? 0) !== 0)
+        // One override line a downline — and one more for each brand paid at its own rate (2026-11-11): each is put
+        // on the bills it was earned on.
+        const sourceRows = personalRows.filter(row => row.staffId === downline && row.status === 'eligible'
+          && (row.ownBrand ?? '') === (line.brandCode ?? '') && (overrideBases.get(row.key) ?? 0) !== 0)
         const amounts = allocateCommissionAmount(line.amount, sourceRows.map(row => overrideBases.get(row.key) ?? 0))
         return sourceRows.map((row, index) => ({
           ...row, key: `${staffId}:${row.key}`, beneficiaryStaffId: staffId,
@@ -429,7 +450,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       // Found with every configured item, KPI pay on or off: what was SOLD.
       // What was PAID is the engine's — an eligible bill, KPI switched on,
       // its sales covering its items — and it paid each exactly its amount.
-      const found = orderRevenueSplit(order, configuredKpiIndex, groupIndex)
+      const found = orderRevenueSplit(order, configuredKpi.kpiIndexFor(order), groupIndex)
       const hits = found.foundHits
       const paid = row.status === 'eligible' && input.scheme.enableKpi && !found.uncovered && !heads.has(person.staffId)
       const bases = hits.map(hit => (paid ? hit.amount : 0))

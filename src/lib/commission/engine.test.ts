@@ -3,6 +3,7 @@ import { splitOrdersByShares } from './shares'
 import { toGwpRules, withGwp } from './run-payload'
 import type { GwpRule } from '@/lib/catalogue/gwp'
 import {
+  brandRateOf,
   classifyLine,
   computeCommissionRun,
   costBasisOf,
@@ -2121,5 +2122,184 @@ describe('half comm halves what a bill pays, never its sales (2026-11-10)', () =
     const r = run({ hierarchy: SIX, orders: [bill('1', 5_000), halfComm(bill('2', 5_000))] })
     expect(find(r.statements, 'rs').productCommission).toBe(450) // 300 + 150
     expect(find(r.statements, 'rs').productRevenue).toBe(10_000)
+  })
+})
+
+describe('a brand with its own scheme — 2990s (2026-11-11)', () => {
+  // The user's list: Team Leader 8%, Senior Team Assistant 7%, Team Assistant 6%,
+  // Senior Revenue Specialist 5%, Revenue Specialist 4% — each a point under Fair's.
+  const RATES_2990S: Record<string, number> = { rs_5: 0.04, rs_6: 0.05, ta_7: 0.06, ta_8: 0.07, tl_9: 0.08 }
+  const LADDER: Rank[] = RANKS.map(r => (r.rankKey in RATES_2990S ? { ...r, brandRates: { '2990S': RATES_2990S[r.rankKey] } } : r))
+  const OWN = { ranks: LADDER, ownSchemeBrands: ['2990S'] }
+  const TEAM: HierarchyNode[] = [node('tl', null, 'tl_9'), node('ta', 'tl', 'ta_7'), node('rs', 'ta', 'rs_5')]
+  const NO_MARGIN_PAY: CommissionScheme = { ...SCHEME, enableMarginPenalty: false, enableMarginIncentive: false }
+  const sofa = (id: string, staffId: string, amount: number, opts: OrderOpts = {}) =>
+    order(id, staffId, [['SOFA', 'BOOQIT-2A(RHF)', 1, amount]], { brandCode: '2990S', ...opts })
+
+  it('pays each rung its rate for the brand, not its own', () => {
+    for (const [rankKey, rate] of Object.entries(RATES_2990S)) {
+      const r = run({ ...OWN, hierarchy: [node('a', null, rankKey)], orders: [sofa('1', 'a', 10_000)] })
+      const a = find(r.statements, 'a')
+      expect(a.productCommission).toBeCloseTo(10_000 * rate, 2)
+      expect(a.lines.find(l => l.component === 'product_revenue')).toMatchObject({
+        basisAmount: 10_000, rate, brandCode: '2990S', note: 'SO-1 · 2026-07-06 · 2990S rate',
+      })
+      expect(r.warnings).toEqual([])
+    }
+  })
+
+  it('pays the override up the line on the brand’s own rates', () => {
+    // RS 4% (own) · TA 6% − 4% · TL 8% − 6%: RM 10,000 pays 400 + 200 + 200 — 8% in all, the brand's top rate.
+    const r = run({ ...OWN, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000)] })
+    expect(find(r.statements, 'rs').productCommission).toBe(400)
+    expect(find(r.statements, 'ta').overrideCommission).toBe(200)
+    expect(find(r.statements, 'tl').overrideCommission).toBe(200)
+    expect(r.totalCommission).toBe(800)
+    const line = find(r.statements, 'ta').lines.find(l => l.component === 'override')
+    expect(line).toMatchObject({
+      sourceStaffId: 'rs', basisAmount: 10_000, amount: 200, brandCode: '2990S',
+      note: 'Override on downline rs · 2% differential · 2990S',
+    })
+    expect(line?.rate).toBeCloseTo(0.02, 10)
+  })
+
+  it('keeps a brand’s bills apart from the rest up the line — each at the rates it was paid at', () => {
+    // A ladder where the gap differs: the Team Assistant's 2990s rate is 6.5%.
+    const ladder = LADDER.map(r => (r.rankKey === 'ta_7' ? { ...r, brandRates: { '2990S': 0.065 } } : r))
+    const akemi = order('2', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { brandCode: 'AKEMI' })
+    const r = run({ ranks: ladder, ownSchemeBrands: ['2990S'], hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000), akemi], scheme: NO_MARGIN_PAY })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(900) // 10,000 × 5% + 10,000 × 4%
+    expect(rs.penaltyWeightedRevenue).toBe(20_000)
+    const overrides = find(r.statements, 'ta').lines.filter(l => l.component === 'override')
+    expect(overrides.map(l => [l.brandCode ?? '', l.basisAmount, l.amount])).toEqual([
+      ['', 10_000, 200], // 7% − 5% of the Akemi bill
+      ['2990S', 10_000, 250], // 6.5% − 4% of the 2990s one
+    ])
+    // The Team Leader over them: 9% − 7% of the Akemi bill, 8% − 6.5% of the 2990s one.
+    expect(find(r.statements, 'tl').overrideCommission).toBe(350)
+  })
+
+  it('counts its sales like any bill — own, group, and the rung they climb', () => {
+    const r = run({ ...OWN, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000)] })
+    expect(find(r.statements, 'rs').productRevenue).toBe(10_000)
+    expect(find(r.statements, 'ta').groupRevenue).toBe(10_000)
+    expect(find(r.statements, 'tl').groupRevenue).toBe(10_000)
+    // RM 300,000 of 2990s alone lifts a variable 6% to Team Assistant — and is paid that rung's 2990s rate, 6%.
+    const variable = run({ ...OWN, hierarchy: [node('rs', null, 'rs_6', 'variable')], orders: [sofa('1', 'rs', 300_000)] })
+    expect(find(variable.statements, 'rs').effectiveRankKey).toBe('ta_7')
+    expect(find(variable.statements, 'rs').productCommission).toBe(18_000)
+  })
+
+  it('is in no margin: no penalty, no cost to wait for, none of the month’s margin or its incentive', () => {
+    // Akemi at 40% clears Incentive Tier 1 (36%); the 2990s bill has no cost and a margin keyed on it — neither is read.
+    const akemi = order('2', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_000]], { brandCode: 'AKEMI' })
+    const r = run({ ...OWN, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000, { manualMarginPct: 0.1 }), akemi] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toEqual([{ brandCode: 'AKEMI', revenue: 10_000, cost: 6_000, marginPct: 0.4 }])
+    expect(rs.marginPct).toBe(0.4)
+    expect(rs.marginIncentive).toBe(1_000)
+    expect(rs.marginPenaltyWithheld).toBe(0)
+    expect(rs.productCommission).toBe(900)
+    expect(r.penalised).toEqual([])
+    expect(r.warnings).toEqual([])
+    // Alone in a month it leaves no margin at all, and nothing to say about it.
+    const alone = run({ ...OWN, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000)] })
+    expect(find(alone.statements, 'rs').marginByBrand).toEqual([])
+    expect(find(alone.statements, 'rs').marginPct).toBeNull()
+    expect(alone.warnings).toEqual([])
+  })
+
+  it('carries none of the sub-department’s KPI items', () => {
+    const o = order('1', 'rs', [['SOFA', 'BOOQIT-CNR', 1, 5_000], ['ACC', 'AK-CS AIRLOFT COMFY PIL', 2, 100]], { brandCode: '2990S' })
+    const rs = find(run({ ...OWN, hierarchy: TEAM, orders: [o] }).statements, 'rs')
+    expect(rs.kpiCommission).toBe(0)
+    expect(rs.kpiQty).toBe(0)
+    expect(rs.productRevenue).toBe(5_100)
+    expect(rs.productCommission).toBe(204) // 5,100 × 4%: nothing taken off as KPI
+  })
+
+  it('a rung with no rate for the brand pays the nearest rung below that has one', () => {
+    // The user's list ends at Team Leader, 8%: a Senior Team Leader's 2990s bill is paid 8%, never Fair's 10%.
+    const r = run({ ...OWN, hierarchy: [node('stl', null, 'stl_10'), node('tl', 'stl', 'tl_9')], orders: [sofa('1', 'stl', 10_000), sofa('2', 'tl', 10_000)] })
+    expect(find(r.statements, 'stl').productCommission).toBe(800)
+    // …and earns no override on a Team Leader's: 8% − 8%.
+    expect(find(r.statements, 'stl').overrideCommission).toBe(0)
+  })
+
+  it('pays a director’s own bill their rung’s rate for the brand', () => {
+    const r = run({
+      ...OWN, hierarchy: TEAM, departmentHeadIds: ['director'],
+      directors: [{ staffId: 'director', rankKey: 'tl_9', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0 }],
+      orders: [sofa('1', 'director', 10_000)],
+    })
+    expect(find(r.statements, 'director').productCommission).toBe(800)
+    expect(find(r.statements, 'director').lines[0].note).toBe("SO-1 · 2026-07-06 · director's own bill · 2990S rate")
+  })
+
+  it('takes a drop on one of its bills back at the rate it was paid', () => {
+    const drop: SalesOrder = {
+      id: 'u1', orderNo: 'DROP 2990-SO-2611-017', staffId: 'rs', orderDate: '2026-07-20', periodMonth: '2026-07-01', eventDate: '2026-07-20',
+      orderTotal: -1_000, paidAmount: -1_000, upsale: true, brandCode: '2990S',
+      lines: [{ id: 'u1', itemGroup: 'UPSALE', productCode: 'DROP', qty: 1, lineAmount: -1_000, upsale: true }],
+    }
+    const r = run({ ...OWN, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000), drop] })
+    expect(find(r.statements, 'rs').productCommission).toBe(360) // 400 − 40
+    expect(find(r.statements, 'ta').overrideCommission).toBe(180) // 2% of 9,000
+  })
+
+  it('pays each holder of a shared bill their own rate for the brand, and halves a half-comm one', () => {
+    const parts = splitOrdersByShares([sofa('1', 'rs', 10_000)], [{ orderId: '1', staffId: 'ta', pct: 0.5 }])
+    const r = run({ ...OWN, hierarchy: TEAM, orders: parts })
+    expect(find(r.statements, 'rs').productCommission).toBe(200) // 5,000 × 4%
+    expect(find(r.statements, 'ta').productCommission).toBe(300) // 5,000 × 6%
+    const half = run({ ...OWN, hierarchy: TEAM, orders: [{ ...sofa('1', 'rs', 10_000), halfComm: true }] })
+    expect(find(half.statements, 'rs').productCommission).toBe(200)
+    expect(find(half.statements, 'ta').overrideCommission).toBe(100)
+  })
+
+  it('holds a bill under its deposit like any other', () => {
+    const r = run({ ...OWN, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000, { paidAmount: 1_000 })] })
+    expect(find(r.statements, 'rs').productCommission).toBe(0)
+    expect(find(r.statements, 'rs').deferredRevenue).toBe(10_000)
+    expect(r.deferred).toHaveLength(1)
+  })
+
+  it('changes nothing while no brand is on its own scheme', () => {
+    // The rates are there and the brand is not named: the bill is an ordinary one — the rung's own rate.
+    const r = run({ ranks: LADDER, hierarchy: TEAM, orders: [sofa('1', 'rs', 10_000)], scheme: NO_MARGIN_PAY })
+    expect(find(r.statements, 'rs').productCommission).toBe(500)
+    expect(find(r.statements, 'ta').lines.find(l => l.component === 'override')?.note).toBe('Override on downline rs · 2% differential')
+  })
+})
+
+describe('brandRateOf — a rung’s rate for a brand with its own scheme', () => {
+  const with2990s = (rates: Record<string, number>): Rank[] =>
+    RANKS.map(r => (r.rankKey in rates ? { ...r, brandRates: { '2990S': rates[r.rankKey] } } : r))
+  const rung = (ladder: Rank[], key: string) => ladder.find(r => r.rankKey === key)
+
+  it('is the rate the rung names, the code read in any case', () => {
+    const ladder = with2990s({ rs_5: 0.04, tl_9: 0.08 })
+    expect(brandRateOf(rung(ladder, 'rs_5'), '2990s', ladder)).toBe(0.04)
+    expect(brandRateOf(rung(ladder, 'tl_9'), ' 2990S ', ladder)).toBe(0.08)
+  })
+
+  it('falls back to the nearest rung below that names one', () => {
+    const ladder = with2990s({ rs_5: 0.04, ta_7: 0.06, tl_9: 0.08 })
+    expect(brandRateOf(rung(ladder, 'rs_6'), '2990S', ladder)).toBe(0.04)
+    expect(brandRateOf(rung(ladder, 'ta_8'), '2990S', ladder)).toBe(0.06)
+    expect(brandRateOf(rung(ladder, 'stl_10'), '2990S', ladder)).toBe(0.08)
+  })
+
+  it('with none below: its own rate, never above the nearest named rate over it', () => {
+    const ladder = with2990s({ ta_7: 0.04 })
+    expect(brandRateOf(rung(ladder, 'rs_5'), '2990S', ladder)).toBe(0.04) // its own 5%, capped at the Team Assistant's 4%
+    const high = with2990s({ ta_7: 0.065 })
+    expect(brandRateOf(rung(high, 'rs_5'), '2990S', high)).toBe(0.05)
+  })
+
+  it('a brand no rung names a rate for pays every rung its own rate; nobody, nothing', () => {
+    expect(brandRateOf(rung(RANKS, 'ta_7'), '2990S', RANKS)).toBe(0.07)
+    expect(brandRateOf(undefined, '2990S', RANKS)).toBe(0)
   })
 })

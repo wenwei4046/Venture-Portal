@@ -115,8 +115,40 @@ function blend(orders: readonly MemberBookOrder[]): number | null {
  */
 export const noSalesBill = (o: MemberBookOrder): boolean => o.margin === null && o.noSales === true;
 
+/**
+ * A bill of a brand on its own commission scheme (2990s, 2026-11-12 — the user: "依然算作 Fair 的 revenue … 唯一不同的是
+ * 看不到 margin"; "他唯一不会出现的，只是所谓的 margin arena"): in the member's sales, their target and the Sales, Brand
+ * and KPI boards — and in no margin: it has none to read, waits for no cost, and its brand is on no ladder.
+ */
+export const ownSchemeBill = (o: MemberBookOrder): boolean => o.ownScheme === true;
+/** What such a bill says where a margin or its tier would be. */
+export const OWN_SCHEME_PILL = "Own scheme";
+
+/**
+ * What stands where a month's margin would be when it reads none (2026-11-12): a cost still waited for; the brand's
+ * own scheme when what was sold stands in no margin at all — a month of 2990s bills read "No sales yet" beside its
+ * RM 21,200 of sales; else no sales yet.
+ */
+export const noMarginTag = (pending: boolean, ownOnly: boolean): string =>
+  pending ? "Cost pending" : ownOnly ? OWN_SCHEME_PILL : "No sales yet";
+
+/**
+ * A month's score — a person's — that sold and stands in no margin: nothing of it is measured, costs anything or
+ * waits for a cost. Only the bills of a brand on its own scheme are so (the facts answer them no margin and a
+ * no-sales cost of 0); a gift costs something, an uncosted bill waits.
+ */
+export const ownOnlyScore = (score: { sales: number; marginRevenue: number; marginCost: number; blindOrders: number }): boolean =>
+  score.sales > 0 && !(score.marginRevenue > 0) && !(score.marginCost > 0) && !(score.blindOrders > 0);
+
+/** Every counted bill of the book is of a brand on its own scheme: the month sold, and stands in no margin. */
+const ownOnlyBook = (book: MemberOrderBook | null): boolean => {
+  const done = counted(book);
+  return done.length > 0 && done.every(ownSchemeBill);
+};
+
 /** Waits for a cost: a bill that sells with none yet, or a gift whose goods are not all costed. An answer from before the server said which bills have no sales reads as it always did. */
-const pendingCost = (o: MemberBookOrder): boolean => o.margin === null && (o.noSales === undefined ? o.revenue > 0 : !o.noSales);
+const pendingCost = (o: MemberBookOrder): boolean =>
+  o.margin === null && !ownSchemeBill(o) && (o.noSales === undefined ? o.revenue > 0 : !o.noSales);
 
 /** The margin the book's counted bills make together: the server's own, a no-sales bill's cost in it, when it gave one. */
 function bookMargin(book: MemberOrderBook | null, brand?: string): number | null {
@@ -127,7 +159,9 @@ function bookMargin(book: MemberOrderBook | null, brand?: string): number | null
 
 export function brandStats(book: MemberOrderBook | null, bands: readonly MemberBand[]): BrandStat[] {
   const byBrand = new Map<string, MemberBookOrder[]>();
-  for (const o of counted(book)) byBrand.set(o.brand, [...(byBrand.get(o.brand) ?? []), o]);
+  // The brands a margin is read on: a bill of a brand on its own scheme (2990s) is on no ladder, so it is no row here,
+  // holds no incentive and waits for no cost.
+  for (const o of counted(book)) if (!ownSchemeBill(o)) byBrand.set(o.brand, [...(byBrand.get(o.brand) ?? []), o]);
   return [...byBrand.entries()]
     .map(([code, orders]) => {
       const ladder = brandLadder(bands.filter(b => b.brand === code));
@@ -177,6 +211,8 @@ export interface InsightMainVM {
     kpi: { value: string; pill: string; pillTone: Tone; sub: string };
     orders: { value: string; pill: string; sub: string; subAmber: boolean };
     overall: string;
+    /** The month sold and stands in no margin (every counted bill a brand's on its own scheme): no brand row, and no "No counted sales yet". */
+    ownOnly: boolean;
     brands: BrandRowVM[];
     notice: { title: string; body: string } | null;
   };
@@ -227,6 +263,8 @@ export interface MarginStanding {
   blind: number;
   /** The lowest incentive's label, for "Below Tier 1". */
   lowest: string | null;
+  /** The month sold, and every counted bill is of a brand on its own scheme (2026-11-12): no margin to read, none waited for. */
+  ownOnly: boolean;
 }
 
 /** Where the month's margin stands — one reading for Today and Insight alike. */
@@ -239,6 +277,7 @@ export function marginStanding(book: MemberOrderBook | null, bands: readonly Mem
     held: stats.some(s => s.blind > 0 || s.code === "UNCLASSIFIED"),
     blind: stats.reduce((n, s) => n + s.blind, 0),
     lowest,
+    ownOnly: ownOnlyBook(book),
   };
 }
 
@@ -313,7 +352,7 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const hits = kpiCounts ? team.filter(r => r.kpiQty >= threshold!).length : 0;
   const rows: TeamRowVM[] = [...team].sort((a, b) => b.sales - a.sales || a.name.localeCompare(b.name)).map(r => {
     const m = r.marginRevenue > 0 ? ((r.marginRevenue - r.marginCost) / r.marginRevenue) * 100 : null;
-    const marginText = m === null ? (r.blindOrders > 0 ? "Cost pending" : "No sales yet") : `${m.toFixed(1)}%`;
+    const marginText = m === null ? noMarginTag(r.blindOrders > 0, ownOnlyScore(r)) : `${m.toFixed(1)}%`;
     return {
       id: r.staffId || (r.mine ? "me" : r.name), ini: initials(r.name), name: r.mine ? `${r.name} (you)` : r.name, title: r.title,
       sales: rm(r.sales), meta: kpiCounts ? `${marginText} · ${r.kpiQty >= threshold! ? "KPI hit" : "KPI pending"}` : marginText, mine: r.mine,
@@ -330,7 +369,8 @@ export function insightMain(input: InsightInput): InsightMainVM {
         value: String(done.length), pill: "Deposit cleared",
         sub: held.length ? `${held.length} waiting for deposit` : "Nothing waiting", subAmber: held.length > 0,
       },
-      overall: overall === null ? (done.some(pendingCost) ? "Cost pending" : "No sales yet") : `${overall.toFixed(1)}% overall`,
+      overall: overall === null ? noMarginTag(done.some(pendingCost), ownOnlyBook(book)) : `${overall.toFixed(1)}% overall`,
+      ownOnly: ownOnlyBook(book),
       brands: stats.map(b => {
         const { pill, tone } = brandPill(b);
         return { code: b.code, name: brandName(b.code), sub: `${rm(b.goods)} goods · ${plural(b.orders, "order")}`, pct: b.margin === null ? "—" : `${b.margin.toFixed(1)}%`, pill, tone };
@@ -475,8 +515,11 @@ export function billsView(input: InsightInput): BillsVM {
     const band = billRow(o, ladders, input.bands);
     const due = stillDue(o);
     const gift = noSalesBill(o);
-    const pill = !o.cleared ? (due > 0 ? `Due ${rm(due)}` : "Deposit due") : gift ? "No sales" : o.margin === null ? "Cost pending" : `${o.margin.toFixed(1)}%`;
-    const ink = !o.cleared || (o.margin === null && !gift) ? TONES.warn.ink : TONES[band?.tone ?? (gift ? "bad" : "neutral")].ink;
+    // A bill of a brand on its own scheme (2990s): no margin to read — it says so, in no tier's colour.
+    const own = ownSchemeBill(o);
+    const pill = !o.cleared ? (due > 0 ? `Due ${rm(due)}` : "Deposit due") : own ? OWN_SCHEME_PILL : gift ? "No sales" : o.margin === null ? "Cost pending" : `${o.margin.toFixed(1)}%`;
+    const ink = !o.cleared ? TONES.warn.ink : own ? TONES.neutral.ink
+      : o.margin === null && !gift ? TONES.warn.ink : TONES[band?.tone ?? (gift ? "bad" : "neutral")].ink;
     // The whole bill, and what of it is the reader's sales — a part, a margin cut (the user: "Sales Order 那边会显示完整
     // full figure，但会多一个 remark … 注明算他的 amount 是 5,000 块").
     return { id: o.id, no: o.number, sub, amt: rm(whole), amtMuted: !o.cleared, pill, pillInk: ink, kpiText: kpiEnabled ? `KPI ${o.kpiQty}` : null, arena };
@@ -579,8 +622,10 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     statusTone: old && o.cleared ? "neutral" : o.cleared ? "good" : "warn",
     amt: rm(o.total),
     margin: o.margin === null ? "—" : `${o.margin.toFixed(1)}%`,
-    marginInk: noSalesBill(o) ? TONES[band?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
-    tier: noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
+    marginInk: ownSchemeBill(o) ? TONES.neutral.ink
+      : noSalesBill(o) ? TONES[band?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
+    // A bill of a brand on its own scheme (2990s) has no margin and no tier: it says which it is.
+    tier: ownSchemeBill(o) ? OWN_SCHEME_PILL : noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
     kpi: old ? "—" : kpiOn(input) ? String(o.kpiQty) : "—",
     oldBill: old ? {
       // The month it was SOLD in: its date's — the bill sits in the month its top-up came in (`sourceMonth`).

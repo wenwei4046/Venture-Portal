@@ -278,6 +278,41 @@ before the window is still `skipped`, its message saying why (*— its
 salesperson still works here*). Comm Cal: §4.19 of
 `docs/module-spec-revenue-commission.md`, `.claude/rules/revenue/comm-cal.md`.
 
+### Another ERP company's orders — only the team's are kept (2026-11-12)
+
+Since 2026-11-10 the feed carries every company of the ERP
+(`scm.venture_portal_feed` = all), so 2990's Home's sales orders (ERP company
+**2**, documents `2990-SO-…`) arrive beside Houzs Century's. The user: an
+order of 2990s whose salesperson is on the Revenue team "就要出现在他们自己的
+记录里。如果不是 revenue team 的人，就不需要 export 过来" — the rest "做的是
+2990s 自己公司的 sales team".
+
+A company is a brand of the portal's when a brand names it
+(`comm_brands.erp_company_id`; 2990S ← 2). For such a company:
+
+- **The brand is the company's.** `erp_sync_order_brand` answers the brand
+  the delivery's `companyId` is before it reads `brand`, `brandPick`, the
+  portal's pick or the booth — a Happi Sleep mattress on a 2990's Home document
+  is a 2990s bill.
+- **A NEW document is kept only when its salesperson is on the team in the
+  month of the sale** (`erp_sync_outside_team`): `salespersonId` matched in
+  `comm_agent_aliases` (else `salespersonName`, as the receiver matches), that
+  person holding a place on one of the sub-department's schemes in the sale's
+  month or directing the sub-department, and not resigned before the sale day
+  (`fair.fairDate` when it is one of the fair's days, else `orderDate`).
+  Anybody else's is answered **200 `skipped`** — *2990s order — NG PENG CHUEN
+  is not on the Fair team* (or *— it names no salesperson*) — and nothing is
+  written: no bill, no month, no fair, no payload kept. The ERP needs to do
+  nothing; its outbox marks the delivery done.
+- **A document the portal already holds is updated as any bill**, whoever the
+  ERP names on it now.
+
+A company no brand names, and a delivery that names no company, are kept as
+every order always was. Somebody on the team HR has not matched yet has their
+2990s orders skipped until they are matched; the ERP's next save of each (or a
+back-fill) then brings it in. Comm Cal: `.claude/rules/revenue/comm-cal.md` ›
+2990s.
+
 ---
 
 ## 4. What the portal does with a delivery
@@ -290,7 +325,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
 | `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported**. Since 2026-10-12 (mig `20261012200000`) a NEW document whose sale month is paid or closed is no longer held: it is `applied` in the first month still open from the month it was keyed in (message *created — keyed late: sold in September 2026, which is paid, so it counts in October 2026*); held only when no month up to the office's own is open | no — payload kept; HR replays after reopening the run or the month |
-| `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window — unless it is an old bill topped up (§3, *An old bill topped up*, 2026-11-07), which is `applied` in the first month still open from its top-up's | no |
+| `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window — unless it is an old bill topped up (§3, *An old bill topped up*, 2026-11-07), which is `applied` in the first month still open from its top-up's; a NEW document of another ERP company a brand names (2990's Home) whose salesperson is not on the team in the month of the sale (§3, *Another ERP company's orders*, 2026-11-12) | no |
 
 **Commission rule, mirrored from the ERP** (`scm/shared/hr-commission.ts`,
 `COMMISSION_EXCLUDED_STATUSES`): `CANCELLED`, `DRAFT`, the retired `ON_HOLD`

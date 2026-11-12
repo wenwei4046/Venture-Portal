@@ -11,7 +11,8 @@ import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
 import { billHalfCommAction, describeHalfComm, HALF_COMM_LABEL } from '@/lib/commission/bill-half-comm'
-import { billBrandAction } from '@/lib/commission/bill-brand'
+import { billBrandAction, pickableBrands } from '@/lib/commission/bill-brand'
+import { isOwnSchemeBill, ownSchemeCodes } from '@/lib/commission/brand-rates'
 import { readsNoSales } from '@/lib/commission/no-sales'
 import { rowOrigin } from '@/lib/commission/row-origin'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
@@ -193,14 +194,22 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   const total = rows.filter(o => !commissionOnly(o.orderId)).reduce((a, o) => a + o.orderTotal, 0)
   const held = rows.filter(o => !o.cancelled && !o.depositMet)
   const heldValue = held.reduce((a, o) => a + o.orderTotal, 0)
-  const noCost = rows.reduce((a, o) => a + o.linesWithoutCost, 0)
+  // A bill of a brand on its own scheme (2990s, 2026-11-11) stands in no
+  // margin: it waits for no cost, and is paid the rank's rate for that brand.
+  const ownCodes = ownSchemeCodes(brandOptions)
+  const ownScheme = (o: MonthOrder) => isOwnSchemeBill(o.brandCode, ownCodes)
+  const ownRate = new Map<string, number>()
+  for (const row of board?.personalRows ?? []) {
+    if (row.ownBrand && !row.upsale) ownRate.set(`${row.originalOrderId}:${row.staffId}`, row.productRate)
+  }
+  const noCost = rows.reduce((a, o) => a + (ownScheme(o) ? 0 : o.linesWithoutCost), 0)
 
   // A bill with no margin is the figure worth counting, not the lines behind
   // it: one uncosted line blinds the whole bill, so ten lines can be one
   // question or ten.
   const live = rows.filter(o => !o.cancelled)
   // A gift on a bill of its own has no margin, and waits for no cost (2026-10-30).
-  const blind = live.filter(o => o.marginPct === null && !readsNoSales(o))
+  const blind = live.filter(o => o.marginPct === null && !readsNoSales(o) && !ownScheme(o))
   const blindValue = blind.reduce((a, o) => a + o.orderTotal, 0)
 
   const base = revenuePath(subDept.slug, period, 'orders')
@@ -247,13 +256,14 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       marginValue: o.marginCost === null ? null : Math.round((o.marginRevenue - o.marginCost) * 100) / 100,
       marginKeyed: o.marginSource === 'manual',
       noSales: readsNoSales(o),
+      ownScheme: ownScheme(o),
       status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending' : halfComms.has(o.orderId) ? HALF_COMM_LABEL : 'Included'),
       cancelled: o.cancelled,
       exclusionDetail: byHand ? describeExclusion(byHand) : null,
       countAction: billCountAction({ ...o, excludedByHand: Boolean(byHand) }, { runLocked, monthLabel }),
       brandAction: billBrandAction(
         { brandCode: o.brandCode, picked: brandPicks.get(o.orderId) ?? null, cancelled: o.cancelled },
-        { runLocked, closedReason: null, monthLabel, hasOptions: brandOptions.length > 0 },
+        { runLocked, closedReason: null, monthLabel, hasOptions: pickableBrands(brandOptions).length > 0 },
       ),
       staff: o.staffId
         ? {
@@ -271,7 +281,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         : `${reason} — nothing to share`,
       title: who?.titleLabel ?? null,
       rank: who?.rankLabel ?? null,
-      rate: who ? who.productRate : null,
+      // The rank's rate — its rate for the brand, on a bill of a brand on its own scheme.
+      rate: who ? ownRate.get(`${o.orderId}:${o.staffId}`) ?? who.productRate : null,
       commission: paid
         ? { product: paid.product, kpi: paid.kpi, marginIncentive: paid.marginIncentive, total: paid.total }
         : o.cancelled || commissionNote

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
+import { OWN_SCHEME_LABEL } from '@/lib/commission/brand-rates'
 import {
   deleteMarginBand,
   upsertBrand,
@@ -426,7 +427,8 @@ export function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData;
             }
           >
             {b.name}
-            {b.item_code_prefixes.length === 0 ? ' ·  no prefixes' : ''}
+            {/* A brand on its own scheme (2990s) is told by the ERP's company, never a prefix. */}
+            {b.own_scheme ? ` · ${OWN_SCHEME_LABEL}` : b.item_code_prefixes.length === 0 ? ' ·  no prefixes' : ''}
           </button>
         ))}
         <button
@@ -503,7 +505,9 @@ export function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData;
         )}
       </ActionForm>
 
-      {activeBrand ? (
+      {/* A brand on its own scheme is outside every margin: it has no ladder to key in
+          (its rate per rank is Rules › Ranks'). */}
+      {activeBrand?.own_scheme ? null : activeBrand ? (
         <div className="overflow-x-auto table-scroll">
           <table className="ledger-table">
             <thead>

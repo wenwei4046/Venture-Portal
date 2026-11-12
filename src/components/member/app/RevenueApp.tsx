@@ -12,7 +12,7 @@ import PushAsk from "@/components/pwa/PushAsk";
 import { useStatusBar } from "@/components/pwa/status-bar";
 import { reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
-import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaRankings, marginBrandCodes, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
@@ -826,7 +826,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // leader and points the Championship card names, as the Arena's does.
   const champ = useMemo(() => {
     if (!arenaToday) return null;
-    const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
+    const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), marginBrands: marginBrandCodes(arenaToday.brands), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
     const standings = championshipStandings([month]);
     return { rank: standings.find(s => s.id === selfId)?.position ?? null, standings };
   }, [arenaToday, kpiRule, selfId]);

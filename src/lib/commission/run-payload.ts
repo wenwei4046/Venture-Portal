@@ -33,6 +33,7 @@ import {
   indexItemGroups,
   indexKpiItems,
   orderProductRevenue,
+  ownSchemesOf,
   round2,
 } from './engine'
 import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, type FabricSeriesRow } from './kpi'
@@ -95,6 +96,20 @@ export interface RankRow {
   personal_sales_threshold: Num
   consecutive_months: number | null
   sort_order: number
+  /**
+   * Embedded `comm_rank_defs (brand_rates)` — what the rank pays on a bill of a
+   * brand with its own scheme (2026-11-11), keyed by `comm_brands.id`. Absent in
+   * older fixtures.
+   */
+  comm_rank_defs?: { brand_rates: unknown } | { brand_rates: unknown }[] | null
+}
+
+/** A brand of the scheme, as far as a run needs it (`comm_brands`, 2026-11-11). */
+export interface BrandRow {
+  id: string
+  code: string
+  /** It follows its own commission scheme: its own rate per rank, no margin, its own KPI items. */
+  own_scheme?: boolean | null
 }
 
 /**
@@ -300,6 +315,11 @@ export interface RunSourceRows {
   directors?: DirectorTerms[]
   /** The month's Commissionable value (Comm Cal's card), when an incentive needs it. */
   monthCommissionableValue?: number
+  /**
+   * The scheme's brands (`comm_brands`, 2026-11-11): which follow their own
+   * scheme, and the code a rank's rate for one is read by. Absent = none does.
+   */
+  brands?: BrandRow[]
 }
 
 /** A `sales_order_shares` row. */
@@ -352,27 +372,63 @@ export function toKpiItems(rows: readonly KpiItemRow[]): KpiItem[] {
   })
 }
 
+/**
+ * The brands that follow their own scheme, by id → the code a bill carries
+ * (2026-11-11 — 2990s). A brand without a code cannot be found on any bill.
+ */
+export function ownSchemeBrandsOf(brands: readonly BrandRow[] | undefined): Map<string, string> {
+  return new Map((brands ?? []).flatMap(b => {
+    const code = (b.code ?? '').trim().toUpperCase()
+    return b.own_scheme && code ? [[b.id, code] as const] : []
+  }))
+}
+
+/**
+ * A rank's rates for the brands with their own scheme, as the engine reads
+ * them: `comm_rank_defs.brand_rates` is keyed by the brand's id (a brand may be
+ * renamed); the engine finds a bill's brand by its code. A rate that is not a
+ * fraction between 0 and 1, or one for a brand that is not on its own scheme,
+ * is left out — the rank then pays that brand as the rung below (`brandRateOf`).
+ */
+export function toBrandRates(raw: unknown, ownBrands: ReadonlyMap<string, string>): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ownBrands.size === 0) return undefined
+  const rates: Record<string, number> = {}
+  for (const [brandId, value] of Object.entries(raw as Record<string, unknown>)) {
+    // An id is compared in lower case, as the database writes one.
+    const code = ownBrands.get(brandId) ?? ownBrands.get(brandId.toLowerCase())
+    const rate = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN
+    if (code && Number.isFinite(rate) && rate >= 0 && rate <= 1) rates[code] = rate
+  }
+  return Object.keys(rates).length > 0 ? rates : undefined
+}
+
 export function toEngineInput(rows: RunSourceRows): EngineInput {
   const released = new Set(rows.releasedOrderNos)
   // (2026-11-07) An old bill topped up: commission only.
   // A bed frame's or a sofa's specials and fabric series — how an option KPI item is found.
   const fabrics = rows.fabrics?.length ? indexFabricSeries(rows.fabrics) : EMPTY_FABRIC_SERIES
   const lineFacts = (l: SalesLineRow) => lineKpiFactsOf(l.item_group, l.description2, l.variants, fabrics)
+  // (2026-11-11) The brands that follow their own scheme — 2990s.
+  const ownBrands = ownSchemeBrandsOf(rows.brands)
 
-  const ranks: Rank[] = rows.ranks.map(r => ({
-    rankKey: r.rank_key,
-    titleId: r.title_id,
-    titleLabel: one(r.titles)?.name ?? r.label,
-    label: r.label,
-    productRate: num(r.product_rate),
-    groupIncentiveAmount: num(r.group_incentive_amount),
-    groupSubsidyCap: num(r.group_subsidy_cap),
-    canRecruit: r.can_recruit,
-    groupSalesThreshold: numOrNull(r.group_sales_threshold),
-    personalSalesThreshold: numOrNull(r.personal_sales_threshold),
-    consecutiveMonths: r.consecutive_months ?? null,
-    sortOrder: r.sort_order,
-  }))
+  const ranks: Rank[] = rows.ranks.map(r => {
+    const brandRates = toBrandRates(one(r.comm_rank_defs)?.brand_rates, ownBrands)
+    return {
+      rankKey: r.rank_key,
+      titleId: r.title_id,
+      titleLabel: one(r.titles)?.name ?? r.label,
+      label: r.label,
+      productRate: num(r.product_rate),
+      groupIncentiveAmount: num(r.group_incentive_amount),
+      groupSubsidyCap: num(r.group_subsidy_cap),
+      canRecruit: r.can_recruit,
+      groupSalesThreshold: numOrNull(r.group_sales_threshold),
+      personalSalesThreshold: numOrNull(r.personal_sales_threshold),
+      consecutiveMonths: r.consecutive_months ?? null,
+      sortOrder: r.sort_order,
+      ...(brandRates ? { brandRates } : {}),
+    }
+  })
 
   // Most recent first, so a streak walks back month by month.
   const priorMonths: PriorMonth[] = [...rows.priorMonths]
@@ -513,6 +569,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     departmentHeadIds: [...new Set(rows.departmentHeadIds ?? [])],
     ...(rows.directors?.length ? { directors: rows.directors } : {}),
     ...(rows.monthCommissionableValue !== undefined ? { monthCommissionableValue: rows.monthCommissionableValue } : {}),
+    ...(ownBrands.size > 0 ? { ownSchemeBrands: [...new Set(ownBrands.values())] } : {}),
   }
 }
 
@@ -603,7 +660,9 @@ export interface RunPayload {
  */
 export function releasedOrders(input: EngineInput, result: EngineResult): ReleasedOrderDto[] {
   const held = new Set(result.deferred.map(d => d.orderId))
-  const kpiIndex = input.scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
+  // The KPI items a bill may carry, as the engine reads them: none of the
+  // sub-department's on a bill of a brand with its own scheme (2026-11-11).
+  const kpiIndexOf = ownSchemesOf(input, input.scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX).kpiIndexFor
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
 
   // One release per BILL: a shared bill reaches the engine as one part per
@@ -616,7 +675,7 @@ export function releasedOrders(input: EngineInput, result: EngineResult): Releas
     // carried, so there is nothing to close — and it has no sales_orders row.
     if (o.upsale) continue
     if (o.alreadyReleased || held.has(o.id)) continue
-    const revenue = orderProductRevenue(o, kpiIndex, groupIndex)
+    const revenue = orderProductRevenue(o, kpiIndexOf(o), groupIndex)
     const seen = byOrder.get(o.id)
     if (seen) {
       seen.product_revenue = round2(seen.product_revenue + revenue)
