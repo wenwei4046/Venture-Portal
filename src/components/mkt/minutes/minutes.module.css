@@ -206,7 +206,7 @@
 .tbox { border: 1px solid rgb(var(--mk-line)); border-radius: 10px; background: rgb(var(--mk-white)); overflow-x: auto; }
 .table { border-collapse: collapse; min-width: 100%; }
 .table thead tr { background: rgb(var(--mk-surface)); }
-.tnum { width: 28px; border-bottom: 1px solid rgb(var(--mk-line-2)); }
+.tnum { width: 28px; min-width: 28px; border-bottom: 1px solid rgb(var(--mk-line-2)); }
 .tcol {
   min-width: 120px; padding: 8px 10px; border-bottom: 1px solid rgb(var(--mk-line-2)); border-left: 1px solid rgb(var(--mk-line-3)); text-align: left;
   font-weight: 400; cursor: pointer; background: rgb(var(--mk-white)); transition: background-color .12s;
@@ -225,7 +225,7 @@
   font-weight: 400; cursor: pointer; border: 0; background: none;
 }
 .taddBtn:hover { background: rgb(var(--mk-hover)); }
-.trn { text-align: center; color: rgb(var(--mk-muted)); font-family: var(--mk-mono); font-size: 10.5px; border-bottom: 1px solid rgb(var(--mk-line-4)); }
+.trn { width: 28px; min-width: 28px; text-align: center; color: rgb(var(--mk-muted)); font-family: var(--mk-mono); font-size: 10.5px; border-bottom: 1px solid rgb(var(--mk-line-4)); }
 .tcell { padding: 2px 3px; border-bottom: 1px solid rgb(var(--mk-line-4)); border-left: 1px solid rgb(var(--mk-line-4)); }
 .cellInput {
   height: 28px; width: 100%; min-width: 100px; box-sizing: border-box; border: 1px solid transparent; border-radius: 5px; padding: 0 6px; font: inherit;
@@ -341,7 +341,6 @@
 .sheetHead { padding: 16px 18px 14px; border-bottom: 1px solid rgb(var(--mk-line-2)); display: flex; gap: 10px; align-items: flex-start; }
 .sheetWords { flex: 1; min-width: 0; }
 .sheetEyebrow { font-size: .75em; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: rgb(var(--mk-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sheetTitle { font-size: 1.2em; font-weight: 600; margin-top: 3px; }
 .sheetMono { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 3px; }
 .status { flex: none; white-space: nowrap; padding: 3px 9px; border-radius: 999px; font-size: .85em; font-weight: 600; transition: background-color .15s, color .15s; }
 .stDone { background: rgb(var(--mk-done-bg)); color: rgb(var(--mk-done)); }
@@ -383,18 +382,21 @@ textarea.pfInput { height: auto; padding: 8px 10px; line-height: 1.5; resize: ve
 .chipOn { border-color: rgb(var(--mk-pick-line)); background: rgb(var(--mk-pick)); color: rgb(var(--mk-ink)); font-weight: 600; }
 .chip:disabled { cursor: default; }
 .gridBox { display: flex; flex-direction: column; gap: 4px; }
-.gridWrap { border: 1px solid rgb(var(--mk-line)); border-radius: 8px; overflow-x: auto; }
-.grid { border-collapse: collapse; min-width: 100%; }
+.gridWrap { border: 1px solid rgb(var(--mk-line)); border-radius: 8px; overflow-x: auto; container-type: inline-size; }
+.grid { border-collapse: collapse; width: 100%; font-size: .9em; }
+/* Its row numbers, as the builder shows them; a cell gives way to fit the pane, a date keeps room for its picker. */
+.gNum { width: 20px; padding: 0 2px 0 6px !important; text-align: center; color: rgb(var(--mk-muted)); font-family: var(--mk-mono); font-size: 10px; font-weight: 400 !important; }
 .grid thead tr { background: rgb(var(--mk-surface)); }
-.grid th { padding: 6px 8px; border-bottom: 1px solid rgb(var(--mk-line-2)); text-align: left; font-weight: 600; white-space: nowrap; }
-.grid td { padding: 2px 3px; border-bottom: 1px solid rgb(var(--mk-line-4)); }
+.grid th { padding: 6px 5px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid rgb(var(--mk-line-2)); text-align: left; font-weight: 600; white-space: nowrap; }
+.grid td { padding: 2px 2px; border-bottom: 1px solid rgb(var(--mk-line-4)); }
 .gAddCol { padding: 0 10px !important; color: rgb(var(--mk-brown)); font-weight: 500 !important; }
 .gAddColBtn { color: inherit; font: inherit; font-weight: 500; cursor: pointer; border: 0; background: none; padding: 0; white-space: nowrap; }
 .gX { width: 22px; }
 .gInput {
-  height: 28px; width: 100%; min-width: 90px; box-sizing: border-box; border: 1px solid transparent; border-radius: 5px; padding: 0 6px; font: inherit;
+  height: 28px; width: 100%; min-width: 44px; box-sizing: border-box; border: 1px solid transparent; border-radius: 5px; padding: 0 4px; font: inherit;
   outline: none; background: transparent; color: rgb(var(--mk-ink)); transition: border-color .12s, background-color .12s;
 }
+.gInput[type="date"] { min-width: 98px; font-size: .92em; }
 .gInput:focus:not([readonly]) { border-color: rgb(var(--mk-focus)); background: rgb(var(--mk-white)); }
 .gHead { font: inherit; font-weight: 600; min-width: 70px; }
 .gXBtn { cursor: pointer; color: rgb(var(--mk-x)); border: 0; background: none; font: inherit; padding: 0; }
@@ -458,6 +460,7 @@ textarea.pfInput { height: auto; padding: 8px 10px; line-height: 1.5; resize: ve
   .pv { display: none; }
   .pvOpen {
     display: flex; position: fixed; top: 10px; right: 10px; bottom: 10px; z-index: 200; box-shadow: var(--mk-shadow-modal); border-radius: 14px;
+    width: 460px; /* over the page, the drawer takes the preview's full width */
     animation: mbIn .15s ease-out;
   }
   .pvToggle { display: flex; }
@@ -467,3 +470,11 @@ textarea.pfInput { height: auto; padding: 8px 10px; line-height: 1.5; resize: ve
 /* The prototype sizes these without a box-sizing reset: a fixed height or width is the content's, the border and padding
    on top (the portal's preflight would make them 2px smaller). */
 .folderBtn, .name, .pill, .glyph, .kind, .fbtn, .popMove, .ckind, .chip, .pvToggle, .issue, .menu, .projectBox, .pvBtn, .tcol { box-sizing: content-box; }
+
+/* A preview too narrow for its table: the table gets smaller before it scrolls. */
+@container (max-width: 360px) {
+  .grid { font-size: .8em; }
+  .gInput { min-width: 34px; padding: 0 3px; }
+  .gInput[type="date"] { min-width: 88px; }
+  .grid th { padding: 5px 3px; }
+}
