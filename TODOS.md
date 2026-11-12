@@ -110,6 +110,24 @@ Build the data's before anybody is narrowed on a Revenue page.
 - **Others' lists in the CRM** (`crm_role_of`) still read the structure: an IR
   salesperson held back from IR is out of the CRM but still assignable.
 
+## Owed — 2990s' own KPI items, the rest (2026-11-12)
+
+Shipped: the items, the run, Comm Cal's month and bill page, Rules' read-only
+list (`.claude/rules/revenue/comm-cal.md` › 2990s' OWN KPI ITEMS). Still owed:
+- **The Revenue app.** The member's KPI card, Insight's KPI figures, the
+  Arena's KPI board and the facts behind them stand behind Fair's own KPI
+  switch (`member_order_facts_with_old_bills`, both order books,
+  `member_kpi_for_staff`'s early return), so a 2990s bonus is in My income's
+  total and on no KPI page. The user: 2990s is in the "KPI item 的 arena".
+- **Rules › KPI items edits a brand's items.** The list is read-only; the
+  writer (`catalogue_save_kpi_items`) already takes a brand's item, its name
+  and its tiers. Until then an item is added or changed by SQL.
+- **A shared bill's once-a-bill KPI item (the sub-department's own).** A Fair
+  sofa special, or a fabric-series set, on a bill two people share is counted
+  whole for EACH holder (`orderKpiHits` splits a brand's item by the part;
+  `marginBase` reads lines only, so the sub-department's own were left). No
+  effect while Fair's KPI switch is off — settle it before it is switched on.
+
 ## Owed — Revenue Director (2026-09-11)
 
 - **The CEO above the directors.** The user: "Revenue Director 上面就是

@@ -61,7 +61,8 @@ export default function RulesView({
         itemGroups: data.itemGroups.length,
         promotionRules: data.promotionRules.length,
         directors: data.directors.length,
-        kpiItems: data.kpiItems.length,
+        // A brand's own items count too: the tab shows them (2026-11-12).
+        kpiItems: data.kpiItems.length + (data.brandKpiItems?.length ?? 0),
         kpiThresholds: data.kpiThresholds.length,
       }).filter(t => t.key !== 'capacity' || capacity !== null)
     : []
