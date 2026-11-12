@@ -64,8 +64,11 @@ function valueOf(v: unknown): MinutesValue | null {
   if (!isObj(v)) return null
   if ('from' in v || 'to' in v) return { from: str(v.from), to: str(v.to) }
   if (!Array.isArray(v.rows)) return null
-  const rows = v.rows.filter(Array.isArray).map(r => r.map(c => (typeof c === 'string' ? c : '')))
-  return Array.isArray(v.cols) ? { rows, cols: v.cols.map(c => (typeof c === 'string' ? c : '')) } : { rows }
+  const words = (x: unknown[]) => x.map(c => (typeof c === 'string' ? c : ''))
+  const rows = v.rows.filter(Array.isArray).map(words)
+  // The columns the staff added to a table, where the template lets them (Minutes Builder v2).
+  const xcols = Array.isArray(v.xcols) && v.xcols.length ? { xcols: words(v.xcols) } : {}
+  return Array.isArray(v.cols) ? { rows, cols: words(v.cols), ...xcols } : { rows, ...xcols }
 }
 
 /** A draft's minutes put back. */

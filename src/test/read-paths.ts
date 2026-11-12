@@ -470,6 +470,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Marketing's Minutes Builder (mig 20261023235800): the minutes templates read, saved and published — all by
   // Marketing · Manage.
   'mkt_minutes_templates', 'mkt_minutes_save', 'mkt_minutes_publish',
+  'mkt_minutes_duplicate', 'mkt_minutes_discard', 'mkt_minutes_move', 'mkt_minutes_folder_save', 'mkt_minutes_folder_delete',
   // Marketing's Product Builder (mig 20261023235900): the products — and their prices — read, saved, published, retired
   // and reactivated, all by Marketing · Manage.
   'mkt_products', 'mkt_product_save', 'mkt_product_publish', 'mkt_product_status',

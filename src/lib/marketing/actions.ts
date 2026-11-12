@@ -19,7 +19,7 @@ import { openDraftFromRow } from './drafts'
 import { keyDatesFromRow, keyPatchOf, type KeyPatch, type MktKeyDate } from './key-dates'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
-import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
+import { minutesFoldersFromRow, minutesTemplatesFromRow, type MinutesFolder, type MinutesTemplate } from './minutes'
 import { picksOf } from './options'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
@@ -398,8 +398,12 @@ export async function deleteMktWorkflow(id: string, rev: number): Promise<Done<{
 
 /** The Minutes Builder's templates as they now stand (mig 20261023235800); null when they cannot be read. */
 async function freshMinutes(db: SupabaseClient): Promise<MinutesTemplate[] | null> {
+  return (await freshMinutesBook(db))?.templates ?? null
+}
+/** …with their folders (v2, mig 20261112180000). */
+async function freshMinutesBook(db: SupabaseClient): Promise<{ templates: MinutesTemplate[]; folders: MinutesFolder[] } | null> {
   const { data, error } = await db.rpc('mkt_minutes_templates')
-  return error ? null : minutesTemplatesFromRow(data)
+  return error ? null : { templates: minutesTemplatesFromRow(data), folders: minutesFoldersFromRow(data) }
 }
 
 /** A minutes template made (`id` null: its name, first fields and rules), or what changed of its draft saved — `rev`,
@@ -439,6 +443,63 @@ export async function deleteMktMinutes(id: string, rev: number): Promise<Done<{ 
   if (error) return { ok: false, reason: words(error, 'The template could not be deleted. Please try again.') }
   revalidatePath('/marketing', 'layout')
   return { ok: true, templates: await freshMinutes(db) }
+}
+
+/** A minutes template copied as a new draft, never published — "<name> copy", after the original (v2). */
+export async function duplicateMktMinutes(id: string): Promise<Done<{ id: string; name: string; templates: MinutesTemplate[] | null }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_duplicate', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The template could not be duplicated. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { id?: string; name?: string }
+  return { ok: true, id: String(r.id ?? ''), name: String(r.name ?? ''), templates: await freshMinutes(db) }
+}
+
+/** The draft put back to the version last published (v2) — `rev`, the draft the builder last saw. */
+export async function discardMktMinutes(id: string, rev: number): Promise<Done<{ rev: number; templates: MinutesTemplate[] | null }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_minutes_discard', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The changes could not be discarded. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, rev: Number((data as { rev?: number } | null)?.rev ?? rev), templates: await freshMinutes(db) }
+}
+
+/** A minutes template moved into a folder, or out of every folder (`folder` null) — no new draft (v2). */
+export async function moveMktMinutes(id: string, folder: string | null): Promise<Done<{ moved: true }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (!isId(id) || (folder !== null && !isId(folder))) return { ok: false, reason: 'That template or folder is not there any more.' }
+  const { error } = await (await client()).rpc('mkt_minutes_move', { p_id: id, p_folder: folder })
+  if (error) return { ok: false, reason: words(error, 'The template could not be moved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, moved: true }
+}
+
+/** A minutes folder made (`id` null, inside `parent`) or renamed (v2). */
+export async function saveMktMinutesFolder(id: string | null, parent: string | null, name: string): Promise<Done<{ folder: MinutesFolder }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if ((id !== null && !isId(id)) || (parent !== null && !isId(parent))) return { ok: false, reason: 'That folder is not there any more.' }
+  if (typeof name !== 'string') return { ok: false, reason: 'Name the folder.' }
+  const { data, error } = await (await client()).rpc('mkt_minutes_folder_save', { p_id: id, p_parent: parent, p_name: name })
+  if (error) return { ok: false, reason: words(error, 'The folder could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const [folder] = minutesFoldersFromRow({ folders: [data] })
+  return folder ? { ok: true, folder } : { ok: false, reason: 'The folder could not be saved. Please try again.' }
+}
+
+/** A minutes folder deleted — its folders and templates move up a level (v2). */
+export async function deleteMktMinutesFolder(id: string): Promise<Done<{ book: { templates: MinutesTemplate[]; folders: MinutesFolder[] } | null }>> {
+  await requireActionOn('/marketing/minutes', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That folder is not there any more.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_minutes_folder_delete', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The folder could not be deleted. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, book: await freshMinutesBook(db) }
 }
 
 /** The Product Builder's book as it now stands (mig 20261023235900); null when it cannot be read. */

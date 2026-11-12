@@ -18,9 +18,9 @@ import { monthLabel, projectBillFromRow, shiftMonth, type ProjectBill } from './
 export type ProductStatus = 'minutes' | 'waiting_pic' | 'changes' | 'approved' | 'active' | 'paused' | 'done' | 'cancelled'
 const STATUSES: readonly ProductStatus[] = ['minutes', 'waiting_pic', 'changes', 'approved', 'active', 'paused', 'done', 'cancelled']
 
-/** What a field holds: text (a date, a number as written), people (ids), a table's rows, the Free space's columns and rows,
- * a campaign's run period. */
-export type MinutesValue = string | string[] | { rows: string[][]; cols?: string[] } | MinutesPeriod
+/** What a field holds: text (a date, a number as written), people (ids), a table's rows (and the columns the staff added,
+ * where the template lets them — Minutes Builder v2), the Free space's columns and rows, a campaign's run period. */
+export type MinutesValue = string | string[] | { rows: string[][]; cols?: string[]; xcols?: string[] } | MinutesPeriod
 
 /** A *Campaign period* as written (the user's answer 13): its two days, '' while one is not picked yet. */
 export interface MinutesPeriod {
@@ -137,7 +137,10 @@ function valueFromRow(v: unknown): MinutesValue | null {
   if (typeof v === 'string') return v
   if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string')
   if (isObj(v) && ('from' in v || 'to' in v) && !('rows' in v)) return { from: str(v.from), to: str(v.to) }
-  if (isObj(v)) return { rows: strRows(v.rows), ...(Array.isArray(v.cols) ? { cols: v.cols.map(c => (typeof c === 'string' ? c : '')) } : {}) }
+  if (isObj(v)) {
+    const words = (x: unknown[]) => x.map(c => (typeof c === 'string' ? c : ''))
+    return { rows: strRows(v.rows), ...(Array.isArray(v.cols) ? { cols: words(v.cols) } : {}), ...(Array.isArray(v.xcols) && v.xcols.length ? { xcols: words(v.xcols) } : {}) }
+  }
   return null
 }
 
@@ -401,9 +404,11 @@ export function productPicksFromRow(v: unknown): ProductPick[] {
 const blank = (v: MinutesValue | undefined) =>
   v === undefined ? true : typeof v === 'string' ? !v.trim() : Array.isArray(v) ? v.length === 0 : isPeriod(v) ? !v.from || !v.to : !v.rows.some(r => r.some(c => c.trim()))
 
-/** The required fields still empty (as mkt_minutes_missing says) — the project link fills itself, signatures are their own. */
+/** The required fields still empty (as mkt_minutes_missing says) — the project link fills itself, signatures are their own;
+ * a table nobody wrote in yet holds its starting rows (Minutes Builder v2). */
 export function minutesMissing(fields: readonly MinutesField[], vals: Readonly<Record<string, MinutesValue>>): string[] {
-  return fields.filter(f => (f.req || f.lock) && f.type !== 'Project link' && f.type !== 'Signature' && blank(vals[f.name])).map(f => f.name)
+  return fields.filter(f => (f.req || f.lock) && f.type !== 'Project link' && f.type !== 'Signature'
+    && blank(vals[f.name] ?? (f.type === 'Table' && f.rows ? { rows: f.rows } : undefined))).map(f => f.name)
 }
 
 /** Who attended: the locked People field. */

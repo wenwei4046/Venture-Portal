@@ -62,6 +62,7 @@
 .fields { display: flex; flex-direction: column; gap: 16px; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .fieldLabel { display: flex; align-items: center; gap: 6px; font-size: .88em; font-weight: 500; }
+.fieldHelp { font-size: .85em; color: rgb(var(--mk-muted)); margin-top: -3px; } /* the template's hint for staff (Minutes Builder v2) */
 .marks { display: inline-flex; gap: 4px; font-size: 11px; }
 .input, .textarea {
   box-sizing: border-box; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; padding: 0 10px; font: inherit; font-size: .94em; outline: none;
