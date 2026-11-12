@@ -303,4 +303,14 @@ check(await value({ name: 'Meeting title', type: 'Title' }, 'Year-end kickoff'),
 await refuses(`SELECT public.mkt_minutes_value($1::jsonb, $2::jsonb)`, [JSON.stringify({ name: 'Meeting title', type: 'Title' }), JSON.stringify('x'.repeat(201))],
   /at most 200 characters/, 'a title of 200 characters at most')
 
+// ── A Title is never required (20261112210000 — "title 就是一个句子"): nothing is filled in, so Complete never waits on it ──
+await asSystem()
+const neverReq = await sql('20261112210000_marketing_minutes_title_never_required.sql')
+await db.exec(neverReq)
+await db.exec(neverReq)
+await as(U.josiah, MANAGER)
+const tr = await save(null, null, { name: 'Title asked', fields: [F('ti', 'Kickoff', 'Title', { req: true, help: 'What we agreed' }), ...BASE], rules: {} })
+check((await row(tr.id)).fields[0], { id: 'ti', name: 'Kickoff', type: 'Title', help: 'What we agreed', req: false, pic: true, lock: false }, 'a Title sent required is kept not required')
+check(await one(`SELECT public.mkt_minutes_missing($1::jsonb, '{}'::jsonb)`, [JSON.stringify([{ name: 'Kickoff', type: 'Title', req: false }])]), [], 'a Title is never missing')
+
 console.log(`marketing minutes builder v2: ${checks} checks passed`)

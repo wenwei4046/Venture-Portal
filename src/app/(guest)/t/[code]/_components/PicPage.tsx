@@ -137,8 +137,15 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
                   {waiting && page.sentAt ? <span className={s.cardMeta}>Sent {receiptTime(page.sentAt)}</span> : null}
                 </div>
                 <div className={s.minutesTitle}>Meeting minutes · {page.minutes.title}</div>
+                {/* A Title field (2026-11-12): the template's sentence and its description, read as a heading. */}
+                {page.minutes.fields.filter(f => f.type === 'Title').map(f => (
+                  <div key={f.name} className={s.minutesHeading}>
+                    {f.name}
+                    {f.help ? <span className={s.kHelp}>{f.help}</span> : null}
+                  </div>
+                ))}
                 <dl className={s.fields}>
-                  {page.minutes.fields.filter(f => f.type !== 'Signature' || f.value !== null).map(f => (
+                  {page.minutes.fields.filter(f => f.type !== 'Title' && (f.type !== 'Signature' || f.value !== null)).map(f => (
                     <div key={f.name} className={s.kv}>
                       <dt className={s.k}>{f.name}{f.help ? <span className={s.kHelp}>{f.help}</span> : null}</dt>
                       <Value field={f} />

@@ -7,9 +7,10 @@
 export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature', 'Campaign period', 'Title'] as const
 export type MinutesType = (typeof MINUTES_TYPES)[number]
 /** The kinds as the builder offers them (the handoff's TYPES): its glyph and what it is for. Title (2026-11-12, the user:
- * "在 field 加一个 Title, 放到这个位置") heads the minutes — in the preview where the project's placeholder title stood. */
+ * "在 field 加一个 Title, 放到这个位置" · "title 就是一个句子 … 最多放 description") is a fixed sentence that heads the minutes, with an
+ * optional description under it (its `help`): nothing to fill in, never required. */
 export const TYPE_CARDS: readonly { type: MinutesType; glyph: string; desc: string }[] = [
-  { type: 'Title', glyph: 'T', desc: 'Heads the minutes · once per template' },
+  { type: 'Title', glyph: 'T', desc: 'A sentence at the top · once per template' },
   { type: 'Short text', glyph: 'Aa', desc: 'One-line answer' },
   { type: 'Long text', glyph: '¶', desc: 'Notes, objectives, decisions' },
   { type: 'Date', glyph: '▦', desc: 'A single day' },
@@ -320,7 +321,7 @@ export function tableAnswer(f: MinutesField, v: unknown): { cols: string[]; type
 
 /** "9 fields · 6 required · 7 visible to PIC". */
 export function minutesSummary(fields: readonly MinutesField[]): string {
-  const req = fields.filter(f => f.req || f.lock).length
+  const req = fields.filter(f => f.type !== 'Title' && (f.req || f.lock)).length
   const pic = fields.filter(f => f.pic).length
   return `${fields.length} field${fields.length === 1 ? '' : 's'} · ${req} required · ${pic} visible to PIC`
 }
@@ -365,7 +366,7 @@ export function minutesFieldsPayload(fields: readonly MinutesField[]): Record<st
       id: f.key,
       name: f.name,
       type: f.type,
-      req: f.req || f.lock,
+      req: f.type !== 'Title' && (f.req || f.lock), // a Title is a fixed sentence: nothing to fill in, never required
       pic: f.pic,
       lock: f.lock,
       ...(help ? { help } : {}),

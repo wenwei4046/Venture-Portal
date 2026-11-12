@@ -155,6 +155,15 @@ export default function MinutesForm({
   }
 
   const field = (f: MinutesField) => {
+    // A Title (2026-11-12): the template's own sentence heading the minutes, its description under it — nothing to fill in.
+    if (f.type === 'Title') {
+      return (
+        <div key={f.name} className={p.field}>
+          <span className={p.minutesTitle}>{f.name}</span>
+          {f.help ? <span className={p.fieldHelp}>{f.help}</span> : null}
+        </div>
+      )
+    }
     const v = vals[f.name]
     const text = typeof v === 'string' ? v : ''
     let input: React.ReactNode
@@ -187,7 +196,7 @@ export default function MinutesForm({
           type={f.type === 'Date' ? 'date' : 'text'}
           inputMode={f.type === 'Number' ? 'decimal' : undefined}
           value={text}
-          maxLength={f.type === 'Short text' || f.type === 'Title' ? 200 : 40}
+          maxLength={f.type === 'Short text' ? 200 : 40}
           readOnly={readOnly}
           aria-label={f.name}
           onChange={e => onVal(f.name, e.target.value)}

@@ -407,7 +407,7 @@ const blank = (v: MinutesValue | undefined) =>
 /** The required fields still empty (as mkt_minutes_missing says) — the project link fills itself, signatures are their own;
  * a table nobody wrote in yet holds its starting rows (Minutes Builder v2). */
 export function minutesMissing(fields: readonly MinutesField[], vals: Readonly<Record<string, MinutesValue>>): string[] {
-  return fields.filter(f => (f.req || f.lock) && f.type !== 'Project link' && f.type !== 'Signature'
+  return fields.filter(f => (f.req || f.lock) && f.type !== 'Project link' && f.type !== 'Signature' && f.type !== 'Title'
     && blank(vals[f.name] ?? (f.type === 'Table' && f.rows ? { rows: f.rows } : undefined))).map(f => f.name)
 }
 

@@ -76,7 +76,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
     if (f.type === 'Table') return { xcols: [], rows: startRows(f) }
     return undefined
   }
-  const missing = fields.filter(f => (f.req || f.lock) && f.type !== 'Signature' && f.type !== 'Project link' && empty(f, valOf(f)))
+  const missing = fields.filter(f => (f.req || f.lock) && f.type !== 'Signature' && f.type !== 'Project link' && f.type !== 'Title' && empty(f, valOf(f)))
   const signedN = att.filter(n => t.signed[n]).length
   const checks: { ok: boolean; text: string }[] = pic
     ? [{ ok: true, text: 'Shared by the HOUZS marketing team. Read only.' }, ...(rules.pic ? [] : [{ ok: false, text: 'PIC sign-off is off for this template, so the PIC can only read.' }])]
@@ -95,8 +95,6 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
     : blocked ? ['Can’t complete yet', m.stWait] : ['Ready to complete', m.stDone]
   const reqN = fields.filter(f => f.req || f.lock).length
   const titleField = shown.find(f => f.type === 'Title')
-  const titleRaw = titleField ? t.vals[titleField.key] : undefined
-  const titleText = typeof titleRaw === 'string' ? titleRaw.trim() : ''
 
   const grid = (f: MinutesField, v: Grid | Table) => {
     const isTable = f.type === 'Table'
@@ -212,13 +210,16 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
           <div className={m.sheetHead}>
             <div className={m.sheetWords}>
               <div className={m.sheetEyebrow}>Meeting minutes · {name || 'Untitled'}</div>
-              {/* The Title field heads the minutes (the user, 2026-11-12): what is typed in it, else its name, faint. */}
+              {/* The Title field heads the minutes (the user, 2026-11-12): its sentence, and its description under it —
+                  nothing to fill in. Ringed like any field picked; a click picks it in the builder. */}
               {titleField ? (
                 <div
-                  className={`${m.sheetTitle}${titleText ? '' : ` ${m.sheetTitleEmpty}`}`}
+                  className={`${m.sheetTitleBox}${titleField.key === selKey ? ` ${m.sheetTitleOn}` : ''}`}
+                  data-field={titleField.key}
                   onClick={() => titleField.key !== selKey && onSelect(titleField.key)}
                 >
-                  {titleText || titleField.name.trim() || 'Title'}
+                  <div className={`${m.sheetTitle}${titleField.name.trim() ? '' : ` ${m.sheetTitleEmpty}`}`}>{titleField.name.trim() || 'Title'}</div>
+                  {titleField.help ? <div className={m.sheetDesc}>{titleField.help}</div> : null}
                 </div>
               ) : null}
               <div className={m.sheetMono}>Track ID · {version}</div>
@@ -227,7 +228,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
           </div>
 
           <div className={m.sheetFields}>
-            {shown.map(f => {
+            {shown.filter(f => f.type !== 'Title').map(f => {
               const v = valOf(f)
               const on = f.key === selKey
               const auto = f.type === 'Project link' || (rules.project && f.type === 'People' && f.lock)
@@ -248,7 +249,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
                     {!pic && f.pic ? <span className={m.pfPic}>👁 PIC sees</span> : null}
                   </div>
                   {f.help ? <div className={m.pfHelp}>{f.help}</div> : null}
-                  {f.type === 'Short text' || f.type === 'Title' || f.type === 'Date' || f.type === 'Number' ? (
+                  {f.type === 'Short text' || f.type === 'Date' || f.type === 'Number' ? (
                     <input
                       className={m.pfInput}
                       type={f.type === 'Date' ? 'date' : f.type === 'Number' ? 'number' : 'text'}

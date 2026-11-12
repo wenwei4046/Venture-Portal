@@ -358,12 +358,17 @@ describe('the live preview', () => {
   })
 
   // 2026-11-12 — the user: "在 field 加一个 Title, 放到这个位置": the Title field heads the minutes in the preview.
-  it('a Title field heads the minutes: its name, faint, until something is typed in it', () => {
-    builder([{ ...KICKOFF, fields: [{ id: 'ti', name: 'Meeting title', type: 'Title', pic: true }, ...FIELDS] }])
+  it('a Title field heads the minutes: its sentence and its description, nothing to fill in, never required', () => {
+    builder([{ ...KICKOFF, fields: [{ id: 'ti', name: 'Year-end Kickoff', type: 'Title', pic: true, help: 'Showroom, 12 Nov' }, ...FIELDS] }])
     const pv = within(preview())
-    expect(pv.getByText('Meeting title', { selector: '[class*=sheetTitle]' }).className).toMatch(/sheetTitleEmpty/)
-    fireEvent.change(pv.getByRole('textbox', { name: 'Meeting title' }), { target: { value: 'Year-end kickoff' } })
-    expect(pv.getByText('Year-end kickoff', { selector: '[class*=sheetTitle]' }).className).not.toMatch(/sheetTitleEmpty/)
+    const head = preview().querySelector('[data-field="ti"]') as HTMLElement
+    expect(head.textContent).toBe('Year-end KickoffShowroom, 12 Nov')
+    expect(pv.queryByRole('textbox', { name: 'Year-end Kickoff' })).toBeNull() // no answer box
+    expect(screen.queryByRole('button', { name: 'Year-end Kickoff is required' })).toBeNull() // no Required pill
+    fireEvent.click(head)
+    expect(row('Year-end Kickoff').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Description')).toBeTruthy()
+    expect(screen.queryByText('Kind of answer')).toBeNull() // no kinds to pick
     expect(actions.saveMktMinutes).not.toHaveBeenCalled()
   })
 
