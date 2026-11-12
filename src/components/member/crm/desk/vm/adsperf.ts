@@ -131,6 +131,14 @@ export function feeTier(spend: number): { tier: (typeof FEE_TIERS)[number]; toNe
   if (spend <= FEE_STEP) return { tier: FEE_TIERS[1], toNext: FEE_STEP - spend };
   return { tier: FEE_TIERS[2], toNext: null };
 }
+/** The fee's working in words, for the hover (the owner, 2026-11-12: "记得写出他的算法"). */
+export function feeWorking(spend: number): string {
+  const rm = (v: number) => `RM ${Math.round(v).toLocaleString("en-MY")}`;
+  if (spend <= 0) return "No spend, no fee";
+  if (spend < FEE_MIN_UNTIL) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}, under the minimum → ${rm(FEE_MIN)}`;
+  if (spend <= FEE_STEP) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}`;
+  return `25% × ${rm(FEE_STEP)} + 20% × ${rm(spend - FEE_STEP)} = ${rm(FEE_STEP * FEE_LOW)} + ${rm((spend - FEE_STEP) * FEE_HIGH)} = ${rm(marketingFee(spend) ?? 0)}`;
+}
 /**
  * The calendar months a range touches, each whole from its 1st to its last day — or to today for the month still running.
  * The fee is billed by the month (the owner, 2026-11-12: "Marketing fee 是以一个月去计算的"), so a week or a day shows
@@ -204,7 +212,24 @@ export function adsPerfVM(ctx: DeskCtx) {
   const ads = adsAll.filter(a => ui.apShowHidden || !data.adNames?.[a.id]?.hidden);
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
-  const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => { const crm = crmFigures(cs, ctx, a, b); return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
+  // The marketing fee is billed by the calendar month (the owner, 2026-11-12: "Marketing fee 是以一个月去计算的"): each month
+  // the range touches, on that whole month's spend up to today — every ad of the source picked, paused and hidden ones too
+  // (they were spent), whatever the Running / Paused filter shows.
+  const feeIds = adsAll.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
+  // The fee on a range's months as a share of their spend (RM 2,500 on RM 3,192 = 78%); null until every month is read.
+  const feeRate = (a: number, b: number): number | null => {
+    const ms = feeMonths(a, b, T).map(([x, y]) => metaFigures(metaOf(feeIds, x, y), {}).spend);
+    if (!ms.length || ms.some(s => s == null)) return null;
+    const spent = ms.reduce((n: number, s) => n + (s ?? 0), 0), fee = ms.reduce((n: number, s) => n + (marketingFee(s) ?? 0), 0);
+    return spent > 0 ? fee / spent : 0;
+  };
+  const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => {
+    const crm = crmFigures(cs, ctx, a, b);
+    // Per lead is the whole cost a lead (the owner, 2026-11-12: "per lead 的价钱是 total cost / leads"): the spend with its
+    // share of the month's marketing fee, ÷ leads — for the overview, every ad's row and the total; the month on screen
+    // gives exactly the Total cost figure divided by Leads.
+    if (k === "cpl") { const spend = metaFigures(metaOf(ids, a, b), crm).spend, rate = feeRate(a, b); return spend == null || rate == null || !crm.leads ? null : (spend * (1 + rate)) / crm.leads; }
+    return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
   const cell = (cs: CrmCustomer[], m: (typeof ALL)[number], isTotal: boolean, adId: string, ids: string[]) => {
     if (m[0] === "delivery") return { v: isTotal ? "" : status(adId) ?? "—", cv: "", d: "", dc: "", db: "" };
     const v = val(cs, ids, m[0], ra, rb);
@@ -265,12 +290,9 @@ export function adsPerfVM(ctx: DeskCtx) {
   })();
   // The ranges whose Meta figures the table needs (DeskScreens reads the missing ones; numeric ad ids only).
   const metaIds = AD.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
-  // The marketing fee is billed by the calendar month (the owner, 2026-11-12: "Marketing fee 是以一个月去计算的"): each month
-  // the range touches, on that whole month's spend up to today — every ad of the source picked, paused and hidden ones too
-  // (they were spent), whatever the Running / Paused filter shows.
-  const feeIds = adsAll.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
+  // …and the months the fee is read on: the range's, and the compare range's (its Per lead carries its own months' fee).
   const feeRanges = feeMonths(ra, rb, T);
-  const apNeed = [...(cmp ? [[ra, rb], [ca, cb]] : [[ra, rb]]).map(([a, b]) => ({ a, b, ids: metaIds })), ...feeRanges.map(([a, b]) => ({ a, b, ids: feeIds }))]
+  const apNeed = [...(cmp ? [[ra, rb], [ca, cb]] : [[ra, rb]]).map(([a, b]) => ({ a, b, ids: metaIds })), ...[...feeRanges, ...(cmp ? feeMonths(ca, cb, T) : [])].map(([a, b]) => ({ a, b, ids: feeIds }))]
     .filter((n, i, l) => l.findIndex(x => x.a === n.a && x.b === n.b && x.ids === n.ids) === i)
     .map(({ a, b, ids: want }) => ({ key: rkey(a, b), since: isoOf(a), until: isoOf(b), ids: want.filter(id => !(id in (ui.apMeta?.[rkey(a, b)] ?? {}))) })).filter(n => n.ids.length);
 
@@ -310,8 +332,24 @@ export function adsPerfVM(ctx: DeskCtx) {
   };
   // The figure strip over the table (D2a): the figures in equal centred columns, each with its line's colour; + adds one
   // (Customise metrics, the chart's list), hover × takes one off, Show chart opens the chart under it.
+  // Per lead's hover (the owner, 2026-11-12: "鼠标指向它是 spent / leads", "记得写出他的算法"): how the figure is made, in
+  // the period's own numbers, then the ads' spend alone ÷ leads.
+  const cplHint = (): { sub?: string[]; title?: string } => {
+    const crm = crmFigures(allCs, ctx, ra, rb), spent = metaFigures(metaOf(AD.map(x => x.id), ra, rb), crm).spend, rate = feeRate(ra, rb), n = crm.leads;
+    if (spent == null || rate == null || !n) return {};
+    const r2 = (v: number) => `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, share = spent * rate;
+    return {
+      sub: [`Spent ÷ leads: ${r2(spent / n)}`, "Ads only, without the marketing fee"],
+      title: [
+        "Per lead = (Spent + marketing fee) ÷ Leads",
+        `(${r2(spent)} + ${r2(share)}) ÷ ${n} = ${r2((spent + share) / n)}`,
+        `Marketing fee here = Spent × ${(rate * 100).toFixed(1)}% (the month's fee ÷ the month's spend)`,
+        `Spent ÷ Leads = ${r2(spent)} ÷ ${n} = ${r2(spent / n)}`,
+      ].join("\n"),
+    };
+  };
   const picked = slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
-    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null } : null)).filter((x): x is NonNullable<typeof x> => !!x);
+    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...(k === "cpl" ? cplHint() : {}) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
   // The Revenue Team's marketing fee and the whole cost (the owner, 2026-11-12: the spend alone is not the whole cost; "mkt
   // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
   // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after
@@ -327,7 +365,7 @@ export function adsPerfVM(ctx: DeskCtx) {
   const feeSub = !feeKnown ? [] : one ? [one.line, one.next] : [feeMon.map(m => `${monName(m.a)} T${tierOf(m).t.tier.n}`).join(" · "), "Each month billed alone"];
   const feeTitle = [
     ...FEE_TIERS.map(t => `Tier ${t.n}: ${t.rule}`), "",
-    ...(feeKnown ? feeMon.map(m => `${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`) : []),
+    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`, feeWorking(m.s ?? 0)]) : []),
   ].join("\n");
   const feeItems = [
     { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle },

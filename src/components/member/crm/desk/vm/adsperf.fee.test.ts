@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL, feeMonths, feeTier, marketingFee } from "./adsperf";
+import { ALL, feeMonths, feeTier, feeWorking, marketingFee } from "./adsperf";
 
 describe("the Revenue Team's marketing fee", () => {
   it("is the owner's three samples", () => {
@@ -26,6 +26,11 @@ describe("the Revenue Team's marketing fee", () => {
     expect(feeMonths(d(2026, 11, 9), d(2026, 11, 12), today)).toEqual([[d(2026, 11, 1), today]]);
     expect(feeMonths(d(2026, 10, 14), d(2026, 11, 12), today)).toEqual([[d(2026, 10, 1), d(2026, 10, 31)], [d(2026, 11, 1), today]]);
     expect(feeMonths(d(2025, 12, 20), d(2026, 1, 5), today)).toEqual([[d(2025, 12, 1), d(2025, 12, 31)], [d(2026, 1, 1), d(2026, 1, 31)]]);
+  });
+  it("writes its working out", () => {
+    expect(feeWorking(3_192)).toBe("25% × RM 3,192 = RM 798, under the minimum → RM 2,500");
+    expect(feeWorking(20_000)).toBe("25% × RM 20,000 = RM 5,000");
+    expect(feeWorking(50_000)).toBe("25% × RM 30,000 + 20% × RM 20,000 = RM 7,500 + RM 4,000 = RM 11,500");
   });
   it("is the overview's alone — never an ad's column", () => {
     const keys = ALL.map(m => m[0]);
