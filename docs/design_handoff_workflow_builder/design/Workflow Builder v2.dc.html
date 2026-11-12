@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:rgb(243 243 241);font-family:Inter,system-ui,sans-serif;font-size:13px;color:rgb(51 36 27)}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}@keyframes wbIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+
+
+<sc-if value="{{ pubOpen }}"><div onClick="{{ closePub }}" style="position:fixed;inset:0;z-index:500;background:rgb(40 30 22 / 0.32);display:flex;align-items:center;justify-content:center;padding:24px">
+  <div onClick="{{ stop }}" style="width:min(540px,100%);max-height:84vh;overflow-y:auto;background:#fff;border-radius:14px;box-shadow:0 24px 64px rgb(51 36 27 / 0.3);display:flex;flex-direction:column;animation:wbIn .16s ease-out">
+    <div style="padding:18px 20px 6px;display:flex;flex-direction:column;gap:4px"><span style="font-weight:600;font-size:1.15em">{{ pubTitle }}</span><span style="font-size:0.88em;color:rgb(117 100 86)">{{ pubSub }}</span></div>
+    <div style="padding:10px 20px 4px;display:flex;flex-direction:column">
+      <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);padding-bottom:6px">What changed</span>
+      <sc-if value="{{ pubNone }}"><span style="font-size:0.9em;color:rgb(117 100 86);padding:6px 0">Nothing changed since the last version.</span></sc-if>
+      <sc-for list="{{ pubChanges }}" as="c" hint-placeholder-count="3"><div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid rgb(244 241 236);font-size:0.9em"><span style="width:18px;text-align:center;color:{{ c.fg }};font-weight:600">{{ c.icon }}</span><span style="flex:1;min-width:0;text-wrap:pretty">{{ c.t }}</span></div></sc-for>
+    </div>
+    <div style="margin:12px 20px 0;padding:12px 14px;border-radius:10px;background:rgb(250 248 244);display:flex;flex-direction:column;gap:4px"><span style="font-weight:600;font-size:0.92em">Who is affected</span><span style="font-size:0.88em;color:rgb(74 64 58);text-wrap:pretty">{{ pubImpact }}</span></div>
+    <sc-if value="{{ pubHasWarn }}"><div style="margin:12px 20px 0;display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ pubWarn }}" as="w" hint-placeholder-count="1"><span style="height:26px;padding:0 10px;border-radius:999px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(110 74 8);display:flex;align-items:center;font-size:0.84em">⚠️ {{ w }}</span></sc-for></div></sc-if>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:16px 20px 18px">
+      <span onClick="{{ closePub }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-weight:600;cursor:pointer" style-hover="background:rgb(250 248 244)">Cancel</span>
+      <span onClick="{{ confirmPub }}" style="height:38px;padding:0 18px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;cursor:pointer" style-hover="background:#E0893F">Publish v{{ nextVer }}</span>
+    </div>
+  </div>
+</div></sc-if>
+
+
+
+<section style="padding:{{ secPad }};display:flex;flex-direction:column;gap:20px">
+  <sc-if value="{{ showAll }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+    <span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Turn 2 · Simpler flow map</span>
+    <span style="font-size:0.94em;color:rgb(74 64 58);text-wrap:pretty"><a href="#2a">2a</a> replaces the group lanes of <a href="#1a">1a</a> with one left-to-right row. Each stage card answers three things: who does it, who approves it, how long. Group is a small tag, so any number of groups fits. The time bar above the cards shows the length against the promise.</span>
+  </div></sc-if>
+  <div onClick="{{ closePick2 }}" style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+    <div id="2a" style="width:1320px;flex:none;display:flex;flex-direction:column;gap:10px">
+      <sc-if value="{{ showAll }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;padding:3px 9px;border-radius:6px;background:rgb(51 36 27);color:#fff">2a</span><span style="font-weight:600">Flow row</span><span style="color:rgb(117 100 86)">· who / approval / days on every card, no lanes</span></div></sc-if>
+      <div data-artboard="2a" onContextMenu="{{ ctxBlock }}" style="position:relative;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:760px">
+        <sc-if value="{{ ctxOn.b2a }}"><div onClick="{{ stop }}" style="position:absolute;left:{{ ctxX }}px;top:{{ ctxY }}px;z-index:60;width:210px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.18);padding:5px;display:flex;flex-direction:column;animation:wbIn .1s ease-out">
+          <span style="font-size:0.76em;color:rgb(117 100 86);padding:5px 9px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ctxTitle }}</span>
+          <sc-for list="{{ ctxItems }}" as="m" hint-placeholder-count="4"><div onClick="{{ m.onClick }}" style="height:32px;padding:0 9px;border-radius:7px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:0.9em;color:{{ m.fg }};opacity:{{ m.op }};border-top:{{ m.sep }}" style-hover="background:rgb(246 244 240)"><span style="width:16px;text-align:center;font-size:12px">{{ m.icon }}</span>{{ m.label }}</div></sc-for>
+        </div></sc-if>
+        <div style="display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid rgb(236 231 224);flex-wrap:wrap">
+          <span style="font-size:18px">🧩</span>
+          <span style="font-size:1.3em;font-weight:600;white-space:nowrap">Workflow Builder</span>
+          <div style="position:relative">
+            <div onClick="{{ togglePick2 }}" style="height:34px;padding:0 10px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:8px;cursor:pointer;margin-left:8px" style-hover="background:rgb(250 248 244)">
+              <span>{{ emoji }}</span><span style="font-weight:600;white-space:nowrap">{{ actName }}</span><span style="color:rgb(160 150 140)">/</span><span style="white-space:nowrap">{{ tName }}</span><span style="font-size:9px;color:rgb(117 100 86)">▼</span>
+            </div>
+            <sc-if value="{{ pickOpen2 }}"><div onClick="{{ stop }}" style="position:absolute;top:calc(100% + 6px);left:8px;z-index:40;width:300px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:8px;max-height:460px;overflow-y:auto;animation:wbIn .12s ease-out">
+              <sc-for list="{{ actions }}" as="a" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:2px;padding-bottom:6px">
+                  <div onContextMenu="{{ a.onCtx }}" style="display:flex;align-items:center;gap:8px;padding:6px 8px 2px"><span style="font-size:14px">{{ a.emoji }}</span><sc-if value="{{ a.editing.b2a }}"><input autoFocus="{{ true }}" value="{{ editDraft }}" onClick="{{ stop }}" onChange="{{ onEditDraft }}" onKeyDown="{{ onEditKey }}" onBlur="{{ onEditBlur }}" style="flex:1;min-width:0;height:26px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:6px;padding:0 7px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if><sc-if value="{{ a.notEditing.b2a }}"><span onDoubleClick="{{ a.onRename }}" style="flex:1;font-weight:600;font-size:0.94em">{{ a.name }}</span></sc-if><span onClick="{{ a.addTpl }}" style="font-size:0.84em;color:rgb(117 100 86);cursor:pointer" style-hover="color:rgb(51 36 27)">+ Template</span></div>
+                  <sc-for list="{{ a.tpls }}" as="t"><div onClick="{{ t.onClick }}" onContextMenu="{{ t.onCtx }}" onMouseEnter="{{ t.onEnter }}" onMouseLeave="{{ t.onLeave }}" style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px;cursor:pointer;background:{{ t.bg }}" style-hover="background:rgb(241 236 228)"><sc-if value="{{ t.editing.b2a }}"><input autoFocus="{{ true }}" value="{{ editDraft }}" onClick="{{ stop }}" onChange="{{ onEditDraft }}" onKeyDown="{{ onEditKey }}" onBlur="{{ onEditBlur }}" style="flex:1;min-width:0;height:26px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:6px;padding:0 7px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if><sc-if value="{{ t.notEditing.b2a }}"><span onDoubleClick="{{ t.onRename }}" style="flex:1;font-size:0.9em;font-weight:{{ t.weight }}">{{ t.name }}</span></sc-if><div style="display:flex;gap:2px;flex:none;opacity:{{ t.iconOp }};transition:opacity .12s"><span onClick="{{ t.onClone }}" title="Clone" style="width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:rgb(74 64 58)" style-hover="background:#fff">⧉</span><span onClick="{{ t.onDel }}" title="{{ t.delTitle }}" style="height:24px;min-width:24px;padding:0 {{ t.delPad }}px;box-sizing:border-box;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;color:{{ t.delFg }};background:{{ t.delBg }}" style-hover="filter:brightness(.96)">{{ t.delLabel }}</span></div></div></sc-for>
+                </div>
+              </sc-for>
+              <div style="border-top:1px solid rgb(244 241 236);margin-top:2px;padding:6px 4px 2px">
+                <sc-if value="{{ addingOn.b2a }}"><input autoFocus="{{ true }}" value="{{ actDraft }}" onChange="{{ onActDraft }}" onKeyDown="{{ onActKey }}" onBlur="{{ onActBlur }}" placeholder="Category name, Enter" style="width:100%;height:30px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:7px;padding:0 9px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if>
+                <sc-if value="{{ notAddingOn.b2a }}"><div onClick="{{ startAct }}" style="height:30px;padding:0 8px;border-radius:7px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;font-weight:500" style-hover="background:rgb(246 244 240)">+ New category</div></sc-if>
+                <span style="display:block;padding:6px 8px 2px;font-size:0.76em;color:rgb(117 100 86)">Double-click a name to rename · right-click for more</span>
+              </div>
+            </div></sc-if>
+          </div>
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid rgb(229 222 211);white-space:nowrap">Draft v{{ nextVer }}</span>
+          <span style="font-size:0.78em;color:{{ saveFg }};white-space:nowrap">{{ saveLabel }}</span>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px;margin-left:8px">
+            <sc-for list="{{ mainTabs }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="height:30px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em;white-space:nowrap">{{ o.label }}</div></sc-for>
+          </div>
+          <span style="flex:1"></span>
+          <div style="display:flex;align-items:center;gap:8px;flex:none"><span style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap">Assignment</span>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+            <sc-for list="{{ lockSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" title="{{ o.hint }}" style="height:30px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.88em;white-space:nowrap">{{ o.label }}</div></sc-for>
+          </div></div>
+        </div>
+
+        
+        <sc-if value="{{ isPreviewTab }}"><div style="background:rgb(243 243 241);border-top:1px solid rgb(236 231 224)"><div style="display:flex;align-items:center;gap:10px;padding:12px 24px 0"><span style="font-size:0.86em;color:rgb(117 100 86)">A sample task on this draft. Switch people at the bottom to see each view, including the PIC link.</span></div><dc-import name="Task Flow" workflow="{{ pvWf }}" hint-size="100%,1000px"></dc-import></div></sc-if>
+        <sc-if value="{{ isCanvasTab }}"><dc-import name="Canvas Template Editor" initial="{{ canvasInit }}" on-change="{{ onCanvas }}" key="{{ tplKey }}" tpl-name="{{ cvName }}" tpl-ver="{{ nextVer }}" sample="{{ isReels }}" stage-names="{{ names }}" hint-size="100%,1300px"></dc-import></sc-if>
+        <sc-if value="{{ isStagesTab }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;flex:1">
+          <div style="padding:22px 24px 28px;min-width:0;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="font-size:1.05em;white-space:nowrap"><strong style="font-weight:600">{{ total }}</strong> working days</span>
+                <span style="display:flex;align-items:center;gap:6px;color:rgb(117 100 86)">Promise <div title="Product promise · working days promised to the client" style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:7px;height:26px;background:#fff"><span onClick="{{ promiseDown }}" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">−</span><span style="min-width:22px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;color:{{ promiseLine }}">{{ promise }}</span><span onClick="{{ promiseUp }}" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">+</span></div> days</span>
+                <span onClick="{{ selOverdue }}" title="What happens when a stage is late" style="height:26px;padding:0 10px;border-radius:999px;border:1px solid {{ odLine }};background:{{ odBg }};display:flex;align-items:center;gap:6px;font-size:0.84em;white-space:nowrap;cursor:pointer" style-hover="border-color:rgb(150 136 120)">{{ odSummary }}</span>
+                <span style="flex:1"></span>
+                <sc-for list="{{ warnings }}" as="w" hint-placeholder-count="0"><span onClick="{{ w.onClick }}" style="height:26px;padding:0 10px;border-radius:999px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(110 74 8);display:flex;align-items:center;gap:6px;font-size:0.84em;white-space:nowrap;cursor:{{ w.cursor }}">⚠️ {{ w.t }}<sc-if value="{{ w.canFix }}"><span style="text-decoration:underline;text-underline-offset:2px">Fix</span></sc-if></span></sc-for>
+              </div>
+              <div style="position:relative;display:flex;height:10px">
+                <sc-for list="{{ bar }}" as="b" hint-placeholder-count="6"><div onClick="{{ b.onClick }}" title="{{ b.title }}" style="width:{{ b.w }}%;box-sizing:border-box;margin-right:2px;border-radius:5px;background:{{ b.tone }};cursor:pointer;transition:width .25s"></div></sc-for>
+                <span style="position:absolute;top:-5px;bottom:-5px;left:{{ promiseLeft }}%;border-left:2px dashed {{ promiseLine }}"></span>
+              </div>
+            </div>
+            <sc-if value="{{ locked }}"><div style="padding:8px 12px;border-radius:8px;background:rgb(246 244 240);font-size:0.86em;color:rgb(74 64 58)">🔒 {{ lockNote }}</div></sc-if>
+            <div style="display:flex;align-items:stretch;flex-wrap:wrap;row-gap:12px;padding:2px 2px 8px">
+              <sc-for list="{{ flow }}" as="f" hint-placeholder-count="6">
+                <div style="display:flex;align-items:stretch;flex:1 1 0;min-width:118px;max-width:{{ cardMax }}">
+                  <div onClick="{{ f.onClick }}" onContextMenu="{{ f.onCtx }}" style="flex:1;min-width:0;border:1.5px solid {{ f.border }};border-radius:12px;box-shadow:{{ f.shadow }};cursor:pointer;display:flex;flex-direction:column;background:#fff;transition:border-color .15s, box-shadow .15s" style-hover="border-color:rgb(150 136 120)">
+                    <div style="display:flex;align-items:center;gap:6px;padding:11px 10px 9px"><span style="width:20px;height:20px;flex:none;border-radius:50%;background:{{ f.numBg }};color:{{ f.numFg }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ f.n }}</span><span style="font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span></div>
+                    <div onClick="{{ f.onWho }}" style="margin:0 6px;padding:8px;border-radius:9px;background:{{ f.whoBg }};display:flex;flex-direction:column;gap:7px;min-height:72px;box-sizing:border-box" style-hover="filter:brightness(.98)">
+                      <span style="font-size:0.7em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Done by</span>
+                      <sc-if value="{{ f.isAssign }}"><div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:24px;height:24px;flex:none;border-radius:50%;background:rgb(51 36 27);color:#fff;font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">MM</span><div style="display:flex;flex-direction:column;min-width:0"><span style="font-size:0.88em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MM assigns</span><span style="font-size:0.76em;color:rgb(117 100 86);white-space:nowrap">per project</span></div></div></sc-if>
+                      <sc-if value="{{ f.prevFull }}"><div style="display:flex;align-items:center;gap:8px;min-width:0"><div style="display:flex;padding-left:6px;flex:none"><sc-for list="{{ f.cands }}" as="c" hint-placeholder-count="2"><span title="{{ c.name }}" style="width:26px;height:26px;margin-left:-6px;box-sizing:border-box;border:2px solid {{ f.whoBg }};border-radius:50%;background:{{ c.av }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ c.init }}</span></sc-for></div><div style="display:flex;flex-direction:column;min-width:0"><span style="font-size:0.88em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.candNames }}</span><span style="font-size:0.76em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.pickedBy }}</span></div></div></sc-if>
+                      <sc-if value="{{ f.prevEmpty }}"><div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:0.88em;font-weight:600;color:rgb(176 40 34);white-space:nowrap">No shortlist</span><span style="font-size:0.76em;color:rgb(176 40 34);white-space:nowrap">Add people →</span></div></sc-if>
+                    </div>
+                    <div onClick="{{ f.onAppr }}" style="padding:9px 12px;display:flex;flex-direction:column;gap:3px"><span style="font-size:0.7em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Approved by</span><span style="font-size:0.86em;font-weight:500;color:{{ f.apprFg }};text-wrap:pretty">{{ f.apprText }}</span></div>
+                    <div style="margin-top:auto;display:flex;align-items:center;gap:6px;padding:9px 12px;border-top:1px solid rgb(244 241 236)"><span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ f.dot }}"></span><span style="font-size:0.78em;color:rgb(117 100 86);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.dept }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;font-weight:500">{{ f.sla }}</span></div>
+                  </div>
+                  <div style="width:12px;flex:none;display:flex;align-items:center"><span style="height:1.5px;width:100%;background:rgb(214 206 196)"></span></div>
+                </div>
+              </sc-for>
+              
+              <div onClick="{{ selEnd }}" style="width:76px;flex:none;border:1.5px solid {{ endLine }};border-radius:12px;background:{{ endCardBg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-align:center;padding:10px" style-hover="border-color:rgb(60 150 90)">
+                <span style="font-size:20px">🏁</span><span style="font-weight:600;color:rgb(40 110 64)">Done</span><span style="font-size:0.78em;color:rgb(74 64 58)">{{ endSummary }}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:0.84em;color:rgb(117 100 86)">Right-click a card to add a stage before or after it, duplicate or delete it. Click a card to edit it. Click “Done by” or “Approved by” to jump straight to that setting.</span>
+            </div>
+          </div>
+          <div style="border-left:1px solid rgb(236 231 224)">
+            <sc-if value="{{ isOverdue }}"><div style="display:flex;flex-direction:column;gap:18px;padding:16px 18px 24px">
+              <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:rgb(252 236 233);font-size:13px;display:flex;align-items:center;justify-content:center">⏰</span><span style="font-weight:600;font-size:1.08em">When a stage is late</span><span style="flex:1"></span><span style="font-size:0.8em;color:rgb(117 100 86)">All stages</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Late by</span><div style="display:flex;align-items:center;gap:10px"><div style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:8px;height:34px"><span onClick="{{ odDown }}" style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(246 244 240)">−</span><span style="min-width:30px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px">{{ odDays }}</span><span onClick="{{ odUp }}" style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(246 244 240)">+</span></div><span style="font-size:0.88em;color:rgb(117 100 86)">working day(s) past the stage’s due date</span></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Notify</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ odNotify }}" as="o" hint-placeholder-count="4"><span onClick="{{ o.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;font-size:0.86em;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.tick }}{{ o.label }}</span></sc-for></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Then</span><sc-for list="{{ odActions }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="display:flex;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid {{ o.border }};background:{{ o.bg }};cursor:pointer"><span style="width:16px;height:16px;flex:none;margin-top:1px;border-radius:50%;box-sizing:border-box;border:{{ o.radio }};background:#fff"></span><div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:0.9em">{{ o.title }}</span><span style="font-size:0.82em;color:rgb(74 64 58)">{{ o.text }}</span></div></div></sc-for></div>
+              <div onClick="{{ odToggleRepeat }}" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer"><div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:0.92em;font-weight:600">Repeat daily</span><span style="font-size:0.82em;color:rgb(117 100 86)">Remind again every day until the stage moves on</span></div><div style="width:36px;height:20px;flex:none;border-radius:10px;background:{{ odTrack }};position:relative;transition:background-color .2s"><span style="position:absolute;top:2px;left:{{ odKnob }}px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></div></div>
+            </div></sc-if>
+            <sc-if value="{{ isEnd }}"><div style="display:flex;flex-direction:column;gap:18px;padding:16px 18px 24px">
+              <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:rgb(232 244 235);font-size:13px;display:flex;align-items:center;justify-content:center">🏁</span><span style="font-weight:600;font-size:1.08em">Task done</span><span style="flex:1"></span><span style="font-size:0.8em;color:rgb(117 100 86)">End of every {{ actName }} task</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Done when</span><div style="padding:10px 12px;border-radius:10px;background:rgb(250 248 244);font-size:0.88em;color:rgb(74 64 58);text-wrap:pretty">{{ endWhen }}</div><span style="font-size:0.8em;color:rgb(117 100 86)">Change it on the last stage’s Approval.</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Notify</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ endNotify }}" as="o" hint-placeholder-count="4"><span onClick="{{ o.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.86em;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.tick }}{{ o.label }}</span></sc-for></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center"><span style="font-size:0.92em;font-weight:600;flex:1">Celebration</span><a href="{{ previewHref }}" target="_blank" style="font-size:0.84em;font-weight:500">▶ Preview run</a></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ celebOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="height:44px;padding:0 10px;border-radius:9px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.88em;border:1.5px solid {{ o.line }};background:{{ o.bg }};font-weight:{{ o.weight }}"><span style="font-size:18px">{{ o.icon }}</span>{{ o.label }}</div></sc-for></div></div>
+              <label style="margin-top:-12px;min-height:44px;box-sizing:border-box;padding:6px 10px;border-radius:9px;border:1.5px dashed {{ uploadLine }};background:{{ uploadBg }};display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.88em" style-hover="border-color:rgb(150 136 120)">
+                <input type="file" accept="image/gif,image/webp,image/apng,image/png" onChange="{{ onCelebUpload }}" style="display:none">
+                <sc-if value="{{ hasCustom }}"><div style="width:40px;height:40px;border-radius:6px;flex:none;background-size:cover;background-position:center;background-image:{{ customBg }}"></div></sc-if>
+                <sc-if value="{{ noCustom }}"><span style="width:32px;height:32px;border-radius:6px;background:rgb(246 244 240);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">⬆</span></sc-if>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-weight:{{ uploadWeight }}">{{ uploadTitle }}</span><span style="font-size:0.84em;color:rgb(117 100 86)">{{ uploadSub }}</span></div>
+              </label>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">PIC sees on the link</span><input value="{{ endPic }}" onChange="{{ onEndPic }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;outline:none;color:rgb(51 36 27)" style-focus="border-color:rgb(150 136 120)"></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">After it’s done</span><div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ endAfter }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="display:flex;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid {{ o.border }};background:{{ o.bg }};cursor:pointer"><span style="width:16px;height:16px;flex:none;margin-top:1px;border-radius:50%;box-sizing:border-box;border:{{ o.radio }};background:#fff"></span><div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:0.9em">{{ o.title }}</span><span style="font-size:0.82em;color:rgb(74 64 58)">{{ o.text }}</span></div></div></sc-for></div></div>
+            </div></sc-if>
+            <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}"><dc-import name="Stage Settings" layout="accordion" stage="{{ selStage }}" at="{{ sel }}" names="{{ names }}" locked="{{ locked }}" section="{{ section }}" start-day="{{ selStart }}" on-section="{{ onSection }}" on-patch="{{ onPatch }}" on-remove="{{ removeStage }}" on-move="{{ onMove }}" on-open-canvas="{{ openCanvas }}" groups="{{ groups }}" on-add-group="{{ addGroup }}" hint-size="100%,640px"></dc-import></sc-if>
+          </div>
+        </div></sc-if>
+        <div style="display:flex;align-items:center;gap:10px 12px;padding:12px 24px;border-top:1px solid rgb(236 231 224);background:rgb(255 255 255 / 0.97);flex-wrap:wrap">
+          
+          <span style="flex:1"></span>
+          <span style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap">{{ activeNote }}</span>
+          <div onClick="{{ previewTask }}" title="See the task page staff and PIC will get" style="height:38px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:6px;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:rgb(250 248 244)">▶ Preview task page</div>
+          <div onClick="{{ save }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap;opacity:{{ saveOp }}" style-hover="background:rgb(250 248 244)">Save draft</div>
+          <div onClick="{{ publish }}" style="height:38px;padding:0 18px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:#E0893F">Publish v{{ nextVer }}</div>
+        </div>
+        <sc-if value="{{ hasToast }}"><div style="position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:wbIn .2s ease-out;white-space:nowrap;display:flex;align-items:center;gap:14px">{{ toast }}<sc-if value="{{ hasUndo }}"><span onClick="{{ undo }}" style="font-weight:600;color:#EC9B55;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Undo</span></sc-if></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<sc-if value="{{ showAll }}" hint-placeholder-val="{{ true }}">
+<section style="padding:48px 48px 24px;display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+    <span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Turn 1 · Workflow Builder redesign</span>
+    <span style="font-size:1.6em;font-weight:600;letter-spacing:-0.01em">Two directions for the stages page</span>
+    <span style="font-size:0.94em;color:rgb(74 64 58);text-wrap:pretty"><a href="#1a">1a</a> lays the stages out as lanes on a day ruler, with a tabbed settings panel. <a href="#1b">1b</a> keeps the list, adds an overview bar and puts settings in collapsible sections. Both use the same stage settings: plain-language “who does it” cards, an approval chain, and one workflow-level assignment switch. Click stages, change settings, toggle the assignment rule.</span>
+  </div>
+  <div onClick="{{ closePick }}" style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+
+    <div id="1a" style="width:1320px;flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;padding:3px 9px;border-radius:6px;background:rgb(51 36 27);color:#fff">1a</span><span style="font-weight:600">Flow map</span><span style="color:rgb(117 100 86)">· lanes by group, width = working days, promise line on the ruler</span></div>
+      <div data-artboard="1a" onContextMenu="{{ ctxBlock }}" style="position:relative;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:840px">
+        <sc-if value="{{ ctxOn.b1a }}"><div onClick="{{ stop }}" style="position:absolute;left:{{ ctxX }}px;top:{{ ctxY }}px;z-index:60;width:210px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.18);padding:5px;display:flex;flex-direction:column;animation:wbIn .1s ease-out">
+          <span style="font-size:0.76em;color:rgb(117 100 86);padding:5px 9px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ctxTitle }}</span>
+          <sc-for list="{{ ctxItems }}" as="m" hint-placeholder-count="4"><div onClick="{{ m.onClick }}" style="height:32px;padding:0 9px;border-radius:7px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:0.9em;color:{{ m.fg }};opacity:{{ m.op }};border-top:{{ m.sep }}" style-hover="background:rgb(246 244 240)"><span style="width:16px;text-align:center;font-size:12px">{{ m.icon }}</span>{{ m.label }}</div></sc-for>
+        </div></sc-if>
+        <div style="display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid rgb(236 231 224);flex-wrap:wrap">
+          <span style="font-size:18px">🧩</span>
+          <span style="font-size:1.3em;font-weight:600;white-space:nowrap">Workflow Builder</span>
+          <div style="position:relative">
+            <div onClick="{{ togglePick }}" style="height:34px;padding:0 10px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:8px;cursor:pointer;margin-left:8px" style-hover="background:rgb(250 248 244)">
+              <span>{{ emoji }}</span><span style="font-weight:600;white-space:nowrap">{{ actName }}</span><span style="color:rgb(160 150 140)">/</span><span style="white-space:nowrap">{{ tName }}</span><span style="font-size:9px;color:rgb(117 100 86)">▼</span>
+            </div>
+            <sc-if value="{{ pickOpen }}"><div onClick="{{ stop }}" style="position:absolute;top:calc(100% + 6px);left:8px;z-index:40;width:300px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:8px;max-height:460px;overflow-y:auto;animation:wbIn .12s ease-out">
+              <sc-for list="{{ actions }}" as="a" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:2px;padding-bottom:6px">
+                  <div onContextMenu="{{ a.onCtx }}" style="display:flex;align-items:center;gap:8px;padding:6px 8px 2px"><span style="font-size:14px">{{ a.emoji }}</span><sc-if value="{{ a.editing.b1a }}"><input autoFocus="{{ true }}" value="{{ editDraft }}" onClick="{{ stop }}" onChange="{{ onEditDraft }}" onKeyDown="{{ onEditKey }}" onBlur="{{ onEditBlur }}" style="flex:1;min-width:0;height:26px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:6px;padding:0 7px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if><sc-if value="{{ a.notEditing.b1a }}"><span onDoubleClick="{{ a.onRename }}" style="flex:1;font-weight:600;font-size:0.94em">{{ a.name }}</span></sc-if><span onClick="{{ a.addTpl }}" style="font-size:0.84em;color:rgb(117 100 86);cursor:pointer" style-hover="color:rgb(51 36 27)">+ Template</span></div>
+                  <sc-for list="{{ a.tpls }}" as="t"><div onClick="{{ t.onClick }}" onContextMenu="{{ t.onCtx }}" onMouseEnter="{{ t.onEnter }}" onMouseLeave="{{ t.onLeave }}" style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px;cursor:pointer;background:{{ t.bg }}" style-hover="background:rgb(241 236 228)"><sc-if value="{{ t.editing.b1a }}"><input autoFocus="{{ true }}" value="{{ editDraft }}" onClick="{{ stop }}" onChange="{{ onEditDraft }}" onKeyDown="{{ onEditKey }}" onBlur="{{ onEditBlur }}" style="flex:1;min-width:0;height:26px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:6px;padding:0 7px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if><sc-if value="{{ t.notEditing.b1a }}"><span onDoubleClick="{{ t.onRename }}" style="flex:1;font-size:0.9em;font-weight:{{ t.weight }}">{{ t.name }}</span></sc-if><div style="display:flex;gap:2px;flex:none;opacity:{{ t.iconOp }};transition:opacity .12s"><span onClick="{{ t.onClone }}" title="Clone" style="width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:rgb(74 64 58)" style-hover="background:#fff">⧉</span><span onClick="{{ t.onDel }}" title="{{ t.delTitle }}" style="height:24px;min-width:24px;padding:0 {{ t.delPad }}px;box-sizing:border-box;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;color:{{ t.delFg }};background:{{ t.delBg }}" style-hover="filter:brightness(.96)">{{ t.delLabel }}</span></div></div></sc-for>
+                </div>
+              </sc-for>
+              <div style="border-top:1px solid rgb(244 241 236);margin-top:2px;padding:6px 4px 2px">
+                <sc-if value="{{ addingOn.b1a }}"><input autoFocus="{{ true }}" value="{{ actDraft }}" onChange="{{ onActDraft }}" onKeyDown="{{ onActKey }}" onBlur="{{ onActBlur }}" placeholder="Category name, Enter" style="width:100%;height:30px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:7px;padding:0 9px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if>
+                <sc-if value="{{ notAddingOn.b1a }}"><div onClick="{{ startAct }}" style="height:30px;padding:0 8px;border-radius:7px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;font-weight:500" style-hover="background:rgb(246 244 240)">+ New category</div></sc-if>
+                <span style="display:block;padding:6px 8px 2px;font-size:0.76em;color:rgb(117 100 86)">Double-click a name to rename · right-click for more</span>
+              </div>
+            </div></sc-if>
+          </div>
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid rgb(229 222 211);white-space:nowrap">Draft v{{ nextVer }}</span>
+          <span style="font-size:0.78em;color:{{ saveFg }};white-space:nowrap">{{ saveLabel }}</span>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px;margin-left:8px">
+            <sc-for list="{{ mainTabs }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="height:30px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em;white-space:nowrap">{{ o.label }}</div></sc-for>
+          </div>
+          <span style="flex:1"></span>
+          <div style="display:flex;align-items:center;gap:8px;flex:none"><span style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap">Assignment</span>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+            <sc-for list="{{ lockSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" title="{{ o.hint }}" style="height:30px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.88em;white-space:nowrap">{{ o.label }}</div></sc-for>
+          </div></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:18px;padding:12px 24px;border-bottom:1px solid rgb(236 231 224);background:rgb(252 251 249);flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="color:rgb(117 100 86)">Total</span><strong style="font-weight:600">{{ total }} working days</strong>
+            <div style="width:180px;height:8px;border-radius:4px;background:rgb(236 231 224);position:relative;overflow:hidden"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ totalPct }}%;background:{{ totalFill }};border-radius:4px;transition:width .4s"></div></div>
+            <span style="color:rgb(117 100 86)">of</span><div title="Product promise · working days promised to the client" style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:7px;height:26px;background:#fff"><span onClick="{{ promiseDown }}" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">−</span><span style="min-width:22px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;color:{{ promiseLine }}">{{ promise }}</span><span onClick="{{ promiseUp }}" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">+</span></div><span style="color:rgb(117 100 86)">-day promise</span>
+          </div>
+          <span style="width:1px;height:16px;background:rgb(229 222 211)"></span>
+          <span><span style="color:rgb(117 100 86)">PIC approves</span> <strong style="font-weight:600">{{ picTimes }}×</strong></span>
+          <span style="width:1px;height:16px;background:rgb(229 222 211)"></span>
+          <span><span style="color:rgb(117 100 86)">Handoffs</span> <strong style="font-weight:600">{{ handoffs }}</strong></span>
+          <span style="flex:1"></span>
+          <sc-for list="{{ warnings }}" as="w" hint-placeholder-count="0"><span onClick="{{ w.onClick }}" style="height:26px;padding:0 10px;border-radius:999px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(110 74 8);display:flex;align-items:center;gap:6px;font-size:0.84em;white-space:nowrap;cursor:{{ w.cursor }}">⚠️ {{ w.t }}<sc-if value="{{ w.canFix }}"><span style="text-decoration:underline;text-underline-offset:2px">Fix</span></sc-if></span></sc-for>
+          <sc-if value="{{ noWarnings }}"><span style="font-size:0.86em;color:rgb(40 110 64)">No warnings</span></sc-if>
+        </div>
+
+        <sc-if value="{{ isCanvasTab }}"><dc-import name="Canvas Template Editor" initial="{{ canvasInit }}" on-change="{{ onCanvas }}" key="{{ tplKey }}" tpl-name="{{ cvName }}" tpl-ver="{{ nextVer }}" sample="{{ isReels }}" stage-names="{{ names }}" hint-size="100%,1300px"></dc-import></sc-if>
+        <sc-if value="{{ isStagesTab }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;flex:1">
+          <div style="padding:20px 24px 28px;min-width:0;display:flex;flex-direction:column;gap:14px">
+            <sc-if value="{{ locked }}"><div style="padding:8px 12px;border-radius:8px;background:rgb(246 244 240);font-size:0.86em;color:rgb(74 64 58)">🔒 {{ lockNote }}</div></sc-if>
+            <div style="position:relative;border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+              <div style="display:grid;grid-template-columns:132px minmax(0,1fr);height:30px;border-bottom:1px solid rgb(236 231 224);background:rgb(252 251 249)">
+                <span style="padding:0 12px;display:flex;align-items:center;font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Group</span>
+                <div style="position:relative;margin-right:16px">
+                  <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="10"><span style="position:absolute;top:9px;left:{{ t.left }}%;transform:translateX(-50%);font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ t.label }}</span></sc-for>
+                </div>
+              </div>
+              <sc-for list="{{ lanes }}" as="l" hint-placeholder-count="2">
+                <div style="display:grid;grid-template-columns:132px minmax(0,1fr);height:92px;border-bottom:1px solid rgb(240 236 230)">
+                  <div style="padding:0 12px;display:flex;align-items:center;border-right:1px solid rgb(240 236 230)"><span style="font-size:0.8em;padding:3px 8px;border-radius:5px;background:{{ l.bg }};color:{{ l.fg }};font-weight:500">{{ l.label }}</span></div>
+                  <div style="position:relative;margin-right:16px">
+                    <sc-for list="{{ l.blocks }}" as="b" hint-placeholder-count="2">
+                      <div onClick="{{ b.onClick }}" style="position:absolute;top:10px;height:72px;left:{{ b.left }}%;width:calc({{ b.width }}% - 4px);margin-left:2px;box-sizing:border-box;padding:7px 9px;border-radius:10px;background:{{ b.bg }};border:1.5px solid {{ b.border }};box-shadow:{{ b.shadow }};cursor:pointer;display:flex;flex-direction:column;gap:3px;overflow:hidden;transition:left .25s, width .25s, border-color .15s;z-index:1" style-hover="border-color:rgb(150 136 120)">
+                        <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:18px;height:18px;flex:none;border-radius:50%;background:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ b.n }}</span><span style="font-weight:600;font-size:0.92em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.name }}</span></div>
+                        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(74 64 58);white-space:nowrap">{{ b.sla }}</span>
+                        <div style="display:flex;align-items:center;gap:3px;min-width:0;overflow:hidden">
+                          <sc-for list="{{ b.gates }}" as="g" hint-placeholder-count="1"><span title="{{ g.title }}" style="height:18px;min-width:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#fff;border:1px solid rgb(229 222 211);font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;white-space:nowrap">{{ g.t }}</span></sc-for>
+                          <sc-if value="{{ b.hasBack }}"><span title="Changes go back to stage {{ b.back }}" style="font-size:9.5px;color:rgb(176 40 34);white-space:nowrap">↩{{ b.back }}</span></sc-if>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="display:grid;grid-template-columns:132px minmax(0,1fr);height:44px;background:rgb(252 251 249)">
+                <span style="padding:0 12px;display:flex;align-items:center;font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);border-right:1px solid rgb(240 236 230)">Assigned by</span>
+                <div style="position:relative;margin-right:16px">
+                  <sc-for list="{{ assignChips }}" as="c" hint-placeholder-count="4"><span onClick="{{ c.onClick }}" title="{{ c.title }}" style="position:absolute;top:11px;left:calc({{ c.left }}% + 2px);height:22px;max-width:calc({{ c.width }}% - 6px);padding:0 7px;box-sizing:border-box;border-radius:999px;display:flex;align-items:center;gap:4px;font-size:10.5px;white-space:nowrap;overflow:hidden;cursor:pointer;background:{{ c.bg }};border:1px solid {{ c.border }};color:{{ c.fg }};z-index:1">{{ c.t }}</span></sc-for>
+                </div>
+              </div>
+              <div style="position:absolute;top:0;bottom:0;left:132px;right:16px;pointer-events:none">
+                <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="10"><span style="position:absolute;top:30px;bottom:0;left:{{ t.left }}%;width:1px;background:rgb(244 241 236)"></span></sc-for>
+                <span style="position:absolute;top:0;bottom:0;left:{{ promiseLeft }}%;border-left:1.5px dashed {{ promiseLine }};z-index:2"></span>
+                <span style="position:absolute;top:30px;bottom:0;left:{{ endLeft }}%;border-left:2px solid rgb(60 150 90);z-index:2"></span>
+                <span onClick="{{ selEnd }}" title="Task done · end settings" style="pointer-events:auto;position:absolute;bottom:10px;left:{{ endLeft }}%;transform:translateX(-50%);height:24px;padding:0 9px;border-radius:999px;background:{{ endChipBg }};border:1.5px solid rgb(60 150 90);color:{{ endChipFg }};font-size:10.5px;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer;z-index:4">🏁 Done</span>
+                <span style="position:absolute;top:6px;left:{{ promiseLeft }}%;transform:translateX(-50%);font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;background:{{ promiseLine }};color:#fff;white-space:nowrap;z-index:3">Promise {{ promise }}d</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px;font-size:0.82em;color:rgb(117 100 86);flex-wrap:wrap">
+              <span><strong style="font-weight:600;color:rgb(51 36 27)">R</strong> / <strong style="font-weight:600;color:rgb(51 36 27)">🔗</strong> approval gates in order</span>
+              <span><span style="color:rgb(176 40 34)">↩3</span> changes go back to stage 3</span>
+              <span>👤 MM assigns · 🔓 previous stage hands off</span>
+              <span style="flex:1"></span>
+              <span onClick="{{ selEnd }}" style="height:32px;padding:0 14px;border-radius:8px;border:1.5px solid {{ endLine }};background:{{ endCardBg }};display:flex;align-items:center;gap:6px;cursor:pointer;font-size:1.08em;color:rgb(40 110 64);font-weight:500">🏁 End settings</span>
+              <span onClick="{{ addStage }}" style="height:32px;padding:0 14px;border-radius:8px;border:1.5px dashed rgb(214 204 190);display:flex;align-items:center;color:rgb(117 100 86);cursor:pointer;font-size:1.08em" style-hover="background:rgb(250 248 244);color:rgb(51 36 27)">+ Add stage</span>
+            </div>
+          </div>
+          <div style="border-left:1px solid rgb(236 231 224)">
+            <sc-if value="{{ isEnd }}"><div style="display:flex;flex-direction:column;gap:18px;padding:16px 18px 24px">
+              <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:rgb(232 244 235);font-size:13px;display:flex;align-items:center;justify-content:center">🏁</span><span style="font-weight:600;font-size:1.08em">Task done</span><span style="flex:1"></span><span style="font-size:0.8em;color:rgb(117 100 86)">End of every {{ actName }} task</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Done when</span><div style="padding:10px 12px;border-radius:10px;background:rgb(250 248 244);font-size:0.88em;color:rgb(74 64 58);text-wrap:pretty">{{ endWhen }}</div><span style="font-size:0.8em;color:rgb(117 100 86)">Change it on the last stage’s Approval.</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Notify</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ endNotify }}" as="o" hint-placeholder-count="4"><span onClick="{{ o.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.86em;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.tick }}{{ o.label }}</span></sc-for></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center"><span style="font-size:0.92em;font-weight:600;flex:1">Celebration</span><a href="{{ previewHref }}" target="_blank" style="font-size:0.84em;font-weight:500">▶ Preview run</a></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ celebOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="height:44px;padding:0 10px;border-radius:9px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.88em;border:1.5px solid {{ o.line }};background:{{ o.bg }};font-weight:{{ o.weight }}"><span style="font-size:18px">{{ o.icon }}</span>{{ o.label }}</div></sc-for></div></div>
+              <label style="margin-top:-12px;min-height:44px;box-sizing:border-box;padding:6px 10px;border-radius:9px;border:1.5px dashed {{ uploadLine }};background:{{ uploadBg }};display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.88em" style-hover="border-color:rgb(150 136 120)">
+                <input type="file" accept="image/gif,image/webp,image/apng,image/png" onChange="{{ onCelebUpload }}" style="display:none">
+                <sc-if value="{{ hasCustom }}"><div style="width:40px;height:40px;border-radius:6px;flex:none;background-size:cover;background-position:center;background-image:{{ customBg }}"></div></sc-if>
+                <sc-if value="{{ noCustom }}"><span style="width:32px;height:32px;border-radius:6px;background:rgb(246 244 240);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">⬆</span></sc-if>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-weight:{{ uploadWeight }}">{{ uploadTitle }}</span><span style="font-size:0.84em;color:rgb(117 100 86)">{{ uploadSub }}</span></div>
+              </label>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">PIC sees on the link</span><input value="{{ endPic }}" onChange="{{ onEndPic }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;outline:none;color:rgb(51 36 27)" style-focus="border-color:rgb(150 136 120)"></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">After it’s done</span><div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ endAfter }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="display:flex;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid {{ o.border }};background:{{ o.bg }};cursor:pointer"><span style="width:16px;height:16px;flex:none;margin-top:1px;border-radius:50%;box-sizing:border-box;border:{{ o.radio }};background:#fff"></span><div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:0.9em">{{ o.title }}</span><span style="font-size:0.82em;color:rgb(74 64 58)">{{ o.text }}</span></div></div></sc-for></div></div>
+            </div></sc-if>
+            <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}"><dc-import name="Stage Settings" layout="tabs" stage="{{ selStage }}" at="{{ sel }}" names="{{ names }}" locked="{{ locked }}" section="{{ section }}" start-day="{{ selStart }}" on-section="{{ onSection }}" on-patch="{{ onPatch }}" on-remove="{{ removeStage }}" on-move="{{ onMove }}" on-open-canvas="{{ openCanvas }}" groups="{{ groups }}" on-add-group="{{ addGroup }}" hint-size="100%,640px"></dc-import></sc-if>
+          </div>
+        </div></sc-if>
+
+        <div style="display:flex;align-items:center;gap:10px 12px;padding:12px 24px;border-top:1px solid rgb(236 231 224);background:rgb(255 255 255 / 0.97);flex-wrap:wrap">
+          
+          <span style="flex:1"></span>
+          <span style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap">{{ activeNote }}</span>
+          <div onClick="{{ previewTask }}" title="See the task page staff and PIC will get" style="height:38px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:6px;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:rgb(250 248 244)">▶ Preview task page</div>
+          <div onClick="{{ save }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap;opacity:{{ saveOp }}" style-hover="background:rgb(250 248 244)">Save draft</div>
+          <div onClick="{{ publish }}" style="height:38px;padding:0 18px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:#E0893F">Publish v{{ nextVer }}</div>
+        </div>
+        <sc-if value="{{ hasToast }}"><div style="position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:wbIn .2s ease-out;white-space:nowrap;display:flex;align-items:center;gap:14px">{{ toast }}<sc-if value="{{ hasUndo }}"><span onClick="{{ undo }}" style="font-weight:600;color:#EC9B55;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Undo</span></sc-if></div></sc-if>
+      </div>
+    </div>
+
+    <div id="1b" style="width:1320px;flex:none;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;padding:3px 9px;border-radius:6px;background:rgb(51 36 27);color:#fff">1b</span><span style="font-weight:600">Readable list</span><span style="color:rgb(117 100 86)">· overview bar, Who → Approval → SLA on one row, settings collapse to summaries</span></div>
+      <div data-artboard="1b" onContextMenu="{{ ctxBlock }}" style="position:relative;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:840px">
+        <sc-if value="{{ ctxOn.b1b }}"><div onClick="{{ stop }}" style="position:absolute;left:{{ ctxX }}px;top:{{ ctxY }}px;z-index:60;width:210px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.18);padding:5px;display:flex;flex-direction:column;animation:wbIn .1s ease-out">
+          <span style="font-size:0.76em;color:rgb(117 100 86);padding:5px 9px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ctxTitle }}</span>
+          <sc-for list="{{ ctxItems }}" as="m" hint-placeholder-count="4"><div onClick="{{ m.onClick }}" style="height:32px;padding:0 9px;border-radius:7px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:0.9em;color:{{ m.fg }};opacity:{{ m.op }};border-top:{{ m.sep }}" style-hover="background:rgb(246 244 240)"><span style="width:16px;text-align:center;font-size:12px">{{ m.icon }}</span>{{ m.label }}</div></sc-for>
+        </div></sc-if>
+        <div style="display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid rgb(236 231 224);flex-wrap:wrap">
+          <span style="font-size:18px">🧩</span>
+          <div><div style="font-size:1.3em;font-weight:600">Workflow Builder</div><div style="font-size:0.86em;color:rgb(117 100 86)">Build the stages each kind of task goes through. Straight line only — run things in parallel with subtasks.</div></div>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px;margin-left:12px">
+            <sc-for list="{{ mainTabs }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="height:30px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em;white-space:nowrap">{{ o.label }}</div></sc-for>
+          </div>
+          <span style="flex:1"></span>
+          <div style="display:flex;align-items:center;gap:8px;flex:none"><span style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap">Assignment</span>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+            <sc-for list="{{ lockSeg }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" title="{{ o.hint }}" style="height:30px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.88em;white-space:nowrap">{{ o.label }}</div></sc-for>
+          </div></div>
+        </div>
+
+        <sc-if value="{{ isCanvasTab }}"><dc-import name="Canvas Template Editor" initial="{{ canvasInit }}" on-change="{{ onCanvas }}" key="{{ tplKey }}" tpl-name="{{ cvName }}" tpl-ver="{{ nextVer }}" sample="{{ isReels }}" stage-names="{{ names }}" hint-size="100%,1300px"></dc-import></sc-if>
+        <sc-if value="{{ isStagesTab }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:220px minmax(0,1fr) 360px;flex:1">
+          <div style="border-right:1px solid rgb(236 231 224);padding:16px 12px;display:flex;flex-direction:column;gap:4px;background:rgb(252 251 249)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 6px 8px"><span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Actions</span><span onClick="{{ startAct }}" title="New category" style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.05em;border:1px solid rgb(229 222 211);background:#fff;cursor:pointer">+</span></div>
+            <sc-if value="{{ addingOn.b1b }}"><input autoFocus="{{ true }}" value="{{ actDraft }}" onChange="{{ onActDraft }}" onKeyDown="{{ onActKey }}" onBlur="{{ onActBlur }}" placeholder="Category name, Enter" style="margin:0 4px 6px;height:30px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:7px;padding:0 9px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if>
+            <sc-for list="{{ actions }}" as="a" hint-placeholder-count="5">
+              <div style="display:flex;flex-direction:column;gap:2px;padding-bottom:8px">
+                <div onContextMenu="{{ a.onCtx }}" style="display:flex;align-items:center;gap:8px;padding:6px 8px 4px"><span style="font-size:14px">{{ a.emoji }}</span><sc-if value="{{ a.editing.b1b }}"><input autoFocus="{{ true }}" value="{{ editDraft }}" onClick="{{ stop }}" onChange="{{ onEditDraft }}" onKeyDown="{{ onEditKey }}" onBlur="{{ onEditBlur }}" style="flex:1;min-width:0;height:26px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:6px;padding:0 7px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27)"></sc-if><sc-if value="{{ a.notEditing.b1b }}"><span onDoubleClick="{{ a.onRename }}" style="flex:1;min-width:0;font-weight:600;font-size:0.94em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</span></sc-if><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ a.count }}</span></div>
+                <sc-for list="{{ a.tpls }}" as="t"><div onClick="{{ t.onClick }}" onContextMenu="{{ t.onCtx }}" onMouseEnter="{{ t.onEnter }}" onMouseLeave="{{ t.onLeave }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px 7px 30px;border-radius:8px;cursor:pointer;background:{{ t.bg }}" style-hover="background:rgb(241 236 228)"><div style="flex:1;min-width:0"><sc-if value="{{ t.editing.b1b }}"><input autoFocus="{{ true }}" value="{{ editDraft }}" onClick="{{ stop }}" onChange="{{ onEditDraft }}" onKeyDown="{{ onEditKey }}" onBlur="{{ onEditBlur }}" style="flex:1;min-width:0;height:26px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:6px;padding:0 7px;font:inherit;font-size:0.9em;outline:none;color:rgb(51 36 27);width:100%"></sc-if><sc-if value="{{ t.notEditing.b1b }}"><div onDoubleClick="{{ t.onRename }}" style="font-size:0.9em;font-weight:{{ t.weight }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div></sc-if></div><div style="display:flex;gap:2px;flex:none;opacity:{{ t.iconOp }};transition:opacity .12s"><span onClick="{{ t.onClone }}" title="Clone" style="width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:rgb(74 64 58)" style-hover="background:#fff">⧉</span><span onClick="{{ t.onDel }}" title="{{ t.delTitle }}" style="height:24px;min-width:24px;padding:0 {{ t.delPad }}px;box-sizing:border-box;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;color:{{ t.delFg }};background:{{ t.delBg }}" style-hover="filter:brightness(.96)">{{ t.delLabel }}</span></div></div></sc-for>
+                <span onClick="{{ a.addTpl }}" style="padding:4px 8px 4px 30px;font-size:0.84em;color:rgb(117 100 86);cursor:pointer" style-hover="color:rgb(51 36 27)">+ Add template</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding:20px 24px 28px;min-width:0;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+              <span style="font-size:1.35em;font-weight:600">{{ actName }}</span><span style="font-size:1.1em;color:rgb(160 150 140)">/</span><span style="font-size:1.15em;font-weight:500">{{ tName }}</span>
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid rgb(229 222 211);white-space:nowrap">Draft v{{ nextVer }}</span>
+              <span style="font-size:0.78em;color:{{ saveFg }};white-space:nowrap">{{ saveLabel }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="position:relative;display:flex;height:28px;border-radius:7px;overflow:visible">
+                <sc-for list="{{ bar }}" as="g" hint-placeholder-count="5"><div onClick="{{ g.onClick }}" title="{{ g.title }}" style="width:{{ g.w }}%;box-sizing:border-box;margin-right:2px;border-radius:6px;background:{{ g.bg }};color:{{ g.fg }};border:1.5px solid {{ g.border }};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;cursor:pointer;transition:width .25s">{{ g.n }}</div></sc-for>
+                <span style="position:absolute;top:-4px;bottom:-4px;left:{{ promiseLeft }}%;border-left:1.5px dashed {{ promiseLine }}"></span>
+              </div>
+              <div style="display:flex;gap:16px;font-size:0.84em;color:rgb(117 100 86)"><span><strong style="font-weight:600;color:rgb(51 36 27)">{{ total }}</strong> working days</span><span style="display:flex;align-items:center;gap:6px"><span style="color:{{ promiseLine }}">┆ Promise</span><div title="Product promise · working days promised to the client" style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:7px;height:26px;background:#fff"><span onClick="{{ promiseDown }}" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">−</span><span style="min-width:22px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;color:{{ promiseLine }}">{{ promise }}</span><span onClick="{{ promiseUp }}" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">+</span></div><span>days</span></span><span>PIC approves <strong style="font-weight:600;color:rgb(51 36 27)">{{ picTimes }}×</strong></span><span>Handoffs <strong style="font-weight:600;color:rgb(51 36 27)">{{ handoffs }}</strong></span></div>
+            </div>
+            <sc-if value="{{ locked }}"><div style="padding:8px 12px;border-radius:8px;background:rgb(246 244 240);font-size:0.86em;color:rgb(74 64 58)">🔒 {{ lockNote }}</div></sc-if>
+            <div style="display:grid;grid-template-columns:28px minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.2fr) 48px;gap:12px;padding:0 14px;font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)"><span></span><span>Stage</span><span>Who does it</span><span>Approval</span><span style="text-align:right">SLA</span></div>
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                <div onDragOver="{{ r.onDragOver }}" onDrop="{{ r.onDrop }}" style="display:flex;flex-direction:column">
+                  <div style="height:{{ r.dropH }}px;border-radius:6px;background:rgb(90 62 43 / 0.15);margin-bottom:{{ r.dropH }}px"></div>
+                  <div draggable="true" onDragStart="{{ r.onDragStart }}" onDragEnd="{{ r.onDragEnd }}" onClick="{{ r.onClick }}" style="display:grid;grid-template-columns:28px minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.2fr) 48px;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;background:#fff;border:1.5px solid {{ r.border }};box-shadow:{{ r.shadow }};cursor:pointer;opacity:{{ r.op }};transition:border-color .15s, box-shadow .15s" style-hover="border-color:rgb(180 170 158)">
+                    <span style="width:24px;height:24px;border-radius:50%;background:rgb(246 244 240);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:grab" title="Drag to reorder">{{ r.n }}</span>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span style="font-weight:600;font-size:1.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-size:0.75em;padding:2px 7px;border-radius:5px;background:{{ r.deptBg }};color:{{ r.deptFg }}">{{ r.dept }}</span><sc-if value="{{ r.hasForm }}"><span style="font-size:0.75em;padding:2px 7px;border-radius:5px;background:rgb(246 244 240);color:rgb(90 78 68)">📝 {{ r.formCount }}</span></sc-if><sc-if value="{{ r.split }}"><span style="font-size:0.75em;padding:2px 7px;border-radius:5px;background:rgb(246 244 240);color:rgb(90 78 68)">⑂ subtasks</span></sc-if></div></div>
+                    <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:0.9em;font-weight:500;color:{{ r.whoFg }}">{{ r.whoMain }}</span><span style="font-size:0.8em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.whoSub }}</span></div>
+                    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0">
+                      <sc-if value="{{ r.noAppr }}"><span style="font-size:0.86em;color:rgb(117 100 86)">— No approval</span></sc-if>
+                      <sc-for list="{{ r.chain }}" as="c" hint-placeholder-count="1"><span style="display:flex;align-items:center;gap:4px"><span style="height:24px;padding:0 8px 0 3px;border-radius:999px;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:5px;font-size:0.84em;font-weight:500"><span style="width:18px;height:18px;border-radius:50%;background:{{ c.av }};font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ c.icon }}</span>{{ c.label }}</span><sc-if value="{{ c.arrow }}"><span style="color:rgb(180 170 158);font-size:0.86em">→</span></sc-if></span></sc-for>
+                      <sc-if value="{{ r.hasBack }}"><span style="font-size:0.8em;color:rgb(176 40 34);margin-left:4px">↩ to {{ r.back }}</span></sc-if>
+                    </div>
+                    <span style="text-align:right;font-family:'Chivo Mono',Menlo,monospace;font-size:11px">{{ r.sla }}</span>
+                  </div>
+                  <sc-if value="{{ r.hasLink }}"><div style="display:flex;align-items:center;gap:10px;height:30px;padding-left:26px"><span style="width:1.5px;height:100%;background:rgb(214 206 196)"></span><span style="font-size:0.8em;color:{{ r.linkFg }}">{{ r.linkText }}</span></div></sc-if>
+                </div>
+              </sc-for>
+              <div onClick="{{ addStage }}" style="height:40px;border-radius:12px;border:1.5px dashed rgb(214 204 190);display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer;font-size:0.94em" style-hover="background:rgb(250 248 244);color:rgb(51 36 27)">+ Add stage</div>
+              <div style="display:flex;align-items:center;height:22px;padding-left:26px"><span style="width:1.5px;height:100%;background:rgb(190 222 199)"></span></div>
+              <div onClick="{{ selEnd }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;background:{{ endCardBg }};border:1.5px solid {{ endLine }};cursor:pointer" style-hover="border-color:rgb(60 150 90)">
+                <span style="width:24px;height:24px;border-radius:50%;background:rgb(232 244 235);font-size:12px;display:flex;align-items:center;justify-content:center">🏁</span>
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:600;font-size:1.02em">Task done</span><span style="font-size:0.8em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ endWhen }}</span></div>
+                <span style="font-size:0.84em;color:rgb(74 64 58);white-space:nowrap">{{ endSummary }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-left:1px solid rgb(236 231 224)">
+            <sc-if value="{{ isEnd }}"><div style="display:flex;flex-direction:column;gap:18px;padding:16px 18px 24px">
+              <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;background:rgb(232 244 235);font-size:13px;display:flex;align-items:center;justify-content:center">🏁</span><span style="font-weight:600;font-size:1.08em">Task done</span><span style="flex:1"></span><span style="font-size:0.8em;color:rgb(117 100 86)">End of every {{ actName }} task</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Done when</span><div style="padding:10px 12px;border-radius:10px;background:rgb(250 248 244);font-size:0.88em;color:rgb(74 64 58);text-wrap:pretty">{{ endWhen }}</div><span style="font-size:0.8em;color:rgb(117 100 86)">Change it on the last stage’s Approval.</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">Notify</span><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ endNotify }}" as="o" hint-placeholder-count="4"><span onClick="{{ o.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.86em;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.tick }}{{ o.label }}</span></sc-for></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center"><span style="font-size:0.92em;font-weight:600;flex:1">Celebration</span><a href="{{ previewHref }}" target="_blank" style="font-size:0.84em;font-weight:500">▶ Preview run</a></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ celebOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="height:44px;padding:0 10px;border-radius:9px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.88em;border:1.5px solid {{ o.line }};background:{{ o.bg }};font-weight:{{ o.weight }}"><span style="font-size:18px">{{ o.icon }}</span>{{ o.label }}</div></sc-for></div></div>
+              <label style="margin-top:-12px;min-height:44px;box-sizing:border-box;padding:6px 10px;border-radius:9px;border:1.5px dashed {{ uploadLine }};background:{{ uploadBg }};display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.88em" style-hover="border-color:rgb(150 136 120)">
+                <input type="file" accept="image/gif,image/webp,image/apng,image/png" onChange="{{ onCelebUpload }}" style="display:none">
+                <sc-if value="{{ hasCustom }}"><div style="width:40px;height:40px;border-radius:6px;flex:none;background-size:cover;background-position:center;background-image:{{ customBg }}"></div></sc-if>
+                <sc-if value="{{ noCustom }}"><span style="width:32px;height:32px;border-radius:6px;background:rgb(246 244 240);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">⬆</span></sc-if>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-weight:{{ uploadWeight }}">{{ uploadTitle }}</span><span style="font-size:0.84em;color:rgb(117 100 86)">{{ uploadSub }}</span></div>
+              </label>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">PIC sees on the link</span><input value="{{ endPic }}" onChange="{{ onEndPic }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;outline:none;color:rgb(51 36 27)" style-focus="border-color:rgb(150 136 120)"></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.92em;font-weight:600">After it’s done</span><div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ endAfter }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="display:flex;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid {{ o.border }};background:{{ o.bg }};cursor:pointer"><span style="width:16px;height:16px;flex:none;margin-top:1px;border-radius:50%;box-sizing:border-box;border:{{ o.radio }};background:#fff"></span><div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:0.9em">{{ o.title }}</span><span style="font-size:0.82em;color:rgb(74 64 58)">{{ o.text }}</span></div></div></sc-for></div></div>
+            </div></sc-if>
+            <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}"><dc-import name="Stage Settings" layout="accordion" stage="{{ selStage }}" at="{{ sel }}" names="{{ names }}" locked="{{ locked }}" section="{{ section }}" start-day="{{ selStart }}" on-section="{{ onSection }}" on-patch="{{ onPatch }}" on-remove="{{ removeStage }}" on-move="{{ onMove }}" on-open-canvas="{{ openCanvas }}" groups="{{ groups }}" on-add-group="{{ addGroup }}" hint-size="100%,520px"></dc-import></sc-if>
+          </div>
+        </div></sc-if>
+
+        <div style="display:flex;align-items:center;gap:16px;padding:12px 24px;border-top:1px solid rgb(236 231 224);background:rgb(255 255 255 / 0.97);flex-wrap:wrap">
+          <sc-for list="{{ warnings }}" as="w" hint-placeholder-count="0"><span onClick="{{ w.onClick }}" style="height:26px;padding:0 10px;border-radius:999px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(110 74 8);display:flex;align-items:center;gap:6px;font-size:0.84em;white-space:nowrap;cursor:{{ w.cursor }}">⚠️ {{ w.t }}<sc-if value="{{ w.canFix }}"><span style="text-decoration:underline;text-underline-offset:2px">Fix</span></sc-if></span></sc-for>
+          <sc-if value="{{ noWarnings }}"><span style="font-size:0.86em;color:rgb(40 110 64)">No warnings</span></sc-if>
+          <span style="flex:1"></span>
+          <span style="font-size:0.86em;color:rgb(117 100 86);white-space:nowrap">{{ activeNote }}</span>
+          <div onClick="{{ previewTask }}" title="See the task page staff and PIC will get" style="height:38px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:6px;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:rgb(250 248 244)">▶ Preview task page</div>
+          <div onClick="{{ save }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap;opacity:{{ saveOp }}" style-hover="background:rgb(250 248 244)">Save draft</div>
+          <div onClick="{{ publish }}" style="height:38px;padding:0 18px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:#E0893F">Publish v{{ nextVer }}</div>
+        </div>
+        <sc-if value="{{ hasToast }}"><div style="position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:wbIn .2s ease-out;white-space:nowrap;display:flex;align-items:center;gap:14px">{{ toast }}<sc-if value="{{ hasUndo }}"><span onClick="{{ undo }}" style="font-weight:600;color:#EC9B55;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Undo</span></sc-if></div></sc-if>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:24px 48px 64px;display:flex;flex-direction:column;gap:14px">
+  <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;padding:3px 9px;border-radius:6px;border:1px solid rgb(51 36 27)">0</span><span style="font-weight:600">Current</span><span style="color:rgb(117 100 86)">· today's Workflow Builder, for comparison</span></div>
+  <div style="width:1170px;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden">
+    <dc-import name="Workflow Builder (current)" hint-size="1170px,900px"></dc-import>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;only&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;all&quot;,&quot;2a&quot;],&quot;default&quot;:&quot;all&quot;,&quot;tsType&quot;:&quot;'all'|'2a'&quot;},&quot;tab&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;'stages'|'canvas'&quot;},&quot;onTab&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(k:string)=&gt;void&quot;}}">
+const DEPT = { content: ['Content', 'oklch(0.94 0.04 295)', 'oklch(0.40 0.12 295)'], social: ['Social Media', 'oklch(0.94 0.04 235)', 'oklch(0.40 0.10 235)'], design: ['Design', 'oklch(0.94 0.04 350)', 'oklch(0.43 0.13 350)'], ads: ['Ads', 'oklch(0.94 0.04 270)', 'oklch(0.40 0.12 270)'], brand: ['Brand', 'oklch(0.94 0.04 195)', 'oklch(0.38 0.08 195)'] };
+const AVC = { Rachel: 'oklch(0.90 0.05 195)', Daniel: 'oklch(0.90 0.05 60)', Mei: 'oklch(0.90 0.05 295)' };
+const S = (name, dept, who, sla, appr, split, extra = {}) => ({ id: Math.random().toString(36).slice(2), name, dept, who, sla, appr, split, form: [], back: 'prev', picText: '', ...extra });
+const A = { assign: { mode: 'assign' } }, R = { kind: 'person', who: 'Rachel' }, PIC = { kind: 'pic' };
+const TPL = {
+  graphic: { action: 'Design photo', tname: 'Simple', emoji: '🖼️', ver: 1, active: 3, promise: 3, stages: () => [S('Design', 'design', A.assign, 2, [PIC], false), S('Publish', 'social', A.assign, 1, [], false)] },
+  graphicFull: { action: 'Design photo', tname: 'With revisions', emoji: '🖼️', ver: 1, active: 2, promise: 6, stages: () => [S('Brief', 'design', A.assign, 1, [R], false), S('Design', 'design', A.assign, 2, [R], true), S('Revisions', 'design', { mode: 'prev', cands: ['Siti', 'Aina'] }, 1, [PIC], false, { back: 1 }), S('Publish', 'social', A.assign, 1, [], false)] },
+  reels: { action: 'Reels video', tname: 'Full production', emoji: '🎞️', ver: 2, active: 12, promise: 10, stages: () => [
+    S('Script', 'content', A.assign, 2, [R], false, { picText: 'Content team is writing the script', form: [['Script doc', 'File']] }),
+    S('Shoot', 'content', A.assign, 1, [], false, { picText: 'Content team is shooting' }),
+    S('Raw upload', 'content', A.assign, 1, [], false, { picText: 'Content team is uploading footage' }),
+    S('Edit', 'content', { mode: 'prev', cands: ['Ali', 'Hafiz'] }, 3, [], true, { picText: 'Content team is editing' }),
+    S('Thumbnail', 'design', { mode: 'prev', cands: [] }, 1, [], false, { picText: 'Design team is making the cover' }),
+    S('Final', 'content', A.assign, 1, [R, PIC], false, { back: 3, picText: 'Ready for your approval', form: [['Final video', 'File'], ['Caption', 'Text']] }),
+  ] },
+  reelsQuick: { action: 'Reels video', tname: 'Quick edit', emoji: '🎞️', ver: 1, active: 4, promise: 5, stages: () => [S('Script', 'content', A.assign, 1, [R], false), S('Edit', 'content', A.assign, 2, [], true), S('Final', 'content', A.assign, 1, [R, PIC], false, { back: 1 })] },
+  social: { action: 'Social media monthly', tname: 'Standard', emoji: '📣', ver: 4, active: 8, promise: 6, stages: () => [S('Content plan & captions', 'social', A.assign, 2, [PIC], false), S('Design graphics', 'design', { mode: 'prev', cands: ['Siti', 'Aina', 'Hafiz'] }, 3, [R], true), S('Schedule & post', 'social', A.assign, 1, [], false)] },
+  media: { action: 'Media buying', tname: 'Standard', emoji: '📈', ver: 3, active: 5, promise: 9, stages: () => [S('Direction', 'ads', A.assign, 2, [PIC], false, { form: [['Direction', 'Text'], ['Budget', 'Number'], ['KPI · Cost per lead', 'Number']] }), S('Creative production', 'ads', A.assign, 5, [], true), S('Compile & review', 'ads', A.assign, 1, [R, PIC], false, { back: 1 }), S('Go live', 'ads', A.assign, 1, [], false)] },
+  brand: { action: 'Brand book', tname: 'Standard', emoji: '📘', ver: 2, active: 1, promise: 15, stages: () => [S('Discovery', 'brand', A.assign, 3, [PIC], false), S('Design system', 'design', A.assign, 8, [R], true), S('Final book', 'design', A.assign, 2, [PIC], false)] },
+};
+const ORDER = ['graphic', 'graphicFull', 'reels', 'reelsQuick', 'social', 'media', 'brand'];
+const INK = 'rgb(51 36 27)';
+const NORM = a => a.kind === 'multi' ? a : { kind: 'multi', ids: [a.kind === 'person' ? a.who : a.kind], rule: 'any' };
+const ICO = id => id === 'pic' ? '🔗' : id === 'assign' ? '👤' : id[0];
+const SL = id => id === 'pic' ? 'PIC' : id === 'assign' ? 'Assigned' : id;
+
+class Component extends DCLogic {
+  state = { ...this.load('reels'), groups: DEPT, published: {}, toast: '', pickOpen: false, mainTab: 'stages' };
+  load(k) { const stages = TPL[k].stages(); return { tpl: k, stages, savedJSON: JSON.stringify(stages), pubBase: JSON.stringify(stages), basePromise: TPL[k].promise, pubOpen: false, savedAt: '', sel: 0, locked: false, section: 'basics', drag: null, over: null }; }
+  flash(t, undo) { this.setState({ toast: t, undoOn: !!undo }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '', undoOn: false }), undo ? 6000 : 2600); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  componentDidMount() { this.emit(); }
+  componentDidUpdate() { this.emit(); }
+  emit() { if (!this.props.onChange || !this._payload) return; const j = JSON.stringify(this._payload); if (j !== this._lastEmit) { this._lastEmit = j; this.props.onChange(JSON.parse(j)); } }
+  snap() { const s = this.state; this._undo = { stages: s.stages, sel: s.sel, tpl: s.tpl, order: [...ORDER], tpls: { ...TPL } }; }
+  undo() { const u = this._undo; if (!u) return; ORDER.length = 0; ORDER.push(...u.order); Object.keys(TPL).forEach(k => { delete TPL[k]; }); Object.assign(TPL, u.tpls); this._undo = null; this.setState({ tpl: u.tpl, stages: u.stages, sel: u.sel, ctx: null }); this.flash('Restored'); }
+  move(from, to) { this.setState(s => { const a = [...s.stages]; const [x] = a.splice(from, 1); a.splice(to, 0, x); return { stages: a, sel: to, drag: null, over: null }; }); }
+  open(k) { this.setState({ ...this.load(k), pickOpen: false, pickOpen2: false }); }
+  boardOf(e) { const el = e && e.currentTarget && e.currentTarget.closest && e.currentTarget.closest('[data-artboard]'); return el ? el.dataset.artboard : null; }
+  eOn(type, key) { const e = this.state.edit, hit = !!(e && e.type === type && e.key === key); const on = hit ? { ['b' + e.board]: true } : {}; return { editing: on, notEditing: { b1a: !on.b1a, b1b: !on.b1b, b2a: !on.b2a } }; }
+  commitAct() {
+    const name = (this.state.actDraft || '').trim();
+    this.setState({ addingAct: false, actDraft: '' });
+    if (!name) return;
+    if (ORDER.some(k => TPL[k].action.toLowerCase() === name.toLowerCase())) return this.flash(`“${name}” already exists`);
+    const EM = ['📦', '🎨', '📸', '🎤', '🗂️', '✨', '🧾', '📰'], used = new Set(ORDER.map(k => TPL[k].emoji));
+    const k = 'a' + Math.random().toString(36).slice(2, 7);
+    TPL[k] = { action: name, tname: 'Standard', emoji: EM.find(x => !used.has(x)) || '📦', ver: 0, active: 0, promise: 3, stages: () => [S('Stage 1', 'design', A.assign, 2, [], false)] };
+    ORDER.push(k); this.open(k); this.flash(`Category “${name}” added with a Standard template`);
+  }
+  commitEdit() {
+    const e = this.state.edit; if (!e) return;
+    const name = e.draft.trim(); this.setState({ edit: null });
+    if (!name) return;
+    if (e.type === 'act') { ORDER.filter(k => TPL[k].action === e.key).forEach(k => { TPL[k].action = name; }); }
+    else if (TPL[e.key]) TPL[e.key].tname = name;
+    this.forceUpdate();
+  }
+  openCtx(e, payload, extra = {}) {
+    e.preventDefault(); e.stopPropagation();
+    const box = e.currentTarget.closest('[data-artboard]'); if (!box) return;
+    const rc = box.getBoundingClientRect(), k = rc.width / box.offsetWidth || 1;
+    const x = Math.min((e.clientX - rc.left) / k, box.offsetWidth - 220), y = Math.min((e.clientY - rc.top) / k, box.offsetHeight - 180);
+    this.setState({ ctx: { ...payload, x, y, board: box.dataset.artboard }, ...extra });
+  }
+  removeKeys(keys, label) {
+    if (keys.length >= ORDER.length) { this.setState({ ctx: null }); return this.flash('Keep at least one template'); }
+    this.snap(); const s = this.state, idx = ORDER.indexOf(keys[0]);
+    keys.forEach(k => { ORDER.splice(ORDER.indexOf(k), 1); delete TPL[k]; });
+    if (keys.includes(s.tpl)) this.open(ORDER[Math.max(0, Math.min(idx, ORDER.length - 1))]);
+    this.setState({ ctx: null });
+    this.flash(`Deleted ${label} · active tasks keep running on their version`, true);
+  }
+  listCtxItems(s) {
+    const c = s.ctx, base = m => ({ fg: 'rgb(51 36 27)', op: 1, sep: 'none', ...m });
+    const confirm = (n, run) => c.confirm
+      ? { icon: '✕', label: n ? `Click to confirm · ${n} active` : 'Click to confirm', fg: 'rgb(176 40 34)', sep: '1px solid rgb(244 241 236)', onClick: run }
+      : { icon: '✕', label: 'Delete…', fg: 'rgb(176 40 34)', sep: '1px solid rgb(244 241 236)', onClick: () => this.setState({ ctx: { ...c, confirm: true } }) };
+    if (c.type === 'tpl') {
+      const t = TPL[c.k]; if (!t) return [];
+      return [
+        { icon: '↗', label: 'Open', onClick: () => this.open(c.k) },
+        { icon: '✎', label: 'Rename', onClick: () => this.setState({ ctx: null, edit: { type: 'tpl', key: c.k, draft: t.tname, board: c.board } }) },
+        { icon: '⧉', label: 'Clone', onClick: () => { const cur = c.k === s.tpl ? s.stages : t.stages(); const nk = c.k + 'c' + Math.random().toString(36).slice(2, 5); TPL[nk] = { ...t, tname: t.tname + ' copy', ver: 0, active: 0, stages: () => cur.map(x => ({ ...x, id: Math.random().toString(36).slice(2) })) }; ORDER.splice(ORDER.indexOf(c.k) + 1, 0, nk); this.open(nk); this.setState({ ctx: null }); } },
+        confirm(t.active, () => this.removeKeys([c.k], `template “${t.tname}”`)),
+      ].map(base);
+    }
+    const keys = ORDER.filter(k => TPL[k].action === c.an), n = keys.reduce((a, k) => a + (TPL[k].active || 0), 0);
+    return [
+      { icon: '✎', label: 'Rename', onClick: () => this.setState({ ctx: null, edit: { type: 'act', key: c.an, draft: c.an, board: c.board } }) },
+      { icon: TPL[keys[0]].emoji, label: 'Change icon', onClick: () => { const EM = ['🖼️', '🎞️', '📣', '📈', '📘', '📦', '🎨', '📸', '🎤', '🗂️', '✨', '🧾', '📰']; const cur = TPL[keys[0]].emoji, nx = EM[(EM.indexOf(cur) + 1) % EM.length]; keys.forEach(k => { TPL[k].emoji = nx; }); this.forceUpdate(); } },
+      { icon: '+', label: 'Add template', onClick: () => { const k = 't' + Math.random().toString(36).slice(2, 7); TPL[k] = { action: c.an, tname: 'Template ' + (keys.length + 1), emoji: TPL[keys[0]].emoji, ver: 0, active: 0, promise: 3, stages: () => [S('Stage 1', 'design', A.assign, 2, [], false)] }; ORDER.splice(ORDER.indexOf(keys[keys.length - 1]) + 1, 0, k); this.open(k); this.setState({ ctx: null }); } },
+      confirm(n, () => this.removeKeys(keys, `action “${c.an}” and its ${keys.length} template${keys.length === 1 ? '' : 's'}`)),
+    ].map(base);
+  }
+  odCfg(s) { return { days: 1, notify: ['doer', 'mm'], action: 'remind', repeat: true, ...((s.overdue || {})[s.tpl] || {}) }; }
+  odVals(s) {
+    const o = this.odCfg(s), set = p => this.setState(st => ({ overdue: { ...(st.overdue || {}), [st.tpl]: { ...o, ...p } } })), on = s.sel === 'overdue';
+    const N = [['doer', 'The person on it'], ['mm', 'Rachel · MM'], ['director', 'Mei · Director'], ['next', 'Next person']];
+    const short = { doer: 'doer', mm: 'MM', director: 'Director', next: 'next' };
+    return {
+      isOverdue: on, selOverdue: () => this.setState({ sel: 'overdue' }),
+      odSummary: `⏰ Late ${o.days}d → ${o.notify.map(k => short[k]).join(' + ') || 'nobody'}${o.action === 'reassign' ? ' · reassign' : ''}`,
+      odLine: on ? INK : 'rgb(229 222 211)', odBg: on ? 'rgb(250 248 244)' : '#fff',
+      odDays: o.days, odUp: () => set({ days: Math.min(10, o.days + 1) }), odDown: () => set({ days: Math.max(1, o.days - 1) }),
+      odNotify: N.map(([k, label]) => { const x = o.notify.includes(k); return { label, tick: x ? '✓ ' : '', border: x ? INK : 'rgb(229 222 211)', bg: x ? INK : '#fff', fg: x ? '#fff' : INK, onClick: () => set({ notify: x ? o.notify.filter(y => y !== k) : [...o.notify, k] }) }; }),
+      odActions: [['remind', 'Just remind', 'The people above get a reminder. Nothing else changes.'], ['reassign', 'Ask MM to reassign', 'Rachel sees “reassign it?” at the top of the task.']].map(([k, title, text]) => { const x = o.action === k; return { title, text, border: x ? INK : 'rgb(236 231 224)', bg: x ? 'rgb(250 248 244)' : '#fff', radio: x ? `5px solid ${INK}` : '1.5px solid rgb(200 192 182)', onClick: () => set({ action: k }) }; }),
+      odTrack: o.repeat ? INK : 'rgb(214 206 196)', odKnob: o.repeat ? 18 : 2, odToggleRepeat: () => set({ repeat: !o.repeat }),
+    };
+  }
+  pubVals(s, T, ver, promise, gateL, DEPT, warnings) {
+    const base = JSON.parse(s.pubBase || '[]'), bMap = Object.fromEntries(base.map(x => [x.id, x])), cMap = Object.fromEntries(s.stages.map(x => [x.id, x]));
+    const whoT = x => x.who.mode === 'prev' ? `handoff (${(x.who.cands || []).join(' / ') || 'no shortlist'})` : 'MM assigns';
+    const ch = [], add = (icon, t, fg = INK) => ch.push({ icon, t, fg });
+    s.stages.forEach((x, i) => {
+      const b = bMap[x.id];
+      if (!b) return add('+', `Added stage ${i + 1} · ${x.name}`, 'rgb(40 110 64)');
+      if (b.name !== x.name) add('✎', `Renamed “${b.name}” → “${x.name}”`);
+      if (b.sla !== x.sla) add('⏱', `${x.name}: ${b.sla} → ${x.sla} working days`);
+      if (whoT(b) !== whoT(x)) add('👤', `${x.name}: ${whoT(b)} → ${whoT(x)}`);
+      const ba = b.appr.map(gateL).join(' → ') || 'no approval', ca = x.appr.map(gateL).join(' → ') || 'no approval';
+      if (ba !== ca) add('✓', `${x.name} approval: ${ba} → ${ca}`);
+      if (b.dept !== x.dept) add('●', `${x.name}: group ${(DEPT[b.dept] || [b.dept])[0]} → ${(DEPT[x.dept] || [x.dept])[0]}`);
+      if ((b.picText || '') !== (x.picText || '')) add('🔗', `${x.name}: PIC now sees “${x.picText || '—'}”`);
+    });
+    base.forEach(b => { if (!cMap[b.id]) add('−', `Removed ${b.name}`, 'rgb(176 40 34)'); });
+    if (base.filter(b => cMap[b.id]).map(b => b.id).join() !== s.stages.filter(x => bMap[x.id]).map(x => x.id).join()) add('⇅', 'Stage order changed');
+    if (promise !== (s.basePromise ?? T.promise)) add('📅', `Promise ${s.basePromise ?? T.promise} → ${promise} working days`);
+    return {
+      pubOpen: !!s.pubOpen, pubTitle: `Publish v${ver} · ${T.action} / ${T.tname}`, pubSub: T.ver ? `Compared with v${ver - 1}, the version running now` : 'First version of this template',
+      pubChanges: ch, pubNone: !ch.length,
+      pubImpact: T.ver ? `${T.active} active task${T.active === 1 ? '' : 's'} stay on v${ver - 1} and finish as they are. Every task started after you publish uses v${ver}.` : 'No tasks use this template yet. New tasks will use v' + ver + '.',
+      pubWarn: warnings.map(w => w.t), pubHasWarn: warnings.length > 0,
+    };
+  }
+  endVals(s, T, eff, endLeft, gateL) {
+    const e = { notify: ['all'], after: 'close', picText: `Your ${T.action.toLowerCase()} is ready`, ...((s.ends || {})[s.tpl] || {}) };
+    const set = p => this.setState(st => ({ ends: { ...(st.ends || {}), [st.tpl]: { ...e, ...p } } }));
+    const last = eff[eff.length - 1], n = eff.length, on = s.sel === 'end';
+    const ck = (s.celeb || {})[s.tpl] || 'fireworks', CI = { fireworks: '🎆', cheers: '🍻', movie: '🎬', confetti: '🎉', custom: '🖼️' };
+    return {
+      selEnd: () => this.setState({ sel: 'end' }), endLeft,
+      endChipBg: on ? 'rgb(60 150 90)' : 'rgb(232 244 235)', endChipFg: on ? '#fff' : 'rgb(40 110 64)',
+      endLine: on ? 'rgb(60 150 90)' : 'rgb(190 222 199)', endCardBg: on ? 'rgb(240 248 242)' : '#fff',
+      endWhen: last ? (last.appr.length ? `Stage ${n} · ${last.name} is approved by ${last.appr.map(gateL).join(' → ')}` : `Stage ${n} · ${last.name} is submitted (no approval)`) : 'Add a stage first',
+      endSummary: `🔔 ${e.notify.length} · ${CI[ck]}`,
+      endNotify: [['all', 'Everyone on the task'], ['mm', 'Rachel · MM'], ['pic', 'PIC via link'], ['req', 'Who requested it']].map(([k, label]) => { const o = e.notify.includes(k); return { label, tick: o ? '✓ ' : '', border: o ? INK : 'rgb(229 222 211)', bg: o ? INK : '#fff', fg: o ? '#fff' : INK, onClick: () => set({ notify: o ? e.notify.filter(x => x !== k) : [...e.notify, k] }) }; }),
+      endPic: e.picText, onEndPic: ev => set({ picText: ev.target.value }),
+      endAfter: [['close', 'Close the task', 'Moves to Done right away. XP is given out.'], ['feedback', 'Keep open 3 days for PIC feedback', 'PIC can still comment on the link. Closes by itself after 3 working days.']].map(([k, title, text]) => { const o = e.after === k; return { title, text, border: o ? INK : 'rgb(236 231 224)', bg: o ? 'rgb(250 248 244)' : '#fff', radio: o ? `5px solid ${INK}` : '1.5px solid rgb(200 192 182)', onClick: () => set({ after: k }) }; }),
+    };
+  }
+  renderVals() {
+    const s = this.state, T = TPL[s.tpl], locked = s.locked;
+    const DEPT = s.groups;
+    const dirty = JSON.stringify(s.stages) !== s.savedJSON;
+    const eff = s.stages.map(st => locked ? { ...st, split: false, who: { ...st.who, mode: 'assign' } } : st);
+    const starts = []; let acc = 0; eff.forEach(x => { starts.push(acc); acc += x.sla; });
+    const total = acc, promise = (s.promises || {})[s.tpl] ?? T.promise, maxD = Math.max(total, promise) + 1;
+    const pct = d => d / maxD * 100;
+    const picTimes = eff.reduce((a, x) => a + x.appr.filter(p => NORM(p).ids.includes('pic')).length, 0);
+    const handoffs = eff.filter(x => x.who.mode === 'prev').length;
+    const ver = (s.published[s.tpl] || T.ver) + 1;
+    const selFn = (i, section) => () => this.setState(section ? { sel: i, section } : { sel: i });
+    const gateT = a => { const n = NORM(a); return n.ids.map(ICO).join(n.rule === 'all' ? '+' : '/') || '?'; };
+    const gateL = a => { const n = NORM(a); return n.ids.map(SL).join(n.rule === 'all' ? ' & ' : ' or ') || 'Choose approvers'; };
+    const backN = x => x.back !== 'prev' && x.back != null ? x.back + 1 : null;
+
+    const laneKeys = [...new Set(eff.map(x => x.dept))];
+    const lanes = laneKeys.map(k => ({ label: DEPT[k][0], bg: DEPT[k][1], fg: DEPT[k][2],
+      blocks: eff.map((x, i) => ({ x, i })).filter(o => o.x.dept === k).map(({ x, i }) => ({
+        n: i + 1, name: x.name || 'Untitled stage', sla: `${x.sla}d`, left: pct(starts[i]), width: pct(x.sla), bg: DEPT[k][1],
+        border: i === s.sel ? 'rgb(90 62 43)' : 'transparent', shadow: i === s.sel ? '0 6px 18px rgb(51 36 27 / 0.12)' : 'none',
+        gates: x.appr.map(a => ({ t: gateT(a), title: gateL(a) })), hasBack: !!backN(x) && x.appr.length > 0, back: backN(x), onClick: selFn(i) })) }));
+    const ticks = []; const step = maxD > 16 ? 2 : 1; for (let d = 0; d <= maxD; d += step) ticks.push({ left: pct(d), label: d === 0 || Math.abs(d - promise) <= 1 ? '' : String(d) });
+    const assignChips = eff.map((x, i) => {
+      const prev = x.who.mode === 'prev', empty = prev && !(x.who.cands || []).length;
+      return { left: pct(starts[i]), width: pct(x.sla), t: x.sla <= 1 ? (prev ? '🔓' : '👤') : prev ? (empty ? '🔓 no shortlist' : `🔓 ${i}'s pick`) : '👤 MM', title: prev ? `Stage ${i}'s person picks from ${(x.who.cands || []).join(' / ') || 'nobody yet'}` : 'MM assigns when planning',
+        bg: empty ? 'rgb(252 236 233)' : prev ? 'rgb(251 243 225)' : '#fff', border: empty ? 'rgb(236 190 184)' : prev ? 'rgb(236 214 164)' : 'rgb(229 222 211)', fg: empty ? 'rgb(176 40 34)' : INK, onClick: selFn(i, 'who') };
+    });
+    const bar = eff.map((x, i) => ({ tone: i === s.sel ? 'rgb(90 62 43)' : DEPT[x.dept][3] || DEPT[x.dept][2], n: i + 1, w: pct(x.sla), bg: DEPT[x.dept][1], fg: DEPT[x.dept][2], border: i === s.sel ? 'rgb(90 62 43)' : 'transparent', title: `${i + 1}. ${x.name} · ${x.sla}d`, onClick: selFn(i) }));
+    const rows = eff.map((x, i) => {
+      const prev = x.who.mode === 'prev', cands = x.who.cands || [], nx = eff[i + 1];
+      const nprev = nx && nx.who.mode === 'prev', ncands = nx ? nx.who.cands || [] : [];
+      const dropOn = s.drag !== null && s.over === i && s.drag !== i;
+      return { n: i + 1, name: x.name || 'Untitled stage', dept: DEPT[x.dept][0], deptBg: DEPT[x.dept][1], deptFg: DEPT[x.dept][2],
+        hasForm: x.form.length > 0, formCount: x.form.length, split: x.split,
+        whoMain: prev ? '🔓 Handoff' : '👤 MM assigns', whoFg: prev && !cands.length ? 'rgb(176 40 34)' : INK,
+        whoSub: prev ? (cands.length ? `Stage ${i}'s person picks · ${cands.join(' / ')}` : 'Shortlist is empty') : 'Chosen when planning each project',
+        noAppr: !x.appr.length, chain: x.appr.map((a, j) => ({ icon: gateT(a), label: gateL(a), av: (NORM(a).ids.length === 1 && AVC[NORM(a).ids[0]]) || 'rgb(246 244 240)', arrow: j < x.appr.length - 1 })),
+        hasBack: !!backN(x) && x.appr.length > 0, back: backN(x), sla: `${x.sla}d`,
+        border: i === s.sel ? 'rgb(90 62 43)' : 'rgb(236 231 224)', shadow: i === s.sel ? '0 6px 18px rgb(51 36 27 / 0.08)' : 'none', op: s.drag === i ? 0.4 : 1,
+        hasLink: !!nx, linkText: nprev ? `then 🔓 this stage's person picks who does Stage ${i + 2}${ncands.length ? ' · ' + ncands.join(' / ') : ' · no shortlist yet'}` : 'then 👤 MM-assigned person takes Stage ' + (i + 2),
+        linkFg: nprev && !ncands.length ? 'rgb(176 40 34)' : 'rgb(117 100 86)', dropH: dropOn ? 6 : 0,
+        onClick: selFn(i),
+        onDragStart: e => { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (_) {} this.setState({ drag: i }); },
+        onDragEnd: () => this.setState({ drag: null, over: null }),
+        onDragOver: e => { e.preventDefault(); if (s.over !== i) this.setState({ over: i }); },
+        onDrop: e => { e.preventDefault(); if (s.drag !== null) this.move(s.drag, i > s.drag ? i : i); },
+      };
+    });
+    const warnings = [];
+    eff.forEach((x, i) => { if (x.who.mode === 'prev' && !(x.who.cands || []).length) warnings.push({ t: `Stage ${i + 1} · 🔓 handoff has no shortlist`, canFix: true, cursor: 'pointer', onClick: selFn(i, 'who') }); });
+    if (total > promise) warnings.push({ t: `Longer than product promise (${total} > ${promise} days)`, canFix: false, cursor: 'default', onClick: () => {} });
+    if (picTimes >= 3) warnings.push({ t: 'PIC approves 3+ times', canFix: false, cursor: 'default', onClick: () => {} });
+    if (!eff.some(x => x.appr.length)) warnings.push({ t: 'No approval in this workflow', canFix: false, cursor: 'default', onClick: () => {} });
+    const affected = s.stages.filter(x => x.who.mode === 'prev' || x.split).length;
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const actions = [...new Set(ORDER.map(k => TPL[k].action))].map(an => { const ks = ORDER.filter(k => TPL[k].action === an); return { name: an, emoji: TPL[ks[0]].emoji, count: ks.length,
+      addTpl: () => { const k = 't' + Math.random().toString(36).slice(2, 7); TPL[k] = { action: an, tname: 'Template ' + (ks.length + 1), emoji: TPL[ks[0]].emoji, ver: 0, active: 0, promise: 3, stages: () => [S(an, 'design', A.assign, 2, [PIC], false)] }; ORDER.splice(ORDER.indexOf(ks[ks.length - 1]) + 1, 0, k); this.open(k); this.flash(`New template added to “${an}”`); },
+      onCtx: e => this.openCtx(e, { type: 'act', an }),
+      ...this.eOn('act', an), onRename: e => { e.stopPropagation(); this.setState({ edit: { type: 'act', key: an, draft: an, board: this.boardOf(e) } }); },
+      tpls: ks.map(k => { const t = TPL[k], on = k === s.tpl; const armed = s.delArm === k; return { onCtx: e => this.openCtx(e, { type: 'tpl', k }),
+          iconOp: s.hoverTpl === k || armed ? 1 : 0,
+          onEnter: () => s.hoverTpl !== k && this.setState({ hoverTpl: k }),
+          onLeave: () => this.setState(p => ({ hoverTpl: p.hoverTpl === k ? null : p.hoverTpl, delArm: p.delArm === k ? null : p.delArm })),
+          delLabel: armed ? 'Delete?' : '✕', delTitle: armed ? 'Click again to delete' : 'Delete', delPad: armed ? 7 : 0,
+          delFg: armed ? '#fff' : 'rgb(176 40 34)', delBg: armed ? 'rgb(190 50 40)' : 'transparent',
+          onDel: e => { e.stopPropagation(); if (armed) { this.setState({ delArm: null }); this.removeKeys([k], `template “${t.tname}”`); } else this.setState({ delArm: k }); }, ...this.eOn('tpl', k), onRename: e => { e.stopPropagation(); this.setState({ edit: { type: 'tpl', key: k, draft: t.tname, board: this.boardOf(e) } }); }, name: t.tname, meta: `${t.ver ? 'v' + (s.published[k] || t.ver) : 'draft'} · ${on ? s.stages.length : t.stages().length} stages`, bg: on ? 'rgb(236 229 219)' : 'transparent', weight: on ? 600 : 400, onClick: () => this.open(k),
+        onClone: e => { e.stopPropagation(); const cur = on ? s.stages : t.stages(); const nk = k + 'c' + Math.random().toString(36).slice(2, 5); TPL[nk] = { ...t, tname: t.tname + ' copy', ver: 0, active: 0, stages: () => cur.map(x => ({ ...x, id: Math.random().toString(36).slice(2) })) }; ORDER.splice(ORDER.indexOf(k) + 1, 0, nk); this.open(nk); this.flash(`Cloned “${t.tname}” · rename it, then publish`); } }; }) }; });
+    return {
+      stop: e => e.stopPropagation(), closePick: () => (s.pickOpen || s.ctx) && this.setState({ pickOpen: false, ctx: null }),
+      togglePick: e => { e.stopPropagation(); this.setState({ pickOpen: !s.pickOpen }); }, pickOpen: s.pickOpen,
+      emoji: T.emoji, actName: T.action, tName: T.tname, nextVer: ver, actions,
+      mainTabs: [['stages', 'Workflow stages'], ['canvas', 'Canvas template'], ['preview', '▶ Preview']].map(([k, label]) => ({ label, ...seg((this.props.tab || s.mainTab) === k), onClick: () => this.props.onTab ? this.props.onTab(k) : this.setState({ mainTab: k }) })),
+      isPreviewTab: (this.props.tab || s.mainTab) === 'preview', isStagesTab: (this.props.tab || s.mainTab) === 'stages', isCanvasTab: (this.props.tab || s.mainTab) === 'canvas',
+      showAll: this.props.only !== '2a', secPad: this.props.only === '2a' ? '0' : '48px 48px 24px',
+      tplKey: s.tpl, cvName: T.action + ' · ' + T.tname, isReels: s.tpl === 'reels',
+      lockSeg: [[false, 'Handoffs allowed', 'Stages can be 🔓 handed off and split into subtasks'], [true, '🔒 MM assigns every stage', 'No handoffs, no subtasks']].map(([v, label, hint]) => ({ label, hint, ...seg(locked === v), onClick: () => { this.setState({ locked: v }); if (v !== locked) this.flash(v ? 'MM now assigns every stage' : 'Handoffs and subtasks are back on'); } })),
+      locked, lockNote: `MM assigns every stage when planning.${affected ? ` Handoffs and subtasks are off on ${affected} stage${affected === 1 ? '' : 's'} — their settings come back if you switch to “Handoffs allowed”.` : ''}`,
+      total, promise, picTimes, handoffs, totalPct: Math.min(100, total / promise * 100), totalFill: total > promise ? 'rgb(200 52 42)' : 'rgb(90 62 43)',
+      promiseLeft: pct(promise), promiseLine: total > promise ? 'rgb(200 52 42)' : 'rgb(90 62 43)',
+      lanes, ticks, assignChips, bar, rows,
+      warnings, noWarnings: !warnings.length,
+      hasSel: typeof s.sel === 'number' && !!s.stages[s.sel], isEnd: s.sel === 'end', sel: s.sel, selStage: eff[s.sel], selStart: starts[s.sel] || 0, names: s.stages.map(x => x.name || 'Untitled stage'), section: s.section,
+      onSection: k => this.setState({ section: k }),
+      onPatch: p => this.setState(st => ({ stages: st.stages.map((x, i) => i === st.sel ? { ...x, ...p } : x) })),
+      removeStage: () => { if (s.stages.length <= 1) return; this.snap(); const dn = s.stages[s.sel].name; this.setState(st => ({ stages: st.stages.filter((_, i) => i !== st.sel), sel: Math.max(0, st.sel - 1) })); this.flash(`Deleted “${dn}”`, true); },
+      onMove: (f, t) => this.move(f, t),
+      addStage: () => this.setState(st => ({ stages: [...st.stages, S('New stage', st.stages[st.stages.length - 1].dept, A.assign, 1, [], false)], sel: st.stages.length, section: 'basics' })),
+      publishWhat: `${T.action} · ${T.tname} · ${eff.length} stages`,
+      activeNote: T.ver ? `${T.active} active tasks stay on v${ver - 1}` : 'Never published',
+      publish: () => this.setState({ pubOpen: true }), closePub: () => this.setState({ pubOpen: false }),
+      confirmPub: () => { this.setState(p => ({ pubOpen: false, published: { ...p.published, [p.tpl]: ver }, savedJSON: JSON.stringify(p.stages), pubBase: JSON.stringify(p.stages), basePromise: promise, savedAt: new Date().toTimeString().slice(0, 5) })); this.flash(`Published ${T.action} · ${T.tname} v${ver} · new tasks use v${ver}`); },
+      ...this.pubVals(s, T, ver, promise, gateL, DEPT, warnings),
+      previewTask: () => this.props.onPreview ? this.props.onPreview() : this.setState({ mainTab: 'preview', sel: s.sel }), pvWf: this._payload || null,
+      hasToast: !!s.toast, toast: s.toast, hasUndo: !!s.undoOn && !!this._undo, undo: () => this.undo(),
+      canvasInit: (s.canvas || {})[s.tpl] || null, onCanvas: d => this.setState(p => ({ canvas: { ...(p.canvas || {}), [p.tpl]: d } })),
+      ...this.odVals(s),
+      ...((() => { const od = this.odCfg(s); this._payload = { action: T.action, tname: T.tname, ver: s.published[s.tpl] || T.ver || 1, promise, stages: eff.map(x => ({ name: x.name, dept: x.dept, who: x.who, sla: x.sla, appr: x.appr, back: x.back, picText: x.picText })), groups: Object.fromEntries(Object.entries(DEPT).map(([k, v]) => [k, [v[0]]])), end: { notify: ['all'], after: 'close', picText: `Your ${T.action.toLowerCase()} is ready`, ...((s.ends || {})[s.tpl] || {}) }, celeb: (s.celeb || {})[s.tpl] || 'fireworks', customGif: (s.customGif || {})[s.tpl] || null, overdue: od, canvas: (s.canvas || {})[s.tpl] || null }; return {}; })()),
+      saveLabel: dirty ? 'Unsaved changes' : s.savedAt ? 'Saved ' + s.savedAt : 'Saved', saveFg: dirty ? 'rgb(138 92 10)' : 'rgb(117 100 86)', saveOp: dirty ? 1 : 0.5,
+      save: () => { if (!dirty) return this.flash('No changes to save'); this.setState(p => ({ savedJSON: JSON.stringify(p.stages), savedAt: new Date().toTimeString().slice(0, 5) })); this.flash('Draft saved · not live until you publish'); },
+      groups: s.groups,
+      openCanvas: () => this.props.onTab ? this.props.onTab('canvas') : this.setState({ mainTab: 'canvas' }),
+      addingOn: { ['b' + s.addingAct]: true }, notAddingOn: { b1a: s.addingAct !== '1a', b1b: s.addingAct !== '1b', b2a: s.addingAct !== '2a' }, actDraft: s.actDraft || '',
+      startAct: e => { if (e) e.stopPropagation(); this.setState({ addingAct: this.boardOf(e) || '2a', actDraft: '' }); },
+      onActDraft: e => this.setState({ actDraft: e.target.value }),
+      onActKey: e => { if (e.key === 'Enter') this.commitAct(); else if (e.key === 'Escape') this.setState({ addingAct: false }); },
+      onActBlur: () => this.commitAct(),
+      editDraft: s.edit ? s.edit.draft : '', onEditDraft: e => this.setState({ edit: { ...s.edit, draft: e.target.value } }),
+      onEditKey: e => { if (e.key === 'Enter') this.commitEdit(); else if (e.key === 'Escape') this.setState({ edit: null }); },
+      onEditBlur: () => this.commitEdit(),
+      pickOpen2: !!s.pickOpen2, togglePick2: e => { e.stopPropagation(); this.setState({ pickOpen2: !s.pickOpen2 }); }, closePick2: () => (s.pickOpen2 || s.ctx) && this.setState({ pickOpen2: false, ctx: null }),
+      ctxBlock: e => e.preventDefault(), ctxOn: s.ctx ? { ['b' + s.ctx.board]: true } : {}, ctxX: s.ctx ? s.ctx.x : 0, ctxY: s.ctx ? s.ctx.y : 0,
+      ctxTitle: s.ctx && s.ctx.type === 'tpl' ? `${TPL[s.ctx.k] ? TPL[s.ctx.k].action + ' / ' + TPL[s.ctx.k].tname : ''}` : s.ctx && s.ctx.type === 'act' ? s.ctx.an : s.ctx && s.stages[s.ctx.i] ? `Stage ${s.ctx.i + 1} · ${s.stages[s.ctx.i].name || 'Untitled stage'}` : '',
+      ctxItems: s.ctx && s.ctx.type !== 'stage' ? this.listCtxItems(s) : s.ctx ? (() => { const i = s.ctx.i, one = s.stages.length <= 1;
+        const ins = at => () => this.setState(st => { const a = [...st.stages]; a.splice(at, 0, S('New stage', st.stages[i].dept, A.assign, 1, [], false)); return { stages: a, sel: at, section: 'basics', ctx: null }; });
+        return [
+          { icon: '←', label: 'Add stage before', onClick: ins(i) },
+          { icon: '→', label: 'Add stage after', onClick: ins(i + 1) },
+          { icon: '⧉', label: 'Duplicate', onClick: () => this.setState(st => { const a = [...st.stages]; a.splice(i + 1, 0, { ...st.stages[i], id: Math.random().toString(36).slice(2), name: st.stages[i].name + ' copy' }); return { stages: a, sel: i + 1, ctx: null }; }) },
+          { icon: '✕', label: one ? 'Delete (last stage left)' : 'Delete', fg: 'rgb(176 40 34)', op: one ? 0.45 : 1, sep: '1px solid rgb(244 241 236)', onClick: () => { if (one) return; this.snap(); this.setState(st => ({ stages: st.stages.filter((_, j) => j !== i), sel: Math.max(0, Math.min(i, st.stages.length - 2)), ctx: null })); this.flash(`Deleted “${s.stages[i].name}”`, true); } },
+        ].map(m => ({ fg: 'rgb(51 36 27)', op: 1, sep: 'none', ...m })); })() : [],
+      cardMax: eff.length > 6 ? 'calc(100% / 6)' : 'none',
+      flow: eff.map((x, i) => {
+        const prev = x.who.mode === 'prev', cands = x.who.cands || [], on = i === s.sel;
+        const AVP = { Siti: 'oklch(0.92 0.04 350)', Aina: 'oklch(0.92 0.04 320)', Hafiz: 'oklch(0.92 0.04 20)', Ali: 'oklch(0.90 0.05 270)', 'Ah Kit': 'oklch(0.90 0.05 160)', Jason: 'oklch(0.90 0.05 235)', 'Wei Lun': 'oklch(0.90 0.05 110)' };
+        return { n: i + 1, name: x.name || 'Untitled stage', dot: DEPT[x.dept][2], dept: DEPT[x.dept][0],
+          isAssign: !prev, prevFull: prev && cands.length > 0, prevEmpty: prev && !cands.length,
+          whoBg: prev && !cands.length ? 'rgb(252 236 233)' : prev ? 'rgb(251 243 225)' : 'rgb(246 244 240)',
+          cands: cands.slice(0, 3).map(c => ({ name: c, init: c[0], av: AVP[c] || 'rgb(236 231 224)' })), candNames: cands.join(' / '),
+          pickedBy: `🔓 picked by ${(eff[i - 1] && eff[i - 1].name) || 'previous stage'}`,
+          apprText: x.appr.length ? x.appr.map(gateL).join(' → ') : '—', apprFg: x.appr.length ? INK : 'rgb(160 150 140)',
+          sla: x.sla + 'd', numBg: on ? INK : 'rgb(246 244 240)', numFg: on ? '#fff' : INK,
+          border: on ? INK : 'rgb(229 222 211)', shadow: on ? '0 8px 20px rgb(51 36 27 / 0.12)' : 'none',
+          onCtx: e => { e.preventDefault(); e.stopPropagation(); const box = e.currentTarget.closest('[data-artboard]'); const rc = box.getBoundingClientRect(), k = rc.width / box.offsetWidth || 1; this.openCtx(e, { type: 'stage', i }, { sel: i }); }, onClick: selFn(i), onWho: e => { e.stopPropagation(); this.setState({ sel: i, section: 'who' }); }, onAppr: e => { e.stopPropagation(); this.setState({ sel: i, section: 'appr' }); } };
+      }),
+      ...this.endVals(s, T, eff, pct(total), gateL),
+      promiseUp: () => this.setState(p => ({ promises: { ...(p.promises || {}), [p.tpl]: Math.min(60, promise + 1) } })),
+      promiseDown: () => this.setState(p => ({ promises: { ...(p.promises || {}), [p.tpl]: Math.max(1, promise - 1) } })),
+      addGroup: name => { const hues = [60, 150, 20, 110, 320, 250], h = hues[(Object.keys(s.groups).length - 5 + hues.length * 10) % hues.length], k = 'g' + Date.now().toString(36); this.setState(p => ({ groups: { ...p.groups, [k]: [name, `oklch(0.94 0.04 ${h})`, `oklch(0.40 0.10 ${h})`, `oklch(0.62 0.10 ${h})`] } })); this.flash(`Group “${name}” added`); return k; },
+      ...(() => {
+        const ck = (s.celeb || {})[s.tpl] || 'fireworks', cu = (s.customGif || {})[s.tpl];
+        const opts = [['fireworks', '🎆', 'Fireworks'], ['cheers', '🍻', 'Cheers'], ['movie', '🎬', 'Movie night'], ['confetti', '🎉', 'Confetti']];
+        return {
+          celebOpts: opts.map(([k, icon, label]) => { const on = ck === k; return { icon, label, line: on ? INK : 'rgb(229 222 211)', bg: on ? 'rgb(250 248 244)' : '#fff', weight: on ? 600 : 400, onClick: () => this.setState(p => ({ celeb: { ...(p.celeb || {}), [p.tpl]: k } })) }; }),
+          hasCustom: !!cu, noCustom: !cu, customGif: cu || '', customBg: cu ? `url(${cu})` : 'none',
+          uploadTitle: cu ? (ck === 'custom' ? '✓ Your GIF · in use' : 'Use your GIF') : 'Upload your own GIF', uploadWeight: ck === 'custom' ? 600 : 400,
+          uploadSub: cu ? 'Click to replace · GIF, WebP or APNG, under 4 MB' : 'GIF, WebP or APNG, under 4 MB',
+          uploadLine: ck === 'custom' ? INK : 'rgb(214 204 190)', uploadBg: ck === 'custom' ? 'rgb(250 248 244)' : '#fff',
+          onCelebUpload: e => { const file = e.target.files && e.target.files[0]; e.target.value = ''; if (!file) return; if (file.size > 4e6) return this.flash('File is over 4 MB'); const fr = new FileReader(); fr.onload = () => { const url = fr.result; try { localStorage.setItem('wb-celeb-custom', url); } catch (_) {} this.setState(p => ({ customGif: { ...(p.customGif || {}), [p.tpl]: url }, celeb: { ...(p.celeb || {}), [p.tpl]: 'custom' } })); this.flash('GIF uploaded · it plays when the task is done'); }; fr.readAsDataURL(file); },
+          previewHref: `Task Flow.dc.html?celebration=${ck}`,
+        };
+      })(),
+    };
+  }
+}
+</script>
+</body>
+</html>
