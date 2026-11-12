@@ -36,10 +36,10 @@ BEGIN;
 
 CREATE TEMP TABLE brand_kpi_member_fns (proc text PRIMARY KEY, written_from text NOT NULL, makes text NOT NULL) ON COMMIT DROP;
 INSERT INTO brand_kpi_member_fns VALUES
-  ('public.member_order_facts_with_old_bills(uuid, date, date)',     'c839f5c6887b77dda97f86898e6f1da3', 'MAKES_FACTS'),
-  ('public.member_order_book_for_staff(uuid, uuid, date, date)',     '3a4b29f5ca1f1b674536cc4d606e9993', 'MAKES_BOOK'),
-  ('public.member_principal_department_order_book(uuid, text, text)', '59e5b8cc4abd4586fc02387ccf1d4d9c', 'MAKES_PBOOK'),
-  ('public.member_kpi_for_staff(uuid, uuid, date)',                  '2c34201f1ed847022e3bc6b306b574f1', 'MAKES_KPI');
+  ('public.member_order_facts_with_old_bills(uuid, date, date)',     'c839f5c6887b77dda97f86898e6f1da3', 'f99143e964e5c299515a24ab5063a6d3'),
+  ('public.member_order_book_for_staff(uuid, uuid, date, date)',     '3a4b29f5ca1f1b674536cc4d606e9993', 'b9c724715bb62031799818b77cdbeead'),
+  ('public.member_principal_department_order_book(uuid, text, text)', '59e5b8cc4abd4586fc02387ccf1d4d9c', '4dcf0bbe8a627107fa54c81fe866710e'),
+  ('public.member_kpi_for_staff(uuid, uuid, date)',                  '2c34201f1ed847022e3bc6b306b574f1', 'df98f7909cba2ad1bfad3a6c4b500d26');
 
 -- A brand's own items are 20261112200000's.
 DO $$
