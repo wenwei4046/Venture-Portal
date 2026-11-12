@@ -4,10 +4,12 @@
 // what the foot sums up and warns of, what publishing refuses (as mkt_minutes_check does), what changed since the version
 // published, and only what changed, for the save; the templates' folders. Pure.
 
-export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature', 'Campaign period'] as const
+export const MINUTES_TYPES = ['Short text', 'Long text', 'Date', 'Number', 'People', 'Project link', 'Free space', 'Table', 'Signature', 'Campaign period', 'Title'] as const
 export type MinutesType = (typeof MINUTES_TYPES)[number]
-/** The kinds as the builder offers them (the handoff's TYPES): its glyph and what it is for. */
+/** The kinds as the builder offers them (the handoff's TYPES): its glyph and what it is for. Title (2026-11-12, the user:
+ * "在 field 加一个 Title, 放到这个位置") heads the minutes — in the preview where the project's placeholder title stood. */
 export const TYPE_CARDS: readonly { type: MinutesType; glyph: string; desc: string }[] = [
+  { type: 'Title', glyph: 'T', desc: 'Heads the minutes · once per template' },
   { type: 'Short text', glyph: 'Aa', desc: 'One-line answer' },
   { type: 'Long text', glyph: '¶', desc: 'Notes, objectives, decisions' },
   { type: 'Date', glyph: '▦', desc: 'A single day' },
@@ -20,8 +22,8 @@ export const TYPE_CARDS: readonly { type: MinutesType; glyph: string; desc: stri
   { type: 'Signature', glyph: '✍', desc: 'Each attendee signs · once per template' },
 ]
 export const TYPE_GLYPH = Object.fromEntries(TYPE_CARDS.map(c => [c.type, c.glyph])) as Record<MinutesType, string>
-/** The kinds a template keeps once: the project it is for, a campaign's run period (answer 13), the signatures. */
-export const ONCE_TYPES: readonly MinutesType[] = ['Project link', 'Campaign period', 'Signature']
+/** The kinds a template keeps once: the project it is for, a campaign's run period (answer 13), the signatures, its title. */
+export const ONCE_TYPES: readonly MinutesType[] = ['Project link', 'Campaign period', 'Signature', 'Title']
 export const MINUTES_COL_TYPES = ['Text', 'Number', 'Date', 'Person'] as const
 export type MinutesColType = (typeof MINUTES_COL_TYPES)[number]
 export const COL_GLYPH: Record<MinutesColType, string> = { Text: 'Aa', Number: '#', Date: '▦', Person: '◎' }
@@ -328,7 +330,7 @@ export interface MinutesWarning { text: string; tab: 'fields' | 'rules' }
 export function minutesWarnings(fields: readonly MinutesField[], rules: MinutesRules): MinutesWarning[] {
   const out: MinutesWarning[] = []
   if (rules.sign && !fields.some(f => f.type === 'Signature')) out.push({ text: '“Every attendee signs” is on, but there is no Signatures field', tab: 'rules' })
-  if (rules.pic && !fields.some(f => f.pic && !['People', 'Project link', 'Date', 'Campaign period', 'Signature'].includes(f.type))) {
+  if (rules.pic && !fields.some(f => f.pic && !['People', 'Project link', 'Date', 'Campaign period', 'Signature', 'Title'].includes(f.type))) {
     out.push({ text: 'PIC signs off but can’t see any content field', tab: 'fields' })
   }
   return out

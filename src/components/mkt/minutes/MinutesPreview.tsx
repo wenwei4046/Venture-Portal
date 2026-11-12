@@ -94,6 +94,9 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
     : pic ? (rules.pic ? (t.approved ? ['Approved', m.stDone] : ['Needs your approval', m.stSoft]) : ['Shared with you', m.stSoft])
     : blocked ? ['Can’t complete yet', m.stWait] : ['Ready to complete', m.stDone]
   const reqN = fields.filter(f => f.req || f.lock).length
+  const titleField = shown.find(f => f.type === 'Title')
+  const titleRaw = titleField ? t.vals[titleField.key] : undefined
+  const titleText = typeof titleRaw === 'string' ? titleRaw.trim() : ''
 
   const grid = (f: MinutesField, v: Grid | Table) => {
     const isTable = f.type === 'Table'
@@ -209,6 +212,15 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
           <div className={m.sheetHead}>
             <div className={m.sheetWords}>
               <div className={m.sheetEyebrow}>Meeting minutes · {name || 'Untitled'}</div>
+              {/* The Title field heads the minutes (the user, 2026-11-12): what is typed in it, else its name, faint. */}
+              {titleField ? (
+                <div
+                  className={`${m.sheetTitle}${titleText ? '' : ` ${m.sheetTitleEmpty}`}`}
+                  onClick={() => titleField.key !== selKey && onSelect(titleField.key)}
+                >
+                  {titleText || titleField.name.trim() || 'Title'}
+                </div>
+              ) : null}
               <div className={m.sheetMono}>Track ID · {version}</div>
             </div>
             <span className={`${m.status} ${tone}`}>{status}</span>
@@ -236,7 +248,7 @@ export default function MinutesPreview({ name, version, fields, rules, attendees
                     {!pic && f.pic ? <span className={m.pfPic}>👁 PIC sees</span> : null}
                   </div>
                   {f.help ? <div className={m.pfHelp}>{f.help}</div> : null}
-                  {f.type === 'Short text' || f.type === 'Date' || f.type === 'Number' ? (
+                  {f.type === 'Short text' || f.type === 'Title' || f.type === 'Date' || f.type === 'Number' ? (
                     <input
                       className={m.pfInput}
                       type={f.type === 'Date' ? 'date' : f.type === 'Number' ? 'number' : 'text'}

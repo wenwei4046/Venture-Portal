@@ -356,4 +356,19 @@ describe('the live preview', () => {
     fireEvent.click(pv.getByRole('button', { name: '+ Column' }))
     expect(pv.getByRole('textbox', { name: 'Column 2 name' })).toBeTruthy()
   })
+
+  // 2026-11-12 — the user: "在 field 加一个 Title, 放到这个位置": the Title field heads the minutes in the preview.
+  it('a Title field heads the minutes: its name, faint, until something is typed in it', () => {
+    builder([{ ...KICKOFF, fields: [{ id: 'ti', name: 'Meeting title', type: 'Title', pic: true }, ...FIELDS] }])
+    const pv = within(preview())
+    expect(pv.getByText('Meeting title', { selector: '[class*=sheetTitle]' }).className).toMatch(/sheetTitleEmpty/)
+    fireEvent.change(pv.getByRole('textbox', { name: 'Meeting title' }), { target: { value: 'Year-end kickoff' } })
+    expect(pv.getByText('Year-end kickoff', { selector: '[class*=sheetTitle]' }).className).not.toMatch(/sheetTitleEmpty/)
+    expect(actions.saveMktMinutes).not.toHaveBeenCalled()
+  })
+
+  it('with no Title field, nothing heads the minutes', () => {
+    builder()
+    expect(preview().querySelector('[class*=sheetTitle]')).toBeNull()
+  })
 })

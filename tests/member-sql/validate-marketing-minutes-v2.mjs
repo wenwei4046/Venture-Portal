@@ -288,4 +288,19 @@ check(await missing([{ ...T, req: true }], {}), [], 'a required table whose star
 check(await missing([{ ...T, req: true, rows: [['', ''], ['', '']] }], {}), ['Actions'], '…blank starting rows are not')
 check(await missing([{ ...T, req: true }], { Actions: { rows: [['', ''], ['', '']] } }), ['Actions'], '…and an answer emptied is empty')
 
+
+// ── The Title field (20261112200000, 2026-11-12 — the user: "在 field 加一个 Title"), swapped into production's bodies — twice ──
+await asSystem()
+const titleSql = await sql('20261112200000_marketing_minutes_title_field.sql')
+await db.exec(titleSql)
+await db.exec(titleSql)
+await as(U.josiah, MANAGER)
+const tt = await save(null, null, { name: 'With a title', fields: [F('ti', 'Meeting title', 'Title'), ...BASE], rules: {} })
+check((await row(tt.id)).fields[0], { id: 'ti', name: 'Meeting title', type: 'Title', req: false, pic: true, lock: false }, 'a Title field kept as set')
+await assert.rejects(save(tt.id, tt.rev, { fields: [F('ti', 'Meeting title', 'Title'), F('t2', 'Another', 'Title'), ...BASE] }),
+  err => /Only one Title field allowed/.test(String(err.message)), 'a title once a template'); checks++
+check(await value({ name: 'Meeting title', type: 'Title' }, 'Year-end kickoff'), 'Year-end kickoff', 'a title is written as a short text is')
+await refuses(`SELECT public.mkt_minutes_value($1::jsonb, $2::jsonb)`, [JSON.stringify({ name: 'Meeting title', type: 'Title' }), JSON.stringify('x'.repeat(201))],
+  /at most 200 characters/, 'a title of 200 characters at most')
+
 console.log(`marketing minutes builder v2: ${checks} checks passed`)

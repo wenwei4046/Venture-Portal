@@ -294,7 +294,7 @@ describe('the rail', () => {
 // 2026-10-24 — ④-2b: a campaign's run period (answer 13), kept once — with the project link and, since v2, the signatures.
 describe('kinds kept once', () => {
   it('the project link, a campaign period and the signatures', () => {
-    expect(ONCE_TYPES).toEqual(['Project link', 'Campaign period', 'Signature'])
+    expect(ONCE_TYPES).toEqual(['Project link', 'Campaign period', 'Signature', 'Title'])
     const one = addField(newMinutesFields(), 'Campaign period', null).fields
     expect(minutesProblems(one).map(p => p.text)).toEqual(['A field has no name'])
     expect(minutesProblems(addField(one, 'Campaign period', null).fields).map(p => p.text)).toContain('Only one Campaign period field allowed')

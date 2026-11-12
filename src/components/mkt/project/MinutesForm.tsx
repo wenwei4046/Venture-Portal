@@ -187,7 +187,7 @@ export default function MinutesForm({
           type={f.type === 'Date' ? 'date' : 'text'}
           inputMode={f.type === 'Number' ? 'decimal' : undefined}
           value={text}
-          maxLength={f.type === 'Short text' ? 200 : 40}
+          maxLength={f.type === 'Short text' || f.type === 'Title' ? 200 : 40}
           readOnly={readOnly}
           aria-label={f.name}
           onChange={e => onVal(f.name, e.target.value)}
