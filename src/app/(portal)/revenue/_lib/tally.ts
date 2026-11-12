@@ -1,7 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  addMonths, buildTally, twoMonthOrderIds, type TallyBrand, type TallyOrder, type TallyReport,
+  addMonths, buildTally, commissionByMonth, twoMonthOrderIds,
+  type TallyBrand, type TallyCommission, type TallyOrder, type TallyReport,
 } from '@/lib/commission/tally'
 import { startRead } from '@/lib/start-read'
 import { loadMonthOrders } from './month-orders'
@@ -32,6 +33,13 @@ interface BrandRow {
   own_scheme: boolean | null
 }
 
+export interface TallyView {
+  report: TallyReport
+  commission: TallyCommission
+}
+
+const NOTHING: TallyView = { report: { from: null, months: [], twoMonthBills: 0, noPctBills: 0 }, commission: {} }
+
 export async function loadTally(
   db: SupabaseClient,
   sub: { id: string; schemeId: string | null },
@@ -39,9 +47,9 @@ export async function loadTally(
   periods: readonly string[],
   /** The first month the portal pays; null when it pays every month. */
   firstPaidMonth: string | null,
-): Promise<TallyReport> {
+): Promise<TallyView> {
   const sorted = [...new Set(periods.map(p => p.slice(0, 10)))].sort()
-  if (sorted.length === 0 || !sub.schemeId) return { from: null, months: [], twoMonthBills: 0, noPctBills: 0 }
+  if (sorted.length === 0 || !sub.schemeId) return NOTHING
 
   // A year back from the latest month, never before the portal began paying.
   const window = addMonths(sorted[sorted.length - 1], -(MONTHS_SHOWN - 1))
@@ -61,6 +69,19 @@ export async function loadTally(
       }),
   )
   const floorRead = startRead(loadFeedFloor(db, sub.id))
+  // A year of closes at most: a few dozen people a month, well under a page.
+  const closesRead = startRead(
+    db
+      .from('comm_salesperson_closes')
+      .select('period_month, total_commission')
+      .eq('sub_department_id', sub.id)
+      .gte('period_month', start)
+      .is('reopened_at', null)
+      .then(({ data, error }) => {
+        if (error) throw new Error(`Could not read the months' closes: ${error.message}`)
+        return (data ?? []) as Array<{ period_month: string; total_commission: number | string }>
+      }),
+  )
 
   const orders: TallyOrder[] = []
   for (let i = 0; i < wanted.length; i += AT_ONCE) {
@@ -86,7 +107,7 @@ export async function loadTally(
     })
   }
 
-  const [brandRows, feedFloor] = await Promise.all([brandsRead, floorRead])
+  const [brandRows, feedFloor, closes] = await Promise.all([brandsRead, floorRead, closesRead])
   const brands: TallyBrand[] = brandRows.map(b => ({
     code: b.code,
     name: b.name,
@@ -99,5 +120,8 @@ export async function loadTally(
   const fairs = await loadOrderFairs(db, twoMonthOrderIds(orders, feedFloor))
   const fairDates = new Map([...fairs.entries()].map(([id, fair]) => [id, fair.fairDate]))
 
-  return buildTally(orders, brands, { feedFloor, from, fairDates })
+  return {
+    report: buildTally(orders, brands, { feedFloor, from, fairDates }),
+    commission: commissionByMonth(closes.map(c => ({ month: c.period_month, total: Number(c.total_commission) }))),
+  }
 }

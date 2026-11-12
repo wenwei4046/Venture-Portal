@@ -132,9 +132,10 @@ describe('Comm Cal — Months and Tally', () => {
   })
 
   it('shows the Tally in place of the cards and the months, and Months goes back to the bare page', () => {
-    render(<CommCalBody data={data()} tab="tally" tally={report} />)
+    render(<CommCalBody data={data()} tab="tally" tally={{ report, commission: { '2026-10-01': { total: 95390.86, closed: 13 } } }} />)
     expect(screen.getByRole('tab', { name: 'Tally' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('table', { name: 'Tally by month' })).toBeInTheDocument()
+    expect(screen.getByText('95,390.86')).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Months with sales data' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Commission Calculation for Fair' })).toBeNull()
     // The strip stays over both tabs.

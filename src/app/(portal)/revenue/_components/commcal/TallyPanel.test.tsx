@@ -53,26 +53,34 @@ beforeEach(() => {
 
 describe('Comm Cal › Tally', () => {
   it('lists every month in its two calendars, with the gap and what is carried', () => {
-    render(<TallyPanel report={report()} sub={SUB} />)
+    render(
+      <TallyPanel
+        report={report()}
+        sub={SUB}
+        commission={{ '2026-10-01': { total: 987.65, closed: 13 }, '2026-09-01': { total: 400, closed: 27 } }}
+      />,
+    )
     const table = screen.getByRole('table', { name: 'Tally by month' })
     expect(within(table).getByText('By SO date · Houzs pays')).toBeInTheDocument()
     expect(within(table).getByText('By fair date · we pay')).toBeInTheDocument()
 
-    // October: Houzs pays on 2,000 + 3,888 (September's, keyed in October); we pay on 2,000 + 9,500.
+    // October: Houzs pays on 2,000 + 3,888 (September's, keyed in October); we pay on 2,000 + 9,500 —
+    // and its closed salespeople are paid 987.65.
     const oct = within(table).getByRole('row', { name: /October 2026/ })
     const cells = within(oct).getAllByRole('cell').map(c => c.textContent)
-    expect(cells).toEqual(['October 2026', '2', '5,888.00', '824.32', '2', '11,500.00', '1,515.00', '690.68', '1,235.00'])
+    expect(cells).toEqual(['October 2026', '2', '5,888.00', '824.32', '2', '11,500.00', '1,515.00', '987.65', '690.68', '1,235.00'])
+    expect(within(oct).getByText('987.65')).toHaveAttribute('title', '13 salespeople closed')
 
     // September: ours alone carries the bill keyed in October.
     const sep = within(table).getByRole('row', { name: /September 2026/ })
     expect(within(sep).getAllByRole('cell').map(c => c.textContent)).toEqual(
-      ['September 2026', '1', '1,000.00', '140.00', '2', '4,888.00', '684.32', '544.32', '544.32'],
+      ['September 2026', '1', '1,000.00', '140.00', '2', '4,888.00', '684.32', '400.00', '544.32', '544.32'],
     )
 
-    // November: Houzs pays October's late bill; nothing is carried past it.
+    // November: Houzs pays October's late bill; nothing is carried past it. Nobody closed yet.
     const nov = within(table).getByRole('row', { name: /November 2026/ })
     expect(within(nov).getAllByRole('cell').map(c => c.textContent)).toEqual(
-      ['November 2026', '2', '10,000.00', '1,305.00', '1', '500.00', '70.00', '(1,235.00)', '0.00'],
+      ['November 2026', '2', '10,000.00', '1,305.00', '1', '500.00', '70.00', '—', '(1,235.00)', '0.00'],
     )
   })
 

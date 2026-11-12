@@ -19,10 +19,11 @@ import { isOldBillDate } from './row-origin'
  * that do — so no bill paid to a salesperson is missed in what Houzs clears.
  *
  * One amount on both sides, so the gap is the calendar's alone: the bill's
- * sales (what earns — `revenue_month_orders.commissionable`) and its Bill to HC
- * (sales × the brand's Bill to HC %, Rules › Brands & margin bands — the brand
- * read as the month's export reads it: the paper's Ref No. prefix, else the
- * bill's own).
+ * sales (what the rate is paid on — `revenue_month_orders.commissionable`: its
+ * commissionable lines, less its KPI items' amounts while KPI is on) and its
+ * Bill to HC (sales × the brand's Bill to HC %, Rules › Brands & margin bands —
+ * the brand read as the month's export reads it: the paper's Ref No. prefix,
+ * else the bill's own).
  *
  * Pure: `revenue/_lib/tally.ts` reads, this decides.
  */
@@ -39,7 +40,7 @@ export interface TallyOrder {
   salesperson: string
   customer: string | null
   brandCode: string | null
-  /** What on the bill earns commission. */
+  /** What the rate is paid on (`MonthOrder.commissionable`). */
   commissionable: number
   cancelled: boolean
   excludedReason: string | null
@@ -253,8 +254,30 @@ export function buildTally(orders: readonly TallyOrder[], brands: readonly Tally
   return { from, months, twoMonthBills, noPctBills }
 }
 
+/**
+ * What a month pays its salespeople, by month `YYYY-MM-01`: the standing
+ * closes' commission (`comm_salesperson_closes` — a salesperson goes to payroll
+ * when closed) and how many are closed. Not `comm_runs.total_commission`, which
+ * nobody keeps in step once a month is closed person by person (October 2026:
+ * a draft run at RM 0.00 beside thirteen closes).
+ */
+export type TallyCommission = Record<string, { total: number; closed: number }>
+
+/** Each month's standing closes, summed to the sen. */
+export function commissionByMonth(closes: ReadonlyArray<{ month: string; total: number }>): TallyCommission {
+  const sums = new Map<string, { sen: number; closed: number }>()
+  for (const close of closes) {
+    const month = close.month.slice(0, 10)
+    const at = sums.get(month) ?? { sen: 0, closed: 0 }
+    at.sen += Math.round(close.total * 100)
+    at.closed += 1
+    sums.set(month, at)
+  }
+  return Object.fromEntries([...sums.entries()].map(([month, at]) => [month, { total: at.sen / 100, closed: at.closed }]))
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const MONTHS_LONG =['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 /** `2026-11-01` → "Nov 2026" (DESIGN.md › Date format: a month is three letters). */
 export function tallyMonthShort(month: string): string {
@@ -281,13 +304,18 @@ export type TallyChipTone = 'alert' | 'ledger' | 'info' | 'plain'
  * listed under. `side` says which list: `ours` — we count it here, so the word
  * is about Houzs; `theirs` — Houzs pays it here, so the word is about us.
  */
-export function tallyOtherSide(bill: TallyBill, side: 'ours' | 'theirs', from: string | null): { text: string; tone: TallyChipTone } {
+export function tallyOtherSide(
+  bill: TallyBill, side: 'ours' | 'theirs', from: string | null,
+): { text: string; tone: TallyChipTone; title?: string } {
   if (side === 'ours') {
     return bill.houzsMonth > bill.ourMonth
       ? { text: `Houzs pays ${tallyMonthShort(bill.houzsMonth)}`, tone: 'alert' }
       : { text: `Houzs paid ${tallyMonthShort(bill.houzsMonth)}`, tone: 'info' }
   }
-  if (from && bill.ourMonth < from) return { text: `Settled by hand · ${tallyMonthShort(bill.ourMonth)}`, tone: 'plain' }
+  // A month before the portal paid: settled by hand, on its claim form. Kept as short as the other words.
+  if (from && bill.ourMonth < from) {
+    return { text: `By hand · ${tallyMonthShort(bill.ourMonth)}`, tone: 'plain', title: `Settled by hand — ${tallyMonthLong(bill.ourMonth)} was paid before the portal paid` }
+  }
   return bill.ourMonth < bill.houzsMonth
     ? { text: `We paid ${tallyMonthShort(bill.ourMonth)}`, tone: 'ledger' }
     : { text: `We pay ${tallyMonthShort(bill.ourMonth)}`, tone: 'info' }

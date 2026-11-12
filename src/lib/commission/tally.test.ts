@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addMonths, buildTally, countsInTally, defaultTallyMonth, houzsMonthOf, monthOf, tallyDay, tallyMonthLong, tallyMonthShort,
-  tallyOtherSide, twoMonthOrderIds, type TallyBrand, type TallyOrder,
+  addMonths, buildTally, commissionByMonth, countsInTally, defaultTallyMonth, houzsMonthOf, monthOf, tallyDay, tallyMonthLong,
+  tallyMonthShort, tallyOtherSide, twoMonthOrderIds, type TallyBrand, type TallyOrder,
 } from './tally'
 
 // The Tally (2026-11-12): Houzs pays by the SO date, we pay the salesperson by
@@ -156,7 +156,9 @@ describe('buildTally', () => {
     expect(sep.theirs.map(b => b.orderId)).toEqual([july.orderId])
     // Counted by us before the tally began and by Houzs inside it: nothing is carried.
     expect(sep.carried).toEqual({ bills: 0, sales: 0, bill: 0 })
-    expect(tallyOtherSide(sep.theirs[0], 'theirs', report.from)).toEqual({ text: 'Settled by hand · Jul 2026', tone: 'plain' })
+    expect(tallyOtherSide(sep.theirs[0], 'theirs', report.from)).toEqual({
+      text: 'By hand · Jul 2026', tone: 'plain', title: 'Settled by hand — July 2026 was paid before the portal paid',
+    })
   })
 
   it('with no first paid month it starts at the first month a bill sits in', () => {
@@ -229,6 +231,21 @@ describe('buildTally', () => {
   it('names the bills whose fair day is worth reading', () => {
     const late = bill({ periodMonth: '2026-11-01', orderDate: '2026-12-01' })
     expect(twoMonthOrderIds([bill(), late, bill({ cancelled: true, orderDate: '2026-12-01' })], '2026-08-01')).toEqual([late.orderId])
+  })
+})
+
+describe('what a month pays its salespeople', () => {
+  it('sums each month’s closes to the sen and counts them', () => {
+    expect(commissionByMonth([
+      { month: '2026-10-01', total: 1234.56 },
+      { month: '2026-10-01', total: 0.1 },
+      { month: '2026-10-01', total: 0.2 },
+      { month: '2026-09-01', total: 500 },
+    ])).toEqual({
+      '2026-10-01': { total: 1234.86, closed: 3 },
+      '2026-09-01': { total: 500, closed: 1 },
+    })
+    expect(commissionByMonth([])).toEqual({})
   })
 })
 

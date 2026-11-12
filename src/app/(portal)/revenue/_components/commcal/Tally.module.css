@@ -24,6 +24,7 @@
 .detail { margin-top: 30px; }
 .list { margin-bottom: 22px; }
 .doc { font-size: 12px; }
+.day { white-space: nowrap; font-size: 12px; }
 .ref {
   font-family: var(--font-mono), 'Chivo Mono', monospace;
   font-size: 10.5px;

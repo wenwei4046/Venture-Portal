@@ -6,7 +6,7 @@ import { formatMoney, formatDate, formatIntlDate } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { formatAgo, ignoreOutcomeNote, matchOutcomeNote } from '@/lib/erp-sync/format'
 import { cancelWarmIntent, warmOnIntent } from '@/lib/nav-warm'
-import type { TallyReport } from '@/lib/commission/tally'
+import type { TallyCommission, TallyReport } from '@/lib/commission/tally'
 import { Chevron } from '@/components/hrv/icons'
 import { Card, Cards, Chip, GridHead, GridRow, GridTable, SectHead, btn, hv, type ChipTone } from '@/components/hrv/kit'
 import { Drawer, Window } from '@/components/hrv/overlay'
@@ -111,8 +111,8 @@ export default function CommCalBody({
   empty?: React.ReactNode
   /** The tab the page was asked for (`?tab=`). */
   tab?: CommCalTab
-  /** The Tally, read only when its tab is the one open. */
-  tally?: TallyReport | null
+  /** The Tally and what each month pays its salespeople, read only when its tab is the one open. */
+  tally?: { report: TallyReport; commission: TallyCommission } | null
 }) {
   const router = useRouter()
   const now = useNow()
@@ -186,9 +186,12 @@ export default function CommCalBody({
       )}
 
       {data.months.length === 0 ? empty : tab === 'tally' && tally ? (
-        <TallyPanel report={tally} sub={data.sub} />
+        // Dimmed while the other tab is on its way: the tab already says where the page is going.
+        <div className={s.pane} data-opening={opening ? 'true' : undefined} aria-busy={opening}>
+          <TallyPanel report={tally.report} commission={tally.commission} sub={data.sub} />
+        </div>
       ) : (
-        <>
+        <div className={s.pane} data-opening={opening ? 'true' : undefined} aria-busy={opening}>
           <Cards label={`Commission Calculation for ${data.sub.name}`} style={{ marginBottom: 26 }}>
             {data.cards.map(c => (
               <Card
@@ -222,7 +225,7 @@ export default function CommCalBody({
               <MonthRow key={m.period} m={m} zebra={i % 2 === 1} />
             ))}
           </GridTable>
-        </>
+        </div>
       )}
 
       {feed ? <DataSourceDrawer open={sourceOpen} onClose={() => setSourceOpen(false)} data={data} link={feed.link} sync={feed.sync} now={now} /> : null}

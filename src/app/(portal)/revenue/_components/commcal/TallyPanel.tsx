@@ -6,7 +6,7 @@ import { revenuePath } from '@/lib/revenue'
 import { billHref } from '@/lib/commission/workbench-nav'
 import {
   defaultTallyMonth, tallyDay, tallyMonthLong, tallyMonthShort, tallyOtherSide,
-  type TallyBill, type TallyMonth, type TallyReport,
+  type TallyBill, type TallyCommission, type TallyMonth, type TallyReport,
 } from '@/lib/commission/tally'
 import { Card, Cards, Chip, GridEmpty, GridHead, GridRow, GridTable, SecLabel, SectHead, hv } from '@/components/hrv/kit'
 import { useTabParam } from '@/components/hrv/tabs'
@@ -19,8 +19,8 @@ import t from './Tally.module.css'
 // between them, what is carried when the month ends, and, for the month
 // picked (`?month=`), the bills the gap is made of. Read-only.
 
-const MONTH_COLS = 'minmax(128px,1.15fr) 60px minmax(104px,1fr) minmax(104px,1fr) 60px minmax(104px,1fr) minmax(104px,1fr) minmax(104px,1fr) minmax(104px,1fr)'
-const BILL_COLS = 'minmax(150px,1.25fr) minmax(110px,1fr) minmax(84px,.7fr) 98px 98px minmax(92px,.8fr) 56px minmax(92px,.8fr) minmax(180px,1.3fr)'
+const MONTH_COLS = 'minmax(118px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
+const BILL_COLS = 'minmax(136px,1.2fr) minmax(92px,1fr) minmax(72px,.7fr) 110px 110px minmax(84px,.8fr) 50px minmax(84px,.8fr) minmax(192px,1.25fr)'
 const PAD = { padding: '11px 14px' }
 
 const bills = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
@@ -31,7 +31,15 @@ function Amount({ value }: { value: number }) {
   return <span className={value < 0 ? t.neg : undefined}>{formatMoneyBare(value)}</span>
 }
 
-export default function TallyPanel({ report, sub }: { report: TallyReport; sub: { name: string; slug: string } }) {
+export default function TallyPanel({
+  report,
+  sub,
+  commission = {},
+}: {
+  report: TallyReport
+  sub: { name: string; slug: string }
+  commission?: TallyCommission
+}) {
   const keys = report.months.map(m => m.month.slice(0, 7))
   const opening = (defaultTallyMonth(report) ?? '').slice(0, 7)
   const [picked, pick] = useTabParam(keys, opening, 'month')
@@ -86,7 +94,7 @@ export default function TallyPanel({ report, sub }: { report: TallyReport; sub: 
           <span role="columnheader" aria-colspan={3} className={t.group} style={{ gridColumn: 'span 3' }}>
             By SO date · Houzs pays
           </span>
-          <span role="columnheader" aria-colspan={3} className={t.group} style={{ gridColumn: 'span 3' }}>
+          <span role="columnheader" aria-colspan={4} className={t.group} style={{ gridColumn: 'span 4' }}>
             By fair date · we pay
           </span>
           <span role="columnheader" aria-colspan={2} className={t.group} style={{ gridColumn: 'span 2' }}>
@@ -104,12 +112,20 @@ export default function TallyPanel({ report, sub }: { report: TallyReport; sub: 
             { label: 'Bills', style: { textAlign: 'right' } },
             { label: 'Sales', style: { textAlign: 'right' } },
             { label: 'Bill to HC', style: { textAlign: 'right' } },
-            { label: 'Gap', style: { textAlign: 'right' } },
-            { label: 'Carried', style: { textAlign: 'right' } },
+            { label: <span title="What the month's closed salespeople are paid">Commission</span>, style: { textAlign: 'right' } },
+            { label: <span title="By fair date less by SO date, in Bill to HC">Gap</span>, style: { textAlign: 'right' } },
+            { label: <span title="As the month ends: bills we have counted that Houzs has not yet, in Bill to HC">Carried</span>, style: { textAlign: 'right' } },
           ]}
         />
         {report.months.map((m, i) => (
-          <MonthRow key={m.month} m={m} zebra={i % 2 === 1} selected={m.month === month.month} onPick={() => pick(m.month.slice(0, 7))} />
+          <MonthRow
+            key={m.month}
+            m={m}
+            paid={commission[m.month] ?? null}
+            zebra={i % 2 === 1}
+            selected={m.month === month.month}
+            onPick={() => pick(m.month.slice(0, 7))}
+          />
         ))}
       </GridTable>
       {report.noPctBills > 0 ? (
@@ -141,7 +157,19 @@ export default function TallyPanel({ report, sub }: { report: TallyReport; sub: 
   )
 }
 
-function MonthRow({ m, zebra, selected, onPick }: { m: TallyMonth; zebra: boolean; selected: boolean; onPick: () => void }) {
+function MonthRow({
+  m,
+  paid,
+  zebra,
+  selected,
+  onPick,
+}: {
+  m: TallyMonth
+  paid: { total: number; closed: number } | null
+  zebra: boolean
+  selected: boolean
+  onPick: () => void
+}) {
   const num = `${hv.right} ${hv.mono}`
   return (
     <GridRow cols={MONTH_COLS} zebra={zebra} selected={selected} onClick={onPick} title={`Show ${tallyMonthLong(m.month)}'s bills in two months`}>
@@ -152,6 +180,9 @@ function MonthRow({ m, zebra, selected, onPick }: { m: TallyMonth; zebra: boolea
       <span role="cell" className={`${num} ${t.edge}`} style={PAD}>{m.fair.bills}</span>
       <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.fair.sales)}</span>
       <span role="cell" className={num} style={PAD}>{formatMoneyBare(m.fair.bill)}</span>
+      <span role="cell" className={num} style={PAD} title={paid ? `${paid.closed} salespeople closed` : 'Nobody closed yet'}>
+        {paid ? formatMoneyBare(paid.total) : '—'}
+      </span>
       <span role="cell" className={`${num} ${t.edge} ${t.strong}`} style={PAD}><Amount value={m.gap.bill} /></span>
       <span role="cell" className={`${num} ${t.strong}`} style={PAD}><Amount value={m.carried.bill} /></span>
     </GridRow>
@@ -199,13 +230,13 @@ function BillList({ title, rows, side, from, sub }: { title: string; rows: Tally
               </div>
               <span role="cell" style={PAD}>{b.salesperson}</span>
               <span role="cell" style={PAD}>{b.brandName}</span>
-              <span role="cell" className={hv.mono} style={PAD}>{b.fairDate ? tallyDay(b.fairDate) : '—'}</span>
-              <span role="cell" className={hv.mono} style={PAD}>{tallyDay(b.soDate)}</span>
+              <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{b.fairDate ? tallyDay(b.fairDate) : '—'}</span>
+              <span role="cell" className={`${hv.mono} ${t.day}`} style={PAD}>{tallyDay(b.soDate)}</span>
               <span role="cell" className={num} style={PAD}>{formatMoneyBare(b.sales)}</span>
               <span role="cell" className={num} style={PAD}>{b.pct === null ? '—' : pctWord(b.pct)}</span>
               <span role="cell" className={num} style={PAD}>{b.bill === null ? '—' : formatMoneyBare(b.bill)}</span>
               <span role="cell" className={t.chips} style={{ padding: '9px 14px 9px 22px' }}>
-                <Chip tone={other.tone}>{other.text}</Chip>
+                <Chip tone={other.tone} title={other.title}>{other.text}</Chip>
                 {b.belowDeposit ? <Chip tone="plain">Below deposit</Chip> : null}
               </span>
             </GridRow>
