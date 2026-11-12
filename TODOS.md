@@ -113,12 +113,14 @@ Build the data's before anybody is narrowed on a Revenue page.
 ## Owed — 2990s' own KPI items, the rest (2026-11-12)
 
 Shipped: the items, the run, Comm Cal's month and bill page, Rules' read-only
-list (`.claude/rules/revenue/comm-cal.md` › 2990s' OWN KPI ITEMS). Still owed:
-- **The Revenue app.** The member's KPI card, Insight's KPI figures, the
-  Arena's KPI board and the facts behind them stand behind Fair's own KPI
-  switch (`member_order_facts_with_old_bills`, both order books,
-  `member_kpi_for_staff`'s early return), so a 2990s bonus is in My income's
-  total and on no KPI page. The user: 2990s is in the "KPI item 的 arena".
+list (`.claude/rules/revenue/comm-cal.md` › 2990s' OWN KPI ITEMS), and the
+Revenue app's KPI readings (`revenue-app.md` › 2990s' OWN KPI ITEMS COUNT IN
+THE APP). Still owed:
+- **One figure for two ladders.** My team's *KPI hit / KPI pending* and the
+  Championship's threshold bonus compare a person's EVERY KPI unit with the
+  sub-department's own threshold — the scoreboard carries one `kpi_qty`. Exact
+  while Fair's own KPI is off (no threshold) or nobody sells a brand's item;
+  split the figure before Fair's switch goes on beside 2990s' items.
 - **Rules › KPI items edits a brand's items.** The list is read-only; the
   writer (`catalogue_save_kpi_items`) already takes a brand's item, its name
   and its tiers. Until then an item is added or changed by SQL.
