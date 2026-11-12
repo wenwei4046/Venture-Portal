@@ -2385,6 +2385,24 @@ await db.exec(`
   await inMsg('7711003', 'done')
   check((await card(dz)).flow_state, 'done', 'and it finishes')
 
+  // A tapped option worded "Talk to Person" is that option, not a request for a person (mig 20261112110000).
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, '4580c7f5edf30b8ee7a0f67a2994c632', 'the runner here is production’s after 20261111130000')
+  await db.exec(await f('20261112110000_lead_option_not_a_person.sql'))
+  await db.exec(await f('20261112110000_lead_option_not_a_person.sql'))
+  check((await q(`select prosrc from pg_proc where proname = 'lead_flow_on_message'`))[0].prosrc.split('mig 20261112110000').length - 1, 1, 'swapped once, applying twice changes nothing')
+  const ttp = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Talk to person button', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([{ id: 'w', kind: 'question', text: 'Hi!', buttons: [{ label: 'Talk to Person', next: 'p' }, { label: 'Sofa', next: 'p' }] },
+                     { id: 'p', kind: 'phone', text: 'Happy to help! Your number?', next: '' }])]))[0].id
+  const AD3 = '120249999000013'
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [AD3, ttp])
+  await inMsg('7711004', 'hello', { sourceId: AD3, headline: 'Sofas' })
+  const tp = await contactOf('7711004')
+  await inMsg('7711004', 'Talk to Person')
+  check([(await last(tp)).body, (await card(tp)).flow_step], ['Happy to help! Your number?', 'p'], 'the button goes to its own step')
+  check((await q(`select count(*)::int n from public.lead_events where contact_id = $1 and what like 'Customer asked for a person%'`, [tp]))[0].n, 0, 'not handed to CS')
+  await inMsg('7711004', 'can I talk to a real person?')
+  check([(await card(tp)).flow_state, (await q(`select count(*)::int n from public.lead_events where contact_id = $1 and what like 'Customer asked for a person%'`, [tp]))[0].n], ['stopped', 1], 'typed words that are no option still go to CS')
+
   // The words fall back, both ways; a step from before keeps its one file.
   const t = (s, lang) => q(`update public.lead_contacts set language = $2 where id = $1`, [en, lang]).then(() => q(`select public.lead_flow_t($1, $2::jsonb, 'text') t`, [en, JSON.stringify(s)])).then(r => r[0].t)
   check([await t({ text: 'Hi', textZh: '' }, 'Mandarin'), await t({ text: '', textZh: '你好' }, 'English'), await t({ text: 'Hi', textZh: '你好' }, 'Mandarin')], ['Hi', '你好', '你好'], 'an empty box is filled by the other language')

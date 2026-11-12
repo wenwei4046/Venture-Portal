@@ -433,7 +433,10 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg' | 'endMsgZh
   const said: Said[] = [...w.said, { from: 'customer', text: answer }]
   const s = t.steps.find(x => x.id === w.waiting)
   if (!s) return { said, waiting: null, tries: 0, ended: 'stopped', lang }
-  if (asksForPerson(answer)) {
+  // A tapped or typed option of the waiting question is that option, whatever its words — "Talk to Person" included
+  // (mig 20261112110000).
+  const isOption = s.kind === 'question' && (s.buttons ?? []).some(b => saysOption(answer, b))
+  if (!isOption && asksForPerson(answer)) {
     said.push({ from: 'system', text: 'Asked for a person · goes to a person' })
     return { said, waiting: null, tries: 0, ended: 'person', lang }
   }
