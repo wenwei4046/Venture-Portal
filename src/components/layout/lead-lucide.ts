@@ -24,6 +24,7 @@ export const LUCIDE = {
   'chevron-down': '<path d="m6 9 6 6 6-6" />',
   'chevron-left': '<path d="m15 18-6-6 6-6" />',
   'chevron-right': '<path d="m9 18 6-6-6-6" />',
+  'chevron-up': '<path d="m18 15-6-6-6 6" />',
   'chevrons-right': '<path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" />',
   'circle-check': '<circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" />',
   'circle-dot': '<circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="1" />',

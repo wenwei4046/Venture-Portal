@@ -10,9 +10,12 @@ export type SaveAs = 'interest' | 'budget' | 'showroom' | 'preferredTime' | 'not
 
 export interface StepOption {
   label: string
+  /** The option in Chinese (2026-11-11, mig 20261111130000); empty = the English one. */
+  labelZh?: string
   /** A step's id, or '' — End here. */
   next: string
   endMsg?: string
+  endMsgZh?: string
   /**
    * Other replies sent first, in order: "Send a message" steps whose words go out (their own Goes to not followed)
    * before the option goes on to `next` (2026-10-29, mig 20261029150010). On a question that takes more than one they
@@ -26,11 +29,18 @@ export interface TemplateStep {
   kind: StepKind
   name?: string
   text: string
+  /**
+   * The step's words in Chinese, beside the English (2026-11-11 — the user: "做中英对照的画面，内容由客服去写"; mig
+   * 20261111130000). The customer gets their language (`tr`); an empty box is filled by the other one.
+   */
+  textZh?: string
   buttons?: StepOption[]
   next?: string | null
   endMsg?: string
+  endMsgZh?: string
   saveAs?: SaveAs | null
   retryText?: string
+  retryTextZh?: string
   /** '1'…'5'; null = no limit. */
   retryMax?: string | null
   /** 'person' | '' (end) | a step's id. */
@@ -39,8 +49,10 @@ export interface TemplateStep {
   multi?: boolean
   /** The finish button of such a question ("That's all"), 20 characters at most. */
   doneLabel?: string
+  doneLabelZh?: string
   /** What it says when it comes back; empty = 'Anything else? Pick another, or tap "That's all".' */
   againText?: string
+  againTextZh?: string
   /** A ‹ Back button: the customer may go back to the step that waited before this one (mig 20261102180000). */
   back?: boolean
   pos?: { x: number; y: number }
@@ -50,15 +62,56 @@ export interface TemplateStep {
    * 20261102120000): the object in `lead-media` under chat/tpl/.
    */
   file?: StepFile | null
+  /**
+   * Photos, videos, PDFs and other files sent in this order before the step’s words, 10 at most (2026-11-11, mig
+   * 20261111130000). A step saved before keeps its one `file` until it is edited.
+   */
+  files?: StepFile[]
 }
 
 export interface StepFile { path: string; name: string; mime: string; size: number }
+
+/** A step sends this many files at most, each up to 25 MB. */
+export const FILES_MAX = 10
+/** A step's files in their order: `files`, else the one `file` of a step saved before them. Twin of lead_flow_say_file. */
+export function filesOf(s: Pick<TemplateStep, 'files' | 'file'>): StepFile[] {
+  if (s.files?.length) return s.files.slice(0, FILES_MAX)
+  return s.file ? [s.file] : []
+}
+
+/** The customer's language for a template: English or Chinese. */
+export type Lang = 'en' | 'zh'
+const CJK = /[\u3400-\u9fff]/
+/**
+ * Which language a customer writes — twin of lead_flow_lang: the customer panel's Language first (Mandarin, English),
+ * else their latest message with words in it: a Chinese character → zh, else en. Digits, emoji and files do not decide.
+ */
+export function langOf(messages: string[], language = ''): Lang {
+  if (language === 'Mandarin') return 'zh'
+  if (language === 'English') return 'en'
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (/^\[[A-Za-z ]+\]/.test(m) || !/[A-Za-z\u3400-\u9fff]/.test(m)) continue
+    return CJK.test(m) ? 'zh' : 'en'
+  }
+  return 'en'
+}
+/** A box's words in the customer's language, the other language's when it is empty. Twin of lead_flow_t. */
+export function tr(o: object, key: string, lang: Lang): string {
+  const w = o as Record<string, unknown>
+  const en = typeof w[key] === 'string' ? (w[key] as string) : ''
+  const zh = typeof w[key + 'Zh'] === 'string' ? (w[key + 'Zh'] as string) : ''
+  if (!zh.trim()) return en
+  if (!en.trim() || lang === 'zh') return zh
+  return en
+}
 
 export interface ReplyTemplate {
   id: string
   name: string
   description: string
   endMsg: string
+  endMsgZh?: string
   steps: TemplateStep[]
   brandId: string | null
   triggerKind: string
@@ -117,8 +170,10 @@ export function templateProblem(steps: TemplateStep[]): string | null {
     const n = s.name || `Step ${ids.indexOf(s.id) + 1}`
     if (!KINDS.some(k => k.kind === s.kind)) return 'A step is an option, an answer, a phone, a message, a person or the AI Agent.'
     if ((s.name ?? '').length > 40) return `${n}: a name is 40 characters at most.`
-    if ((s.text ?? '').length > 1000 || (!['handoff', 'ai'].includes(s.kind) && !s.text?.trim())) return `${n} says nothing yet — write its message.`
-    if ((s.endMsg ?? '').length > 1000 || (s.retryText ?? '').length > 1000) return `${n}: a message is 1,000 characters at most.`
+    if ((s.text ?? '').length > 1000 || (!['handoff', 'ai'].includes(s.kind) && !s.text?.trim() && !s.textZh?.trim())) return `${n} says nothing yet — write its message.`
+    if ([s.endMsg, s.retryText, s.textZh, s.endMsgZh, s.retryTextZh, s.againTextZh].some(x => (x ?? '').length > 1000)) return `${n}: a message is 1,000 characters at most.`
+    if ((s.files ?? []).length > FILES_MAX) return `${n}: a step sends ${FILES_MAX} files at most.`
+    if ((s.files ?? []).some(f => !/^chat\/tpl\/[0-9a-f-]{36}\/[^/]+$/.test(f?.path ?? ''))) return `${n}: a file is still uploading.`
     if (s.retryMax != null && !/^[1-5]$/.test(s.retryMax)) return `${n}: ask again 1 to 5 times, or without a limit.`
     if (s.failNext != null && !['', 'person'].includes(s.failNext) && !ids.includes(s.failNext)) return `${n}: still wrong goes to a person, the end or a step.`
     if (s.kind === 'question') {
@@ -126,7 +181,8 @@ export function templateProblem(steps: TemplateStep[]): string | null {
       if (b.length === 0) return `${n} needs at least one option.`
       if (b.length > 13) return `${n}: Messenger shows 13 options at most.`
       for (const o of b) {
-        if (!o.label.trim() || o.label.length > OPTION_MAX) return `${n}: an option says 1 to ${OPTION_MAX} characters.`
+        if ((!o.label.trim() && !o.labelZh?.trim()) || o.label.length > OPTION_MAX || (o.labelZh ?? '').length > OPTION_MAX) return `${n}: an option says 1 to ${OPTION_MAX} characters.`
+        if ((o.endMsgZh ?? '').length > 1000) return `${n}: a message is 1,000 characters at most.`
         if (o.next !== '' && !ids.includes(o.next)) return `${n}: every option goes to a step, or ends.`
         if (s.multi && o.next) return `${n}: on a question that takes more than one, an option's replies are its messages.`
         const also = o.also ?? []
@@ -138,7 +194,7 @@ export function templateProblem(steps: TemplateStep[]): string | null {
           if (t.kind !== 'message') return `${n}: an option's other replies are "Send a message" steps.`
         }
       }
-      if ((s.doneLabel ?? '').length > 20) return `${n}: the finish button says 20 characters at most.`
+      if ((s.doneLabel ?? '').length > 20 || (s.doneLabelZh ?? '').length > 20) return `${n}: the finish button says 20 characters at most.`
       if ((s.againText ?? '').length > 1000) return `${n}: a message is 1,000 characters at most.`
       if (s.multi && s.next && !ids.includes(s.next)) return `${n}: "${doneOf(s)}" goes to a step that is not there.`
     } else if (s.next && !ids.includes(s.next)) return `${n} goes to a step that is not there.`
@@ -158,18 +214,27 @@ export interface StepRow {
 /** An option sends this many other replies at most. */
 export const ALSO_MAX = 5
 /** A question's finish button, as it reads to the customer. */
-export function doneOf(s: Pick<TemplateStep, 'doneLabel'>): string {
-  return s.doneLabel?.trim() || "That's all"
+export function doneOf(s: Pick<TemplateStep, 'doneLabel' | 'doneLabelZh'>, lang: Lang = 'en'): string {
+  // An empty box is filled by the other language (mig 20261112100000), then the default.
+  return lang === 'zh' ? s.doneLabelZh?.trim() || s.doneLabel?.trim() || '就这些' : s.doneLabel?.trim() || s.doneLabelZh?.trim() || "That's all"
 }
 /** What a question that takes more than one says when it comes back. */
-export function againOf(s: Pick<TemplateStep, 'againText' | 'doneLabel'>): string {
-  return s.againText?.trim() || `Anything else? Pick another, or tap "${doneOf(s)}".`
+export function againOf(s: Pick<TemplateStep, 'againText' | 'againTextZh' | 'doneLabel' | 'doneLabelZh'>, lang: Lang = 'en'): string {
+  return tr(s, 'againText', lang).trim()
+    || (lang === 'zh' ? `还有别的吗？再选一个，或点“${doneOf(s, lang)}”。` : `Anything else? Pick another, or tap "${doneOf(s, lang)}".`)
+}
+/** An option's words as a customer in that language gets them. */
+export const labelOf = (b: StepOption, lang: Lang = 'en'): string => tr(b, 'label', lang)
+/** Does an answer say this option, in either language? Twin of lead_flow_is. */
+export function saysOption(answer: string, b: StepOption): boolean {
+  const a = answer.trim().toLowerCase()
+  return !!a && (a === b.label.trim().toLowerCase() || a === (b.labelZh ?? '').trim().toLowerCase())
 }
 
 /** A card's rows: each option, or one line saying what the customer does, with where it goes. */
 export function rowsOf(s: TemplateStep): StepRow[] {
   if (s.kind === 'question') {
-    const rows: StepRow[] = (s.buttons ?? []).map((b, i) => ({ i, label: b.label, next: b.next, also: b.also ?? [] }))
+    const rows: StepRow[] = (s.buttons ?? []).map((b, i) => ({ i, label: labelOf(b), next: b.next, also: b.also ?? [] }))
     // A question that takes more than one goes on by its finish button.
     return s.multi ? [...rows, { i: -1, label: doneOf(s), next: s.next ?? '' }] : rows
   }
@@ -262,7 +327,9 @@ export function normDigits(v: string): string {
 
 /** The ‹ Back button (a Messenger quick reply), and the words a customer may type for it — twin of lead_flow_on_message. */
 export const BACK_LABEL = '‹ Back'
-const BACK_WORDS = ['‹ back', 'back', '返回', '上一步', 'kembali']
+export const BACK_LABEL_ZH = '‹ 返回'
+export const backLabel = (lang: Lang): string => (lang === 'zh' ? BACK_LABEL_ZH : BACK_LABEL)
+const BACK_WORDS = ['‹ back', '‹ 返回', 'back', '返回', '上一步', 'kembali']
 export function isBack(answer: string): boolean {
   return BACK_WORDS.includes(answer.trim().toLowerCase())
 }
@@ -293,6 +360,8 @@ export interface Walk {
   picked?: number[]
   /** The steps that waited in this run, oldest first, for ‹ Back (lead_contacts.flow_trail). */
   trail?: string[]
+  /** The customer's language (Test as customer's EN / ZH). */
+  lang?: Lang
 }
 
 const NUMBERS = /^\s*\d{1,2}((\s*([,，、/&+]|和|及|and)\s*|\s+)\d{1,2})*\s*$/i
@@ -304,10 +373,10 @@ const NUMBERS = /^\s*\d{1,2}((\s*([,，、/&+]|和|及|and)\s*|\s+)\d{1,2})*\s*$
  */
 export function answerPicks(s: TemplateStep, answer: string, shown: string[]): { picks: number[]; finish: boolean } | null {
   const opts = s.buttons ?? []
-  const done = doneOf(s).toLowerCase()
+  const dones = [doneOf(s, 'en').toLowerCase(), doneOf(s, 'zh').toLowerCase()]
   const a = answer.trim().toLowerCase()
-  if (s.multi && a === done) return { picks: [], finish: true }
-  const byWords = opts.findIndex(b => b.label.trim().toLowerCase() === a)
+  if (s.multi && dones.includes(a)) return { picks: [], finish: true }
+  const byWords = opts.findIndex(b => saysOption(answer, b))
   if (byWords >= 0) return { picks: [byWords], finish: false }
   const norm = normDigits(answer)
   if (!NUMBERS.test(norm)) return null
@@ -317,73 +386,81 @@ export function answerPicks(s: TemplateStep, answer: string, shown: string[]): {
     const k = Number(m)
     const label = k >= 1 ? shown[k - 1] : undefined
     if (label === undefined) continue
-    if (s.multi && label.trim().toLowerCase() === done) { finish = true; continue }
-    const i = opts.findIndex(b => b.label.trim().toLowerCase() === label.trim().toLowerCase())
+    if (s.multi && dones.includes(label.trim().toLowerCase())) { finish = true; continue }
+    const i = opts.findIndex(b => saysOption(label, b))
     if (i >= 0 && !picks.includes(i)) picks.push(i)
   }
   const kept = s.multi ? picks : picks.slice(0, 1)
   return kept.length || finish ? { picks: kept, finish } : null
 }
 
-function endWith(t: { endMsg: string }, own: string | undefined, said: Said[]) {
-  const msg = own?.trim() || t.endMsg.trim()
+function endWith(t: { endMsg: string; endMsgZh?: string }, own: string | undefined, said: Said[], lang: Lang) {
+  const msg = own?.trim() || tr(t, 'endMsg', lang).trim()
   if (msg) said.push({ from: 'bot', text: msg })
   said.push({ from: 'system', text: own?.trim() ? 'End · closing message (step)' : msg ? 'End · closing message (template)' : 'End' })
 }
 
 /** Send from a step on. Twin of lead_flow_send. */
-export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, from: string, before: Said[] = [], trail: string[] = []): Walk {
+export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg' | 'endMsgZh'>, from: string, before: Said[] = [], trail: string[] = [], lang: Lang = 'en'): Walk {
   const said = [...before]
   let at: string | null | undefined = from
   for (let hops = 0; hops < 40; hops++) {
     const s = t.steps.find(x => x.id === at)
-    if (!s) return { said, waiting: null, tries: 0, ended: 'done' }
-    if (s.file) said.push({ from: 'bot', text: '', file: s.file })
+    if (!s) return { said, waiting: null, tries: 0, ended: 'done', lang }
+    for (const file of filesOf(s)) said.push({ from: 'bot', text: '', file })
     const waits = s.kind === 'question' || s.kind === 'phone' || s.kind === 'text'
     // Twin of lead_flow_buttons: the options, then ‹ Back when something waited before this step in the run.
     const back = waits && !!s.back && s.id !== t.steps[0]?.id && trail.some(x => x !== s.id)
-    const opts = s.kind === 'question' ? (s.buttons ?? []).map(b => b.label) : undefined
-    const buttons = back ? [...(opts ?? []), BACK_LABEL] : opts
-    if (s.text?.trim()) said.push({ from: 'bot', text: s.text, buttons })
-    if (waits) return { said, waiting: s.id, tries: 0, ended: null, trail: s.id === t.steps[0]?.id ? [s.id] : [...trail, s.id] }
+    const opts = s.kind === 'question' ? (s.buttons ?? []).map(b => labelOf(b, lang)) : undefined
+    const buttons = back ? [...(opts ?? []), backLabel(lang)] : opts
+    const text = tr(s, 'text', lang)
+    if (text.trim()) said.push({ from: 'bot', text, buttons })
+    if (waits) return { said, waiting: s.id, tries: 0, ended: null, trail: s.id === t.steps[0]?.id ? [s.id] : [...trail, s.id], lang }
     if (s.kind === 'handoff' || s.kind === 'ai') {
       said.push({ from: 'system', text: s.kind === 'ai' ? 'Goes to the AI Agent · it reads the chat and answers from here' : 'Goes to a person · waits in the Inbox' })
-      return { said, waiting: null, tries: 0, ended: s.kind === 'ai' ? 'ai' : 'person' }
+      return { said, waiting: null, tries: 0, ended: s.kind === 'ai' ? 'ai' : 'person', lang }
     }
-    if (!s.next) { endWith(t, s.endMsg, said); return { said, waiting: null, tries: 0, ended: 'done' } }
+    if (!s.next) { endWith(t, tr(s, 'endMsg', lang), said, lang); return { said, waiting: null, tries: 0, ended: 'done', lang } }
     at = s.next
   }
-  return { said, waiting: null, tries: 0, ended: 'done' }
+  return { said, waiting: null, tries: 0, ended: 'done', lang }
 }
 
 /** The customer answered. Twin of lead_flow_on_message. */
-export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, answer: string): Walk {
+export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg' | 'endMsgZh'>, w: Walk, answer: string): Walk {
   const t0 = t
+  const lang = w.lang ?? 'en'
   const said: Said[] = [...w.said, { from: 'customer', text: answer }]
   const s = t.steps.find(x => x.id === w.waiting)
-  if (!s) return { said, waiting: null, tries: 0, ended: 'stopped' }
+  if (!s) return { said, waiting: null, tries: 0, ended: 'stopped', lang }
   if (asksForPerson(answer)) {
     said.push({ from: 'system', text: 'Asked for a person · goes to a person' })
-    return { said, waiting: null, tries: 0, ended: 'person' }
+    return { said, waiting: null, tries: 0, ended: 'person', lang }
   }
   const trail = w.trail ?? []
   if (s.back && isBack(answer) && trail.length > 1 && trail[trail.length - 1] === s.id) {
     said.push({ from: 'system', text: 'Back to the question before' })
-    return walkFrom(t, trail[trail.length - 2], said, trail.slice(0, -2))
+    return walkFrom(t, trail[trail.length - 2], said, trail.slice(0, -2), lang)
   }
   let next: string | null = null
   let end: string | undefined
   if (s.kind === 'question') {
-    const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (s.buttons ?? []).map(b => b.label)
+    const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (s.buttons ?? []).map(b => labelOf(b, lang))
     const hit = answerPicks(s, answer, shown)
     const sayAlso = (ids: string[] | undefined) => {
-      for (const id of ids ?? []) { const t = t0.steps.find(x => x.id === id); if (t?.file) said.push({ from: 'bot', text: '', file: t.file }); if (t?.text?.trim()) said.push({ from: 'bot', text: t.text }) }
+      for (const id of ids ?? []) {
+        const t = t0.steps.find(x => x.id === id)
+        if (!t) continue
+        for (const file of filesOf(t)) said.push({ from: 'bot', text: '', file })
+        const text = tr(t, 'text', lang)
+        if (text.trim()) said.push({ from: 'bot', text })
+      }
     }
     if (hit && !s.multi) {
       const o = s.buttons![hit.picks[0]]
       sayAlso(o.also)
       next = o.next
-      end = o.endMsg
+      end = tr(o, 'endMsg', lang)
     } else if (hit) {
       const had = [...(w.picked ?? [])]
       for (const i of hit.picks) {
@@ -391,34 +468,34 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
         sayAlso(s.buttons![i].also)
         had.push(i)
       }
-      if (s.saveAs && hit.picks.length) said.push({ from: 'system', text: `Saved to ${SAVE_AS.find(x => x.v === s.saveAs)?.l ?? s.saveAs}: ${had.map(i => s.buttons![i].label).join(', ')}` })
-      const left = (s.buttons ?? []).map((b, i) => ({ b, i })).filter(x => !had.includes(x.i)).map(x => x.b.label)
+      if (s.saveAs && hit.picks.length) said.push({ from: 'system', text: `Saved to ${SAVE_AS.find(x => x.v === s.saveAs)?.l ?? s.saveAs}: ${had.map(i => labelOf(s.buttons![i], lang)).join(', ')}` })
+      const left = (s.buttons ?? []).map((b, i) => ({ b, i })).filter(x => !had.includes(x.i)).map(x => labelOf(x.b, lang))
       if (!hit.finish && left.length) {
-        said.push({ from: 'bot', text: againOf(s), buttons: [...left, doneOf(s)] })
-        return { said, waiting: s.id, tries: 0, ended: null, picked: had, trail }
+        said.push({ from: 'bot', text: againOf(s, lang), buttons: [...left, doneOf(s, lang)] })
+        return { said, waiting: s.id, tries: 0, ended: null, picked: had, trail, lang }
       }
       next = s.next ?? ''
-      end = s.endMsg
+      end = tr(s, 'endMsg', lang)
     }
   } else if (s.kind === 'text') {
     next = s.next ?? ''
-    end = s.endMsg
+    end = tr(s, 'endMsg', lang)
     if (s.saveAs) said.push({ from: 'system', text: `Saved to ${SAVE_AS.find(x => x.v === s.saveAs)?.l ?? s.saveAs}` })
   } else if (s.kind === 'phone') {
     const phone = findPhone(normDigits(answer))
-    if (phone) { next = s.next ?? ''; end = s.endMsg; said.push({ from: 'system', text: 'Phone saved to the card' }) }
-    else if (s.retryText?.trim()) {
+    if (phone) { next = s.next ?? ''; end = tr(s, 'endMsg', lang); said.push({ from: 'system', text: 'Phone saved to the card' }) }
+    else if (tr(s, 'retryText', lang).trim()) {
       if (s.retryMax == null || w.tries < Number(s.retryMax)) {
-        said.push({ from: 'bot', text: s.retryText })
-        return { said, waiting: s.id, tries: w.tries + 1, ended: null, trail }
+        said.push({ from: 'bot', text: tr(s, 'retryText', lang) })
+        return { said, waiting: s.id, tries: w.tries + 1, ended: null, trail, lang }
       }
-      if ((s.failNext ?? 'person') === 'person') { said.push({ from: 'system', text: 'Still not a phone · goes to a person' }); return { said, waiting: null, tries: 0, ended: 'person' } }
+      if ((s.failNext ?? 'person') === 'person') { said.push({ from: 'system', text: 'Still not a phone · goes to a person' }); return { said, waiting: null, tries: 0, ended: 'person', lang } }
       next = s.failNext ?? ''
     }
   }
-  if (next === null) { said.push({ from: 'system', text: 'Typed their own answer · the template stops for CS' }); return { said, waiting: null, tries: 0, ended: 'stopped' } }
-  if (next === '') { endWith(t, end, said); return { said, waiting: null, tries: 0, ended: 'done' } }
-  return walkFrom(t, next, said, trail)
+  if (next === null) { said.push({ from: 'system', text: 'Typed their own answer · the template stops for CS' }); return { said, waiting: null, tries: 0, ended: 'stopped', lang } }
+  if (next === '') { endWith(t, end, said, lang); return { said, waiting: null, tries: 0, ended: 'done', lang } }
+  return walkFrom(t, next, said, trail, lang)
 }
 
 // ── The library ──
@@ -486,15 +563,20 @@ export function updateFromLibrary(step: TemplateStep, item: Pick<LibraryItem, 'i
         const o: StepOption = { ...b, next: own?.next ?? '' }
         delete o.also
         delete o.endMsg
+        delete o.endMsgZh
         if (own?.also) o.also = own.also
         if (own?.endMsg) o.endMsg = own.endMsg
+        if (own?.endMsgZh) o.endMsgZh = own.endMsgZh
         return o
       })
     : undefined
   const out: TemplateStep = { ...step, kind: src.kind, name: src.name, text: src.text, lib: { id: item.id, ver: item.ver } }
-  for (const k of ['file', 'saveAs', 'retryText', 'retryMax', 'multi', 'doneLabel', 'againText', 'buttons'] as const) delete out[k]
+  for (const k of ['textZh', 'file', 'files', 'saveAs', 'retryText', 'retryTextZh', 'retryMax', 'multi', 'doneLabel', 'doneLabelZh', 'againText', 'againTextZh', 'buttons'] as const) delete out[k]
   return {
     ...out,
+    ...(src.textZh ? { textZh: src.textZh } : {}), ...(src.files?.length ? { files: src.files } : {}),
+    ...(src.retryTextZh ? { retryTextZh: src.retryTextZh } : {}), ...(src.doneLabelZh ? { doneLabelZh: src.doneLabelZh } : {}),
+    ...(src.againTextZh ? { againTextZh: src.againTextZh } : {}),
     ...(src.file ? { file: src.file } : {}), ...(src.saveAs ? { saveAs: src.saveAs } : {}), ...(src.retryText ? { retryText: src.retryText } : {}),
     ...(src.retryMax ? { retryMax: src.retryMax } : {}), ...(src.multi ? { multi: src.multi } : {}), ...(src.doneLabel ? { doneLabel: src.doneLabel } : {}),
     ...(src.againText ? { againText: src.againText } : {}), ...(buttons ? { buttons } : {}),

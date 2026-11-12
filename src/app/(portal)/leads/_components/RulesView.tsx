@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { LeadIcon } from '@/components/layout/lead-icons'
-import { saveReplyRules, setAdOutlet } from '@/lib/leads/actions'
+import { leadMediaLinks, saveReplyRules, setAdOutlet } from '@/lib/leads/actions'
 import type { LeadAd } from '@/lib/leads/ads'
 import { adSlots, replyLabel, withAdSlots, type PageChannel, type RuleLogLine, type Slot } from '@/lib/leads/pages'
-import { extOf } from '@/lib/leads/template-map'
+import { extOf, isImage } from '@/lib/leads/template-map'
 import { outletCounts, outletName, outletsFor, passesOutlet, type LeadOutlet, type OutletFilter as Filter } from '@/lib/leads/outlets'
 import OutletFilter from './ui/OutletFilter'
-import { walkAnswer, walkFrom, type ReplyRules, type ReplyTemplate, type Walk } from '@/lib/leads/template'
+import { filesOf, labelOf, walkAnswer, walkFrom, type ReplyRules, type ReplyTemplate, type Walk } from '@/lib/leads/template'
 import RichText from './RichText'
 import s from './rules.module.css'
 
@@ -353,7 +353,7 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
 
 const stamp = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' }).replace(',', '')
 
-type Line = { k: 'cust' | 'bot' | 'file' | 'btns' | 'wait'; text: string; by?: string; btns?: string[] }
+type Line = { k: 'cust' | 'bot' | 'img' | 'vid' | 'file' | 'btns' | 'wait'; text: string; by?: string; btns?: string[]; url?: string }
 
 /** The preview (README §7.5): the chosen reply, run step by step as the customer would see it. */
 function Preview({ sel, d, ads, brandName, tpl }: {
@@ -375,6 +375,15 @@ function Preview({ sel, d, ads, brandName, tpl }: {
   const v = slot === 'follow' ? pageV : slot
   const brand = brandName(brandId)
   const title = sel.kind === 'page' ? `${brand} · ${CH[channel]}` : (ad?.name || ad?.headline || `Ad ${sel.kind === 'ad' ? sel.adId : ''}`)
+  // The template's photos and videos as the customer sees them, first (2026-11-11): an hour's signed links.
+  const [links, setLinks] = useState<Record<string, string>>({})
+  const want = useMemo(() => { const t = v && v !== 'cs' && v !== 'ai' ? tpl(v) : undefined; return [...new Set((t?.steps ?? []).flatMap(x => filesOf(x).map(f => f.path)))].filter(x => !links[x]).sort().join('|') }, [v, tpl, links])
+  useEffect(() => {
+    if (!want) return
+    let live = true
+    leadMediaLinks(want.split('|')).then(r => { if (live && r.ok) setLinks(l => ({ ...l, ...r.data })) })
+    return () => { live = false }
+  }, [want])
   const runKey = `${JSON.stringify(sel)}|${time}|${v}`
   const [run, setRun] = useState<{ key: string; picks: string[] }>({ key: runKey, picks: [] })
   const picks = useMemo(() => (run.key === runKey ? run.picks : []), [run, runKey])
@@ -401,17 +410,17 @@ function Preview({ sel, d, ads, brandName, tpl }: {
     for (const x of w.said) {
       if (x.from === 'customer') out.push({ k: 'cust', text: x.text })
       else if (x.from === 'system') out.push({ k: 'wait', text: x.text.startsWith('Goes to the AI') ? 'AI Agent takes over' : x.text.startsWith('Goes to a person') ? 'Handed to a person' : x.text })
-      else if (x.file) out.push({ k: 'file', text: x.file.name })
+      else if (x.file) out.push({ k: isImage(x.file.mime) ? 'img' : x.file.mime.startsWith('video/') && links[x.file.path] ? 'vid' : 'file', text: x.file.name, url: links[x.file.path] })
       else out.push({ k: 'bot', text: x.text.replace(/\{name\}/g, 'Jason'), by })
     }
     const waiting = w.waiting ? t.steps.find(x => x.id === w.waiting) : undefined
     if (waiting?.kind === 'question') {
-      const shownBtns = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (waiting.buttons ?? []).map(b => b.label)
+      const shownBtns = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (waiting.buttons ?? []).map(b => labelOf(b))
       out.push({ k: 'btns', text: '', btns: waiting.multi ? [...shownBtns, waiting.doneLabel || 'That’s all'] : shownBtns })
     } else if (waiting?.kind === 'phone') out.push({ k: 'btns', text: '', btns: ['Send my number'] })
     else if (waiting?.kind === 'text') out.push({ k: 'btns', text: '', btns: ['Type an answer'] })
     return out
-  }, [sel.kind, v, time, brand, picks, tpl])
+  }, [sel.kind, v, time, brand, picks, tpl, links])
   const answer = (b: string) => add(b === 'Send my number' ? '012-338 4721' : b === 'Type an answer' ? 'Next Saturday afternoon' : b)
   useEffect(() => { scroll.current?.scrollTo({ top: scroll.current.scrollHeight }) }, [lines, dev])
 
@@ -420,6 +429,8 @@ function Preview({ sel, d, ads, brandName, tpl }: {
       <div className={s.spacer} />
       {lines.map((m, i) => m.k === 'cust' ? <div key={i} className={s.cust}>{m.text}</div>
         : m.k === 'bot' ? <div key={i} className={s.bot}><div className={s.botText}><RichText text={m.text} /></div><span className={s.by}>{m.by}</span></div>
+        : m.k === 'img' ? <span key={i} className={s.img} style={{ backgroundImage: m.url ? `url("${m.url}")` : undefined }} role="img" aria-label={m.text} />
+        : m.k === 'vid' ? <video key={i} className={s.vid} src={m.url} controls preload="metadata" aria-label={m.text} />
         : m.k === 'file' ? <div key={i} className={s.fileMsg}><span className={s.fileTag}>{extOf(m.text)}</span>{m.text}</div>
         : m.k === 'btns' ? <div key={i} className={s.btns}>{m.btns!.map(b => <button key={b} type="button" className={s.btn} onClick={() => answer(b)}>{b}</button>)}</div>
         : <span key={i} className={s.wait}>{m.text}</span>)}

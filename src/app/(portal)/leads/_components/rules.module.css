@@ -190,3 +190,7 @@
 .logWhat { font-size: 13px; line-height: 1.45; color: rgb(var(--lv-fg)); }
 .logBy { font-size: 11px; color: rgb(var(--lv-fg-3)); }
 .logEmpty { padding: 10px 12px; font-size: 13px; color: rgb(var(--lv-fg-3)); }
+
+/* The template's photos and videos in the preview (2026-11-11). */
+.img { display: block; align-self: flex-start; width: 80%; height: 160px; border-radius: 12px; border: 1px solid rgb(var(--lv-line)); background: rgb(var(--lv-page)) center / cover no-repeat; }
+.vid { display: block; align-self: flex-start; width: 80%; max-height: 220px; border-radius: 12px; border: 1px solid rgb(var(--lv-line)); background: rgb(var(--lv-page)); }

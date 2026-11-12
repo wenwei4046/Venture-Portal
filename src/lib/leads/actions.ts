@@ -279,7 +279,7 @@ export async function forwardMessage(toContactId: string, m: { body: string; med
 
 /** Short-lived links (an hour) to the photos and files sent in a conversation, by their paths. */
 export async function leadMediaLinks(paths: string[]): Promise<LeadOutcome<Record<string, string>>> {
-  await requireActionOn(['/leads', '/leads/flows', '/leads/library'], 'leads', 'view')
+  await requireActionOn(['/leads', '/leads/flows', '/leads/library', '/leads/rules'], 'leads', 'view')
   // A chat's files, and a template's (chat/tpl/<uuid>/<name>, mig 20261102120000).
   const wanted = [...new Set(paths)].filter(p => /^chat\/(tpl\/)?[0-9a-f-]{36}\/[^/]{1,200}$/.test(p)).slice(0, 100)
   if (!wanted.length) return { ok: true, data: {} }
@@ -400,7 +400,7 @@ export async function saveLeave(rows: Array<Pick<StaffLeave, 'id' | 'userId' | '
 }
 
 /** Reply templates' Save: a template's name, description, closing message and steps (new: id null). Returns its id. */
-export async function saveTemplate(templateId: string | null, data: { name: string; description: string; endMsg: string; steps: TemplateStep[] }) {
+export async function saveTemplate(templateId: string | null, data: { name: string; description: string; endMsg: string; endMsgZh: string; steps: TemplateStep[] }) {
   await requireActionOn('/leads/flows', 'leads', 'manage')
   return call<string>('lead_save_template', { p_id: templateId, p_data: data }, 'The template was not saved.')
 }

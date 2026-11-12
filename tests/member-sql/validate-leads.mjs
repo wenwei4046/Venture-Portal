@@ -2295,4 +2295,126 @@ await db.exec(`
   await as(CS_USER, ALL)
 }
 
+// Reply templates in English and Chinese, several files a step (mig 20261111130000): the customer's language decides,
+// the other one fills an empty box, an option matches either language, the files go first in their order.
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await as(CS_USER, ALL)
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, '708935155aae4bc8a0a93ad6f69fd622', 'the runner here is production’s')
+  await db.exec(await f('20261111130000_lead_templates_bilingual_files.sql'))
+  await db.exec(await f('20261111130000_lead_templates_bilingual_files.sql'))
+  for (const fn of ['lead_flow_on_message', 'lead_flow_say', 'lead_template_problem', 'lead_flow_send', 'lead_flow_question'])
+    check((await q(`select prosrc from pg_proc where proname = $1`, [fn]))[0].prosrc.split('mig 20261111130000').length - 1, 1, `${fn}: changed once, applying twice changes nothing`)
+  check((await q(`select prosrc from pg_proc where proname = 'lead_flow_on_message'`))[0].prosrc.split(`public.lead_flow_t(c.id, s, 'endMsg')`).length - 1, 2, 'both closing messages of the runner are in the customer’s language')
+  for (const sig of ['lead_flow_lang(uuid)', 'lead_flow_t(uuid,jsonb,text)', 'lead_flow_is(text,jsonb)'])
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [false, false], `${sig}: the runner’s alone`)
+
+  const P = '946946021838962', AD = '120249999000011'
+  const F1 = 'chat/tpl/00000000-0000-4000-8000-0000000b1001/sofa.jpg', F2 = 'chat/tpl/00000000-0000-4000-8000-0000000b1001/price list.pdf'
+  await q(`insert into public.file_objects (bucket_id, name) values ('lead-media', $1), ('lead-media', $2)`, [F1, F2])
+  const files = [{ path: F1, name: 'sofa.jpg', mime: 'image/jpeg' }, { path: F2, name: 'price list.pdf', mime: 'application/pdf' }]
+  const steps = [
+    { id: 'q1', kind: 'question', text: 'Hi {name}! Sofa or bed?', textZh: '{name}你好！沙发还是床？', saveAs: 'interest', files,
+      buttons: [{ label: 'Sofa', labelZh: '沙发', next: 'q2' }, { label: 'Bed', labelZh: '', next: 'q2' }] },
+    { id: 'q2', kind: 'question', text: 'Which ones?', textZh: '', multi: true, back: true, doneLabelZh: '好了', saveAs: 'interest', next: 'p',
+      buttons: [{ label: 'Fabric', labelZh: '布', next: '' }, { label: 'Leather', labelZh: '皮', next: '' }] },
+    { id: 'p', kind: 'phone', text: 'Your number?', textZh: '您的电话？', back: true, retryText: 'Not a phone', retryTextZh: '这不是电话号码', retryMax: '1', failNext: '', next: '' },
+  ]
+  const tpl = await q(`select public.lead_save_template(null, $1::jsonb) i`, [JSON.stringify({ name: 'Bilingual', endMsg: 'Thanks!', endMsgZh: '谢谢！', steps })]).then(r => r[0].i)
+  check((await q(`select end_msg, end_msg_zh from public.lead_flows where id = $1`, [tpl]))[0], { end_msg: 'Thanks!', end_msg_zh: '谢谢！' }, 'the closing message in both languages')
+  check((await q(`select public.lead_flows() l`))[0].l.find(x => x.id === tpl).endMsgZh, '谢谢！', 'read back as endMsgZh')
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [AD, tpl])
+
+  let seq = 0
+  const inMsg = (psid, body, ad = null) => q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: `bi.${psid}.${++seq}`, pageId: P, psid, name: 'Bi Lang', kind: 'text', body, sentAt: new Date().toISOString(), ad },
+  ])])
+  const contactOf = async psid => (await q(`select id from public.lead_contacts where channel = 'messenger' and external_id = $1`, [psid]))[0].id
+  const flowMsgs = async (id, n) => (await q(`select body, buttons, media_path from public.lead_messages where contact_id = $1 and sender = 'flow' order by id desc limit $2`, [id, n])).reverse()
+  const last = async id => { const [m] = await flowMsgs(id, 1); return { body: m.body, buttons: m.buttons } }
+  const card = async id => (await q(`select interest, flow_step, flow_state from public.lead_contacts where id = $1`, [id]))[0]
+
+  // A customer writing Chinese.
+  await inMsg('7711001', '你好', { sourceId: AD, headline: 'Sofas' })
+  const zh = await contactOf('7711001')
+  const nm = async id => (await q('select name from public.lead_contacts where id = $1', [id]))[0].name
+  check(await flowMsgs(zh, 3), [
+    { body: '[Photo]', buttons: null, media_path: F1 },
+    { body: '[File] price list.pdf', buttons: null, media_path: F2 },
+    { body: `${await nm(zh)}你好！沙发还是床？`, buttons: ['沙发', 'Bed'], media_path: null },
+  ], 'the files first, in order; then the Chinese words; an option with no Chinese keeps its English')
+  await inMsg('7711001', '沙发')
+  check([await last(zh), (await card(zh)).interest], [{ body: 'Which ones?', buttons: ['布', '皮', '‹ 返回'] }, '沙发'], 'tapped in Chinese; kept as shown; no Chinese words → the English; ‹ 返回')
+  await inMsg('7711001', '1')
+  check(await last(zh), { body: '还有别的吗？再选一个，或点“好了”。', buttons: ['皮', '好了'] }, 'a number keeps the language; the Chinese default comes back with its finish button')
+  await inMsg('7711001', '好了')
+  check([await last(zh), (await card(zh)).flow_step], [{ body: '您的电话？', buttons: ['‹ 返回'] }, 'p'], 'finished in Chinese; on to the phone')
+  await inMsg('7711001', '‹ 返回')
+  check((await card(zh)).flow_step, 'q2', '‹ 返回 goes back')
+  await inMsg('7711001', '好了')
+  await inMsg('7711001', '不知道')
+  check(await last(zh), { body: '这不是电话号码', buttons: null }, 'still wrong, in Chinese')
+  await inMsg('7711001', '0123384721')
+  check([await last(zh), (await card(zh)).flow_state], [{ body: '谢谢！', buttons: null }, 'done'], 'the template’s Chinese closing message')
+
+  // A customer writing English, then typing Chinese with the panel's Language set to English.
+  await inMsg('7711002', 'hello there', { sourceId: AD, headline: 'Sofas' })
+  const en = await contactOf('7711002')
+  check(await last(en), { body: `Hi ${await nm(en)}! Sofa or bed?`, buttons: ['Sofa', 'Bed'] }, 'English words and options')
+  await inMsg('7711002', 'sofa')
+  await q(`update public.lead_contacts set language = 'English' where id = $1`, [en])
+  await inMsg('7711002', '皮')
+  check([await last(en), (await card(en)).interest], [{ body: 'Anything else? Pick another, or tap "That\'s all".', buttons: ['Fabric', "That's all"] }, 'Leather'],
+    'the Chinese words still pick the option; the panel’s Language keeps English')
+  await inMsg('7711002', "That's all")
+  check(await last(en), { body: 'Your number?', buttons: ['‹ Back'] }, 'on to the phone in English')
+
+  // The finish button falls back to the other language's too (mig 20261112100000).
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_question'`))[0].m, '8aacc9c1b3c88c9d89f68d8a98a6d6bf', 'lead_flow_question here is production’s after 20261111130000')
+  await db.exec(await f('20261112100000_lead_done_label_fallback.sql'))
+  await db.exec(await f('20261112100000_lead_done_label_fallback.sql'))
+  check((await q(`select prosrc from pg_proc where proname = 'lead_flow_question'`))[0].prosrc.split('mig 20261112100000').length - 1, 1, 'swapped once, applying twice changes nothing')
+  const doneTpl = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Done label', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([{ id: 'm', kind: 'question', text: '选几个？', multi: true, doneLabel: 'Done', buttons: [{ label: 'A', labelZh: '甲', next: '' }, { label: 'B', labelZh: '乙', next: '' }] }])]))[0].id
+  const AD2 = '120249999000012'
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [AD2, doneTpl])
+  await inMsg('7711003', '你好', { sourceId: AD2, headline: 'Sofas' })
+  const dz = await contactOf('7711003')
+  await inMsg('7711003', '甲')
+  check(await last(dz), { body: '还有别的吗？再选一个，或点“Done”。', buttons: ['乙', 'Done'] }, 'no Chinese finish button: the English one, not 就这些')
+  await inMsg('7711003', 'done')
+  check((await card(dz)).flow_state, 'done', 'and it finishes')
+
+  // The words fall back, both ways; a step from before keeps its one file.
+  const t = (s, lang) => q(`update public.lead_contacts set language = $2 where id = $1`, [en, lang]).then(() => q(`select public.lead_flow_t($1, $2::jsonb, 'text') t`, [en, JSON.stringify(s)])).then(r => r[0].t)
+  check([await t({ text: 'Hi', textZh: '' }, 'Mandarin'), await t({ text: '', textZh: '你好' }, 'English'), await t({ text: 'Hi', textZh: '你好' }, 'Mandarin')], ['Hi', '你好', '你好'], 'an empty box is filled by the other language')
+  const before = (await q(`select count(*)::int n from public.lead_messages where contact_id = $1`, [en]))[0].n
+  await q(`select public.lead_flow_say_file($1, 'Old', $2::jsonb)`, [en, JSON.stringify({ file: files[0] })])
+  await q(`select public.lead_flow_say_file($1, 'Old', $2::jsonb)`, [en, JSON.stringify({ files: [{ path: 'chat/tpl/00000000-0000-4000-8000-0000000b1001/missing.jpg', mime: 'image/jpeg' }] })])
+  check((await q(`select count(*)::int n from public.lead_messages where contact_id = $1`, [en]))[0].n, before + 1, 'the old one `file` still goes; a file not in the bucket is skipped')
+  await q(`update public.lead_contacts set name = '', language = 'Mandarin' where id = $1`, [en])
+  await q(`select public.lead_flow_say($1, 'T', '你好 {name}！', null)`, [en])
+  check((await last(en)).body, '你好 朋友！', 'no name, in Chinese: 朋友')
+
+  // What a save takes.
+  const bad = (s, what, re) => refuses(`select public.lead_save_template(null, $1::jsonb)`, [JSON.stringify({ name: 'Bad', steps: [s] })], re, what)
+  await bad({ id: 'a', kind: 'message', text: 'x', files: Array.from({ length: 11 }, () => files[0]), next: '' }, '11 files', /10 files/)
+  await bad({ id: 'a', kind: 'message', text: 'x', files: [{ path: 'elsewhere/x.jpg' }], next: '' }, 'a file from elsewhere', /uploaded with the template/)
+  await bad({ id: 'a', kind: 'message', text: 'x', textZh: 'x'.repeat(1001), next: '' }, 'Chinese words too long', /1,000/)
+  await bad({ id: 'a', kind: 'question', text: 'x', doneLabelZh: '一二三四五六七八九十一二三四五六七八九十一', multi: true, buttons: [{ label: 'a', next: '' }] }, 'a long Chinese finish button', /20 characters/)
+  await bad({ id: 'a', kind: 'message', text: '', textZh: '', next: '' }, 'no words in either', /says something/)
+  check(typeof (await q(`select public.lead_save_template(null, $1::jsonb) i`, [JSON.stringify({ name: 'Only Chinese', steps: [
+    { id: 'a', kind: 'question', text: '', textZh: '选一个', buttons: [{ label: '', labelZh: '沙发', next: '' }] }] })]))[0].i, 'string', 'Chinese alone is enough')
+
+  // The library brings its Chinese words and its files.
+  const lib = (await q(`insert into public.lead_step_library (kind, name, steps, ver) values ('step', 'Promo', $1::jsonb, 2) returning id`,
+    [JSON.stringify([{ id: 's1', kind: 'message', text: 'Promo!', textZh: '优惠！', files: [files[0]], next: '' }])]))[0].id
+  const usesLib = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Uses lib', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([{ id: 'x', kind: 'message', text: 'old', endMsgZh: '再见', next: '', lib: { id: lib, ver: 1 } }])]))[0].id
+  await q(`select public.lead_library_push($1)`, [lib])
+  const pushed = (await q(`select steps->0 s from public.lead_flows where id = $1`, [usesLib]))[0].s
+  check([pushed.text, pushed.textZh, pushed.files.length, pushed.endMsgZh, pushed.lib.ver], ['Promo!', '优惠！', 1, '再见', 2], 'the library’s words in both languages and its files; the template’s own closing kept')
+  await as(CS_USER, ALL)
+}
+
 console.log(`validate-leads: ${checks} checks passed`)
