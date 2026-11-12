@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addMonths, buildTally, commissionByMonth, countsInTally, defaultTallyMonth, houzsMonthOf, monthOf, tallyDay, tallyMonthLong,
-  tallyMonthShort, tallyOtherSide, twoMonthOrderIds, type TallyBrand, type TallyOrder,
+  addMonths, buildTally, commissionByMonth, countsInTally, defaultTallyMonth, houzsMonthOf, monthOf, tallyBills, tallyDay,
+  tallyMonthExport, tallyMonthLong, tallyMonthShort, tallyOf, tallyOtherSide, twoMonthOrderIds, type TallyBrand, type TallyOrder,
 } from './tally'
 
 // The Tally (2026-11-12): Houzs pays by the SO date, we pay the salesperson by
@@ -231,6 +231,55 @@ describe('buildTally', () => {
   it('names the bills whose fair day is worth reading', () => {
     const late = bill({ periodMonth: '2026-11-01', orderDate: '2026-12-01' })
     expect(twoMonthOrderIds([bill(), late, bill({ cancelled: true, orderDate: '2026-12-01' })], '2026-08-01')).toEqual([late.orderId])
+  })
+})
+
+describe('a month whole — its export', () => {
+  const sep = bill({ periodMonth: '2026-09-01', orderDate: '2026-10-10', commissionable: 3888 })
+  const own = bill({ periodMonth: '2026-10-01', orderDate: '2026-10-08', commissionable: 2000 })
+  const late = bill({ periodMonth: '2026-10-01', orderDate: '2026-11-02', commissionable: 9500, refNo: 'ZNT6389', brandCode: 'ZANOTTI' })
+  const nov = bill({ periodMonth: '2026-11-01', orderDate: '2026-11-06', commissionable: 500 })
+  const bills = () => tallyBills([sep, own, late, nov, bill({ cancelled: true, periodMonth: '2026-10-01', orderDate: '2026-10-09' })], BRANDS, {
+    feedFloor: '2026-08-01',
+    fairDates: new Map([[sep.orderId, '2026-09-19'], [own.orderId, '2026-10-04']]),
+  })
+
+  it('lists EVERY bill on each side, not only the ones in two months', () => {
+    const month = tallyMonthExport(bills(), '2026-09-01', '2026-10-01')!
+    // By SO date: September's bill keyed in October, and October's own.
+    expect(month.so.map(b => b.orderId)).toEqual([own.orderId, sep.orderId])
+    // By fair date: October's own, and the one keyed in November.
+    expect(month.fair.map(b => b.orderId)).toEqual([own.orderId, late.orderId])
+    // The fair day read for a bill in one month comes along too.
+    expect(month.fair[0].fairDate).toBe('2026-10-04')
+    // The row is the page's.
+    expect(month.row.so).toEqual({ bills: 2, sales: 5888, bill: 824.32 })
+    expect(month.row.fair).toEqual({ bills: 2, sales: 11500, bill: 1515 })
+    expect(month.row.carried.bill).toBe(1235)
+    expect(month.from).toBe('2026-09-01')
+  })
+
+  it('splits both sides by brand, the biggest first', () => {
+    const month = tallyMonthExport(bills(), '2026-09-01', '2026-10-01')!
+    expect(month.brands).toEqual([
+      { code: 'ZANOTTI', name: 'Zanotti', pct: 0.13, so: { bills: 0, sales: 0, bill: 0 }, fair: { bills: 1, sales: 9500, bill: 1235 } },
+      { code: 'AKEMI', name: 'Akemi', pct: 0.14, so: { bills: 2, sales: 5888, bill: 824.32 }, fair: { bills: 1, sales: 2000, bill: 280 } },
+    ])
+    // Each side's brands add up to its row.
+    expect(month.brands.reduce((t, b) => t + b.so.bill, 0)).toBeCloseTo(month.row.so.bill, 2)
+    expect(month.brands.reduce((t, b) => t + b.fair.bill, 0)).toBeCloseTo(month.row.fair.bill, 2)
+  })
+
+  it('is nothing for a month the Tally does not list', () => {
+    expect(tallyMonthExport(bills(), '2026-09-01', '2026-08-01')).toBeNull()
+    expect(tallyMonthExport(bills(), '2026-09-01', '2027-01-01')).toBeNull()
+    expect(tallyMonthExport([], '2026-09-01', '2026-10-01')).toBeNull()
+  })
+
+  it('tallyOf over the bills is buildTally', () => {
+    const orders = [sep, own, late, nov]
+    const options = { feedFloor: '2026-08-01', from: '2026-09-01' }
+    expect(tallyOf(tallyBills(orders, BRANDS, options), options.from)).toEqual(buildTally(orders, BRANDS, options))
   })
 })
 

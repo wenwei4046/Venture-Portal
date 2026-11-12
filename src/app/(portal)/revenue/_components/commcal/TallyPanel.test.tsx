@@ -147,6 +147,18 @@ describe('Comm Cal › Tally', () => {
     expect(flag.closest('a')).toHaveAttribute('href', '/revenue/fair/rules?tab=brands')
   })
 
+  it('offers the picked month’s workbook only to whoever may export', () => {
+    nav.search = 'tab=tally&month=2026-10'
+    const { unmount } = render(<TallyPanel report={report()} sub={SUB} canExport />)
+    const link = screen.getByRole('link', { name: 'Export Oct 2026' })
+    expect(link).toHaveAttribute('href', '/revenue/fair/tally/export?month=2026-10')
+    expect(link).toHaveAttribute('download')
+    unmount()
+
+    render(<TallyPanel report={report()} sub={SUB} />)
+    expect(screen.queryByRole('link', { name: /Export/ })).toBeNull()
+  })
+
   it('says so when there is nothing to tally', () => {
     render(<TallyPanel report={{ from: null, months: [], twoMonthBills: 0, noPctBills: 0 }} sub={SUB} />)
     expect(screen.getByText('Nothing to tally yet.')).toBeInTheDocument()

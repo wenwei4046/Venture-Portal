@@ -8,7 +8,7 @@ import {
   defaultTallyMonth, tallyDay, tallyMonthLong, tallyMonthShort, tallyOtherSide,
   type TallyBill, type TallyCommission, type TallyMonth, type TallyReport,
 } from '@/lib/commission/tally'
-import { Card, Cards, Chip, GridEmpty, GridHead, GridRow, GridTable, SecLabel, SectHead, hv } from '@/components/hrv/kit'
+import { Card, Cards, Chip, GridEmpty, GridHead, GridRow, GridTable, SecLabel, SectHead, btn, hv } from '@/components/hrv/kit'
 import { useTabParam } from '@/components/hrv/tabs'
 import t from './Tally.module.css'
 
@@ -19,8 +19,8 @@ import t from './Tally.module.css'
 // between them, what is carried when the month ends, and, for the month
 // picked (`?month=`), the bills the gap is made of. Read-only.
 
-const MONTH_COLS = 'minmax(118px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
-const BILL_COLS = 'minmax(136px,1.2fr) minmax(92px,1fr) minmax(72px,.7fr) 110px 110px minmax(84px,.8fr) 50px minmax(84px,.8fr) minmax(192px,1.25fr)'
+const MONTH_COLS = 'minmax(130px,1.1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) 52px minmax(112px,1.1fr) minmax(96px,1fr) minmax(96px,1fr) minmax(88px,.9fr) minmax(88px,.9fr)'
+const BILL_COLS = 'minmax(136px,1.2fr) minmax(92px,1fr) minmax(72px,.7fr) 110px 110px minmax(84px,.8fr) 50px minmax(98px,.8fr) minmax(192px,1.25fr)'
 const PAD = { padding: '11px 14px' }
 
 const bills = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
@@ -35,10 +35,13 @@ export default function TallyPanel({
   report,
   sub,
   commission = {},
+  canExport = false,
 }: {
   report: TallyReport
   sub: { name: string; slug: string }
   commission?: TallyCommission
+  /** The page's canDo(user, 'revenue', 'export'): the month's workbook is offered only to whoever may take it out. */
+  canExport?: boolean
 }) {
   const keys = report.months.map(m => m.month.slice(0, 7))
   const opening = (defaultTallyMonth(report) ?? '').slice(0, 7)
@@ -138,6 +141,20 @@ export default function TallyPanel({
 
       <div className={t.detail}>
         <SectHead title={`${tallyMonthLong(month.month)} · bills in two months`} count={bills(twoMonth).toUpperCase()} />
+        {canExport ? (
+          // The month whole — every bill on each side — as an Excel workbook (`tally/export?month=`).
+          <div className={t.tools}>
+            <a
+              href={`${revenuePath(sub.slug, 'tally', 'export')}?month=${month.month.slice(0, 7)}`}
+              download
+              className={btn('outline')}
+              style={{ padding: '7px 13px', fontSize: 12.5 }}
+              title={`Every bill of ${tallyMonthLong(month.month)} by SO date and by fair date, as an Excel workbook`}
+            >
+              Export {tallyMonthShort(month.month)}
+            </a>
+          </div>
+        ) : null}
         <BillList
           title={`Fair date in ${tallyMonthShort(month.month)} · SO date in another month`}
           rows={month.ours}

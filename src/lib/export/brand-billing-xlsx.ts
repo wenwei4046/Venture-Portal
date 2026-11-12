@@ -9,13 +9,13 @@ import { reportWords, TYPE_LABEL, type BrandBillingReport, type ExportLine } fro
 
 const MONEY = '#,##0.00;(#,##0.00);–'
 const PCT = '0%'
-const PCT_FINE = '0.##%'
+export const PCT_FINE = '0.##%'
 
-type Cell = string | number | null
-interface Fmt { col: number; z: string }
+export type Cell = string | number | null
+export interface Fmt { col: number; z: string }
 
 /** One sheet: rows of cells, which columns are money / percentages, widths. */
-class SheetDraft {
+export class SheetDraft {
   rows: Cell[][] = []
   private formats: Map<number, Fmt[]> = new Map()
 
@@ -41,7 +41,7 @@ class SheetDraft {
   }
 }
 
-const money = (...cols: number[]): Fmt[] => cols.map(col => ({ col, z: MONEY }))
+export const money = (...cols: number[]): Fmt[] => cols.map(col => ({ col, z: MONEY }))
 
 /** A record row: the 15 columns of the user's All records. */
 function recordRow(line: ExportLine): Cell[] {

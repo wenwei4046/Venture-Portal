@@ -1,8 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  addMonths, buildTally, commissionByMonth, twoMonthOrderIds,
-  type TallyBrand, type TallyCommission, type TallyOrder, type TallyReport,
+  addMonths, commissionByMonth, tallyBills, tallyMonthExport, tallyOf, twoMonthOrderIds,
+  type TallyBrand, type TallyCommission, type TallyMonthExport, type TallyOrder, type TallyReport,
 } from '@/lib/commission/tally'
 import { startRead } from '@/lib/start-read'
 import { loadMonthOrders } from './month-orders'
@@ -40,16 +40,24 @@ export interface TallyView {
 
 const NOTHING: TallyView = { report: { from: null, months: [], twoMonthBills: 0, noPctBills: 0 }, commission: {} }
 
-export async function loadTally(
+interface TallyFacts {
+  orders: TallyOrder[]
+  brands: TallyBrand[]
+  feedFloor: string | null
+  /** The first month tallied; null = the first month a bill sits in. */
+  from: string | null
+  commission: TallyCommission
+}
+
+/** Everything the Tally is worked out from; null when there is nothing to tally. */
+async function readTally(
   db: SupabaseClient,
   sub: { id: string; schemeId: string | null },
-  /** The months with a committed batch, `YYYY-MM-01`. */
   periods: readonly string[],
-  /** The first month the portal pays; null when it pays every month. */
   firstPaidMonth: string | null,
-): Promise<TallyView> {
+): Promise<TallyFacts | null> {
   const sorted = [...new Set(periods.map(p => p.slice(0, 10)))].sort()
-  if (sorted.length === 0 || !sub.schemeId) return NOTHING
+  if (sorted.length === 0 || !sub.schemeId) return null
 
   // A year back from the latest month, never before the portal began paying.
   const window = addMonths(sorted[sorted.length - 1], -(MONTHS_SHOWN - 1))
@@ -108,20 +116,70 @@ export async function loadTally(
   }
 
   const [brandRows, feedFloor, closes] = await Promise.all([brandsRead, floorRead, closesRead])
-  const brands: TallyBrand[] = brandRows.map(b => ({
-    code: b.code,
-    name: b.name,
-    refPrefixes: b.ref_prefixes ?? [],
-    hcBillPct: b.hc_bill_pct === null ? null : Number(b.hc_bill_pct),
-    ownScheme: b.own_scheme === true,
-  }))
-
-  // The fair day is read only for the bills the gap is made of.
-  const fairs = await loadOrderFairs(db, twoMonthOrderIds(orders, feedFloor))
-  const fairDates = new Map([...fairs.entries()].map(([id, fair]) => [id, fair.fairDate]))
-
   return {
-    report: buildTally(orders, brands, { feedFloor, from, fairDates }),
+    orders,
+    brands: brandRows.map(b => ({
+      code: b.code,
+      name: b.name,
+      refPrefixes: b.ref_prefixes ?? [],
+      hcBillPct: b.hc_bill_pct === null ? null : Number(b.hc_bill_pct),
+      ownScheme: b.own_scheme === true,
+    })),
+    feedFloor,
+    from,
     commission: commissionByMonth(closes.map(c => ({ month: c.period_month, total: Number(c.total_commission) }))),
   }
+}
+
+/** Each bill's fair day (`raw.fair.fairDate`), for the bills named. */
+async function fairDatesOf(db: SupabaseClient, orderIds: readonly string[]): Promise<Map<string, string | null>> {
+  const fairs = await loadOrderFairs(db, orderIds)
+  return new Map([...fairs.entries()].map(([id, fair]) => [id, fair.fairDate]))
+}
+
+/** The page's Tally: every month's row, and the bills in two months. */
+export async function loadTally(
+  db: SupabaseClient,
+  sub: { id: string; schemeId: string | null },
+  /** The months with a committed batch, `YYYY-MM-01`. */
+  periods: readonly string[],
+  /** The first month the portal pays; null when it pays every month. */
+  firstPaidMonth: string | null,
+): Promise<TallyView> {
+  const facts = await readTally(db, sub, periods, firstPaidMonth)
+  if (!facts) return NOTHING
+  // The fair day is read only for the bills the gap is made of.
+  const fairDates = await fairDatesOf(db, twoMonthOrderIds(facts.orders, facts.feedFloor))
+  return {
+    report: tallyOf(tallyBills(facts.orders, facts.brands, { feedFloor: facts.feedFloor, fairDates }), facts.from),
+    commission: facts.commission,
+  }
+}
+
+export interface TallyMonthView {
+  month: TallyMonthExport
+  commission: { total: number; closed: number } | null
+}
+
+/**
+ * One month whole, for its export: every bill on each side with its fair day.
+ * Null when the month is not one the Tally lists.
+ */
+export async function loadTallyMonth(
+  db: SupabaseClient,
+  sub: { id: string; schemeId: string | null },
+  periods: readonly string[],
+  firstPaidMonth: string | null,
+  /** `YYYY-MM-01`. */
+  month: string,
+): Promise<TallyMonthView | null> {
+  const facts = await readTally(db, sub, periods, firstPaidMonth)
+  if (!facts) return null
+  const at = month.slice(0, 10)
+  const mine = tallyBills(facts.orders, facts.brands, { feedFloor: facts.feedFloor })
+    .filter(b => b.ourMonth === at || b.houzsMonth === at)
+    .map(b => b.orderId)
+  const fairDates = await fairDatesOf(db, mine)
+  const whole = tallyMonthExport(tallyBills(facts.orders, facts.brands, { feedFloor: facts.feedFloor, fairDates }), facts.from, at)
+  return whole ? { month: whole, commission: facts.commission[at] ?? null } : null
 }

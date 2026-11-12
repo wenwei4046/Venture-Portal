@@ -1744,6 +1744,7 @@ user: *"我需要有一个 tab 能 list 出来：House entry 那边跟着 Sales 
 | A month's row | by SO date — bills, Sales, Bill to HC; by fair date — the same, and **Commission**, what the month's closed salespeople are paid (§4.11's closes, summed); **Gap** = fair − SO; **Carried** = as the month ends, the bills we have counted that Houzs has not yet, less the ones Houzs has and we have not |
 | The month picked | its bills in two months, in two lists — *Fair date in {Mon} · SO date in another month*, *SO date in {Mon} · fair date in another month* — each with its fair day, SO date, Sales, %, Bill to HC and when the other side pays |
 | From | the first month the portal pays (`comm_cutovers`), a year of months at most |
+| Export | *Export {Mon YYYY}* (Revenue · Export): the picked month whole as an Excel workbook — Summary (with each brand on both sides), **every** bill by SO date, every bill by fair date, the bills in two months — `/revenue/<sub>/tally/export?month=YYYY-MM` |
 
 A month's gap is exactly its bills in two months. It is the portal's own bills
 in Houzs's calendar, **not the ERP's Event Commission report**: that pays an

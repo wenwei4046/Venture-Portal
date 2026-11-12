@@ -265,6 +265,7 @@ export default async function CommissionCalculationPage({ params, searchParams }
             sync,
             canManage: canDo(user, 'revenue', 'manage'),
             canEdit: canDo(user, 'revenue', 'edit'),
+            canExport: canDo(user, 'revenue', 'export'),
           }}
           tab={tab}
           tally={tally}
