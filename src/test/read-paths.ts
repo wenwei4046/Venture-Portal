@@ -217,6 +217,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   revenue_possible_double_claims: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_restore_double_claim: ['comm_double_claim_dismissals'],
   revenue_set_order_brand: ['comm_brands', 'comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_order_brand_picks', 'sales_order_lines', 'sales_orders', 'users'],
+  // Comm Cal › Tally (mig 20261112190000): every bill with its deposit day, its fair and the month a close released it.
+  revenue_tally_orders: ['comm_item_groups', 'comm_order_releases', 'comm_schemes', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_uncosted_products: ['catalogue_skus', 'comm_item_groups', 'comm_schemes', 'erp_products', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   // What a bill's special order charges for each special (20261112200000): the run and a bill's page read it for a brand's own KPI items.
   sales_order_special_money: ['sales_order_lines', 'sales_orders'],

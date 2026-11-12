@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 import {
-  tallyDay, tallyMonthLong, tallyMonthShort, tallyOtherSide,
-  type TallyBill, type TallyMonthExport,
+  tallyDay, tallyMonthLong, tallyMonthShort,
+  type TallyBill, type TallyMonthExport, type TallySide,
 } from '@/lib/commission/tally'
 import { PCT_FINE, SheetDraft, money, type Cell, type Fmt } from './brand-billing-xlsx'
 
@@ -9,51 +9,74 @@ import { PCT_FINE, SheetDraft, money, type Cell, type Fmt } from './brand-billin
  * Comm Cal › Tally's workbook for one month (2026-11-12): what the page sums,
  * listed whole — to lay beside what Houzs clears, bill by bill.
  *
- *   Summary        — the month by SO date and by fair date, the gap, what is
- *                    carried, what its closed salespeople are paid; then each
- *                    brand on both sides.
- *   By SO date     — every bill whose SO date is in the month (Houzs pays).
- *   By fair date   — every bill counted in the month (we pay salespeople on).
- *   In two months  — the bills the gap is made of, as the page lists them.
+ *   Summary        — what Houzs pays and what we pay in the month, how much of
+ *                    ours waits for a close, the gap, what is carried, the bills
+ *                    under their deposit, what its closed salespeople are paid;
+ *                    then each brand on both sides.
+ *   Houzs pays     — every bill Houzs pays in the month (its deposit reached,
+ *                    by its SO date — or the day the deposit came, when later).
+ *   We pay         — every bill the month's closes paid, or will.
+ *   Paid apart     — the bills the gap is made of, as the page lists them.
+ *   Below deposit  — the month's bills neither side pays yet.
  */
 
 const BILL_HEAD = [
-  'ERP no.', 'Ref No.', 'Salesperson', 'Customer', 'Brand', 'Fair day', 'SO date',
-  'Sales', 'Bill to HC %', 'Bill to HC', 'Fair month (we pay)', 'SO month (Houzs pays)', 'Note',
+  'ERP no.', 'Ref No.', 'Salesperson', 'Customer', 'Brand', 'Fair day', 'SO date', 'Deposit reached',
+  'Sales', 'Bill to HC %', 'Bill to HC', 'We pay', 'Houzs pays', 'Note',
 ]
-const BILL_FORMATS: Fmt[] = [...money(7, 9), { col: 8, z: PCT_FINE }]
-const BILL_WIDTHS = [18, 14, 18, 26, 13, 12, 12, 13, 12, 13, 19, 21, 34]
+const BILL_FORMATS: Fmt[] = [...money(8, 10), { col: 9, z: PCT_FINE }]
+const BILL_WIDTHS = [18, 14, 18, 26, 13, 12, 12, 16, 13, 12, 13, 24, 16, 34]
 
-/** What a bill's row says beyond its figures: the other side's month when it differs, its deposit, an old bill. */
-function noteOf(bill: TallyBill, side: 'ours' | 'theirs', from: string | null): string {
+/** A bill's "We pay" cell: the month, and how it stands there. */
+export function ourColumn(bill: TallyBill): string {
+  if (bill.ourMonth === null) return 'Held · below deposit'
+  const month = tallyMonthShort(bill.ourMonth)
+  if (bill.ours === 'open') return `${month} · not closed yet`
+  if (bill.ours === 'by_hand') return `${month} · by hand`
+  return month
+}
+
+/** A bill's "Houzs pays" cell: the month, or why there is none. */
+export function houzsColumn(bill: TallyBill): string {
+  if (bill.houzs === 'no_fair') return 'No fair in ERP'
+  if (bill.houzsMonth === null) return 'Below deposit'
+  return tallyMonthShort(bill.houzsMonth)
+}
+
+/** What a bill's row says beyond its two months: an old bill, a brand with no %. */
+function noteOf(bill: TallyBill): string {
   const notes: string[] = []
-  if (bill.ourMonth !== bill.houzsMonth) notes.push(tallyOtherSide(bill, side, from).text)
   if (bill.oldBill) notes.push(`Old bill topped up · sold ${tallyDay(bill.soDate)}`)
-  if (bill.belowDeposit) notes.push('Below deposit')
   if (bill.pct === null) notes.push('No Bill to HC % set')
   return notes.join(' · ')
 }
 
-function billRow(bill: TallyBill, side: 'ours' | 'theirs', from: string | null): Cell[] {
+function billRow(bill: TallyBill): Cell[] {
   return [
     bill.orderNo, bill.refNo ?? '', bill.salesperson, bill.customer ?? '', bill.brandName,
-    bill.fairDate ?? '', bill.soDate, bill.sales, bill.pct, bill.bill,
-    tallyMonthShort(bill.ourMonth), tallyMonthShort(bill.houzsMonth), noteOf(bill, side, from),
+    bill.fairDate ?? '', bill.soDate, bill.reachedOn ?? '', bill.sales, bill.pct, bill.bill,
+    ourColumn(bill), houzsColumn(bill), noteOf(bill),
   ]
 }
 
+const sen = (rows: readonly TallyBill[], of: (b: TallyBill) => number) => rows.reduce((sum, b) => sum + Math.round(of(b) * 100), 0) / 100
+
 function totalRow(label: string, rows: readonly TallyBill[]): Cell[] {
-  const sales = rows.reduce((sum, b) => sum + Math.round(b.sales * 100), 0) / 100
-  const bill = rows.reduce((sum, b) => sum + Math.round((b.bill ?? 0) * 100), 0) / 100
-  return [label, null, null, null, null, null, null, sales, null, bill, null, null, null]
+  return [label, null, null, null, null, null, null, null, sen(rows, b => b.sales), null, sen(rows, b => b.bill ?? 0), null, null, null]
 }
 
-function billSheet(rows: readonly TallyBill[], side: 'ours' | 'theirs', from: string | null): SheetDraft {
-  const sheet = new SheetDraft()
+const count = (n: number) => `${n} bill${n === 1 ? '' : 's'}`
+
+/** A list of bills under its heading: the head, a row each, their total. */
+function addList(sheet: SheetDraft, title: string | null, rows: readonly TallyBill[]) {
+  if (title) sheet.add([title])
   sheet.add(BILL_HEAD)
-  for (const bill of rows) sheet.add(billRow(bill, side, from), BILL_FORMATS)
-  sheet.add(totalRow(`${rows.length} bill${rows.length === 1 ? '' : 's'}`, rows), BILL_FORMATS)
-  return sheet
+  for (const bill of rows) sheet.add(billRow(bill), BILL_FORMATS)
+  sheet.add(totalRow(count(rows.length), rows), BILL_FORMATS)
+}
+
+function sideOf(rows: readonly TallyBill[]): TallySide {
+  return { bills: rows.length, sales: sen(rows, b => b.sales), bill: sen(rows, b => b.bill ?? 0) }
 }
 
 export interface TallyWorkbook {
@@ -66,19 +89,22 @@ export interface TallyWorkbook {
 
 export function buildTallyXlsx({ title, month, commission }: TallyWorkbook): Buffer {
   const wb = XLSX.utils.book_new()
-  const { row, from } = month
+  const { row } = month
   const long = tallyMonthLong(month.month)
   const short = tallyMonthShort(month.month)
+  const held = sideOf(row.held)
 
   // ── Summary ────────────────────────────────────────────────────────────
   const s = new SheetDraft()
   s.add([`${title} · Tally · ${long}`])
   s.blank()
   s.add(['', 'Bills', 'Sales', 'Bill to HC'])
-  s.add(['By SO date — Houzs pays', row.so.bills, row.so.sales, row.so.bill], money(2, 3))
-  s.add(['By fair date — we pay', row.fair.bills, row.fair.sales, row.fair.bill], money(2, 3))
-  s.add(['Gap (fair − SO)', row.gap.bills, row.gap.sales, row.gap.bill], money(2, 3))
+  s.add(['Houzs pays', row.houzs.bills, row.houzs.sales, row.houzs.bill], money(2, 3))
+  s.add(['We pay', row.we.bills, row.we.sales, row.we.bill], money(2, 3))
+  s.add(['  of which not closed yet', row.open.bills, row.open.sales, row.open.bill], money(2, 3))
+  s.add(['Gap (we − Houzs)', row.gap.bills, row.gap.sales, row.gap.bill], money(2, 3))
   s.add([`Carried after ${long}`, row.carried.bills, row.carried.sales, row.carried.bill], money(2, 3))
+  s.add(['Below deposit — neither pays', held.bills, held.sales, held.bill], money(2, 3))
   s.blank()
   s.add(
     ['Commission paid to salespeople', commission ? `${commission.closed} closed` : 'Nobody closed yet', null, commission?.total ?? null],
@@ -90,39 +116,42 @@ export function buildTallyXlsx({ title, month, commission }: TallyWorkbook): Buf
   s.add(['By brand'])
   s.add([
     'Brand', 'Bill to HC %',
-    'SO date · bills', 'SO date · sales', 'SO date · Bill to HC',
-    'Fair date · bills', 'Fair date · sales', 'Fair date · Bill to HC',
+    'Houzs pays · bills', 'Houzs pays · sales', 'Houzs pays · Bill to HC',
+    'We pay · bills', 'We pay · sales', 'We pay · Bill to HC',
     'Gap · Bill to HC',
   ])
   const brandFormats: Fmt[] = [{ col: 1, z: PCT_FINE }, ...money(3, 4, 6, 7, 8)]
   for (const b of month.brands) {
     s.add(
-      [b.name, b.pct ?? 'Not set', b.so.bills, b.so.sales, b.so.bill, b.fair.bills, b.fair.sales, b.fair.bill, Math.round((b.fair.bill - b.so.bill) * 100) / 100],
+      [b.name, b.pct ?? 'Not set', b.houzs.bills, b.houzs.sales, b.houzs.bill, b.we.bills, b.we.sales, b.we.bill, Math.round((b.we.bill - b.houzs.bill) * 100) / 100],
       brandFormats,
     )
   }
   s.add(
-    ['Total', null, row.so.bills, row.so.sales, row.so.bill, row.fair.bills, row.fair.sales, row.fair.bill, row.gap.bill],
+    ['Total', null, row.houzs.bills, row.houzs.sales, row.houzs.bill, row.we.bills, row.we.sales, row.we.bill, row.gap.bill],
     brandFormats,
   )
-  XLSX.utils.book_append_sheet(wb, s.build([32, 13, 15, 16, 20, 16, 17, 21, 17]), 'Summary')
+  XLSX.utils.book_append_sheet(wb, s.build([32, 17, 17, 18, 22, 15, 15, 19, 17]), 'Summary')
 
   // ── Every bill on each side ────────────────────────────────────────────
-  XLSX.utils.book_append_sheet(wb, billSheet(month.so, 'theirs', from).build(BILL_WIDTHS), 'By SO date')
-  XLSX.utils.book_append_sheet(wb, billSheet(month.fair, 'ours', from).build(BILL_WIDTHS), 'By fair date')
+  const houzs = new SheetDraft()
+  addList(houzs, null, month.houzs)
+  XLSX.utils.book_append_sheet(wb, houzs.build(BILL_WIDTHS), 'Houzs pays')
+  const we = new SheetDraft()
+  addList(we, null, month.we)
+  XLSX.utils.book_append_sheet(wb, we.build(BILL_WIDTHS), 'We pay')
 
-  // ── The bills in two months ────────────────────────────────────────────
-  const two = new SheetDraft()
-  two.add([`Fair date in ${short} · SO date in another month`])
-  two.add(BILL_HEAD)
-  for (const bill of row.ours) two.add(billRow(bill, 'ours', from), BILL_FORMATS)
-  two.add(totalRow(`${row.ours.length} bill${row.ours.length === 1 ? '' : 's'}`, row.ours), BILL_FORMATS)
-  two.blank()
-  two.add([`SO date in ${short} · fair date in another month`])
-  two.add(BILL_HEAD)
-  for (const bill of row.theirs) two.add(billRow(bill, 'theirs', from), BILL_FORMATS)
-  two.add(totalRow(`${row.theirs.length} bill${row.theirs.length === 1 ? '' : 's'}`, row.theirs), BILL_FORMATS)
-  XLSX.utils.book_append_sheet(wb, two.build(BILL_WIDTHS), 'In two months')
+  // ── The bills the two sides pay apart ──────────────────────────────────
+  const apart = new SheetDraft()
+  addList(apart, `We pay in ${short} · Houzs does not`, row.ours)
+  apart.blank()
+  addList(apart, `Houzs pays in ${short} · we do not`, row.theirs)
+  XLSX.utils.book_append_sheet(wb, apart.build(BILL_WIDTHS), 'Paid apart')
+
+  // ── The bills neither side pays ────────────────────────────────────────
+  const below = new SheetDraft()
+  addList(below, `Below deposit in ${short} · neither pays`, row.held)
+  XLSX.utils.book_append_sheet(wb, below.build(BILL_WIDTHS), 'Below deposit')
 
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true }) as Buffer
 }
