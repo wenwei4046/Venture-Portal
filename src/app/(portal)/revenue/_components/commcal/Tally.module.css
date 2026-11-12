@@ -22,6 +22,8 @@
 
 /* The month picked: its bills in two months. */
 .detail { margin-top: 30px; }
+/* Its Export, right under the heading's rule. */
+.tools { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
 .list { margin-bottom: 22px; }
 .doc { font-size: 12px; }
 .day { white-space: nowrap; font-size: 12px; }

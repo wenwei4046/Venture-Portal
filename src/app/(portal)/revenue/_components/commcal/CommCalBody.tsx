@@ -67,6 +67,8 @@ export interface CommCalData {
   sync: ErpSyncPanelData | null
   canManage: boolean
   canEdit: boolean
+  /** Revenue · Export: the Tally offers a month's workbook only to whoever may take it out. */
+  canExport?: boolean
 }
 
 const PERIODS = (n: number) => `${n} PERIOD${n === 1 ? '' : 'S'}`
@@ -188,7 +190,7 @@ export default function CommCalBody({
       {data.months.length === 0 ? empty : tab === 'tally' && tally ? (
         // Dimmed while the other tab is on its way: the tab already says where the page is going.
         <div className={s.pane} data-opening={opening ? 'true' : undefined} aria-busy={opening}>
-          <TallyPanel report={tally.report} commission={tally.commission} sub={data.sub} />
+          <TallyPanel report={tally.report} commission={tally.commission} sub={data.sub} canExport={data.canExport ?? false} />
         </div>
       ) : (
         <div className={s.pane} data-opening={opening ? 'true' : undefined} aria-busy={opening}>

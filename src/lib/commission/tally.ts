@@ -173,12 +173,17 @@ function add(side: TallySide, bill: TallyBill, sign = 1) {
 const byDay = (a: TallyBill, b: TallyBill) =>
   a.soDate.localeCompare(b.soDate) || a.orderNo.localeCompare(b.orderNo) || a.orderId.localeCompare(b.orderId)
 
-export function buildTally(orders: readonly TallyOrder[], brands: readonly TallyBrand[], options: TallyOptions): TallyReport {
+/**
+ * Every counted bill in its two months, with its brand and its Bill to HC —
+ * what `buildTally` sums, and what the month's export lists whole.
+ */
+export function tallyBills(
+  orders: readonly TallyOrder[], brands: readonly TallyBrand[], options: Pick<TallyOptions, 'feedFloor' | 'fairDates'>,
+): TallyBill[] {
   const brandByCode = new Map(brands.map(b => [norm(b.code), b]))
   const ownScheme = new Set(brands.filter(b => b.ownScheme).map(b => norm(b.code)))
 
   const bills: TallyBill[] = []
-  let noPctBills = 0
   for (const o of orders) {
     if (!countsInTally(o)) continue
     const own = o.brandCode && ownScheme.has(norm(o.brandCode)) ? brandByCode.get(norm(o.brandCode))!.code : null
@@ -206,11 +211,27 @@ export function buildTally(orders: readonly TallyOrder[], brands: readonly Tally
       belowDeposit: !o.depositMet,
     })
   }
+  return bills
+}
+
+/** The first month tallied: the first the portal pays, else the first month any bill sits in. */
+function firstTallyMonth(bills: readonly TallyBill[], from: string | null): string | null {
+  if (from) return from.slice(0, 10)
+  const seen = bills.flatMap(b => [b.ourMonth, b.houzsMonth])
+  return seen.length > 0 ? seen.reduce((a, b) => (a < b ? a : b)) : null
+}
+
+export function buildTally(orders: readonly TallyOrder[], brands: readonly TallyBrand[], options: TallyOptions): TallyReport {
+  return tallyOf(tallyBills(orders, brands, options), options.from)
+}
+
+/** The months of a set of bills, each in its two calendars. */
+export function tallyOf(bills: readonly TallyBill[], firstMonth: string | null): TallyReport {
+  let noPctBills = 0
 
   // The months tallied: from the first month the portal pays (else the first
   // month any bill sits in) to the last month a bill sits in on either side.
-  const seen = bills.flatMap(b => [b.ourMonth, b.houzsMonth])
-  const from = options.from?.slice(0, 10) ?? (seen.length > 0 ? seen.reduce((a, b) => (a < b ? a : b)) : null)
+  const from = firstTallyMonth(bills, firstMonth)
   const inScope = from === null ? [] : bills.filter(b => b.ourMonth >= from || b.houzsMonth >= from)
   if (from === null || inScope.length === 0) return { from: null, months: [], twoMonthBills: 0, noPctBills: 0 }
 
@@ -252,6 +273,57 @@ export function buildTally(orders: readonly TallyOrder[], brands: readonly Tally
     .sort((a, b) => b.month.localeCompare(a.month))
 
   return { from, months, twoMonthBills, noPctBills }
+}
+
+// ─── A month, whole — its export ─────────────────────────────────────────────
+
+/** A brand on both sides of a month. */
+export interface TallyBrandRow {
+  /** '' = no brand. */
+  code: string
+  name: string
+  pct: number | null
+  so: TallySide
+  fair: TallySide
+}
+
+/**
+ * A month as its export lists it (2026-11-12): the month's row, EVERY bill on
+ * each side — the page lists only the ones in two months — and each brand's
+ * part of both.
+ */
+export interface TallyMonthExport {
+  month: string
+  from: string | null
+  row: TallyMonth
+  /** Every bill whose SO date is in the month: what Houzs pays for it. */
+  so: TallyBill[]
+  /** Every bill counted in the month by its fair date: what we pay salespeople on. */
+  fair: TallyBill[]
+  brands: TallyBrandRow[]
+}
+
+export function tallyMonthExport(bills: readonly TallyBill[], firstMonth: string | null, month: string): TallyMonthExport | null {
+  const report = tallyOf(bills, firstMonth)
+  const row = report.months.find(m => m.month === month.slice(0, 10))
+  if (!row) return null
+  const so = bills.filter(b => b.houzsMonth === row.month).sort(byDay)
+  const fair = bills.filter(b => b.ourMonth === row.month).sort(byDay)
+
+  const byBrand = new Map<string, TallyBrandRow>()
+  const brandOf = (b: TallyBill) => {
+    const at = byBrand.get(b.brandCode) ?? { code: b.brandCode, name: b.brandName, pct: b.pct, so: emptySide(), fair: emptySide() }
+    byBrand.set(b.brandCode, at)
+    return at
+  }
+  for (const b of so) add(brandOf(b).so, b)
+  for (const b of fair) add(brandOf(b).fair, b)
+  // Biggest first, as the month's Sales by Brand & Billing; "No brand" last.
+  const brands = [...byBrand.values()]
+    .map(b => ({ ...b, so: roundSide(b.so), fair: roundSide(b.fair) }))
+    .sort((a, b) => (a.code === '' ? 1 : 0) - (b.code === '' ? 1 : 0) || b.fair.sales + b.so.sales - (a.fair.sales + a.so.sales) || a.name.localeCompare(b.name))
+
+  return { month: row.month, from: report.from, row, so, fair, brands }
 }
 
 /**

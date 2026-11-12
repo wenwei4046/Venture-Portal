@@ -8,7 +8,7 @@ import {
   defaultTallyMonth, tallyDay, tallyMonthLong, tallyMonthShort, tallyOtherSide,
   type TallyBill, type TallyCommission, type TallyMonth, type TallyReport,
 } from '@/lib/commission/tally'
-import { Card, Cards, Chip, GridEmpty, GridHead, GridRow, GridTable, SecLabel, SectHead, hv } from '@/components/hrv/kit'
+import { Card, Cards, Chip, GridEmpty, GridHead, GridRow, GridTable, SecLabel, SectHead, btn, hv } from '@/components/hrv/kit'
 import { useTabParam } from '@/components/hrv/tabs'
 import t from './Tally.module.css'
 
@@ -35,10 +35,13 @@ export default function TallyPanel({
   report,
   sub,
   commission = {},
+  canExport = false,
 }: {
   report: TallyReport
   sub: { name: string; slug: string }
   commission?: TallyCommission
+  /** The page's canDo(user, 'revenue', 'export'): the month's workbook is offered only to whoever may take it out. */
+  canExport?: boolean
 }) {
   const keys = report.months.map(m => m.month.slice(0, 7))
   const opening = (defaultTallyMonth(report) ?? '').slice(0, 7)
@@ -138,6 +141,20 @@ export default function TallyPanel({
 
       <div className={t.detail}>
         <SectHead title={`${tallyMonthLong(month.month)} · bills in two months`} count={bills(twoMonth).toUpperCase()} />
+        {canExport ? (
+          // The month whole — every bill on each side — as an Excel workbook (`tally/export?month=`).
+          <div className={t.tools}>
+            <a
+              href={`${revenuePath(sub.slug, 'tally', 'export')}?month=${month.month.slice(0, 7)}`}
+              download
+              className={btn('outline')}
+              style={{ padding: '7px 13px', fontSize: 12.5 }}
+              title={`Every bill of ${tallyMonthLong(month.month)} by SO date and by fair date, as an Excel workbook`}
+            >
+              Export {tallyMonthShort(month.month)}
+            </a>
+          </div>
+        ) : null}
         <BillList
           title={`Fair date in ${tallyMonthShort(month.month)} · SO date in another month`}
           rows={month.ours}
