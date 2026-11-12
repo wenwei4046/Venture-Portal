@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261112200000_marketing_minutes_title_field.sql
+-- 20261112203000_marketing_minutes_title_field.sql
 -- The Minutes Builder's Title field (2026-11-12 — the user, on the live preview's heading: "在 field 加一个 Title, 放到
 -- 这个位置"): a field of its own kind, one a template, a line of words (≤ 200, as a Short text) that heads the minutes.
 --   mkt_minutes_check  — Title is a kind the minutes hold, kept once (as Project link, Campaign period, Signature).

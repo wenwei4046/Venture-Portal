@@ -1,10 +1,10 @@
 -- ============================================================================
--- 20261112210000_marketing_minutes_title_never_required.sql
+-- 20261112204000_marketing_minutes_title_never_required.sql
 -- The Minutes Builder's Title, as the user settled it (2026-11-12): "title 就是一个句子，不需要再什么 long answer 之类的" ·
 -- "最多放 description" · "title 是必填" — answered A: every template has one.
 --   mkt_minutes_check       a Title is never required (nothing is filled in — Complete must never wait on it), and a
 --                           template is published only with a Title. Both swapped in place in production's body
---                           (mig 20261112200000), refused if it moved.
+--                           (mig 20261112203000), refused if it moved.
 --   mkt_minutes_locks_kept  a template that has a Title keeps it (by its id), of its kind — its sentence and description
 --                           change freely. The function is 20261112180000's own (no copy of it drifted elsewhere).
 -- ============================================================================
