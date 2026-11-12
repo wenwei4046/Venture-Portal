@@ -18,6 +18,8 @@ export type PicValue = string | string[] | { cols: string[]; rows: string[][] } 
 export interface PicField {
   name: string
   type: string
+  /** The template's hint for staff, read under the name (Minutes Builder v2). */
+  help?: string
   value: PicValue
 }
 
@@ -255,7 +257,7 @@ export function picPageFromRow(v: unknown): PicPage | null {
     minutes: minutes ? {
       title: str(minutes.title),
       fields: (Array.isArray(minutes.fields) ? minutes.fields : []).filter(isObj)
-        .map(f => ({ name: str(f.name), type: str(f.type), value: valueFromRow(str(f.type), f.value) })),
+        .map(f => ({ name: str(f.name), type: str(f.type), ...(str(f.help).trim() ? { help: str(f.help).trim() } : {}), value: valueFromRow(str(f.type), f.value) })),
     } : null,
     work: (Array.isArray(v.work) ? v.work : []).filter(isObj).map(workFromRow),
     ads: adsFromRow(v.ads),

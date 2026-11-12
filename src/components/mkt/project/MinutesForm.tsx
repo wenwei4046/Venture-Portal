@@ -1,7 +1,7 @@
 'use client'
 
 import type { MktPerson } from '@/lib/marketing/board'
-import { COL_GLYPH, type MinutesField } from '@/lib/marketing/minutes'
+import { COL_GLYPH, tableAnswer, type MinutesField } from '@/lib/marketing/minutes'
 import { attendeesOf, isPeriod, type MinutesDoc, type MinutesValue } from '@/lib/marketing/project'
 import p from './project.module.css'
 
@@ -47,28 +47,42 @@ export default function MinutesForm({
     </span>
   )
 
+  // A Table (Minutes Builder v2): its starting rows until somebody writes in it; rows added and taken off only where the
+  // template lets the staff add rows, columns of their own only where it lets them add columns.
   const table = (f: MinutesField, v: MinutesValue | undefined) => {
     const free = f.type === 'Free space'
     const cur = typeof v === 'object' && !Array.isArray(v) && !isPeriod(v) ? v : null
-    const cols = free ? cur?.cols ?? FREE_COLS : (f.cols ?? []).map(c => c.name)
-    const types = free ? cols.map(() => 'Text' as const) : (f.cols ?? []).map(c => c.type)
-    const rows = cur?.rows?.length ? cur.rows : [cols.map(() => '')]
-    const put = (next: { rows: string[][]; cols?: string[] }) => onVal(f.name, free ? { cols: next.cols ?? cols, rows: next.rows } : { rows: next.rows })
+    const ans = free ? null : tableAnswer(f, cur ?? undefined)
+    const own = free ? 0 : (f.cols ?? []).length
+    const cols = free ? cur?.cols ?? FREE_COLS : ans?.cols ?? []
+    const types = free ? cols.map(() => 'Text' as const) : ans?.types ?? []
+    const xcols = ans?.xcols ?? []
+    const rows = free ? (cur?.rows?.length ? cur.rows : [cols.map(() => '')]) : ans?.rows ?? []
+    const canRow = !readOnly && (free || f.staffRows !== false)
+    const canCol = !readOnly && cols.length < 8 && (free || f.staffCols === true)
+    const put = (next: { rows: string[][]; cols?: string[]; xcols?: string[] }) => {
+      if (free) return onVal(f.name, { cols: next.cols ?? cols, rows: next.rows })
+      const x = next.xcols ?? xcols
+      onVal(f.name, x.length ? { rows: next.rows, xcols: x } : { rows: next.rows })
+    }
+    const named = (ci: number) => free || ci >= own // a column the staff named, theirs to rename
     return (
       <div className={p.table}>
         <div className={p.tScroll}>
-          <div className={p.tGrid} style={{ gridTemplateColumns: `${cols.map(() => 'minmax(120px, 1fr)').join(' ')}${readOnly ? '' : ' 30px'}` }}>
+          <div className={p.tGrid} style={{ gridTemplateColumns: `${cols.map(() => 'minmax(120px, 1fr)').join(' ')}${canRow ? ' 30px' : ''}` }}>
             {cols.map((c, ci) => (
               <div key={`h${ci}`} className={p.tHead}>
-                {free && !readOnly ? (
+                {named(ci) && !readOnly ? (
                   <input className={p.tHeadInput} value={c} maxLength={40} aria-label={`Column ${ci + 1} name`}
-                    onChange={e => put({ rows, cols: cols.map((x, j) => (j === ci ? e.target.value : x)) })} />
+                    onChange={e => free
+                      ? put({ rows, cols: cols.map((x, j) => (j === ci ? e.target.value : x)) })
+                      : put({ rows, xcols: xcols.map((x, j) => (j === ci - own ? e.target.value : x)) })} />
                 ) : (
                   <><span className={p.glyph}>{free ? 'Aa' : COL_GLYPH[types[ci]]}</span><span>{c}</span></>
                 )}
               </div>
             ))}
-            {readOnly ? null : <div className={p.tHead} />}
+            {canRow ? <div className={p.tHead} /> : null}
             {rows.map((r, ri) => (
               <div key={`r${ri}`} className={p.tRow} style={{ display: 'contents' }}>
                 {cols.map((_, ci) => (
@@ -84,19 +98,23 @@ export default function MinutesForm({
                     />
                   </div>
                 ))}
-                {readOnly ? null : (
+                {canRow ? (
                   <button type="button" className={p.tX} aria-label={`Remove row ${ri + 1}`} onClick={() => put({ rows: rows.filter((_, j) => j !== ri) })}>×</button>
-                )}
+                ) : null}
               </div>
             ))}
           </div>
         </div>
-        {readOnly ? null : (
+        {canRow || canCol ? (
           <div className={p.tFoot}>
-            <button type="button" className={p.tAdd} disabled={rows.length >= 50} onClick={() => put({ rows: [...rows, cols.map(() => '')] })}>+ Add row</button>
-            {free && cols.length < 8 ? <button type="button" className={p.tAdd} onClick={() => put({ cols: [...cols, ''], rows: rows.map(r => [...r, '']) })}>+ Add column</button> : null}
+            {canRow ? <button type="button" className={p.tAdd} disabled={rows.length >= 50} onClick={() => put({ rows: [...rows, cols.map(() => '')] })}>+ Add row</button> : null}
+            {canCol ? (
+              <button type="button" className={p.tAdd} onClick={() => free
+                ? put({ cols: [...cols, ''], rows: rows.map(r => [...r, '']) })
+                : put({ xcols: [...xcols, ''], rows: rows.map(r => [...r, '']) })}>+ Add column</button>
+            ) : null}
           </div>
-        )}
+        ) : null}
       </div>
     )
   }
@@ -179,6 +197,7 @@ export default function MinutesForm({
     return (
       <div key={f.name} className={p.field}>
         <span className={p.fieldLabel}>{f.name}{marks(f)}</span>
+        {f.help ? <span className={p.fieldHelp}>{f.help}</span> : null}
         {input}
       </div>
     )

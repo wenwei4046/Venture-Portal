@@ -7901,6 +7901,13 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-miss-line: 220 150 140; --mk-miss-bg: 255 249 248; --mk-req-bg: 245 244 241; --mk-note-bg: 251 247 238;
   --mk-warn-ink: 110 74 8; --mk-drop: rgb(90 62 43 / .15); --mk-scrim: rgb(51 36 27 / .35);
   --mk-shadow-dd: 0 14px 34px rgb(51 36 27 / .16); --mk-shadow-dialog: 0 24px 60px rgb(51 36 27 / .25);
+  /* The Minutes Builder v2 (docs/design_handoff_minutes_builder_v2/). */
+  --mk-pick: 251 243 232; --mk-pick-line: 214 180 140; --mk-focus: 176 140 104; --mk-grip: 190 180 168;
+  --mk-faint-2: 150 140 130; --mk-switch-off: 222 216 208; --mk-add-hover: 244 239 232; --mk-drop-root: 246 241 233;
+  --mk-ring-focus: 0 0 0 3px rgb(214 180 140 / .25); --mk-ring-glow: 0 0 0 3px rgb(236 155 85 / .18);
+  --mk-shadow-rail: 0 1px 2px rgb(51 36 27 / .06), 0 0 0 1px rgb(236 231 224);
+  --mk-shadow-menu: 0 14px 36px rgb(51 36 27 / .16); --mk-shadow-col: 0 14px 36px rgb(51 36 27 / .12);
+  --mk-shadow-sheet: 0 8px 28px rgb(51 36 27 / .06); --mk-shadow-seg-2: 0 1px 2px rgb(0 0 0 / .08);
   background: rgb(var(--mk-app));
 }
 /* The PIC's link, /t/<code> (⑤-1, `PIC Link.dc.html`): the client-facing page in the handoff's own cooler palette,

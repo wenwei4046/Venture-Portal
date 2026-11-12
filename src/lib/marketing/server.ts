@@ -11,7 +11,7 @@ import { keyDatesFromRow, type MktKeyDate } from './key-dates'
 import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
 import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
-import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
+import { minutesFoldersFromRow, minutesTemplatesFromRow, type MinutesFolder, type MinutesTemplate } from './minutes'
 import { optionListsFromRow, type OptionLists } from './options'
 import { productBookFromRow, type ProductBook } from './products'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
@@ -51,12 +51,12 @@ export async function readWorkflows(): Promise<WfTemplate[]> {
   return workflowsFromRow(data)
 }
 
-/** The Minutes Builder's templates with their drafts (mig 20261023235800) — Marketing · Manage. */
-export async function readMinutesTemplates(): Promise<MinutesTemplate[]> {
+/** The Minutes Builder's templates with their drafts and folders (mig 20261023235800, v2 20261112180000) — Marketing · Manage. */
+export async function readMinutesTemplates(): Promise<{ templates: MinutesTemplate[]; folders: MinutesFolder[] }> {
   const db = await client()
   const { data, error } = await db.rpc('mkt_minutes_templates')
   if (error) throw new Error(error.message)
-  return minutesTemplatesFromRow(data)
+  return { templates: minutesTemplatesFromRow(data), folders: minutesFoldersFromRow(data) }
 }
 
 /** Replace Person (④-5, mig 20261025036000) — Marketing · Manage: everybody who stands somewhere, and in how many places. */
