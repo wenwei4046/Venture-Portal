@@ -28,6 +28,9 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   // A payment request (2026-10-29, mig 20261029200000): sent for one's approval, or one's own approved, sent back,
   // rejected by Finance, paid — the Claim page opens it, whichever app the phone signed up in.
   | 'payment_request'
+  // A quotation the client accepted (2026-11-12, mig 20261113100000) — to Marketing's managers: the Product Builder's
+  // Quotations, the quotation open, until its tasks are assigned.
+  | 'mkt_quote'
 
 export interface Notice {
   id: string
@@ -102,6 +105,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'mkt_project') return `/marketing/projects/${id}`
   // A payment request (2026-10-29): the Claim page, its drawer open — Claim & approve's for its approver.
   if (n.refKind === 'payment_request') return `/claims?open=${id}`
+  // An accepted quotation (2026-11-12): the Product Builder, that quotation open.
+  if (n.refKind === 'mkt_quote') return `/marketing/products?q=${id}`
   // A probation or a contract ending (2026-10-23 / 10-24): the person, in the HR app — HR's acts on it there, whichever
   // app the phone signed up in.
   if (n.refKind === 'hr_staff') return `/hr-app?open=person:${id}`

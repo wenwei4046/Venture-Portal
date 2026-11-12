@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { readNotices } from '@/lib/push/actions'
 import { noticeUrl } from '@/lib/push/notices'
 import { LOOK_FONTS, LOOK_SIZES, DEFAULT_LOOK, type Look, type LookSize } from '@/lib/marketing/look'
 import { noticeAge, type MktNotice } from '@/lib/marketing/shell'
 import { lookFamily } from '../fonts'
-import { readMktNotices } from './useMktShell'
+import { readMktNotices, readQuoteStates, type QuoteState } from './useMktShell'
 import s from './shell.module.css'
 
 // The shell's two panels (`Marketing Shell.dc.html`): the bell's Notifications — Marketing's own notices, newest first,
@@ -15,11 +16,17 @@ import s from './shell.module.css'
 
 export function NoticesPanel({ onClose, onRead }: { onClose: () => void; onRead: () => void }) {
   const [items, setItems] = useState<MktNotice[] | null>(null)
+  const router = useRouter()
+  const [quotes, setQuotes] = useState<Record<string, QuoteState>>({})
   const [now] = useState(() => new Date())
   useEffect(() => {
     let live = true
     void readMktNotices().then(list => {
-      if (live) setItems(list ?? [])
+      if (!live) return
+      setItems(list ?? [])
+      // An accepted quotation's notice asks whether its work is assigned yet (the Product Builder's Assign tasks).
+      const ids = [...new Set((list ?? []).filter(n => n.refKind === 'mkt_quote' && n.ref).map(n => n.ref as string))]
+      if (ids.length) void readQuoteStates(ids).then(st => { if (live) setQuotes(st) })
     })
     return () => {
       live = false
@@ -53,28 +60,57 @@ export function NoticesPanel({ onClose, onRead }: { onClose: () => void; onRead:
         </div>
       ) : items.length ? (
         <div className={s.noticeList}>
-          {items.map(n => (
-            <Link
-              key={n.id}
-              href={n.ref ? noticeUrl({ refKind: n.refKind, refId: n.ref }, 'hr') : '/marketing'}
-              className={`${s.notice}${n.read ? '' : ` ${s.noticeUnread}`}`}
-              onClick={() => {
-                if (!n.read) void readNotices([n.id]).then(r => (r.ok ? onRead() : undefined))
-                onClose()
-              }}
-            >
-              <span className={s.noticeIcon} aria-hidden="true">{n.refKind === 'payment_request' ? '🧾' : '🎬'}</span>
-              <span className={s.noticeText}>
-                <span className={s.noticeTitle}>{n.title}</span>
-                <span className={s.noticeMeta}>
-                  {n.body ? <span>{n.body}</span> : null}
-                  {n.body ? <span>·</span> : null}
-                  <span>{noticeAge(n.at, now)}</span>
+          {items.map(n => {
+            const quote = n.refKind === 'mkt_quote' && n.ref ? quotes[n.ref] ?? null : null
+            const read = () => {
+              if (!n.read) void readNotices([n.id]).then(r => (r.ok ? onRead() : undefined))
+              onClose()
+            }
+            return (
+              <Link
+                key={n.id}
+                href={n.ref ? noticeUrl({ refKind: n.refKind, refId: n.ref }, 'hr') : '/marketing'}
+                className={`${s.notice}${n.read ? '' : ` ${s.noticeUnread}`}`}
+                onClick={read}
+              >
+                <span className={`${s.noticeIcon}${n.refKind === 'mkt_quote' ? ` ${s.noticeIconOk}` : ''}`} aria-hidden="true">
+                  {n.refKind === 'payment_request' ? '🧾' : n.refKind === 'mkt_quote' ? '✅' : '🎬'}
                 </span>
-              </span>
-              {n.read ? null : <span className={s.noticeDot} aria-label="Unread" />}
-            </Link>
-          ))}
+                <span className={s.noticeText}>
+                  <span className={s.noticeTitle}>{n.title}</span>
+                  {n.refKind === 'mkt_quote' ? (
+                    <span className={s.noticeMeta}>
+                      <span>{noticeAge(n.at, now)}</span>
+                      {n.body ? <span>·</span> : null}
+                      {n.body ? <span>{n.body}</span> : null}
+                    </span>
+                  ) : (
+                    <span className={s.noticeMeta}>
+                      {n.body ? <span>{n.body}</span> : null}
+                      {n.body ? <span>·</span> : null}
+                      <span>{noticeAge(n.at, now)}</span>
+                    </span>
+                  )}
+                  {quote && quote.status === 'accepted' && quote.tasks == null && n.ref ? (
+                    <button
+                      type="button"
+                      className={s.noticeAssign}
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        read()
+                        router.push(`/marketing/products?q=${encodeURIComponent(n.ref as string)}&assign=1`)
+                      }}
+                    >
+                      Assign tasks
+                    </button>
+                  ) : null}
+                  {quote?.tasks != null ? <span className={s.noticeDone}>✓ {quote.tasks} tasks assigned</span> : null}
+                </span>
+                {n.read ? null : <span className={s.noticeDot} aria-label="Unread" />}
+              </Link>
+            )
+          })}
         </div>
       ) : (
         <div className={s.noticesEmpty}>

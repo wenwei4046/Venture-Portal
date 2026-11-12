@@ -91,6 +91,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_minutes_templates',
   // Marketing's Product Builder (mig 20261023235900): the products, their prices and versions — STABLE.
   'mkt_products',
+  // The Product Builder's Product List and quotations (mig 20261113100000), and the bell's question about them — STABLE.
+  'mkt_quote_book', 'mkt_quote_states',
   // Marketing's product projects (mig 20261024002000): the products on sale, a product project's page — STABLE.
   'mkt_product_picker', 'mkt_product_project',
   // New Project's drafts (mig 20261025211000): the login's own list, and one with its form — STABLE.

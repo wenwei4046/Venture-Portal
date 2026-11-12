@@ -217,7 +217,15 @@
   width: 34px; height: 34px; flex: none; border-radius: 8px; background: var(--mk-team-content-bg); display: flex;
   align-items: center; justify-content: center; font-size: 16px;
 }
+.noticeIconOk { background: rgb(var(--mk-done-bg)); }
 .noticeText { flex: 1; min-width: 0; }
+/* A quotation the client accepted: Assign tasks, or what was assigned (the Product Builder handoff, 2026-11-12). */
+.noticeAssign {
+  display: block; margin-top: 8px; height: 28px; padding: 0 12px; border-radius: 7px; border: 0; background: var(--mk-primary);
+  color: rgb(var(--mk-ink-2)); font: inherit; font-weight: 600; font-size: .84em; cursor: pointer;
+}
+.noticeAssign:hover { background: var(--mk-primary-hover); }
+.noticeDone { display: inline-block; margin-top: 8px; font-size: .82em; color: rgb(var(--mk-done)); font-weight: 600; }
 .noticeTitle { font-size: 1em; line-height: 1.45; text-wrap: pretty; }
 .noticeMeta { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: .85em; color: rgb(var(--mk-muted)); white-space: nowrap; }
 .noticeDot { width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--mk-brown)); margin-top: 6px; flex: none; }

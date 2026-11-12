@@ -81,7 +81,7 @@ describe('the five sections and publishing', () => {
     expect(productProblems(p, book)).toEqual(['A linked workflow is not published yet'])
     const published = { ...book, workflows: book.workflows.map(w => ({ ...w, version: 1 })) }
     expect(productProblems(p, published)).toEqual([])
-    expect(productProblems({ ...p, groups: [{ ...p.groups[0], items: [{ ...p.groups[0].items[0], workflow: null }] }] }, published)).toEqual(['Link a workflow to each action'])
+    expect(productProblems({ ...p, groups: [{ ...p.groups[0], items: [{ ...p.groups[0].items[0], workflow: null }] }] }, published)).toEqual(['Link a workflow to each item'])
     expect(productProblems({ ...p, intake: null, price: 0, effectiveFrom: null }, published)).toEqual(['Pick its intake minutes template', 'Set its list price', 'Pick the day it takes effect'])
     expect(productProblems({ ...p, status: 'retired' }, published)).toEqual(['A retired product is read-only — reactivate it first'])
   })

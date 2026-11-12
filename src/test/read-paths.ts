@@ -479,6 +479,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Marketing's Product Builder (mig 20261023235900): the products — and their prices — read, saved, published, retired
   // and reactivated, all by Marketing · Manage.
   'mkt_products', 'mkt_product_save', 'mkt_product_publish', 'mkt_product_status',
+  // The Product Builder's three tabs (mig 20261113100000): the Product List, quotations (sent, accepted, their tasks
+  // assigned), a product duplicated or its status set from the list — all Marketing · Manage; the bell's quotation states.
+  'mkt_quote_book', 'mkt_item_save', 'mkt_item_delete', 'mkt_catalogue_rename', 'mkt_quote_save', 'mkt_quote_send', 'mkt_quote_accept',
+  'mkt_quote_assign', 'mkt_quote_duplicate', 'mkt_quote_states', 'mkt_product_duplicate', 'mkt_product_set_status',
+  'mkt_item_column_save', 'mkt_item_column_delete', 'mkt_item_columns_order',
   // Marketing's product projects (mig 20261024002000): the products on sale and a project started by Marketing · Manage;
   // its page read by View; its intake minutes written and sent, started before approval, resent by Manage; signed by an
   // attendee (Edit).
