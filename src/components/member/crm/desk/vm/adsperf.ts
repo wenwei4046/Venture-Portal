@@ -51,7 +51,8 @@ export function moveHeld(list: string[], from: number | null | undefined, to: nu
 }
 /** The chart's metrics are the table's (2026-10-23, the owner: "他的资料跟下方的 + 是一样的"), less Delivery. */
 // The daily budget is today's setting, not a day-by-day figure, so the chart leaves it out.
-const CHART_METRICS = ALL.filter(m => m[3] !== "t" && m[0] !== "dbudget").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
+const NOT_CHARTED = new Set(["dbudget"]);
+const CHART_METRICS = ALL.filter(m => m[3] !== "t" && !NOT_CHARTED.has(m[0])).map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
 // 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
 // lead say RM in their heads (2026-10-23, the owner: "spend（加RM） & per lead （加RM）").
 /** The figures picked for the strip and the chart, as kept on the server (v4 notes/21). */
@@ -104,6 +105,47 @@ export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<st
     clicks: s.clicks, cpc: per(s.clicks), ctr: s.impr ? (s.clicks / s.impr) * 100 : null, allclk: s.allClicks, ctrall: s.impr ? (s.allClicks / s.impr) * 100 : null, cpcall: per(s.allClicks),
     cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won), dbudget: dailyBudget(got) };
 }
+/**
+ * The Revenue Team's marketing fee on an amount of ads spend (the owner, 2026-11-12): ladder stacking — 25% of the first
+ * RM 30,000, 20% of the rest — and never under RM 2,500; billed at the end of the month. RM 10k → 2,500 (the minimum),
+ * RM 20k → 5,000, RM 50k → 7,500 + 4,000 = 11,500. Nothing spent, no fee.
+ */
+export const FEE_MIN = 2500, FEE_STEP = 30000, FEE_LOW = 0.25, FEE_HIGH = 0.2;
+export function marketingFee(spend: number | null | undefined): number | null {
+  if (spend == null) return null;
+  if (spend <= 0) return 0;
+  const ladder = Math.min(spend, FEE_STEP) * FEE_LOW + Math.max(0, spend - FEE_STEP) * FEE_HIGH;
+  return Math.max(FEE_MIN, ladder);
+}
+/** Where the minimum stops: the spend at which 25% is RM 2,500 (RM 10,000). */
+export const FEE_MIN_UNTIL = FEE_MIN / FEE_LOW;
+/** The fee's three tiers, as the strip names them under the fee (the owner, 2026-11-12: "加上 tier 的价钱（已经目前到哪个阶段）"). */
+export const FEE_TIERS = [
+  { n: 1, price: "Min RM 2,500", rule: `Minimum RM 2,500 · spend up to RM ${FEE_MIN_UNTIL.toLocaleString("en-MY")}` },
+  { n: 2, price: "25%", rule: `25% · spend RM ${FEE_MIN_UNTIL.toLocaleString("en-MY")} – ${FEE_STEP.toLocaleString("en-MY")}` },
+  { n: 3, price: "25% + 20%", rule: `25% of the first RM ${FEE_STEP.toLocaleString("en-MY")} + 20% above` },
+] as const;
+/** The tier a month's spend has reached, and how much more spend reaches the next (null on the last). */
+export function feeTier(spend: number): { tier: (typeof FEE_TIERS)[number]; toNext: number | null } {
+  if (spend < FEE_MIN_UNTIL) return { tier: FEE_TIERS[0], toNext: FEE_MIN_UNTIL - spend };
+  if (spend <= FEE_STEP) return { tier: FEE_TIERS[1], toNext: FEE_STEP - spend };
+  return { tier: FEE_TIERS[2], toNext: null };
+}
+/**
+ * The calendar months a range touches, each whole from its 1st to its last day — or to today for the month still running.
+ * The fee is billed by the month (the owner, 2026-11-12: "Marketing fee 是以一个月去计算的"), so a week or a day shows
+ * its month's fee, and a range over two months the two months' fees.
+ */
+export function feeMonths(a: number, b: number, today: number): [number, number][] {
+  const out: [number, number][] = [];
+  const d0 = new Date(a), last = new Date(b);
+  for (let y = d0.getFullYear(), m = d0.getMonth(); y < last.getFullYear() || (y === last.getFullYear() && m <= last.getMonth()); m === 11 ? (y++, m = 0) : m++) {
+    const start = new Date(y, m, 1).getTime(), end = new Date(y, m + 1, 0).getTime();
+    if (start > today) break;
+    out.push([start, Math.min(end, today)]);
+  }
+  return out;
+}
 export const fmt = (v: number | null | undefined, t: Fmt) => (v == null ? "—" : t === "rm" ? Math.round(v).toLocaleString("en-MY") : t === "rm2" ? v.toFixed(2) : t === "pct" ? `${v.toFixed(2)}%` : t === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY"));
 
 export function adsPerfVM(ctx: DeskCtx) {
@@ -154,11 +196,12 @@ export function adsPerfVM(ctx: DeskCtx) {
   // The source picked (the owner, 2026-10-27: DC and The Conts, each WhatsApp · Messenger): an ad's leads from that source, an ad
   // with none yet by its Page; the list, the chart and the total all follow it.
   const src = (ui.apSrc ?? "all") as SourcePick;
-  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src));
+  const adsAll = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src));
     const s0 = all[0] ? sourceOf(all[0]) : null, brand = s0?.brandLabel || (brandOf(data.adNames?.[id]?.pageId) ? BRAND_LABEL[brandOf(data.adNames?.[id]?.pageId)!] : "");
     return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, // An ad with no lead in the brand picked at the top (Insight's DC / The Conts) is listed only when its Page is that brand's — else
     // the other brand's ads stood there with 0 leads (the owner, 2026-10-30: "我在msg 跑广告怎么都没显示出来？" — the page was on Dream Crafter).
     keep: (all.length > 0 || adPageInSource(data.adNames?.[id]?.pageId, ui.insSrc as SourcePick | undefined)) && (src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src))) }; }).filter(a => a.keep);
+  const ads = adsAll.filter(a => ui.apShowHidden || !data.adNames?.[a.id]?.hidden);
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
   const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => { const crm = crmFigures(cs, ctx, a, b); return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
@@ -222,7 +265,14 @@ export function adsPerfVM(ctx: DeskCtx) {
   })();
   // The ranges whose Meta figures the table needs (DeskScreens reads the missing ones; numeric ad ids only).
   const metaIds = AD.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
-  const apNeed = (cmp ? [[ra, rb], [ca, cb]] : [[ra, rb]]).map(([a, b]) => ({ key: rkey(a, b), since: isoOf(a), until: isoOf(b), ids: metaIds.filter(id => !(id in (ui.apMeta?.[rkey(a, b)] ?? {}))) })).filter(n => n.ids.length);
+  // The marketing fee is billed by the calendar month (the owner, 2026-11-12: "Marketing fee 是以一个月去计算的"): each month
+  // the range touches, on that whole month's spend up to today — every ad of the source picked, paused and hidden ones too
+  // (they were spent), whatever the Running / Paused filter shows.
+  const feeIds = adsAll.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
+  const feeRanges = feeMonths(ra, rb, T);
+  const apNeed = [...(cmp ? [[ra, rb], [ca, cb]] : [[ra, rb]]).map(([a, b]) => ({ a, b, ids: metaIds })), ...feeRanges.map(([a, b]) => ({ a, b, ids: feeIds }))]
+    .filter((n, i, l) => l.findIndex(x => x.a === n.a && x.b === n.b && x.ids === n.ids) === i)
+    .map(({ a, b, ids: want }) => ({ key: rkey(a, b), since: isoOf(a), until: isoOf(b), ids: want.filter(id => !(id in (ui.apMeta?.[rkey(a, b)] ?? {}))) })).filter(n => n.ids.length);
 
   // The chart over the table (vm/adschart.ts): the range's days, a tile a metric — its total as the table's — and its line.
   const dayKey = rkey(ra, rb), daily = ui.apDaily?.[dayKey] ?? {};
@@ -260,9 +310,33 @@ export function adsPerfVM(ctx: DeskCtx) {
   };
   // The figure strip over the table (D2a): the figures in equal centred columns, each with its line's colour; + adds one
   // (Customise metrics, the chart's list), hover × takes one off, Show chart opens the chart under it.
+  const picked = slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
+    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null } : null)).filter((x): x is NonNullable<typeof x> => !!x);
+  // The Revenue Team's marketing fee and the whole cost (the owner, 2026-11-12: the spend alone is not the whole cost; "mkt
+  // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
+  // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after
+  // Spent; under the fee, the tier the month has reached and the spend to the next. Total cost = those months' spend + fee.
+  const feeMon = feeRanges.map(([a, b]) => { const s = metaFigures(metaOf(feeIds, a, b), {}).spend; return { a, s, fee: marketingFee(s) }; });
+  const feeKnown = feeMon.length > 0 && feeMon.every(m => m.s != null);
+  const feeSum = feeKnown ? feeMon.reduce((n, m) => n + (m.fee ?? 0), 0) : null, monSpend = feeKnown ? feeMon.reduce((n, m) => n + (m.s ?? 0), 0) : null;
+  const monName = (t: number) => MON[new Date(t).getMonth()].slice(0, 3);
+  const rmW = (n: number) => `RM ${Math.round(n).toLocaleString("en-MY")}`;
+  const tierOf = (m: (typeof feeMon)[number]) => { const t = feeTier(m.s ?? 0); return { t, line: `Tier ${t.tier.n} · ${t.tier.price}`, next: t.toNext == null ? "Top tier" : `${rmW(t.toNext)} to Tier ${t.tier.n + 1}` }; };
+  const one = feeKnown && feeMon.length === 1 ? tierOf(feeMon[0]) : null;
+  // The month is Total cost's line ("Nov spend + fee") and the hover's; the fee's lines are its tier and the way to the next.
+  const feeSub = !feeKnown ? [] : one ? [one.line, one.next] : [feeMon.map(m => `${monName(m.a)} T${tierOf(m).t.tier.n}`).join(" · "), "Each month billed alone"];
+  const feeTitle = [
+    ...FEE_TIERS.map(t => `Tier ${t.n}: ${t.rule}`), "",
+    ...(feeKnown ? feeMon.map(m => `${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`) : []),
+  ].join("\n");
+  const feeItems = [
+    { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle },
+    { key: "totalcost", label: "Total cost", total: chartFmt(feeSum == null || monSpend == null ? null : monSpend + feeSum, "rm"), color: "var(--crm-ink)", remove: null,
+      sub: feeKnown ? [`${feeMon.map(m => monName(m.a)).join(" + ")} spend + fee`] : [], title: feeKnown ? `${rmW(monSpend ?? 0)} spent + ${rmW(feeSum ?? 0)} marketing fee` : undefined },
+  ];
+  const at = picked.findIndex(x => x.key === "spend");
   const apStrip = {
-    items: slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
-      remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null } : null)).filter((x): x is NonNullable<typeof x> => !!x),
+    items: at < 0 ? [...picked, ...feeItems] : [...picked.slice(0, at + 1), ...feeItems, ...picked.slice(at + 1)],
     canAdd: chosen.length < CHART_MAX, add: () => patch({ pane: "docked", kind: "metrics", mFor: "chart", mDraft: null, mDrag: null }),
     open: chartOpen, toggle: () => keepFigures(chosen, !chartOpen),
   };
@@ -336,9 +410,9 @@ export function adsPerfVM(ctx: DeskCtx) {
     mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : forChart ? CHART_DEF.filter((k): k is string => !!k) : DEF)] }),
     mFoldAllLabel: METRICS.every(g => ui.mFold[g[0]]) ? "Expand all" : "Collapse all",
     mFoldAll: () => set(u => { const all = METRICS.every(g => u.mFold[g[0]]); return { ...u, mFold: { ...u.mFold, ...Object.fromEntries(METRICS.map(g => [g[0], !all])) } }; }),
-    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && (m[3] === "t" || m[0] === "dbudget"))).length}`,
+    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && (m[3] === "t" || NOT_CHARTED.has(m[0])))).length}`,
       fold: () => set(u => ({ ...u, mFold: { ...u.mFold, [label]: !u.mFold[label] } })),
-      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && (m[3] === "t" || m[0] === "dbudget"))).map(m => { const on = dsel.includes(m[0]);
+      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && (m[3] === "t" || NOT_CHARTED.has(m[0])))).map(m => { const on = dsel.includes(m[0]);
         return { label: m[1], hint: m[2], on, bg: on ? "var(--crm-rust)" : "#fff", bd: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
           toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); if (!c.includes(m[0]) && u.mFor === "chart" && c.length >= CHART_MAX) return u; return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
     mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
