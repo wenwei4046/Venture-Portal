@@ -271,6 +271,25 @@ describe('the Product Builder', () => {
     expect(onOpen).toHaveBeenLastCalledWith('p2')
   })
 
+  it('right-click Delete: a draft never published, asked first; one once on sale says to retire it (2026-11-13)', async () => {
+    actions.deleteMktProduct.mockResolvedValue({ ok: true, book: productBookFromRow({ ...BOOK, products: [SMA, RETIRED] }) })
+    builder()
+    fireEvent.contextMenu(screen.getByText('Social Media Package A'))
+    const off = within(screen.getByRole('menu', { name: 'Social Media Package A' })).getByRole('menuitem', { name: /Delete/ }) as HTMLButtonElement
+    expect([off.disabled, off.textContent]).toEqual([true, 'DeleteRetire instead'])
+    fireEvent.contextMenu(screen.getByText('Brand Book'))
+    const menu = screen.getByRole('menu', { name: 'Brand Book' })
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Delete' }))
+    expect(within(menu).getByText('Delete “Brand Book”? This cannot be undone.')).toBeTruthy()
+    expect(actions.deleteMktProduct).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(within(menu).getByRole('button', { name: 'Delete' }))
+    })
+    expect(actions.deleteMktProduct).toHaveBeenCalledWith('p2', 1)
+    expect(await screen.findByText('Deleted Brand Book')).toBeTruthy()
+    expect(screen.queryByText('Brand Book')).toBeNull()
+  })
+
   it('a product on sale opens a quotation with it', () => {
     builder('p1')
     fireEvent.click(screen.getByRole('button', { name: '📄 New quotation' }))

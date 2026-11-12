@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductAccount, setMktProductStatus } from '@/lib/marketing/actions'
 import { duplicateMktProduct, setMktProductStatusTo } from '@/lib/marketing/quote-actions'
-import { extrasOf, itemNamed, norm, pickerGroups, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
+import { extrasOf, itemNamed, itemsCost, norm, pickerGroups, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
 import {
   accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections,
   type Product, type ProductBook, type ProductEdit, type ProductGroup, type ProductItem, type ProductStatus, type ProductWorkflowOption,
@@ -74,6 +74,7 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   const [acctBusy, setAcctBusy] = useState(false)
   const [catDraft, setCatDraft] = useState('')
   const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [ctxDelete, setCtxDelete] = useState(false)
   const [mustPublish, setMustPublish] = useState<string | null>(null)
   const [pickFor, setPickFor] = useState<string | null>(null)
   const [pickRect, setPickRect] = useState<PickRect | null>(null)
@@ -354,6 +355,27 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     }
   }
 
+  /** Delete from the right-click menu (the user, 2026-11-13: "product 点右键可以删除"): a product never published, asked
+   * first; one published once is retired instead (answer 8 — its projects keep their version), so the row says so. */
+  const removeFromMenu = async (p: Product) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const isOpen = p.id === selRef.current
+      if (isOpen && !(await flush())) return
+      const r = await deleteMktProduct(p.id, isOpen ? revRef.current : p.rev)
+      if (!r.ok) return flash(r.reason)
+      const products = r.book?.products ?? book.products.filter(x => x.id !== p.id)
+      setBook(b => r.book ?? { ...b, products })
+      if (isOpen) await open(null, products)
+      flash(`Deleted ${p.name.trim() || p.code}`)
+    } finally {
+      setBusy(false)
+      setCtx(null)
+      setCtxDelete(false)
+    }
+  }
+
   // ── The right-click menu and the "publish it first" window, over the list and the editor alike ──
   const ctxP = ctx ? book.products.find(p => p.id === ctx.id) ?? null : null
   const mustP = mustPublish ? book.products.find(p => p.id === mustPublish) ?? null : null
@@ -361,7 +383,7 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     <>
       {ctxP && ctx ? (
         <>
-          <div className={pb.ctxScrim} onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} />
+          <div className={pb.ctxScrim} onClick={() => { setCtx(null); setCtxDelete(false) }} onContextMenu={e => { e.preventDefault(); setCtx(null); setCtxDelete(false) }} />
           <div className={pb.ctx} style={{ left: ctx.x, top: ctx.y }} role="menu" aria-label={ctxP.name || 'New product'}>
             <div className={pb.ctxName}>{ctxP.name || 'New product'}</div>
             <div className={pb.ctxSect}>Status</div>
@@ -378,6 +400,23 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
             <div className={pb.ctxLine} />
             <button type="button" role="menuitem" className={pb.ctxRow} onClick={() => { setCtx(null); void open(ctxP.id) }}>Open</button>
             <button type="button" role="menuitem" className={pb.ctxRow} onClick={() => { setCtx(null); void duplicate(ctxP) }}>⧉ Duplicate</button>
+            <div className={pb.ctxLine} />
+            {ctxP.version > 0 ? (
+              <button type="button" role="menuitem" className={`${pb.ctxRow} ${pb.ctxOff}`} disabled
+                title="A product once on sale is retired, not deleted — its projects keep their version">
+                <span className={pb.grow}>Delete</span><span className={pb.ctxHint}>Retire instead</span>
+              </button>
+            ) : ctxDelete ? (
+              <div className={pb.ctxAsk}>
+                <span className={pb.ctxAskText}>Delete “{ctxP.name.trim() || ctxP.code}”? This cannot be undone.</span>
+                <span className={pb.ctxAskBtns}>
+                  <button type="button" className={pb.ctxDanger} disabled={busy} onClick={() => void removeFromMenu(ctxP)}>Delete</button>
+                  <button type="button" className={pb.ctxKeep} onClick={() => setCtxDelete(false)}>Keep</button>
+                </span>
+              </div>
+            ) : (
+              <button type="button" role="menuitem" className={`${pb.ctxRow} ${pb.ctxDel}`} onClick={() => setCtxDelete(true)}>Delete</button>
+            )}
           </div>
         </>
       ) : null}
@@ -404,8 +443,28 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   )
   const onMenu = (p: Product) => (e: React.MouseEvent) => {
     e.preventDefault()
-    setCtx({ id: p.id, x: Math.min(e.clientX, window.innerWidth - 230), y: Math.min(e.clientY, window.innerHeight - 220) })
+    setCtxDelete(false)
+    setCtx({ id: p.id, x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 330) })
   }
+
+  // The internal cost follows the items (the user, 2026-11-13: "加了物品后，internal cost 没自动跳出"): when the items
+  // change, a cost left empty — or still the items' cost from before — becomes the Product List's cost × quantity. A cost
+  // typed by hand stays; "Use cost of items" offers the sum. Opening a product changes nothing.
+  const costOfItems = edit ? itemsCost(edit.groups, items) : null
+  const lastCost = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    lastCost.current = undefined
+  }, [selId])
+  useEffect(() => {
+    if (!costOfItems) return
+    const prev = lastCost.current
+    lastCost.current = costOfItems.cost
+    if (prev === undefined || prev === costOfItems.cost || ro) return
+    const cur = editRef.current?.cost ?? null
+    if (cur === null || cur === prev) change({ cost: costOfItems.cost > 0 ? costOfItems.cost : null })
+    // Only a change of the items' cost moves it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costOfItems?.cost])
 
   // ── The list ──
   if (!sel || !edit) {
@@ -799,6 +858,14 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                   <span className={pb.rm}>RM</span>
                   <MoneyInput className={pb.moneyInput} value={edit.cost} placeholder="—" label="Internal cost" disabled={ro} onChange={v => change({ cost: v })} />
                 </span>
+                {!ro && costOfItems && costOfItems.cost > 0 && costOfItems.cost !== edit.cost ? (
+                  <button type="button" className={pb.link} onClick={() => change({ cost: costOfItems.cost })}>
+                    Use cost of items ({rm(costOfItems.cost)}{per(edit.kind)})
+                  </button>
+                ) : null}
+                {costOfItems?.missing ? (
+                  <span className={pb.muted}>{costOfItems.missing} item{costOfItems.missing === 1 ? ' has' : 's have'} no cost on the Product List</span>
+                ) : null}
               </div>
               <div className={pb.field}>
                 <span className={pb.label}>Margin</span>
