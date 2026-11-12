@@ -44,20 +44,20 @@ describe('a deliverable’s Assignment Plan', () => {
     const d = planFromTask(pg)
     expect(d.start).toBe('') // not planned: no start day yet
     expect(d.stages.map(s => [s.name, s.mode, s.owner, s.appr, s.split])).toEqual([
-      ['Design', 'assign', null, [{ kind: 'pic' }], false],
-      ['Caption', 'prev', null, [{ kind: 'person', staff: JOSIAH }], false],
-      ['Publish', 'assign', null, [{ kind: 'assign' }], true],
+      ['Design', 'assign', null, [{ ids: ['pic'], rule: 'any' }], false],
+      ['Caption', 'prev', null, [{ ids: [JOSIAH], rule: 'any' }], false],
+      ['Publish', 'assign', null, [{ ids: ['assign'], rule: 'any' }], true],
     ])
     // A locked template leaves nothing to the stage before and no subtasks.
     expect(planFromTask(page({ locked: true })).stages.map(s => [s.mode, s.split])).toEqual([['assign', false], ['assign', false], ['assign', false]])
   })
 
-  it('counts its dates as the database does: the start day, each stage’s days, weekends and holidays skipped', () => {
+  it('counts its dates as the database does: the start day, each stage’s days, Monday to Friday (a holiday is a working day)', () => {
     const d = { ...planFromTask(page()), start: '2026-11-02' }
     const dates = planDates(d, new Set(['2026-11-03']))
-    expect(dates.map(x => [x.startsOn, x.dueOn])).toEqual([['2026-11-02', '2026-11-05'], ['2026-11-06', '2026-11-06'], ['2026-11-09', '2026-11-09']])
-    expect([datesLabel(dates[0]), datesLabel(dates[1])]).toEqual(['2 Nov → 5 Nov', 'Fri 6 Nov'])
-    expect(planSummary(d, page().holidays)).toEqual({ days: 4, pic: 1, internal: 2, starts: 'Mon 2 Nov', finishes: 'Mon 9 Nov', skipped: 'Selangor day' })
+    expect(dates.map(x => [x.startsOn, x.dueOn])).toEqual([['2026-11-02', '2026-11-04'], ['2026-11-05', '2026-11-05'], ['2026-11-06', '2026-11-06']])
+    expect([datesLabel(dates[0]), datesLabel(dates[1])]).toEqual(['2 Nov → 4 Nov', 'Thu 5 Nov'])
+    expect(planSummary(d, page().holidays)).toEqual({ days: 4, pic: 1, internal: 2, starts: 'Mon 2 Nov', finishes: 'Fri 6 Nov', skipped: 'Selangor day' })
     expect(planSummary({ ...d, start: '2026-11-16' }, page().holidays).skipped).toBe('none in this range')
   })
 
@@ -69,7 +69,7 @@ describe('a deliverable’s Assignment Plan', () => {
     ])
     // Caption is the stage before's to pick: not unassigned.
     expect(saved.stages.map(unassigned)).toEqual([true, false, true])
-    const d = { start: '2026-10-25', stages: saved.stages.map((s, i) => (i === 0 ? { ...s, owner: ALI } : i === 2 ? { ...s, owner: MEI, appr: [{ kind: 'person' as const, staff: JOSIAH }] } : s)) }
+    const d = { start: '2026-10-25', stages: saved.stages.map((s, i) => (i === 0 ? { ...s, owner: ALI } : i === 2 ? { ...s, owner: MEI, appr: [{ ids: [JOSIAH], rule: 'any' as const }] } : s)) }
     expect(planProblems(saved, d, false, '2026-10-26', {})).toEqual(['Pick the day it starts — today or later'])
     expect(planProblems(saved, { ...d, start: '2026-11-02' }, false, '2026-10-26', {})).toEqual([])
   })
@@ -109,12 +109,36 @@ describe('a deliverable’s Assignment Plan', () => {
 
   it('names who is on it — each person and approver once, then the PIC', () => {
     const d = planFromTask(page())
-    const planned = { ...d, stages: d.stages.map((s, i) => (i === 0 ? { ...s, owner: ALI } : i === 2 ? { ...s, owner: ALI, appr: [{ kind: 'person' as const, staff: JOSIAH }] } : s)) }
+    const planned = { ...d, stages: d.stages.map((s, i) => (i === 0 ? { ...s, owner: ALI } : i === 2 ? { ...s, owner: ALI, appr: [{ ids: [JOSIAH], rule: 'any' as const }] } : s)) }
     expect(planCrew(planned, page().team, 'Kelvin').map(c => c.name)).toEqual(['Ali', 'SIA', 'Kelvin (PIC)'])
   })
 
   it('offers tomorrow to start — or the next working day after it', () => {
     expect(firstStart('2026-10-26', new Set())).toBe('2026-10-27')
     expect(firstStart('2026-10-30', new Set(['2026-11-02']))).toBe('2026-11-03') // Fri → past the weekend and a holiday
+  })
+})
+
+// 2026-11-13 — the Workflow Builder 2a's levels on the plan: one or more on a level, any one or everyone, sent whole.
+describe('the plan’s approval levels', () => {
+  const lv = (ids: string[], rule: 'any' | 'all' = 'any') => ({ ids, rule })
+  it('keeps a level of several whole — never trimmed to its first — and sends {ids, rule, picAll}', () => {
+    const pg = page({}, [stage(0, { name: 'Design', owner: ALI, appr: [{ ids: [JOSIAH, MEI], rule: 'all' }, { ids: ['pic'], rule: 'any', picAll: true }] })])
+    const d = planFromTask(pg)
+    // Both PICs read back from the level's picAll.
+    expect(d.stages[0].appr).toEqual([lv([JOSIAH, MEI], 'all'), { ids: ['pic'], rule: 'any', picAll: true }])
+    const both = { ...d, start: '2026-11-02' }
+    expect(planPayload(both, {}, []).stages[0].appr).toEqual([{ ids: [JOSIAH, MEI], rule: 'all' }, { ids: ['pic'], rule: 'any', picAll: true }])
+    expect(planSummary(both, []).internal).toBe(1)
+    expect(planCrew(both, pg.team, 'Kelvin').map(c => c.name)).toEqual(['Ali', 'SIA', 'Mei', 'Kelvin (PIC)'])
+  })
+  it('refuses what mkt_levels_check refuses: nobody on a level, one still to pick, a person twice, the PIC twice', () => {
+    const d = { ...planFromTask(page()), start: '2026-11-02' }
+    const at0 = (appr: { ids: string[]; rule: 'any' | 'all' }[]) => ({ ...d, stages: d.stages.map((s, i) => (i === 0 ? { ...s, owner: ALI, appr } : { ...s, owner: ALI, appr: [] })) })
+    expect(planProblems(d, at0([lv([])]), false, '2026-10-26', {})).toEqual(['Stage 1 (Design): pick who approves it'])
+    expect(planProblems(d, at0([lv([JOSIAH, 'assign'])]), false, '2026-10-26', {})).toEqual(['Stage 1 (Design): pick who approves it'])
+    expect(planProblems(d, at0([lv([JOSIAH]), lv([JOSIAH, MEI])]), false, '2026-10-26', {})).toEqual(['Stage 1 (Design): the same approver twice'])
+    expect(planProblems(d, at0([lv(['pic']), lv(['pic'])]), false, '2026-10-26', {})).toEqual(['Stage 1 (Design): the PIC twice'])
+    expect(planProblems(d, at0([lv([JOSIAH, MEI], 'all'), lv(['pic'])]), false, '2026-10-26', {})).toEqual([])
   })
 })

@@ -4,6 +4,7 @@
 // strings, the office's (the database answers today in Asia/Kuala_Lumpur).
 
 import type { AdsEvery } from './ads'
+import { levelFromRow, levelsFromRow, levelWaits, PIC_ID, type ApprLevel, type LevelOk } from './flow'
 import { groupOf } from './groups'
 import type { MktTeam } from './shell'
 
@@ -93,7 +94,12 @@ export interface MktStage {
   /** Its group — a People title. */
   dept: MktGroup
   owner: string | null
+  /** Its approvers in the older one-person shape (each level's first) — for the pages that still read them. */
   appr: MktApprover[]
+  /** Its approval levels (Workflow Builder 2a, mig 20261113210000): who, any or all; legacy rows read as levels of one. */
+  levels: ApprLevel[]
+  /** Who approved the level now (this version): id → when. */
+  apprOk: LevelOk
   split: boolean
   /** Working days the stage is planned to take. */
   sla: number
@@ -214,7 +220,15 @@ function approver(v: unknown): MktApprover | null {
   if (!isObj(v)) return null
   if (v.kind === 'pic') return v.all === true ? { kind: 'pic', all: true } : { kind: 'pic' }
   if (v.kind === 'person' && str(v.staff)) return { kind: 'person', staff: str(v.staff) }
-  return null
+  // A level of the 2a shape: its first id stands for it here (the levels themselves are `levels`).
+  const lv = Array.isArray(v.ids) ? levelFromRow(v) : null
+  return lv ? idApprover(lv.ids[0], v.picAll === true) : null
+}
+
+/** One id of a level as an approver: the PIC, or a person (never one still to be picked at assignment). */
+function idApprover(id: string | undefined, picAll = false): MktApprover | null {
+  if (!id || id === 'assign') return null
+  return id === PIC_ID ? (picAll ? { kind: 'pic', all: true } : { kind: 'pic' }) : { kind: 'person', staff: id }
 }
 
 function recur(v: unknown): MktRecur | null {
@@ -323,6 +337,8 @@ export function stageFromRow(s: Record<string, unknown>): MktStage {
     dept: groupOf(str(s.dept)),
     owner: strOrNull(s.owner),
     appr: (Array.isArray(s.appr) ? s.appr : []).map(approver).filter((a): a is MktApprover => !!a),
+    levels: levelsFromRow(Array.isArray(s.levels) ? s.levels : s.appr),
+    apprOk: isObj(s.apprOk) ? Object.fromEntries(Object.entries(s.apprOk).filter(([k]) => !!k).map(([k, at]) => [k, typeof at === 'string' && at ? at : 'yes'])) : {},
     split: s.split === true,
     sla: Math.max(1, int(s.sla, 1)),
     startsOn: day(s.startsOn),
@@ -503,9 +519,20 @@ export function indexBoard(b: MktBoard): BoardIndex {
   }
 }
 
-/** The approver a stage in review waits for now — null when it is not in review. */
+/** Who a stage in review still waits for at its level now (staff ids, 'pic'); none when it is not in review. */
+export function waitsNow(s: Pick<MktStage, 'status' | 'levels' | 'apprIdx' | 'apprOk'>): string[] {
+  if (s.status !== 'review') return []
+  const lv = s.levels[s.apprIdx]
+  return lv ? levelWaits(lv, s.apprOk) : []
+}
+
+/** The approver a stage in review waits for now — the first the level still waits for; null when it is not in review. */
 export function approverNow(s: MktStage): MktApprover | null {
-  return s.status === 'review' ? s.appr[s.apprIdx] ?? null : null
+  if (s.status !== 'review') return null
+  const lv = s.levels[s.apprIdx]
+  if (!lv) return s.appr[s.apprIdx] ?? null
+  const legacy = s.appr[s.apprIdx]
+  return idApprover(levelWaits(lv, s.apprOk)[0], legacy?.kind === 'pic' && legacy.all === true)
 }
 
 /** A recurring task's series: the rule and the stages each run copies — the runs are projects of their own. */

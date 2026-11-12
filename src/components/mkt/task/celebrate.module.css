@@ -1,0 +1,63 @@
+/* The celebration overlay (Task Flow.dc.html › art): its keyframes one for one — fwUp / fwBurst (fireworks), clinkL /
+   clinkR / bubble (cheers), clap / beam / cfFall (movie night's popcorn), cfFall (confetti), celebIn (the words). */
+
+@keyframes fwUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(var(--up)); opacity: 0; } }
+@keyframes fwBurst {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  8% { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; }
+}
+@keyframes cfFall {
+  0% { transform: translateY(-40px) rotate(0); opacity: 1; }
+  100% { transform: translateY(var(--fall)) rotate(var(--rot)); opacity: .9; }
+}
+@keyframes clinkL { 0%, 100% { transform: translateX(0) rotate(-8deg); } 45%, 55% { transform: translateX(34px) rotate(14deg); } }
+@keyframes clinkR {
+  0%, 100% { transform: translateX(0) rotate(8deg) scaleX(-1); }
+  45%, 55% { transform: translateX(-34px) rotate(-14deg) scaleX(-1); }
+}
+@keyframes bubble {
+  0% { transform: translateY(0) scale(.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-140px) scale(1.1); opacity: 0; }
+}
+@keyframes clap { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-22deg); } 45% { transform: rotate(0); } }
+@keyframes beam { 0%, 100% { opacity: .35; } 50% { opacity: .7; } }
+@keyframes celebIn { 0% { transform: scale(.9); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+.overlay { position: fixed; inset: 0; z-index: 80; overflow: hidden; cursor: pointer; border: 0; padding: 0; width: 100%; font: inherit; text-align: left; }
+.night { background: var(--mk-celeb-night); }
+.movie { background: var(--mk-celeb-movie); }
+.light { background: var(--mk-celeb-light); }
+.art { position: absolute; inset: 0; pointer-events: none; }
+.abs { position: absolute; }
+.up { width: 3px; height: 14px; border-radius: 2px; top: 100%; animation: fwUp .55s ease-out both; }
+.spark { width: 6px; height: 6px; border-radius: 3px; animation: fwBurst 1.3s cubic-bezier(.2, .7, .3, 1) infinite; }
+.confetti { top: 0; border-radius: 2px; animation-name: cfFall; animation-timing-function: cubic-bezier(.3, .6, .5, 1); animation-fill-mode: both; }
+.pop { left: 50%; top: 26%; transform: translateX(-50%); font-size: 96px; animation: celebIn .5s ease-out both; }
+.mugL { left: calc(50% - 120px); top: 22%; font-size: 110px; animation: clinkL 1.6s ease-in-out infinite; }
+.mugR { left: calc(50% + 10px); top: 22%; font-size: 110px; animation: clinkR 1.6s ease-in-out infinite; }
+.shine { left: calc(50% - 16px); top: 17%; font-size: 34px; animation: celebIn .3s ease-out .7s both; }
+.bubble {
+  top: 44%; border-radius: 50%; border: 1.5px solid var(--mk-celeb-bubble-line); background: var(--mk-celeb-bubble);
+  animation-name: bubble; animation-timing-function: ease-out; animation-iteration-count: infinite;
+}
+.beam {
+  left: 50%; top: 0; width: 520px; height: 62%; transform: translateX(-50%); background: var(--mk-celeb-beam);
+  animation: beam 2.4s ease-in-out infinite;
+}
+.clap { left: calc(50% - 60px); top: 16%; font-size: 110px; transform-origin: 20% 30%; animation: clap .9s ease-in-out 3; }
+.corn { top: 0; animation-name: cfFall; animation-timing-function: ease-in; animation-fill-mode: both; }
+.gif {
+  position: absolute; left: 50%; top: 10%; transform: translateX(-50%); max-width: min(420px, 80%); max-height: 44%;
+  border-radius: 14px; box-shadow: var(--mk-celeb-gif-shadow); animation: celebIn .45s ease-out both;
+}
+.words {
+  position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center;
+  gap: 8px; text-align: center; animation: celebIn .5s ease-out both; animation-delay: .3s; width: min(520px, 90%);
+}
+.wTitle { font-size: 2.2em; font-weight: 600; letter-spacing: -.01em; color: rgb(var(--mk-ink)); }
+.wText { font-size: 1em; color: rgb(var(--mk-text-2)); text-wrap: pretty; }
+.wHint { font-size: .84em; color: rgb(var(--mk-text-2)); margin-top: 8px; }
+.dark .wTitle { color: rgb(var(--mk-white)); }
+.dark .wText, .dark .wHint { color: rgb(var(--mk-celeb-sub-dark)); }

@@ -24,7 +24,7 @@ import { picksOf } from './options'
 import { productBookFromRow, type ProductBook, type ProductStatus } from './products'
 import { productProjectFromRow, type ProductProjectPage } from './project'
 import { replaceDoneFromRow, type ReplaceDone } from './replace'
-import { workflowsFromRow, type WfTemplate } from './workflows'
+import { workflowBookFromRow, type WfBook, type WfGroup } from './workflows'
 import { petStatsFromRow, spaceFromRow, spacePatchOf, type PetStats, type Space, type SpacePatch } from './space'
 import { chatMessageFromRow, type ChatMessage } from './chat'
 import { reviewOpenFromRow, type ChatReviewOpen } from './chat-review'
@@ -315,7 +315,8 @@ export async function removeMktSubtask(project: string, subtask: string): Promis
 
 /** The manager's Nudge: a notice to whoever the task waits on, at most one an hour. */
 export async function nudgeMkt(project: string): Promise<Done<{ who: string; already: boolean }>> {
-  await requireActionOn('/marketing/tracking', 'marketing', 'manage')
+  // Tracking's person card, and the task page's MM banner (Workflow Builder 2a).
+  await requireActionOn(['/marketing/projects/[id]', '/marketing/tracking'], 'marketing', 'manage')
   if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
   const { data, error } = await (await client()).rpc('mkt_nudge', { p_project: project })
   if (error) return { ok: false, reason: words(error, 'The nudge could not be sent. Please try again.') }
@@ -336,15 +337,17 @@ export async function setMktSeries(series: string, to: 'pause' | 'resume' | 'end
   return { ok: true, page: await fresh(db, current ?? series) }
 }
 
-/** The Workflow Builder's templates as they now stand (mig 20261023235500); null when they cannot be read. */
-async function freshWorkflows(db: SupabaseClient): Promise<WfTemplate[] | null> {
+/** The Workflow Builder's categories, groups and templates as they now stand (migs 20261023235500, 20261113200000);
+ * null when they cannot be read. */
+async function freshWorkflows(db: SupabaseClient): Promise<WfBook | null> {
   const { data, error } = await db.rpc('mkt_workflows')
-  return error ? null : workflowsFromRow(data)
+  return error ? null : workflowBookFromRow(data)
 }
 
-/** A template made (`id` null: its action, name and first stages), or what changed of its draft saved — `rev`, the draft
- * the builder last saw; a draft somebody saved since is not written over. */
-export async function saveMktWorkflow(id: string | null, rev: number | null, patch: Record<string, unknown>): Promise<Done<{ id: string; rev: number; workflows: WfTemplate[] | null }>> {
+/** A template made (`id` null: its category — `category` an id, or `action` a name found or made — its name and first
+ * stages), or what changed of its draft saved — `rev`, the draft the builder last saw; a draft somebody saved since is
+ * not written over. */
+export async function saveMktWorkflow(id: string | null, rev: number | null, patch: Record<string, unknown>): Promise<Done<{ id: string; rev: number; book: WfBook | null }>> {
   // The Product Builder makes an action's Standard template too (+ New action workflow).
   await requireActionOn(['/marketing/workflows', '/marketing/products'], 'marketing', 'manage')
   if (id !== null && !isId(id)) return { ok: false, reason: 'That template is not there any more.' }
@@ -356,7 +359,7 @@ export async function saveMktWorkflow(id: string | null, rev: number | null, pat
   revalidatePath('/marketing', 'layout')
   const r = (data ?? {}) as { id?: string; rev?: number }
   // A new template: the list again, so the builder shows it where it belongs.
-  return { ok: true, id: String(r.id ?? ''), rev: Number(r.rev ?? 1), workflows: id === null ? await freshWorkflows(db) : null }
+  return { ok: true, id: String(r.id ?? ''), rev: Number(r.rev ?? 1), book: id === null ? await freshWorkflows(db) : null }
 }
 
 /** The draft, as its publisher saw it, published as the template's next version. */
@@ -371,8 +374,8 @@ export async function publishMktWorkflow(id: string, rev: number): Promise<Done<
   return { ok: true, version: Number(r.version ?? 0), live: Number(r.live ?? 0) }
 }
 
-/** A new template of the same action from this one's draft ("… copy"). */
-export async function cloneMktWorkflow(id: string): Promise<Done<{ id: string; tname: string; workflows: WfTemplate[] | null }>> {
+/** A new template of the same category from this one's draft ("… copy"). */
+export async function cloneMktWorkflow(id: string): Promise<Done<{ id: string; tname: string; book: WfBook | null }>> {
   await requireActionOn('/marketing/workflows', 'marketing', 'manage')
   if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
   const db = await client()
@@ -380,12 +383,12 @@ export async function cloneMktWorkflow(id: string): Promise<Done<{ id: string; t
   if (error) return { ok: false, reason: words(error, 'The template could not be cloned. Please try again.') }
   revalidatePath('/marketing', 'layout')
   const r = (data ?? {}) as { id?: string; tname?: string }
-  return { ok: true, id: String(r.id ?? ''), tname: String(r.tname ?? ''), workflows: await freshWorkflows(db) }
+  return { ok: true, id: String(r.id ?? ''), tname: String(r.tname ?? ''), book: await freshWorkflows(db) }
 }
 
 /** A template never published, deleted (the user's answer 8, mig 20261025004100) — refused while a product's draft links
  * it; the list as it now stands. */
-export async function deleteMktWorkflow(id: string, rev: number): Promise<Done<{ workflows: WfTemplate[] | null }>> {
+export async function deleteMktWorkflow(id: string, rev: number): Promise<Done<{ book: WfBook | null }>> {
   await requireActionOn('/marketing/workflows', 'marketing', 'manage')
   if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
   if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the builder and try again.' }
@@ -393,7 +396,62 @@ export async function deleteMktWorkflow(id: string, rev: number): Promise<Done<{
   const { error } = await db.rpc('mkt_workflow_delete', { p_id: id, p_rev: rev })
   if (error) return { ok: false, reason: words(error, 'The template could not be deleted. Please try again.') }
   revalidatePath('/marketing', 'layout')
-  return { ok: true, workflows: await freshWorkflows(db) }
+  return { ok: true, book: await freshWorkflows(db) }
+}
+
+/** A template renamed from the picker (mig 20261113200000) — its draft's next count. */
+export async function renameMktWorkflow(id: string, tname: string): Promise<Done<{ rev: number }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That template is not there any more.' }
+  const { data, error } = await (await client()).rpc('mkt_workflow_rename', { p_id: id, p_tname: String(tname ?? '').slice(0, 80) })
+  if (error) return { ok: false, reason: words(error, 'The template could not be renamed. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, rev: Number((data as { rev?: number } | null)?.rev ?? 1) }
+}
+
+/** A category made with a Standard template of one stage (the prototype's commitAct) — refused when the name is there. */
+export async function addMktWfCategory(name: string, emoji: string | null): Promise<Done<{ id: string; rev: number; category: string; book: WfBook | null }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_wf_category_add', { p_name: String(name ?? '').slice(0, 80), p_emoji: emoji })
+  if (error) return { ok: false, reason: words(error, 'The category could not be added. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { id?: string; rev?: number; category?: string }
+  return { ok: true, id: String(r.id ?? ''), rev: Number(r.rev ?? 1), category: String(r.category ?? ''), book: await freshWorkflows(db) }
+}
+
+/** A category renamed (every template's action with it) or given another icon. */
+export async function editMktWfCategory(id: string, change: { name: string } | { emoji: string }): Promise<Done<{ book: WfBook | null }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That category is not there any more.' }
+  const db = await client()
+  const { error } = 'name' in change
+    ? await db.rpc('mkt_wf_category_rename', { p_id: id, p_name: String(change.name ?? '').slice(0, 80) })
+    : await db.rpc('mkt_wf_category_icon', { p_id: id, p_emoji: String(change.emoji ?? '').slice(0, 16) })
+  if (error) return { ok: false, reason: words(error, 'The category could not be changed. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, book: await freshWorkflows(db) }
+}
+
+/** A category deleted with its templates — refused while one was ever published or a product links one. */
+export async function deleteMktWfCategory(id: string): Promise<Done<{ book: WfBook | null }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That category is not there any more.' }
+  const db = await client()
+  const { error } = await db.rpc('mkt_wf_category_delete', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The category could not be deleted. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, book: await freshWorkflows(db) }
+}
+
+/** + New group: Marketing's own, the next hue (mig 20261113200000). */
+export async function addMktGroup(name: string): Promise<Done<{ group: WfGroup }>> {
+  await requireActionOn('/marketing/workflows', 'marketing', 'manage')
+  const { data, error } = await (await client()).rpc('mkt_group_add', { p_name: String(name ?? '').slice(0, 80) })
+  if (error) return { ok: false, reason: words(error, 'The group could not be added. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  const r = (data ?? {}) as { key?: string; name?: string; hue?: number }
+  return { ok: true, group: { key: String(r.key ?? ''), name: String(r.name ?? ''), hue: Number(r.hue ?? 60) } }
 }
 
 /** The Minutes Builder's templates as they now stand (mig 20261023235800); null when they cannot be read. */

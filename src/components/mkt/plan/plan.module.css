@@ -172,3 +172,22 @@
   .side { position: static; }
   .menu { width: min(280px, calc(100vw - 80px)); }
 }
+
+/* An approval level of one or more (Workflow Builder 2a, 2026-11-13): L1, its people joined by & (everyone) or "or" (any
+   one), Any one | Everyone, + to add to it; the menu ticks who is on it and greys who approves at another level. */
+.levelN { font-size: 9.5px; font-weight: 600; color: rgb(var(--mk-muted)); }
+.levelWho { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.levelJoin { font-size: 10.5px; color: rgb(var(--mk-muted)); }
+.needs { display: inline-flex; padding: 1px; border-radius: 9px; background: rgb(var(--mk-surface-3)); }
+.needsBtn {
+  height: 18px; padding: 0 7px; border-radius: 8px; border: 0; background: none; color: rgb(var(--mk-muted)); font: inherit;
+  font-size: 10.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.needsBtn:disabled { cursor: default; }
+.needsOn { background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); box-shadow: var(--mk-shadow-seg); font-weight: 600; }
+.levelAdd {
+  width: 18px; height: 18px; border-radius: 50%; border: 1px dashed rgb(var(--mk-field-hover)); background: none;
+  color: rgb(var(--mk-brown)); font: inherit; font-size: 12px; line-height: 1; cursor: pointer; padding: 0;
+}
+.optCheck { width: 14px; font-size: 11px; color: rgb(var(--mk-ink)); }
+.optOff { opacity: .45; cursor: not-allowed; }

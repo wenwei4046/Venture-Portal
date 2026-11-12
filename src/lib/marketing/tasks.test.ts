@@ -15,11 +15,11 @@ describe('stage dates: working days after the one before', () => {
   it('a Friday start: a one-day stage is due Monday, the next starts Tuesday', () => {
     expect(rows(stageDates('2027-01-08', [1, 2], none))).toEqual([[0, '2027-01-08', '2027-01-11'], [1, '2027-01-12', '2027-01-13']])
   })
-  it('steps over HR’s holidays', () => {
-    expect(rows(stageDates('2027-01-08', [1, 2], new Set(['2027-01-11'])))).toEqual([[0, '2027-01-08', '2027-01-12'], [1, '2027-01-13', '2027-01-14']])
+  it('a holiday is a working day (Monday to Friday only — the user, 2026-11-13)', () => {
+    expect(rows(stageDates('2027-01-08', [1, 2], new Set(['2027-01-11'])))).toEqual([[0, '2027-01-08', '2027-01-11'], [1, '2027-01-12', '2027-01-13']])
   })
   it('a Saturday start counts from Monday', () => {
-    expect(rows(stageDates('2027-01-09', [3], new Set(['2027-01-11'])))).toEqual([[0, '2027-01-09', '2027-01-14']])
+    expect(rows(stageDates('2027-01-09', [3], new Set(['2027-01-11'])))).toEqual([[0, '2027-01-09', '2027-01-13']])
   })
 })
 

@@ -366,9 +366,9 @@ export default function MySpace(p: MySpaceProps) {
           onExercise={() => void care('workout')} />
       ),
     },
-    turn: { body: <TaskTile column={col('turn')} wide={wide('turn')} canAccept={p.canEdit} /> },
-    waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} canAccept={p.canEdit} />, red: col('waiting').anyRed },
-    delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} canAccept={p.canEdit} /> },
+    turn: { body: <TaskTile column={col('turn')} wide={wide('turn')} /> },
+    waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} />, red: col('waiting').anyRed },
+    delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} /> },
     trophies: { body: <TrophiesTile stats={stats} /> },
     lobby: {
       bare: true,

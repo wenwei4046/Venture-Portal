@@ -3,6 +3,7 @@ import { mayActOn, requireAuth, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { readAdsPage, readBoard, readOptionLists, readProductProject, readTask, readTaskFiles } from '@/lib/marketing/server'
 import { builderPeople } from '@/lib/marketing/tasks'
+import { boardLoads } from '@/lib/marketing/task-flow-page'
 import TaskPage from '@/components/mkt/task/TaskPage'
 import ProductProject from '@/components/mkt/project/ProductProject'
 import AssignmentPlan from '@/components/mkt/plan/AssignmentPlan'
@@ -43,14 +44,16 @@ export default async function MarketingProjectPage({ params, searchParams }: {
     const adsOn = page.project.qType === 'ads' && (page.project.kind === 'quick' || (page.project.kind === 'recurring' && !page.project.series))
     const [files, board, lists, ads] = await Promise.all([
       page.project.kind === 'recurring' && !page.project.series ? [] : readTaskFiles(page.project.id),
-      splits ? readBoard() : null,
+      // The board for the split's roster, or for a manager's reassign modal ("{n} active" — Workflow Builder 2a).
+      splits || can.manage ? readBoard() : null,
       shared ? readOptionLists() : {},
       adsOn ? readAdsPage(page.project.id) : null,
     ])
-    const splitPeople = board
+    const loads = can.manage && board ? boardLoads(board) : undefined
+    const splitPeople = splits && board
       ? builderPeople(board).people.filter(p => p.id !== page.me && board.team.some(t => t.id === p.id && !!t.user))
       : []
-    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} lists={lists} ads={ads} />
+    return <TaskPage key={page.project.id} initial={page} can={can} files={files} splitPeople={splitPeople} lists={lists} ads={ads} loads={loads} />
   }
   const product = await readProductProject(page?.project.id ?? key)
   if (!product) notFound()

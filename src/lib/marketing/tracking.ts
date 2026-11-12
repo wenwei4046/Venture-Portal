@@ -4,18 +4,18 @@
 // flagged). Five counts on top: Ongoing, Needs you (overdue or waiting for an OK), Overdue, At risk, On track.
 //
 // A task's state, the first that holds:
-//   red      its stage's date has passed; a delivery came back 3 times or more; or its stage has waited 4 working
-//            hours for its owner to Accept (2026-10-24 — the user: "4 个工作小时")
+//   red      its stage's date has passed (18:00 office time); or a delivery came back 3 times or more — no Accept
+//            since the Workflow Builder 2a (2026-11-13), so the 4-working-hours red is gone
 //   waiting  the stage waits for an approval (a person, or the PIC through the link)
 //   risk     due today; or the stages left need more working days than remain before the project's own date
 //   ok       moving as planned
-// Working days are Monday to Friday, less HR's holidays that Selangor keeps (Attendance › Holidays); working hours
-// those days' 09:00–13:00 and 14:00–18:00, office time (board.ts › workingHours). Pure.
+// Working days are Monday to Friday, no holidays (flow.ts — the user, 2026-11-13). Pure.
 
 import {
-  ACCEPT_HOURS, addDays, approverNow, daysBetween, indexBoard, isSeries, runsStages, shortDay, weekdayOf, workingHours, type MktBoard,
+  addDays, approverNow, daysBetween, indexBoard, isSeries, runsStages, shortDay, waitsNow, weekdayOf, type MktBoard,
   type MktProjectKind, type MktSub,
 } from './board'
+import { lateDays, PIC_ID } from './flow'
 
 export type TrackTone = 'red' | 'waiting' | 'risk' | 'ok'
 export type TrackStatus = 'All' | 'attention' | 'red' | 'risk' | 'ok'
@@ -46,10 +46,11 @@ export interface TrackTask {
 const RANK: Record<TrackTone, number> = { red: 0, waiting: 1, risk: 2, ok: 3 }
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 
-/** The working days after `from`, up to and including `to` (Monday to Friday, less the holidays). */
-export function workingDays(from: string, to: string, holidays: ReadonlySet<string>): number {
+/** The working days after `from`, up to and including `to` — Monday to Friday, no holidays since the Workflow Builder 2a
+ * (flow.ts); `_holidays` is no longer read. */
+export function workingDays(from: string, to: string, _holidays?: ReadonlySet<string>): number {
   let n = 0
-  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (weekdayOf(d) < 5 && !holidays.has(d)) n += 1
+  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (weekdayOf(d) < 5) n += 1
   return n
 }
 
@@ -69,7 +70,6 @@ const FLOW: Record<MktProjectKind, { icon: string; name: string }> = {
 
 export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
   const ix = indexBoard(board)
-  const holidays = new Set(board.holidays.map(h => h.day))
   const first = (id: string | null | undefined) => ix.person(id)?.first || ix.person(id)?.full || '—'
   const today = board.today
   const out: TrackTask[] = []
@@ -84,28 +84,28 @@ export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
     const appr = approverNow(s)
     let tone: TrackTone = 'ok'
     let why = ''
-    const late = s.dueOn && today ? daysBetween(s.dueOn, today) : 0
+    // Late = whole days past 18:00 of its due day, rounded up (flow.ts › lateDays).
+    const late = s.dueOn ? lateDays(s.dueOn, now) : 0
+    const waits = waitsNow(s)
     if (late > 0) {
       tone = 'red'
       why = `${s.name} overdue ${plural(late, 'day')}`
     } else if (returns >= 3) {
       tone = 'red'
       why = `Delivery returned ${plural(returns, 'time')}`
-    } else if (s.status === 'todo' && s.enteredAt && workingHours(s.enteredAt, now, holidays) >= ACCEPT_HOURS) {
-      tone = 'red'
-      why = `Not accepted · ${plural(Math.floor(workingHours(s.enteredAt, now, holidays)), 'working hour')}`
     } else if (appr) {
       tone = 'waiting'
       const wait = waited(s.submittedAt, now)
-      why = appr.kind === 'pic'
+      const names = waits.map(id => (id === PIC_ID ? `PIC${p.pic ? ` (${p.pic})` : ''}` : first(id)))
+      why = waits.length === 1 && waits[0] === PIC_ID
         ? `Waiting for PIC${p.pic ? ` (${p.pic})` : ''}${wait ? ` · ${wait}` : ''}`
-        : `Waiting for ${first(appr.staff)}’s approval${wait ? ` · ${wait}` : ''}`
+        : `Waiting for ${names.join(' & ')}’s approval${wait ? ` · ${wait}` : ''}`
     } else if (s.dueOn && s.dueOn === today) {
       tone = 'risk'
       why = 'Due today'
     } else if (p.dueOn && today) {
       const need = stages.filter(x => x.idx >= s.idx && x.status !== 'done').reduce((n, x) => n + x.sla, 0)
-      const left = workingDays(today, p.dueOn, holidays)
+      const left = workingDays(today, p.dueOn)
       if (need > left) {
         tone = 'risk'
         why = `${plural(need, 'SLA day')} left, ${plural(left, 'working day')} to deadline`
@@ -127,7 +127,7 @@ export function trackTasks(board: MktBoard, now: Date): TrackTask[] {
       stageName: s.name,
       owner: s.owner,
       ownerName: first(s.owner),
-      waitsOn: appr ? (appr.kind === 'person' ? appr.staff : null) : s.owner,
+      waitsOn: s.status === 'review' ? (waits.find(id => id !== PIC_ID) ?? null) : s.owner,
       tone,
       why,
       due: s.dueOn,

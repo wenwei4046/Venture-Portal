@@ -734,3 +734,13 @@ div.lobbyPet { cursor: default; }
   .obPanel { padding: 22px 18px; }
   .obStep:not([data-now]) .obLabel { display: none; }
 }
+
+/* My turn / Waiting (2026-11-13 — the Workflow Builder 2a handoff, step 3): the whole card opens the task; Waiting's
+   status is the prototype's calm grey. */
+.card { position: relative; }
+.cardHit { position: absolute; inset: 0; border-radius: inherit; z-index: 0; }
+.card > :not(.cardHit) { position: relative; z-index: 1; pointer-events: none; }
+.card .act, .card .open { pointer-events: auto; }
+.calm { background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); border-color: rgb(var(--mk-line)); }
+.calm .statusDot { background: rgb(var(--mk-handle)); }
+.card:hover .cardTitle { text-decoration: underline; }
