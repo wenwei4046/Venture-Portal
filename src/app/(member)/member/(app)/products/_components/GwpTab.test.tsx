@@ -139,6 +139,11 @@ describe('Product List › GWP', () => {
     click('Save changes')
     await waitFor(() => expect(saveGwp).toHaveBeenCalledWith('gwp-1', { gifts: [{ id: 'mp-k', qty: 1 }, { id: 'mf', qty: 3 }] }))
     expect(await screen.findByRole('alert')).toHaveTextContent('MF PILLOW is both bought and given')
+    // The refusal (set after the await) and the write's end (the transition's isPending going false) are two
+    // renders in different lanes. On a busy CI runner React's scheduler yields between them, so the alert can be
+    // on screen while the button still reads Saving… and the pickers are locked (CI's "Unit tests (2/2)" failed
+    // here 11 times, 2026-11-08 → 11-12). Wait for the write to end before editing again.
+    expect(await screen.findByRole('button', { name: 'Save changes' })).toBeEnabled()
     // A chip taken off is a change of that side alone.
     click('Take AERO-MP (K) off', side('Gifts'))
     click('Save changes')
