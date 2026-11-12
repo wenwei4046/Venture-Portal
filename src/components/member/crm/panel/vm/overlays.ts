@@ -79,6 +79,8 @@ export function overlaysVM(ctx: PanelCtx) {
   const vaGroups = [
     ...(ctx.directors.length ? [{ name: "Director", people: ctx.directors }] : []),
     ...ctx.teams.map(t => ({ name: t.name, people: t.people })),
+    // In the CRM with no CRM title (CRM · View in People › Permissions — Marketing's managers, the directors; 2026-11-12).
+    ...(ctx.viewers?.length ? [{ name: "Others with CRM access", people: ctx.viewers }] : []),
   ].map(g => {
     const ps = g.people.filter(p => !q || `${p.name} ${titleOf(p)}`.toLowerCase().includes(q));
     return { name: g.name, n: ps.length, people: ps.map((p, k) => ({ name: p.name, ini: ini(p.name), title: titleOf(p), rule: k ? "1px solid var(--crm-rule-soft)" : "0", pick: () => { patch({ viewAs: false, vaQ: "" }); ctx.openCrmOf(p.id); } })) };

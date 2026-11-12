@@ -13,6 +13,8 @@ export interface CrmPeopleRow {
   me: string | null;
   role: CrmRole | null;
   people: { id: string; name: string; role: CrmRole; uplineId: string | null; fullTime: boolean; title?: string | null; login?: boolean; paused?: boolean }[];
+  /** People opened to the CRM across teams (CRM · View, no CRM role) — handed only to whoever sees everybody's CRM (mig 20261112010000). */
+  viewers?: { id: string; name: string; title?: string | null; reach?: "own" | "dept" | "all" | null; editOwn?: boolean; editAll?: boolean; manage?: boolean }[];
 }
 
 export interface CrmContactRow {
