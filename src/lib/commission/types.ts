@@ -73,6 +73,15 @@ export interface SalesLine {
    */
   fabricSeries?: string
   /**
+   * What the line's special order charges for each special (2026-11-12): the
+   * special's name (`valueKey`) → RM, above nothing — the ERP's
+   * `custom_specials` on the delivered item (`sales_order_special_money`). How
+   * a brand's own KPI item is found on its brand's bill, and what it takes off
+   * that bill's sales. A unit price of the sofa set: never scaled with a share.
+   * Loaded for the bills of a brand with KPI items of its own; absent = none.
+   */
+  specialMoney?: Readonly<Record<string, number>>
+  /**
    * The one line of an upsale HR recorded by hand (`comm_upsales`, 2026-09-24).
    * Always commissionable whatever the scheme's item groups say, never a KPI
    * item, and never part of a margin — it carries no cost and it is not goods
@@ -485,7 +494,9 @@ export interface StatementLine {
    * the bill's own commission, and the override an upline earns on that brand's
    * bills — one override line a downline and brand, beside the line for the rest.
    * Never saved (the note says the brand); the ledger reads it to put each
-   * override on the bills it was earned on.
+   * override on the bills it was earned on. Also on the line a brand's own
+   * KPI item pays (2026-11-12): the ledger keeps it out of the sub-department's
+   * quantity ladder.
    */
   brandCode?: string
 }

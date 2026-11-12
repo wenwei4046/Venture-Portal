@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
   fabricSeriesLabel,
+  indexBrandKpiItems,
   indexFabricSeries,
   indexKpiItems,
   kpiAmountOf,
   kpiItemKey,
   kpiItemKind,
   kpiItemLabel,
+  kpiPaidOf,
+  kpiUnitPay,
   lineKpiFactsOf,
   lineSpecialsOf,
   coverKpi,
   orderKpiHits,
+  toUnitTiers,
   type KpiItem,
   type KpiLine,
 } from './kpi'
@@ -262,5 +266,149 @@ describe('orderKpiHits — a fabric series', () => {
     expect(fabricSeriesLabel('bedframe_fabric_series', ' KS ')).toBe('KS · Bed frame fabric')
     expect(kpiItemKind(PC151_SOFA)).toEqual({ kind: 'Sofa fabric series', counted: 'Once per sofa set' })
     expect(kpiItemKind(PC151_BED)).toEqual({ kind: 'Bed frame fabric series', counted: 'Per bed frame' })
+  })
+})
+
+// 2026-11-12 — a brand on its own commission scheme has KPI items of its own (2990s; the user: "这个 KPI item 是独立的，
+// 属于 2990 专属的 KPI item"; "Upgrade fabric … Bonus RM50 — Upgrade latex seat … Bonus by tier (units): 1 - 4 per units
+// RM50; 5-9 per units RM70; 10 above per units RM100"; "升级的钱只拿 bonus").
+const UPGRADE_FABRIC: KpiItem = { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S' }
+const UPGRADE_LATEX: KpiItem = {
+  source: 'option', optionPool: 'sofa_specials', optionValue: 'Latex Seat', label: 'Upgrade latex seat', kpiAmount: 50, brandCode: '2990S',
+  unitTiers: [{ minQty: 5, amount: 70 }, { minQty: 10, amount: 100 }],
+}
+/** The sub-department's own item of the same special. */
+const OWN_LATEX: KpiItem = { source: 'option', optionPool: 'sofa_specials', optionValue: 'Latex Seat', kpiAmount: 40 }
+const ALL_ITEMS = [HB_STRAIGHT, WOODEN_ARM, PILLOW, OWN_LATEX, UPGRADE_FABRIC, UPGRADE_LATEX]
+const brandIndex = indexBrandKpiItems(ALL_ITEMS).get('2990S')!
+
+/** A sofa piece carrying specials, with what its special order charges for each (by the special's name, lower case). */
+function sofaPiece(id: string, productCode: string, qty: number, specials: string[], money: Record<string, number> = {}): KpiLine {
+  return { id, itemGroup: 'SOFA', productCode, qty, specials, ...(Object.keys(money).length ? { specialMoney: money } : {}) }
+}
+
+describe("a brand's own KPI items — whose they are", () => {
+  it('keeps them out of the sub-department’s index, and indexes each brand’s own', () => {
+    const own = indexKpiItems(ALL_ITEMS)
+    expect(own.size).toBe(4)
+    expect(own.byOption.get('sofa_specials')?.get('latex seat')).toBe(OWN_LATEX)
+    expect([...indexBrandKpiItems(ALL_ITEMS).keys()]).toEqual(['2990S'])
+    expect(brandIndex.size).toBe(2)
+    expect(brandIndex.byOption.get('sofa_specials')?.get('latex seat')).toBe(UPGRADE_LATEX)
+  })
+
+  it('takes a brand’s item only when it is a sofa special, the brand’s code in any case', () => {
+    const odd: KpiItem[] = [
+      { source: 'sku', productCode: 'SQUARE PILLOW-M', kpiAmount: 10, brandCode: '2990S' },
+      { source: 'option', optionPool: 'bedframe_specials', optionValue: 'HB Straight', kpiAmount: 10, brandCode: '2990S' },
+      { ...UPGRADE_FABRIC, brandCode: ' 2990s ' },
+    ]
+    const made = indexBrandKpiItems(odd)
+    expect([...made.keys()]).toEqual(['2990S'])
+    expect(made.get('2990S')?.size).toBe(1)
+    // …and none of them is the sub-department's.
+    expect(indexKpiItems(odd).size).toBe(0)
+  })
+
+  it('tells it from the sub-department’s item of the same special', () => {
+    expect(kpiItemKey(UPGRADE_LATEX)).toBe('brand:2990S:option:sofa_specials:latex seat')
+    expect(kpiItemKey(OWN_LATEX)).toBe('option:sofa_specials:latex seat')
+    expect(kpiItemLabel(UPGRADE_LATEX)).toBe('Upgrade latex seat')
+    expect(kpiItemKind(UPGRADE_LATEX)).toEqual({ kind: 'Sofa special', counted: 'Once per sofa set' })
+    expect(kpiItemKind(OWN_LATEX)).toEqual({ kind: 'Sofa special', counted: 'Once per sofa bill' })
+  })
+})
+
+describe("a brand's own KPI items — what a bill carries", () => {
+  it('finds one where the bill charges for it: a unit a sofa, what it charged off the bill, the item’s amount paid', () => {
+    // 2990-SO-2611-017: one sofa of two pieces, Latex Seat RM 500 written on both.
+    const hits = orderKpiHits({ lines: [
+      sofaPiece('a', 'BOAAT-1A(P)(LHF)', 1, ['Latex Seat'], { 'latex seat': 500 }),
+      sofaPiece('b', 'BOAAT-1A(P)(RHF)', 1, ['Latex Seat'], { 'latex seat': 500 }),
+    ] }, brandIndex)
+    expect(hits).toEqual([{ item: UPGRADE_LATEX, itemKey: 'brand:2990S:option:sofa_specials:latex seat', lineId: 'a', qty: 1, amount: 500, paid: 50 }])
+    expect(kpiAmountOf(hits)).toBe(500)
+    expect(kpiPaidOf(hits)).toBe(50)
+  })
+
+  it('finds none where the upgrade was given away, or only typed into the special order', () => {
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'])] }, brandIndex)).toEqual([])
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { 'latex seat': 0 })] }, brandIndex)).toEqual([])
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, [], { 'latex seat': 500 })] }, brandIndex)).toEqual([])
+    // What the special order charges for something else is no item's.
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { miscellaneous: 10 })] }, brandIndex)).toEqual([])
+  })
+
+  it('counts each sofa on the bill, at its own surcharge — a corner’s RM 1,000', () => {
+    const hits = orderKpiHits({ lines: [
+      sofaPiece('a', 'BOAAT-2A', 1, ['Latex Seat'], { 'latex seat': 500 }),
+      sofaPiece('b', 'KABBIN-2A(LHF)', 1, ['Latex Seat'], { 'latex seat': 1_000 }),
+      sofaPiece('c', 'KABBIN-L(RHF)', 1, ['Latex Seat'], { 'latex seat': 1_000 }),
+    ] }, brandIndex)
+    expect(hits.map(h => [h.lineId, h.qty, h.amount, h.paid])).toEqual([['a', 1, 500, 50], ['b', 1, 1_000, 50]])
+  })
+
+  it('counts one model twice as two sofas, and takes a returned sofa back', () => {
+    const twice = orderKpiHits({ lines: [
+      sofaPiece('a', 'LOTTI-2A(LHF)', 2, ['Latex Seat'], { 'latex seat': 500 }),
+      sofaPiece('b', 'LOTTI-L(RHF)', 2, ['Latex Seat'], { 'latex seat': 500 }),
+    ] }, brandIndex)
+    expect(twice.map(h => [h.qty, h.amount, h.paid])).toEqual([[2, 1_000, 100]])
+    const returned = orderKpiHits({ lines: [sofaPiece('a', 'LOTTI-2A(LHF)', -1, ['Latex Seat'], { 'latex seat': 500 })] }, brandIndex)
+    expect(returned.map(h => [h.qty, h.amount, h.paid])).toEqual([[-1, -500, -50]])
+  })
+
+  it('reads a special with words in brackets as the item without them, at what that spelling was charged', () => {
+    const hits = orderKpiHits({ lines: [sofaPiece('a', 'KABBIN-2A(LHF)', 1, ['Latex Seat (Corner)'], { 'latex seat (corner)': 1_000 })] }, brandIndex)
+    expect(hits.map(h => [h.item, h.amount])).toEqual([[UPGRADE_LATEX, 1_000]])
+  })
+
+  it('finds both upgrades on one sofa, each on its own', () => {
+    const hits = orderKpiHits({ lines: [sofaPiece('a', 'TELLUC-2A', 1, ['Sofa Full Fabric', 'Latex Seat'], { 'sofa full fabric': 250, 'latex seat': 500 })] }, brandIndex)
+    expect(hits.map(h => [kpiItemLabel(h.item), h.amount, h.paid]).sort()).toEqual([['Upgrade fabric', 250, 50], ['Upgrade latex seat', 500, 50]])
+  })
+
+  it('carries a part of a shared bill its part of the unit and of what the bill charged', () => {
+    // Half a bill: the lines' quantities are halved (splitOrdersByShares); the surcharge is the sofa's, not scaled.
+    const share = { parts: [{ staffId: 'owner', pct: 0.5 }, { staffId: 'mate', pct: 0.5 }] }
+    const half = [sofaPiece('a', 'TELLUC-2A(LHF)', 0.5, ['Sofa Full Fabric'], { 'sofa full fabric': 250 }), sofaPiece('b', 'TELLUC-L(RHF)', 0.5, ['Sofa Full Fabric'], { 'sofa full fabric': 250 })]
+    for (const staffId of ['owner', 'mate']) {
+      expect(orderKpiHits({ lines: half, staffId, share }, brandIndex).map(h => [h.qty, h.amount, h.paid])).toEqual([[0.5, 125, 25]])
+    }
+    // A third of two sofas of one model: two thirds of a unit.
+    const third = { parts: [{ staffId: 'owner', pct: 2 / 3 }, { staffId: 'mate', pct: 1 / 3 }] }
+    const hits = orderKpiHits({ lines: [sofaPiece('a', 'LOTTI-2A', 2 / 3, ['Latex Seat'], { 'latex seat': 500 })], staffId: 'mate', share: third }, brandIndex)
+    expect(hits[0].qty).toBeCloseTo(2 / 3, 10)
+    expect(hits[0].amount).toBe(333.33)
+  })
+
+  it('is never found by the sub-department’s index, nor the sub-department’s by the brand’s', () => {
+    const lines = [sofaPiece('a', 'BOAAT-2A', 1, ['Latex Seat', 'Wooden Arm'], { 'latex seat': 500, 'wooden arm': 300 })]
+    expect(orderKpiHits({ lines }, indexKpiItems(ALL_ITEMS)).map(h => [h.itemKey, h.amount, h.paid]).sort()).toEqual([
+      ['option:sofa_specials:latex seat', 40, 40],
+      ['option:sofa_specials:wooden arm', 150, 150],
+    ])
+    expect(orderKpiHits({ lines }, brandIndex).map(h => [h.itemKey, h.amount, h.paid])).toEqual([['brand:2990S:option:sofa_specials:latex seat', 500, 50]])
+  })
+})
+
+describe('kpiUnitPay — what a unit pays in a month', () => {
+  it('pays the item’s amount below the first tier, and the tier the month’s units reach from it — whole', () => {
+    const pay = (units: number) => kpiUnitPay(UPGRADE_LATEX, units)
+    expect([1, 4, 4.5, 5, 6, 9, 9.99, 10, 25].map(pay)).toEqual([50, 50, 50, 70, 70, 70, 70, 100, 100])
+    // The user's month: six latex seats are 6 × RM 70.
+    expect(6 * pay(6)).toBe(420)
+  })
+
+  it('pays an item without tiers its amount, whatever the month', () => {
+    expect([1, 50].map(units => kpiUnitPay(UPGRADE_FABRIC, units))).toEqual([50, 50])
+    expect(kpiUnitPay(PILLOW, 99)).toBe(50)
+  })
+
+  it('reads the column’s tiers lowest first, leaving out what is not a tier', () => {
+    expect(toUnitTiers([{ min_qty: 10, amount: 100 }, { min_qty: 5, amount: '70' }])).toEqual([{ minQty: 5, amount: 70 }, { minQty: 10, amount: 100 }])
+    expect(toUnitTiers([{ min_qty: 5 }, { amount: 70 }, null, 'x', { min_qty: 0, amount: 70 }, { min_qty: 5, amount: -1 }, { min_qty: null, amount: 70 }])).toEqual([])
+    expect(toUnitTiers(null)).toEqual([])
+    expect(toUnitTiers({ min_qty: 5, amount: 70 })).toEqual([])
   })
 })

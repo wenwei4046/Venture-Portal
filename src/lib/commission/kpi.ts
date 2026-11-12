@@ -38,10 +38,26 @@
  * pieces of one model (its code before the first '-') in that series, as many
  * sets as its fewest pieces: two PC151 sofas on one bill are two.
  *
- * The twin of the SQL in migrations 20260927050000 and 20261030010000
- * (`comm_kpi_hits`); the run, the month page, the member app and the
- * calculator must find the same items. The calculator's cart names no fabric,
- * so a quote finds no fabric series.
+ * A BRAND'S OWN ITEM (2026-11-12 — a brand on its own commission scheme, 2990s;
+ * the user: "这个 KPI item 是独立的，属于 2990 专属的 KPI item") is the fourth:
+ * a SOFA SPECIAL of that brand's (`KpiItem.brandCode`), found only on that
+ * brand's bills — which find none of the sub-department's — and only where the
+ * bill CHARGES for it (`KpiLine.specialMoney`: the ERP's special order on the
+ * line; an upgrade given away earns nothing). It differs in the money: what
+ * comes OFF the bill is what the bill charged for the special ("升级的钱只拿
+ * bonus"), and what is PAID is the item's amount a unit — or its tier's, by
+ * the month's units (`kpiUnitPay`: 1–4 RM 50, 5–9 RM 70 → six are 6 × 70).
+ * Counted once per sofa SET, as a fabric series is. Paid whatever the
+ * sub-department's own KPI switch says.
+ *
+ *   RM 3,240 bill (sofa 2,990 + Sofa Full Fabric 250), rate 4%, bonus RM 50
+ *     main   2,990 × 4% = 119.60
+ *     KPI    RM 50                    → RM 169.60
+ *
+ * The twin of the SQL in migrations 20260927050000, 20261030010000 and
+ * 20261112200000 (`comm_kpi_hits`); the run, the month page, the member app
+ * and the calculator must find the same items. The calculator's cart names no
+ * fabric, so a quote finds no fabric series.
  */
 
 import { valueKey } from '@/lib/catalogue/keys'
@@ -95,8 +111,61 @@ export interface KpiItem {
   optionValue?: string | null
   /** What a person reads: the SKU's name, or the special. */
   label?: string | null
-  /** RM per unit — taken off the bill and paid as the KPI allowance. */
+  /**
+   * RM per unit — taken off the bill and paid as the KPI allowance. A brand's
+   * own item: what a unit PAYS below its first tier (what comes off the bill is
+   * what the bill charged).
+   */
   kpiAmount: number
+  /**
+   * The brand whose OWN item this is (2026-11-12 — a brand on its own
+   * commission scheme, 2990s): its code as the brand list spells it. Absent =
+   * the sub-department's own.
+   */
+  brandCode?: string | null
+  /** A brand's own item alone: what a unit pays once the month's units reach a tier. */
+  unitTiers?: readonly KpiUnitTier[]
+}
+
+/** A step of a brand's own item (`comm_kpi_items.unit_tiers`): from `minQty` units in a month EVERY unit pays `amount`. */
+export interface KpiUnitTier {
+  minQty: number
+  amount: number
+}
+
+/**
+ * `comm_kpi_items.unit_tiers` as the engine reads it: `[{min_qty, amount}]`,
+ * lowest first. A step that is not two numbers is left out (the column's
+ * CHECK, `comm_kpi_unit_tiers_valid`, refuses one).
+ */
+export function toUnitTiers(raw: unknown): KpiUnitTier[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((step): KpiUnitTier[] => {
+    if (!step || typeof step !== 'object') return []
+    const { min_qty: minQty, amount } = step as { min_qty?: unknown; amount?: unknown }
+    const [units, pay] = [Number(minQty), Number(amount)]
+    return minQty !== null && amount !== null && Number.isFinite(units) && Number.isFinite(pay) && units > 0 && pay >= 0
+      ? [{ minQty: units, amount: pay }]
+      : []
+  }).sort((a, b) => a.minQty - b.minQty)
+}
+
+/**
+ * What a unit of the item pays in a month that counts `units` of it: its
+ * amount — or, a brand's own item, the highest tier the units reach. The tier
+ * is WHOLE (the user, 2026-11-12: six at "5-9 per units RM70" are 6 × RM 70,
+ * not four at RM 50 and two at RM 70).
+ */
+export function kpiUnitPay(item: Pick<KpiItem, 'kpiAmount' | 'unitTiers'>, units: number): number {
+  let pay = item.kpiAmount
+  let reached = -Infinity
+  for (const tier of item.unitTiers ?? []) {
+    if (units + 1e-9 >= tier.minQty && tier.minQty > reached) {
+      reached = tier.minQty
+      pay = tier.amount
+    }
+  }
+  return pay
 }
 
 /**
@@ -186,6 +255,14 @@ export interface KpiLine {
   specials?: readonly string[]
   /** The series of the fabric the line carries (`lineKpiFactsOf`). */
   fabricSeries?: string
+  /**
+   * What the line's special order charges for each special (2026-11-12): the
+   * special's name (`valueKey`) → RM, only those charged above nothing — the
+   * ERP's `custom_specials` on the delivered item, read by
+   * `sales_order_special_money`. A sofa set's surcharge is on every piece.
+   * Loaded for the bills of a brand with KPI items of its own; absent = none.
+   */
+  specialMoney?: Readonly<Record<string, number>>
   upsale?: boolean
 }
 
@@ -207,11 +284,16 @@ export function kpiSourceOf(item: Pick<KpiItem, 'source' | 'optionPool'>): 'sku'
   return item.source ?? (item.optionPool ? 'option' : 'sku')
 }
 
-/** A stable key for one item, for summaries and React keys. */
-export function kpiItemKey(item: Pick<KpiItem, 'source' | 'productCode' | 'optionPool' | 'optionValue'>): string {
-  return kpiSourceOf(item) === 'sku'
+/**
+ * A stable key for one item, for summaries and React keys. A brand's own item
+ * is not the sub-department's of the same special: its key says whose it is.
+ */
+export function kpiItemKey(item: Pick<KpiItem, 'source' | 'productCode' | 'optionPool' | 'optionValue' | 'brandCode'>): string {
+  const key = kpiSourceOf(item) === 'sku'
     ? `sku:${kpiCodeKey(item.productCode)}`
     : `option:${item.optionPool}:${valueKey(item.optionValue) ?? ''}`
+  const brand = kpiCodeKey(item.brandCode)
+  return brand ? `brand:${brand}:${key}` : key
 }
 
 export function kpiItemLabel(item: KpiItem): string {
@@ -230,12 +312,38 @@ const OPTION_KINDS: Record<KpiOptionPool, { kind: string; counted: string }> = {
 }
 
 /** What an item is, and how a bill counts it — the words the tabs print. */
-export function kpiItemKind(item: Pick<KpiItem, 'source' | 'optionPool'>): { kind: string; counted: string } {
+export function kpiItemKind(item: Pick<KpiItem, 'source' | 'optionPool' | 'brandCode'>): { kind: string; counted: string } {
   if (kpiSourceOf(item) === 'sku') return { kind: 'SKU', counted: 'Per unit' }
+  // A brand's own sofa special is counted as a fabric series is: a unit a sofa.
+  if (kpiCodeKey(item.brandCode) && item.optionPool === 'sofa_specials') return { kind: 'Sofa special', counted: 'Once per sofa set' }
   return (item.optionPool && OPTION_KINDS[item.optionPool]) || OPTION_KINDS.bedframe_specials
 }
 
+/**
+ * The sub-department's OWN items, indexed. A brand's own item (`brandCode`) is
+ * never among them — it is found on its brand's bills alone
+ * (`indexBrandKpiItems`).
+ */
 export function indexKpiItems(items: readonly KpiItem[]): KpiIndex {
+  return buildIndex(items.filter(item => !kpiCodeKey(item.brandCode)))
+}
+
+/**
+ * Each brand's own items (2026-11-12): the brand's code (`kpiCodeKey`) → its
+ * index. A brand's item is a sofa special (`kpi_item_brand_kinds`); anything
+ * else stored for a brand is found on no bill.
+ */
+export function indexBrandKpiItems(items: readonly KpiItem[]): ReadonlyMap<string, KpiIndex> {
+  const byBrand = new Map<string, KpiItem[]>()
+  for (const item of items) {
+    const brand = kpiCodeKey(item.brandCode)
+    if (!brand || kpiSourceOf(item) !== 'option' || item.optionPool !== 'sofa_specials') continue
+    byBrand.set(brand, [...(byBrand.get(brand) ?? []), item])
+  }
+  return new Map([...byBrand].map(([brand, list]) => [brand, buildIndex(list)]))
+}
+
+function buildIndex(items: readonly KpiItem[]): KpiIndex {
   const byCode = new Map<string, KpiItem>()
   const byOption = new Map<KpiOptionPool, Map<string, KpiItem>>()
   let size = 0
@@ -276,8 +384,37 @@ export interface KpiHit {
   /** The line that carries it — the first such line for a once-a-bill special. */
   lineId: string
   qty: number
-  /** qty × the item's amount: off the bill, and the allowance paid. */
+  /**
+   * What it takes OFF the bill's commissionable sales: qty × the item's amount
+   * — a brand's own item, qty × what the bill charged for it.
+   */
   amount: number
+  /**
+   * The allowance the bill pays for it: qty × the item's amount. The same as
+   * `amount` for the sub-department's own item; a brand's own item's, before
+   * its month's tier (`kpiUnitPay` — the run pays qty × that).
+   */
+  paid: number
+}
+
+/** A bill as far as finding its KPI items needs it. */
+export interface KpiOrder {
+  lines: readonly KpiLine[]
+  upsale?: boolean
+  /** With `share`, which part of a shared bill this is. */
+  staffId?: string
+  /** A shared bill's holders, as each of its parts carries them (`BillShare`). */
+  share?: { parts: readonly { staffId: string; pct: number }[] }
+}
+
+/**
+ * The part of the whole bill these lines are — a shared bill's parts carry
+ * their lines scaled (`splitOrdersByShares`: quantity and amount × the part) —
+ * else 1.
+ */
+function billPartOf(order: KpiOrder): number {
+  const pct = order.share?.parts.find(part => part.staffId === order.staffId)?.pct
+  return pct !== undefined && pct > 0 && pct < 1 ? pct : 1
 }
 
 function round2(n: number): number {
@@ -293,21 +430,52 @@ function sofaModelOf(line: KpiLine): string {
   return kpiCodeKey(line.productCode).split('-')[0] || `line:${line.id}`
 }
 
-/** Every KPI item a bill carries. An upsale HR recorded is never one. */
-export function orderKpiHits(order: { lines: readonly KpiLine[]; upsale?: boolean }, index: KpiIndex): KpiHit[] {
+/** A sofa's pieces of one model that carry one item, as they are counted into sets. */
+interface SofaSet {
+  item: KpiItem
+  itemKey: string
+  lineId: string
+  sum: number
+  fewest: number
+  /** A brand's own item: the dearest copy of what the set's special order charges for it. */
+  charged: number
+}
+
+/**
+ * Every KPI item a bill carries. An upsale HR recorded is never one.
+ *
+ * A part of a shared bill carries its part of a brand's own item (2026-11-12):
+ * half a bill, half the unit and half of what the bill charged — the parts add
+ * back up to the bill's own count, as `member_order_facts` counts them
+ * (qty × part). The sub-department's own once-a-bill items (a sofa's special,
+ * its fabric series) are still counted whole on each part, as they always were
+ * (TODOS.md: a shared bill's once-a-bill KPI item).
+ */
+export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
   if (index.size === 0 || order.upsale) return []
   const hits: KpiHit[] = []
+  const own = (item: KpiItem, lineId: string, qty: number): KpiHit => {
+    const amount = round2(qty * item.kpiAmount)
+    return { item, itemKey: kpiItemKey(item), lineId, qty, amount, paid: amount }
+  }
   // Once-a-bill specials (a sofa's): item key → the hit being built.
-  const perBill = new Map<string, KpiHit>()
-  // A sofa's fabric series, once per sofa set: model + item key → its pieces.
-  const perSet = new Map<string, { item: KpiItem; itemKey: string; lineId: string; sum: number; fewest: number }>()
+  const perBill = new Map<string, { item: KpiItem; lineId: string; qty: number }>()
+  // Once per sofa set — a sofa's fabric series, and a brand's own sofa special: model + item key → its pieces.
+  const perSet = new Map<string, SofaSet>()
+  const intoSet = (line: KpiLine, item: KpiItem, charged = 0) => {
+    const key = kpiItemKey(item)
+    const setKey = `${sofaModelOf(line)}\u0000${key}`
+    const set = perSet.get(setKey) ?? { item, itemKey: key, lineId: line.id, sum: 0, fewest: Infinity, charged: 0 }
+    set.sum += line.qty
+    set.fewest = Math.min(set.fewest, Math.abs(line.qty))
+    set.charged = Math.max(set.charged, charged)
+    perSet.set(setKey, set)
+  }
 
   for (const line of order.lines) {
     if (line.upsale) continue
     const sku = index.byCode.get(kpiCodeKey(line.productCode))
-    if (sku) {
-      hits.push({ item: sku, itemKey: kpiItemKey(sku), lineId: line.id, qty: line.qty, amount: round2(line.qty * sku.kpiAmount) })
-    }
+    if (sku) hits.push(own(sku, line.id, line.qty))
     const group = kpiCodeKey(line.itemGroup)
     const series = valueKey(line.fabricSeries)
     if (series) {
@@ -315,16 +483,8 @@ export function orderKpiHits(order: { lines: readonly KpiLine[]; upsale?: boolea
         if (POOL_GROUP[poolName] !== group) continue
         const item = index.byOption.get(poolName)?.get(series)
         if (!item) continue
-        const key = kpiItemKey(item)
-        if (poolName === 'bedframe_fabric_series') {
-          hits.push({ item, itemKey: key, lineId: line.id, qty: line.qty, amount: round2(line.qty * item.kpiAmount) })
-          continue
-        }
-        const setKey = `${sofaModelOf(line)}\u0000${key}`
-        const set = perSet.get(setKey) ?? { item, itemKey: key, lineId: line.id, sum: 0, fewest: Infinity }
-        set.sum += line.qty
-        set.fewest = Math.min(set.fewest, Math.abs(line.qty))
-        perSet.set(setKey, set)
+        if (poolName === 'bedframe_fabric_series') hits.push(own(item, line.id, line.qty))
+        else intoSet(line, item)
       }
     }
     if (!line.specials?.length) continue
@@ -332,38 +492,62 @@ export function orderKpiHits(order: { lines: readonly KpiLine[]; upsale?: boolea
       if (POOL_GROUP[poolName] !== group || isFabricSeriesPool(poolName)) continue
       // One line may print a special twice; it is still one add-on.
       const seen = new Set<KpiItem>()
+      // A brand's own item: what this line's special order charges for it (its dearest spelling's).
+      const charged = new Map<KpiItem, number>()
       for (const special of line.specials) {
         const item = optionFor(special, pool)
-        if (!item || seen.has(item)) continue
+        if (!item) continue
+        if (kpiCodeKey(item.brandCode)) {
+          const money = line.specialMoney?.[valueKey(special) ?? ''] ?? 0
+          if (money > 0) charged.set(item, Math.max(charged.get(item) ?? 0, money))
+          continue
+        }
+        if (seen.has(item)) continue
         seen.add(item)
-        const key = kpiItemKey(item)
         if (poolName === 'sofa_specials') {
-          if (!perBill.has(key)) {
-            perBill.set(key, { item, itemKey: key, lineId: line.id, qty: 0, amount: 0 })
-          }
+          const key = kpiItemKey(item)
           // The sign of the sofa's quantity decides: a return takes it back.
-          const hit = perBill.get(key)!
+          const hit = perBill.get(key) ?? { item, lineId: line.id, qty: 0 }
           hit.qty += line.qty
+          perBill.set(key, hit)
         } else {
-          hits.push({ item, itemKey: key, lineId: line.id, qty: line.qty, amount: round2(line.qty * item.kpiAmount) })
+          hits.push(own(item, line.id, line.qty))
         }
       }
+      // Found only where the bill charges for it: an upgrade given away is no unit.
+      for (const [item, money] of charged) intoSet(line, item, money)
     }
   }
 
   for (const hit of perBill.values()) {
     const qty = Math.sign(hit.qty)
     if (qty === 0) continue
-    hits.push({ ...hit, qty, amount: round2(qty * hit.item.kpiAmount) })
+    hits.push(own(hit.item, hit.lineId, qty))
   }
   // As many sets as the sofa's fewest pieces (×2 everywhere = two sofas), its
   // sign the sofa's: a return takes them back, an exchange of a piece is none.
+  const part = billPartOf(order)
   for (const set of perSet.values()) {
-    const qty = Math.sign(set.sum) * Math.max(1, Math.floor(set.fewest))
+    if (!kpiCodeKey(set.item.brandCode)) {
+      const qty = Math.sign(set.sum) * Math.max(1, Math.floor(set.fewest))
+      if (qty !== 0) hits.push(own(set.item, set.lineId, qty))
+      continue
+    }
+    // A brand's own item: the whole bill's sets, then this part of them; what the bill charged comes off its
+    // sales, the item's amount a unit is what it pays.
+    const qty = Math.sign(set.sum) * Math.max(1, Math.floor(set.fewest / part + 1e-9)) * part
     if (qty === 0) continue
-    hits.push({ item: set.item, itemKey: set.itemKey, lineId: set.lineId, qty, amount: round2(qty * set.item.kpiAmount) })
+    hits.push({
+      item: set.item, itemKey: set.itemKey, lineId: set.lineId, qty,
+      amount: round2(qty * set.charged), paid: round2(qty * set.item.kpiAmount),
+    })
   }
   return hits
+}
+
+/** What the bill's KPI items pay, each at its item's amount (a brand's own, before its month's tier). */
+export function kpiPaidOf(hits: readonly KpiHit[]): number {
+  return round2(hits.reduce((sum, hit) => sum + hit.paid, 0))
 }
 
 /** What the bill's KPI items take off its commissionable sales. */

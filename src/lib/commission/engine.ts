@@ -45,19 +45,23 @@ import { directorIncentiveEarned } from './director-pay'
 import {
   EMPTY_KPI_INDEX,
   coverKpi,
+  indexBrandKpiItems,
   indexKpiItems,
   kpiAmountOf,
+  kpiCodeKey,
   kpiItemLabel,
+  kpiUnitPay,
   orderKpiHits,
   type KpiHit,
   type KpiIndex,
+  type KpiItem,
 } from './kpi'
 import { costBasisOf, costDivisorFor, type CostBasis } from './cost-basis'
 import { brandRateOf } from './brand-rates'
 
 export * from './types'
 export { brandRateOf } from './brand-rates'
-export { EMPTY_KPI_INDEX, indexKpiItems, orderKpiHits, type KpiHit, type KpiIndex } from './kpi'
+export { EMPTY_KPI_INDEX, indexKpiItems, kpiUnitPay, orderKpiHits, type KpiHit, type KpiIndex } from './kpi'
 export { costBasisOf, costDivisorFor, type CostBasis } from './cost-basis'
 
 /** Guards against a hierarchy cycle that slipped past the DB trigger. */
@@ -113,13 +117,20 @@ export interface RevenueSplit {
   foundHits: KpiHit[]
   /** The ones paid on it: all of them, or none when its sales cannot cover them. */
   kpiHits: KpiHit[]
-  /** What the paid ones take off: Σ qty × each item's amount — paid as KPI instead. */
+  /**
+   * What the paid ones take off: Σ qty × each item's amount — paid as KPI
+   * instead. A brand's own item takes off what the bill charged for it, and
+   * pays its own amount a unit (`KpiHit.paid`, `kpiUnitPay`).
+   */
   kpiAmount: number
   /** What the rate is paid on: commissionable − kpiAmount. */
   main: number
   /** It carries KPI items its sales do not cover: none is paid, it is paid as sales. */
   uncovered: boolean
 }
+
+/** A bill as far as splitting its sales needs it — a part of a shared bill says which part it is. */
+type SplitOrder = Pick<SalesOrder, 'lines' | 'upsale'> & Partial<Pick<SalesOrder, 'staffId' | 'share'>>
 
 /**
  * One bill, split (user 2026-09-27): a RM 10,000 bill carrying HB Straight at
@@ -129,7 +140,7 @@ export interface RevenueSplit {
  * what comes off.
  */
 export function orderRevenueSplit(
-  order: Pick<SalesOrder, 'lines' | 'upsale'>,
+  order: SplitOrder,
   kpiIndex: KpiIndex,
   groupIndex: Map<string, boolean>,
 ): RevenueSplit {
@@ -144,7 +155,7 @@ export function orderRevenueSplit(
 
 /** Product revenue of one order: its commissionable sales less its KPI items. */
 export function orderProductRevenue(
-  order: Pick<SalesOrder, 'lines' | 'upsale'>,
+  order: SplitOrder,
   kpiIndex: KpiIndex,
   groupIndex: Map<string, boolean>,
 ): number {
@@ -723,24 +734,55 @@ export interface OwnSchemes {
   /** The own-scheme brand the bill was written under — its code as the brand list spells it — else null. */
   brandOf(order: Pick<SalesOrder, 'brandCode'>): string | null
   /**
-   * The KPI items a bill may carry: the sub-department's, and none on a bill of
-   * a brand with its own scheme — its KPI items are its own (the user: "这个 KPI
-   * item 是独立的，属于 2990s 专属的 KPI item").
+   * The KPI items a bill may carry: the sub-department's — `kpiIndex`, the
+   * caller's (none while its KPI switch is off) — and on a bill of a brand with
+   * its own scheme that brand's OWN items alone, whatever the switch says (the
+   * user: "这个 KPI item 是独立的，属于 2990s 专属的 KPI item"; 2026-11-12:
+   * "2990s 独立照发").
    */
   kpiIndexFor(order: Pick<SalesOrder, 'brandCode'>): KpiIndex
 }
 
-export function ownSchemesOf(input: Pick<EngineInput, 'ownSchemeBrands'>, kpiIndex: KpiIndex): OwnSchemes {
+export function ownSchemesOf(
+  input: Pick<EngineInput, 'ownSchemeBrands'> & { kpiItems?: readonly KpiItem[] },
+  kpiIndex: KpiIndex,
+): OwnSchemes {
   const brands = new Map((input.ownSchemeBrands ?? []).flatMap(code => {
     const key = normaliseCode(code)
     return key ? [[key, code.trim()] as const] : []
   }))
   const brandOf = (order: Pick<SalesOrder, 'brandCode'>) =>
     brands.size > 0 && order.brandCode ? brands.get(normaliseCode(order.brandCode)) ?? null : null
+  // Each such brand's own KPI items (2026-11-12), by the brand's code.
+  const brandItems = brands.size > 0 ? indexBrandKpiItems(input.kpiItems ?? []) : new Map<string, KpiIndex>()
   return {
     brandOf,
-    kpiIndexFor: order => (brandOf(order) ? EMPTY_KPI_INDEX : kpiIndex),
+    kpiIndexFor: order => {
+      const brand = brandOf(order)
+      return brand === null ? kpiIndex : brandItems.get(kpiCodeKey(brand)) ?? EMPTY_KPI_INDEX
+    },
   }
+}
+
+/**
+ * A person's units of each brand's own KPI item in a month (2026-11-12): on the
+ * bills the run pays them, each bill's sales covering its items — `kpiItemKey`
+ * → units. What a unit pays follows them (`kpiUnitPay`): the tier is WHOLE, so
+ * every unit of the month is paid at the tier the month reached (the user: six
+ * latex seats are 6 × RM 70). One reading for the run and the ledger.
+ */
+export function brandKpiUnits(
+  orders: readonly (SplitOrder & Pick<SalesOrder, 'brandCode'>)[],
+  kpiIndexOf: OwnSchemes['kpiIndexFor'],
+  groupIndex: Map<string, boolean>,
+): Map<string, number> {
+  const units = new Map<string, number>()
+  for (const order of orders) {
+    for (const hit of orderRevenueSplit(order, kpiIndexOf(order), groupIndex).kpiHits) {
+      if (hit.item.brandCode) units.set(hit.itemKey, (units.get(hit.itemKey) ?? 0) + hit.qty)
+    }
+  }
+  return units
 }
 
 // ─── Engine ─────────────────────────────────────────────────────────────────
@@ -855,7 +897,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const schemeKpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
   // The brands that follow their own scheme (2026-11-11 — 2990s): their bills
   // are paid at the brand's rate for the rung, stand outside every margin, and
-  // carry none of the sub-department's KPI items.
+  // carry none of the sub-department's KPI items — their brand's own instead
+  // (2026-11-12), whatever the switch above says.
   const own = ownSchemesOf(input, schemeKpiIndex)
   const kpiIndexOf = own.kpiIndexFor
   // Every line's cost ÷ its own SKU's ratio, else the sub-department's.
@@ -1206,6 +1249,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       continue
     }
 
+    // A brand's own KPI items pay by the month's units (2026-11-12): read once,
+    // over every bill the month pays this person, before any of them is paid.
+    const brandUnits = brandKpiUnits(draft.eligibleOrders, kpiIndexOf, groupIndex)
+
     for (const order of draft.eligibleOrders) {
       const split = orderRevenueSplit(order, kpiIndexOf(order), groupIndex)
       const opr = split.main
@@ -1282,6 +1329,29 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // main sales above and is paid here, flat. The allowance is for moving
       // the item and is NOT margin-scaled (user 2026-09-27).
       for (const hit of split.kpiHits) {
+        // A brand's own item (2026-11-12, "升级的钱只拿 bonus"): what the bill
+        // charged for it came off the main sales above; what it pays is the
+        // item's amount a unit — its tier's, by the month's units — whatever
+        // the sub-department's KPI switch says. No part of the sub-department's
+        // quantity ladder, nor of any override base.
+        if (hit.item.brandCode) {
+          const units = brandUnits.get(hit.itemKey) ?? 0
+          const unit = kpiUnitPay(hit.item, units)
+          draft.lines.push({
+            component: 'kpi_item',
+            sourceOrderId: order.id,
+            sourceLineId: hit.lineId,
+            basisAmount: hit.amount,
+            rate: null,
+            qty: hit.qty,
+            amount: round2(hit.qty * unit),
+            note: `${order.orderNo} · ${kpiItemLabel(hit.item)} × ${round2(hit.qty)} @ ${unit}`
+              + `${unit === hit.item.kpiAmount ? '' : ` (${round2(units)} this month)`} · ${hit.amount.toFixed(2)} off its sales`,
+            // Whose item it is: the ledger keeps a brand's own allowance out of the sub-department's quantity ladder.
+            brandCode: hit.item.brandCode,
+          })
+          continue
+        }
         draft.kpiRevenue = round2(draft.kpiRevenue + hit.amount)
         draft.kpiQty += hit.qty
         draft.kpiBase = round2(draft.kpiBase + hit.amount)

@@ -12,6 +12,7 @@ import { loadHalfComms, loadMonthOrders } from './month-orders'
 import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
+import { billsWithBrandKpi, readSpecialMoney } from './special-money'
 import type {
   BrandRow,
   CostRatioBrandRow,
@@ -64,8 +65,11 @@ async function readByKeys<T>(
   }))
 }
 
-/** A KPI item is a SKU, a Maintenance special (2026-09-27) or a fabric series (2026-10-29). */
-const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount'
+/**
+ * A KPI item is a SKU, a Maintenance special (2026-09-27) or a fabric series (2026-10-29) — the sub-department's
+ * own, or (brand_id, unit_tiers) a brand's own on its own commission scheme (2026-11-12).
+ */
+const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers'
 
 function periodEnd(period: string): string {
   if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(period)) {
@@ -273,7 +277,7 @@ export async function loadCommissionInput(
     // The scheme's brands (2026-11-11): one that follows its own scheme — 2990s —
     // is paid at its own rate per rank and stands outside every margin.
     readRows<BrandRow>('the brands', (from, to) =>
-      supabase.from('comm_brands').select('id, code, own_scheme')
+      supabase.from('comm_brands').select('id, code, own_scheme, is_active')
         .eq('scheme_id', scheme.id).order('id').range(from, to)),
   ])
 
@@ -315,7 +319,10 @@ export async function loadCommissionInput(
   // taken back — at the rate that bill was paid at (2026-11-11): the brand of
   // the bill each one changed, read only while a brand has its own scheme.
   const ownBrands = ownSchemeBrandsOf(brands)
-  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands] = await Promise.all([
+  // A brand's own KPI items (2026-11-12) are found where its bill's special order charges for them: read for the
+  // bills of a brand that has such items, and for no other.
+  const brandKpiBills = billsWithBrandKpi(orderRows, brands, [...kpiItems, ...currentKpiItems])
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -338,6 +345,7 @@ export async function loadCommissionInput(
         (chunk, from, to) => supabase.from('sales_orders').select('id, brand_code')
           .in('id', chunk).order('id').range(from, to))
       : Promise.resolve([]),
+    readSpecialMoney(supabase, brandKpiBills),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
   const ownBrandCodes = new Set(ownBrands.values())
@@ -415,6 +423,7 @@ export async function loadCommissionInput(
     monthCommissionableValue: monthValue,
     feedFloor,
     brands,
+    specialMoney,
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,
