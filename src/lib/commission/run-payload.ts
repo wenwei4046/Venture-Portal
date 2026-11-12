@@ -36,7 +36,7 @@ import {
   ownSchemesOf,
   round2,
 } from './engine'
-import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, type FabricSeriesRow } from './kpi'
+import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, toUnitTiers, type FabricSeriesRow } from './kpi'
 import { isOldBillDate } from './row-origin'
 import { gwpFreeParts, type GwpRule } from '@/lib/catalogue/gwp'
 import type {
@@ -110,6 +110,18 @@ export interface BrandRow {
   code: string
   /** It follows its own commission scheme: its own rate per rank, no margin, its own KPI items. */
   own_scheme?: boolean | null
+  /** Switched off, it is no brand of its own scheme (as the database reads it). Absent in older fixtures = on. */
+  is_active?: boolean | null
+}
+
+/**
+ * What a line's special order charges for one special (`sales_order_special_money`, 2026-11-12): the special's
+ * name as the database keys it (`catalogue_value_key`) and RM, above nothing.
+ */
+export interface SpecialMoneyRow {
+  line_id: string
+  special_key: string
+  amount: Num
 }
 
 /**
@@ -140,6 +152,10 @@ export interface KpiItemRow {
   option_pool?: string | null
   option_value?: string | null
   kpi_amount: Num
+  /** The brand whose own item this is (`comm_brands.id`, 2026-11-12); null / absent = the sub-department's own. */
+  brand_id?: string | null
+  /** A brand's own item alone: `[{min_qty, amount}]` — what a unit pays once the month's units reach a tier. */
+  unit_tiers?: unknown
 }
 
 /** A SKU's own cost ratio (`comm_cost_ratios`, Product List › Costing Setting). */
@@ -320,6 +336,12 @@ export interface RunSourceRows {
    * scheme, and the code a rank's rate for one is read by. Absent = none does.
    */
   brands?: BrandRow[]
+  /**
+   * What the special orders of the bills of a brand with KPI items of its own
+   * charge (2026-11-12): a brand's own item is found where its bill charges for
+   * it, and takes that off the bill's sales. Absent = no bill charges for one.
+   */
+  specialMoney?: SpecialMoneyRow[]
 }
 
 /** A `sales_order_shares` row. */
@@ -359,28 +381,59 @@ function one<T>(v: T | T[] | null | undefined): T | null {
  * KPI item rows as the engine reads them. A row that names neither a code nor
  * a known pool's option cannot be found on any bill and is dropped.
  */
-export function toKpiItems(rows: readonly KpiItemRow[]): KpiItem[] {
+export function toKpiItems(rows: readonly KpiItemRow[], ownBrands: ReadonlyMap<string, string> = new Map()): KpiItem[] {
   return rows.flatMap((k): KpiItem[] => {
     const kpiAmount = num(k.kpi_amount)
     const label = k.product_name ?? null
+    // A brand's own item (2026-11-12): its brand's code and its tiers. One whose
+    // brand is not on its own scheme — switched off, or no longer on it — is
+    // found on no bill: never read as the sub-department's own.
+    let brand: Pick<KpiItem, 'brandCode' | 'unitTiers'> = {}
+    if (k.brand_id) {
+      const brandCode = ownBrands.get(k.brand_id) ?? ownBrands.get(k.brand_id.toLowerCase())
+      if (!brandCode) return []
+      const unitTiers = toUnitTiers(k.unit_tiers)
+      brand = { brandCode, ...(unitTiers.length > 0 ? { unitTiers } : {}) }
+    }
     if ((k.source ?? 'sku') === 'sku') {
-      return k.product_code ? [{ source: 'sku', productCode: k.product_code, label, kpiAmount }] : []
+      return k.product_code ? [{ source: 'sku', productCode: k.product_code, label, kpiAmount, ...brand }] : []
     }
     return k.option_pool && isKpiOptionPool(k.option_pool) && k.option_value
-      ? [{ source: 'option', optionPool: k.option_pool, optionValue: k.option_value, label, kpiAmount }]
+      ? [{ source: 'option', optionPool: k.option_pool, optionValue: k.option_value, label, kpiAmount, ...brand }]
       : []
   })
 }
 
 /**
  * The brands that follow their own scheme, by id → the code a bill carries
- * (2026-11-11 — 2990s). A brand without a code cannot be found on any bill.
+ * (2026-11-11 — 2990s). A brand without a code cannot be found on any bill;
+ * one switched off is no brand of its own scheme (the database's readers ask
+ * `is_active` too — `comm_kpi_hits`, `member_order_facts`).
  */
 export function ownSchemeBrandsOf(brands: readonly BrandRow[] | undefined): Map<string, string> {
   return new Map((brands ?? []).flatMap(b => {
     const code = (b.code ?? '').trim().toUpperCase()
-    return b.own_scheme && code ? [[b.id, code] as const] : []
+    return b.own_scheme && b.is_active !== false && code ? [[b.id, code] as const] : []
   }))
+}
+
+/**
+ * What each line's special order charges, as a line carries it
+ * (`SalesLine.specialMoney`): line id → the special's name → RM. A row that
+ * charges nothing, or names no special, is left out.
+ */
+export function specialMoneyByLine(rows: readonly SpecialMoneyRow[] | undefined): Map<string, Record<string, number>> {
+  const byLine = new Map<string, Record<string, number>>()
+  for (const row of rows ?? []) {
+    const amount = num(row.amount)
+    const key = (row.special_key ?? '').trim()
+    if (!row.line_id || !key || !(amount > 0)) continue
+    const line = byLine.get(row.line_id) ?? {}
+    // The dearest copy, as the database's reader keeps one (MAX).
+    line[key] = Math.max(line[key] ?? 0, amount)
+    byLine.set(row.line_id, line)
+  }
+  return byLine
 }
 
 /**
@@ -445,7 +498,9 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     commissionable: g.commissionable,
   }))
 
-  const kpiItems = toKpiItems(rows.kpiItems)
+  const kpiItems = toKpiItems(rows.kpiItems, ownBrands)
+  // (2026-11-12) What the special orders of a brand's bills charge — how its own KPI items are found.
+  const specialMoney = specialMoneyByLine(rows.specialMoney)
 
   const kpiThresholds: KpiThreshold[] = rows.kpiThresholds.map(t => ({
     minQty: t.min_qty,
@@ -520,6 +575,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         // Only when there is one: a line without a charge reads exactly as it always has.
         ...(numOrNull(l.option_charge_amount) ? { optionCharge: numOrNull(l.option_charge_amount)! } : {}),
         ...lineFacts(l),
+        ...(specialMoney.has(l.id) ? { specialMoney: specialMoney.get(l.id)! } : {}),
       })),
     }))
     // A gift with purchase (Product List › GWP, 2026-11-08), worked out on the whole bill before it is shared.

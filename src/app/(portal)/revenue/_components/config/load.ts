@@ -177,6 +177,7 @@ export async function loadCommissionSettings(
       .map(t => ({ id: t.id, name: t.name, isDepartmentHead: t.is_department_head })) satisfies TitleRow[],
     itemGroups: [],
     kpiItems: [],
+    brandKpiItems: [],
     kpiThresholds: [],
     kpiSpecials: [],
     kpiFabricSeries: [],
@@ -272,7 +273,9 @@ export async function loadCommissionSettings(
     rankDefs: rows<RankDefRow>(rankDefs.data),
     ranks: rows(ranks.data),
     itemGroups: rows(itemGroups.data),
-    kpiItems: rows(kpiItems.data),
+    // The sub-department's own items are what the tab edits; a brand's own (2026-11-12) are listed under them.
+    kpiItems: rows<KpiItemRow>(kpiItems.data).filter(k => !k.brand_id),
+    brandKpiItems: rows<KpiItemRow>(kpiItems.data).filter(k => !!k.brand_id),
     kpiThresholds: rows(kpiThresholds.data),
     kpiSpecials: rows<{ pool: KpiSpecialRow['pool']; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(kpiSpecials.data)
       .map(o => ({

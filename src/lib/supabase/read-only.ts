@@ -128,9 +128,13 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   // Whose sale (mig 20261031030000): Comm Cal's held bills — STABLE.
   'revenue_seller_checks',
+  // Comm Cal › Tally (mig 20261112190000): every bill with its deposit day and the month a close released it — STABLE.
+  'revenue_tally_orders',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',
+  // What a bill's special order charges (mig 20261112200000) — STABLE; Comm Cal's month and a bill's page read it for 2990s' KPI items.
+  'sales_order_special_money',
   'team_org_chart', 'venue_event_organiser_for_order', 'view_as_people',
   // Admin › Meeting Rooms (mig 20261011090000):
   'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people',

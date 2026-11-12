@@ -455,6 +455,77 @@ describe('a brand with its own scheme on the ledger — 2990s', () => {
     expect(row).not.toHaveProperty('ownBrand')
     expect(row).toMatchObject({ productRate: 0.05, productRevenue: 980, kpiBase: 20 })
   })
+
+  // 2026-11-12 — the brand's own KPI items (the user: "属于 2990 专属的 KPI item", "升级的钱只拿 bonus"): found where the
+  // bill charges for the special, the upgrade's money off its sales, RM 50 a unit — RM 70 from two units here.
+  describe('its own KPI items', () => {
+    const LATEX = {
+      source: 'option' as const, optionPool: 'sofa_specials' as const, optionValue: 'Latex Seat', label: 'Upgrade latex seat',
+      kpiAmount: 50, brandCode: '2990S', unitTiers: [{ minQty: 2, amount: 70 }],
+    }
+    // A RM 1,500 sofa whose special order charges RM 500 for its latex seat.
+    const upgraded = (id: string, extra: Partial<SalesOrder> = {}): SalesOrder => ({
+      ...sale(id, 1_500, { brandCode: '2990S', ...extra }),
+      lines: [{ id: `${id}-sofa`, itemGroup: 'SOFA', productCode: 'BOAAT-2A', brandCode: '2990S', qty: 1, lineAmount: 1_500, specials: ['Latex Seat'], specialMoney: { 'latex seat': 500 } }],
+    })
+    const withItems = (extra: Partial<EngineInput> = {}) => input({
+      ranks, ownSchemeBrands: ['2990S'], kpiItems: [{ productCode: 'PILLOW', kpiAmount: 20 }, LATEX],
+      orders: [sale('one'), sale('two', 2_000), upgraded('u1'), upgraded('u2')], ...extra,
+    })
+
+    it('pays the bill its rate on what is left and the item’s amount at the month’s tier', () => {
+      const made = buildCommissionWorkbench(withItems())
+      expect(made.personalRows.find(row => row.orderId === 'u1')).toMatchObject({
+        ownBrand: '2990S', productRevenue: 1_000, productRate: 0.04, productCommission: 40,
+        kpiQty: 1, kpiBase: 70, kpiBonus: 0, totalCommission: 110,
+      })
+      reconcile(made)
+    })
+
+    it('keeps the sub-department’s quantity bonus on its own items’ bills', () => {
+      const made = buildCommissionWorkbench(withItems())
+      // Two pillows clear the 2-unit ladder: +20% of their RM 40, on the two bills that carry them — none on a 2990s bill.
+      expect(made.personalRows.map(row => [row.orderId, row.kpiBase, row.kpiBonus])).toEqual([['one', 20, 4], ['two', 20, 4], ['u1', 70, 0], ['u2', 70, 0]])
+    })
+
+    it('lists it on the KPI tab beside the sub-department’s own, as paid', () => {
+      const agent = buildCommissionWorkbench(withItems()).kpi.find(row => row.staffId === 'agent')!
+      expect(agent).toMatchObject({ soldQty: 4, qty: 4, base: 180, bonus: 8, total: 188, thresholdPct: 0.2 })
+      expect(agent.perItem).toEqual([
+        {
+          itemKey: 'brand:2990S:option:sofa_specials:latex seat', source: 'option', productCode: 'Latex Seat', productName: 'Upgrade latex seat',
+          qty: 2, heldQty: 0, excludedQty: 0, payableQty: 2, unitAmount: 70, base: 140, bonus: 0, total: 140, brandCode: '2990S',
+        },
+        {
+          itemKey: 'sku:PILLOW', source: 'sku', productCode: 'PILLOW', productName: 'PILLOW',
+          qty: 2, heldQty: 0, excludedQty: 0, payableQty: 2, unitAmount: 20, base: 40, bonus: 8, total: 48,
+        },
+      ])
+    })
+
+    it('is paid with the sub-department’s KPI switched off, where its own items are only counted', () => {
+      const source = withItems()
+      const off = buildCommissionWorkbench({ ...source, scheme: { ...source.scheme, enableKpi: false } })
+      const agent = off.kpi.find(row => row.staffId === 'agent')!
+      expect(agent).toMatchObject({ soldQty: 4, qty: 2, base: 140, bonus: 0, total: 140 })
+      expect(agent.perItem.map(item => [item.productCode, item.qty, item.payableQty, item.base])).toEqual([['Latex Seat', 2, 2, 140], ['PILLOW', 2, 0, 0]])
+      reconcile(off)
+    })
+
+    it('counts the month’s units over the bills the month pays: one held for its deposit is not among them', () => {
+      const held = buildCommissionWorkbench(withItems({ orders: [upgraded('u1'), upgraded('u2', { paidAmount: 100 })] }))
+      const agent = held.kpi.find(row => row.staffId === 'agent')!
+      // One paid unit: below the 2-unit tier, RM 50.
+      expect(agent.perItem).toMatchObject([{ productCode: 'Latex Seat', qty: 2, heldQty: 1, payableQty: 1, unitAmount: 50, base: 50, total: 50 }])
+      expect(held.personalRows.map(row => [row.orderId, row.status, row.kpiBase])).toEqual([['u1', 'eligible', 50], ['u2', 'deposit_pending', 0]])
+      reconcile(held)
+    })
+
+    it('is the engine’s own answer', () => {
+      const source = withItems()
+      expect(buildCommissionWorkbench(source).result).toEqual(computeCommissionRun(source))
+    })
+  })
 })
 
 describe('commission display allocation', () => {

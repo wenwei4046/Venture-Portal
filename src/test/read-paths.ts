@@ -156,7 +156,7 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   catalogue_remove_combos: ['catalogue_combo_prices', 'catalogue_combos'],
   catalogue_save_fabric_upgrades: ['catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades'],
   catalogue_save_gwp: ['catalogue_gwp', 'catalogue_gwp_items', 'erp_products'],
-  catalogue_save_kpi_items: ['comm_kpi_items', 'comm_schemes', 'erp_fabrics', 'erp_maintenance_options', 'erp_products'],
+  catalogue_save_kpi_items: ['comm_brands', 'comm_kpi_items', 'comm_schemes', 'erp_fabrics', 'erp_maintenance_options', 'erp_products'],
   comm_clear_first_paid_month: ['comm_cutovers'],
   commission_payroll_closed: [],
   comm_close_salespeople: ['comm_salesperson_closes', 'hr_staff_costs', 'users'],
@@ -211,12 +211,17 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   revenue_fair_calendar_moves: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
   revenue_move_order: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_reassignments', 'sales_order_shares', 'sales_orders', 'users'],
-  revenue_month_orders: ['catalogue_gwp_items', 'comm_cost_ratio_brands', 'comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
+  // comm_brands (20261112200000): comm_kpi_hits asks which bills are a brand's on its own scheme — their KPI items are their brand's own.
+  revenue_month_orders: ['catalogue_gwp_items', 'comm_brands', 'comm_cost_ratio_brands', 'comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_pay_lines_closed: [],
   revenue_possible_double_claims: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_restore_double_claim: ['comm_double_claim_dismissals'],
   revenue_set_order_brand: ['comm_brands', 'comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_order_brand_picks', 'sales_order_lines', 'sales_orders', 'users'],
+  // Comm Cal › Tally (mig 20261112190000): every bill with its deposit day, its fair and the month a close released it.
+  revenue_tally_orders: ['comm_item_groups', 'comm_order_releases', 'comm_schemes', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_uncosted_products: ['catalogue_skus', 'comm_item_groups', 'comm_schemes', 'erp_products', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
+  // What a bill's special order charges for each special (20261112200000): the run and a bill's page read it for a brand's own KPI items.
+  sales_order_special_money: ['sales_order_lines', 'sales_orders'],
   venue_event_organiser_for_order: ['comm_organisers', 'comm_venue_events', 'comm_venues'],
 }
 

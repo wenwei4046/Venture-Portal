@@ -62,9 +62,9 @@ function monthOnly(period: string): string {
  * Batches and runs both belong to this sub-department. Membership in more
  * than one programme never makes an order pay through several programmes.
  *
- * `?tab=tally` (2026-11-12) is the same page's second tab — each month by SO
- * date (what Houzs pays) beside by fair date (what we pay salespeople on) —
- * and the only time its bills are read.
+ * `?tab=tally` (2026-11-12) is the same page's second tab — each month's bills
+ * as Houzs pays them (deposit reached, by SO date) beside as we pay salespeople
+ * (the month whose close released them) — and the only time its bills are read.
  */
 export default async function CommissionCalculationPage({ params, searchParams }: PageProps) {
   await requirePage('/revenue/[sub]')

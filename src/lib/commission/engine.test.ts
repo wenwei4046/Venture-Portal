@@ -2271,6 +2271,148 @@ describe('a brand with its own scheme — 2990s (2026-11-11)', () => {
     expect(find(r.statements, 'rs').productCommission).toBe(500)
     expect(find(r.statements, 'ta').lines.find(l => l.component === 'override')?.note).toBe('Override on downline rs · 2% differential')
   })
+
+  // 2026-11-12 — the user: "这个 KPI item 是独立的，属于 2990 专属的 KPI item"; "Upgrade fabric RM125/RM250(corner)
+  // Bonus RM50 — Upgrade latex seat RM500/RM1000(corner) Bonus by tier (units): 1 - 4 per units RM50; 5-9 per units
+  // RM70; 10 above per units RM100"; six in a month are 6 × RM 70; and of the upgrade's money, "升级的钱只拿 bonus".
+  describe('its own KPI items (2026-11-12)', () => {
+    const FABRIC = { source: 'option' as const, optionPool: 'sofa_specials' as const, optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S' }
+    const LATEX = {
+      source: 'option' as const, optionPool: 'sofa_specials' as const, optionValue: 'Latex Seat', label: 'Upgrade latex seat', kpiAmount: 50, brandCode: '2990S',
+      unitTiers: [{ minQty: 5, amount: 70 }, { minQty: 10, amount: 100 }],
+    }
+    // The sub-department's own item of the same special — and its KPI switched OFF, as Fair's is.
+    const OWN_LATEX = { source: 'option' as const, optionPool: 'sofa_specials' as const, optionValue: 'Latex Seat', kpiAmount: 40 }
+    const KPI_OFF: CommissionScheme = { ...NO_MARGIN_PAY, enableKpi: false }
+    const ITEMS = { ...OWN, scheme: KPI_OFF, kpiItems: [FABRIC, LATEX, OWN_LATEX, ...KPI_ITEMS] }
+    // A sofa of two pieces carrying one special; its special order charges `charged` for it, written on each piece.
+    const upgraded = (id: string, staffId: string, sofaAmount: number, special: string, charged: number, opts: OrderOpts = {}): SalesOrder => {
+      const o = order(id, staffId, [['SOFA', 'TELLUC-2A(LHF)', 1, sofaAmount / 2], ['SOFA', 'TELLUC-L(RHF)', 1, sofaAmount / 2], ['TRANS', 'SVC-DELIVERY', 1, 250]], { brandCode: '2990S', ...opts })
+      return {
+        ...o,
+        lines: o.lines.map(l => (l.itemGroup === 'SOFA'
+          ? { ...l, specials: [special], ...(charged > 0 ? { specialMoney: { [special.toLowerCase()]: charged } } : {}) }
+          : l)),
+      }
+    }
+
+    it('the user’s bill: RM 3,240 (sofa 2,990 + fabric 250) at 4% is 2,990 × 4% + RM 50 = RM 169.60', () => {
+      const r = run({ ...ITEMS, hierarchy: TEAM, orders: [upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250)] })
+      const rs = find(r.statements, 'rs')
+      expect(rs.productRevenue).toBe(2_990)
+      expect(rs.productCommission).toBe(119.6)
+      expect(rs.kpiCommission).toBe(50)
+      expect(rs.totalCommission).toBe(169.6)
+      expect(rs.lines.find(l => l.component === 'kpi_item')).toMatchObject({
+        sourceOrderId: '1', basisAmount: 250, qty: 1, amount: 50, brandCode: '2990S',
+        note: 'SO-1 · Upgrade fabric × 1 @ 50 · 250.00 off its sales',
+      })
+      expect(r.warnings).toEqual([])
+    })
+
+    it('is paid whatever the sub-department’s KPI switch says, and is no part of its quantity ladder', () => {
+      for (const enableKpi of [false, true]) {
+        // Ten latex seats: far past the sub-department's own 10-unit ladder (+20%).
+        const orders = Array.from({ length: 10 }, (_, i) => upgraded(String(i + 1), 'rs', 3_740, 'Latex Seat', 500))
+        const rs = find(run({ ...ITEMS, scheme: { ...KPI_OFF, enableKpi }, hierarchy: TEAM, orders }).statements, 'rs')
+        expect(rs.kpiCommission).toBe(1_000) // 10 × RM 100
+        expect([rs.kpiQty, rs.kpiBase, rs.kpiThresholdPct]).toEqual([0, 0, 0])
+        expect(rs.lines.filter(l => l.component === 'kpi_threshold')).toEqual([])
+        expect(rs.productRevenue).toBe(32_400) // 10 × (3,740 − 500)
+      }
+    })
+
+    it('pays every unit of the month at the tier the month reaches — the tier is whole', () => {
+      const month = (units: number) => {
+        const orders = Array.from({ length: units }, (_, i) => upgraded(String(i + 1), 'rs', 3_740, 'Latex Seat', 500))
+        return find(run({ ...ITEMS, hierarchy: TEAM, orders }).statements, 'rs')
+      }
+      expect(month(1).kpiCommission).toBe(50)
+      expect(month(4).kpiCommission).toBe(200) // 4 × 50
+      expect(month(5).kpiCommission).toBe(350) // 5 × 70
+      expect(month(6).kpiCommission).toBe(420) // the user's: 6 × 70, never 4 × 50 + 2 × 70
+      expect(month(9).kpiCommission).toBe(630)
+      expect(month(10).kpiCommission).toBe(1_000) // 10 × 100
+      expect(month(6).lines.filter(l => l.component === 'kpi_item')[0].note)
+        .toBe('SO-1 · Upgrade latex seat × 1 @ 70 (6 this month) · 500.00 off its sales')
+    })
+
+    it('counts each item on its own: fabric has no tier and moves none of latex’s', () => {
+      const orders = [
+        ...Array.from({ length: 4 }, (_, i) => upgraded(`L${i}`, 'rs', 3_740, 'Latex Seat', 500)),
+        ...Array.from({ length: 6 }, (_, i) => upgraded(`F${i}`, 'rs', 3_240, 'Sofa Full Fabric', 250)),
+      ]
+      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders }).statements, 'rs')
+      expect(rs.kpiCommission).toBe(500) // 4 × 50 + 6 × 50
+    })
+
+    it('counts a person’s own units: a colleague’s do not lift their tier', () => {
+      const orders = [
+        ...Array.from({ length: 3 }, (_, i) => upgraded(`A${i}`, 'rs', 3_740, 'Latex Seat', 500)),
+        ...Array.from({ length: 3 }, (_, i) => upgraded(`B${i}`, 'ta', 3_740, 'Latex Seat', 500)),
+      ]
+      const r = run({ ...ITEMS, hierarchy: TEAM, orders })
+      expect(find(r.statements, 'rs').kpiCommission).toBe(150)
+      expect(find(r.statements, 'ta').kpiCommission).toBe(150)
+    })
+
+    it('pays the upline no override on the upgrade’s money', () => {
+      const r = run({ ...ITEMS, hierarchy: TEAM, orders: [upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250)] })
+      // TA 6% − RS 4% on the 2,990 that earned commission.
+      expect(find(r.statements, 'ta').lines.find(l => l.component === 'override')).toMatchObject({ basisAmount: 2_990, amount: 59.8, brandCode: '2990S' })
+    })
+
+    it('finds it only where the bill charges for it', () => {
+      const given = upgraded('1', 'rs', 2_990, 'Latex Seat', 0)
+      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders: [given] }).statements, 'rs')
+      expect(rs.kpiCommission).toBe(0)
+      expect(rs.productCommission).toBe(119.6) // the whole 2,990 at 4%
+    })
+
+    it('pays nothing where the bill’s sales do not cover what it charged', () => {
+      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders: [upgraded('1', 'rs', 400, 'Latex Seat', 500)] }).statements, 'rs')
+      expect(rs.kpiCommission).toBe(0)
+      expect(rs.productRevenue).toBe(400)
+    })
+
+    it('never finds the brand’s items on another brand’s bill, nor the sub-department’s on its own', () => {
+      const akemi = { ...upgraded('1', 'rs', 6_000, 'Latex Seat', 500), brandCode: 'AKEMI' }
+      const off = find(run({ ...ITEMS, hierarchy: TEAM, orders: [akemi] }).statements, 'rs')
+      expect([off.kpiCommission, off.productRevenue]).toEqual([0, 6_000]) // its own item is switched off
+      const on = find(run({ ...ITEMS, scheme: NO_MARGIN_PAY, hierarchy: TEAM, orders: [akemi, upgraded('2', 'rs', 3_740, 'Latex Seat', 500)] }).statements, 'rs')
+      // The Akemi bill: the sub-department's Latex Seat, RM 40 off and paid. The 2990s bill: the brand's, RM 500 off, RM 50 paid.
+      expect(on.lines.filter(l => l.component === 'kpi_item').map(l => [l.sourceOrderId, l.basisAmount, l.amount])).toEqual([['1', 40, 40], ['2', 500, 50]])
+      expect([on.kpiQty, on.kpiBase]).toEqual([1, 40])
+      expect(on.productRevenue).toBe(9_200) // 5,960 + 3,240
+    })
+
+    it('shares a unit as the bill is shared, and what it charged with it', () => {
+      const parts = splitOrdersByShares([upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250)], [{ orderId: '1', staffId: 'ta', pct: 0.5 }])
+      const r = run({ ...ITEMS, hierarchy: TEAM, orders: parts })
+      const [rs, ta] = [find(r.statements, 'rs'), find(r.statements, 'ta')]
+      expect([rs.productRevenue, rs.productCommission, rs.kpiCommission]).toEqual([1_495, 59.8, 25]) // half of 2,990 at 4%, half the bonus
+      expect([ta.productRevenue, ta.productCommission, ta.kpiCommission]).toEqual([1_495, 89.7, 25]) // …at 6%
+    })
+
+    it('leaves a half-comm bill’s bonus whole, and an old bill topped up and a director’s own bill without one', () => {
+      const half = find(run({ ...ITEMS, hierarchy: TEAM, orders: [{ ...upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250), halfComm: true }] }).statements, 'rs')
+      expect([half.productCommission, half.kpiCommission]).toEqual([59.8, 50])
+      const old = find(run({ ...ITEMS, hierarchy: TEAM, orders: [{ ...upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250), commissionOnly: true }] }).statements, 'rs')
+      expect([old.productCommission, old.kpiCommission]).toEqual([129.6, 0]) // the rate on everything that earns, as billed
+      const head = run({
+        ...ITEMS, hierarchy: TEAM, departmentHeadIds: ['director'],
+        directors: [{ staffId: 'director', rankKey: 'tl_9', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0 }],
+        orders: [upgraded('1', 'director', 3_240, 'Sofa Full Fabric', 250)],
+      })
+      expect(find(head.statements, 'director').kpiCommission).toBe(0)
+    })
+
+    it('finds none once the brand is no longer on its own scheme', () => {
+      const r = run({ ranks: LADDER, scheme: KPI_OFF, kpiItems: [FABRIC, LATEX], hierarchy: TEAM, orders: [upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250)] })
+      const rs = find(r.statements, 'rs')
+      expect([rs.kpiCommission, rs.productRevenue, rs.productCommission]).toEqual([0, 3_240, 162]) // an ordinary bill at 5%
+    })
+  })
 })
 
 describe('brandRateOf — a rung’s rate for a brand with its own scheme', () => {

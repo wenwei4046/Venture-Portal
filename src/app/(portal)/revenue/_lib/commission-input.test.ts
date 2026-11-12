@@ -8,9 +8,22 @@ import { loadCommissionInput } from './commission-input'
 
 type Row = Record<string, unknown>
 
-/** A PostgREST-like cap makes a missing range visible in these regressions. */
-function database(tables: Record<string, Row[]>, failedTable?: string) {
+/** A PostgREST-like cap makes a missing range visible in these regressions. `rpcRows`: what a function answers. */
+function database(tables: Record<string, Row[]>, failedTable?: string, rpcRows: Record<string, Row[]> = {}) {
   const requests: { table: string; from: number; to: number }[] = []
+  const rpcs: { fn: string; args: unknown }[] = []
+  const rpc = (fn: string, args: unknown) => {
+    rpcs.push({ fn, args })
+    let low = 0
+    let high = 999
+    const answer = {
+      order: () => answer,
+      range: (from: number, to: number) => { low = from; high = to; return answer },
+      then: (resolve: (result: { data: Row[]; error: null }) => unknown) =>
+        Promise.resolve({ data: (rpcRows[fn] ?? []).slice(low, high + 1), error: null }).then(resolve),
+    }
+    return answer
+  }
   const from = (table: string) => {
     const filters: ((row: Row) => boolean)[] = []
     let low = 0
@@ -43,7 +56,7 @@ function database(tables: Record<string, Row[]>, failedTable?: string) {
     }
     return query
   }
-  return { client: { from } as unknown as SupabaseClient, requests }
+  return { client: { from, rpc } as unknown as SupabaseClient, requests, rpcs }
 }
 
 function order(id: string, period = '2026-09-01', extra: Row = {}): Row {
@@ -272,6 +285,59 @@ describe('authoritative commission input', () => {
       expect(loaded.input.orders.filter(o => o.upsale).every(o => !o.brandCode)).toBe(true)
       // The month's bills and the earlier months' — never a third read for the bills behind the upsells.
       expect(db.requests.filter(r => r.table === 'sales_orders')).toHaveLength(2)
+    })
+
+    // 2026-11-12 — the brand's own KPI items, found where its bill's special order charges for them.
+    const kpiRow = (id: string, extra: Row) => ({
+      id, scheme_id: 'scheme-1', source: 'option', product_code: null, product_name: null, option_pool: 'sofa_specials',
+      option_value: 'Latex Seat', kpi_amount: '50.00', brand_id: null, unit_tiers: [], effective_from: '2026-09-01', effective_to: null, ...extra,
+    })
+    const withItems = () => {
+      const data = withBrand()
+      data.comm_upsales = []
+      data.comm_kpi_items = [
+        kpiRow('kpi-latex', { product_name: 'Upgrade latex seat', brand_id: 'brand-2990', unit_tiers: [{ min_qty: 5, amount: 70 }] }),
+        kpiRow('kpi-own', { kpi_amount: '40.00' }),
+        // Another scheme's brand is no brand of this run's: its item is found on no bill — never read as the sub-department's own.
+        kpiRow('kpi-stray', { product_name: 'Stray', option_value: 'Nylon Fabric', brand_id: 'brand-outlet' }),
+      ]
+      data.sales_order_lines = [
+        { id: 'line-own', order_id: 'current', item_group: 'sofa', product_code: 'BOAAT-2A', qty: 1, line_amount: 1000, cost_amount: null, variants: { specials: ['Latex Seat'] } },
+        { id: 'line-hc', order_id: 'hc', item_group: 'sofa', product_code: '8030-2A', qty: 1, line_amount: 1000, cost_amount: 600, variants: { specials: ['Latex Seat'] } },
+      ]
+      return data
+    }
+    const MONEY = { sales_order_special_money: [{ order_id: 'current', line_id: 'line-own', special_key: 'latex seat', amount: '500.00' }] }
+
+    it('reads a brand’s own KPI items with its code and tiers, and what its bills’ special orders charge — for those bills alone', async () => {
+      const db = database(withItems(), undefined, MONEY)
+      const loaded = await loadCommissionInput('2026-09-01', 'sub-1', db.client)
+      expect(loaded.input.kpiItems).toEqual([
+        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Latex Seat', label: 'Upgrade latex seat', kpiAmount: 50, brandCode: '2990S', unitTiers: [{ minQty: 5, amount: 70 }] },
+        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Latex Seat', label: null, kpiAmount: 40 },
+      ])
+      // Asked once, for the 2990s bill alone — never the Akemi one.
+      expect(db.rpcs).toEqual([{ fn: 'sales_order_special_money', args: { p_order_ids: ['current'] } }])
+      const lineOf = (orderId: string) => loaded.input.orders.find(o => o.id === orderId)!.lines[0]
+      expect(lineOf('current')).toMatchObject({ specials: ['Latex Seat'], specialMoney: { 'latex seat': 500 } })
+      expect(lineOf('hc')).not.toHaveProperty('specialMoney')
+    })
+
+    it('asks for no special order while no brand has an item of its own, or the brand is switched off', async () => {
+      const none = withItems()
+      none.comm_kpi_items = [kpiRow('kpi-own', { kpi_amount: '40.00' })]
+      const db = database(none, undefined, MONEY)
+      await loadCommissionInput('2026-09-01', 'sub-1', db.client)
+      expect(db.rpcs).toEqual([])
+
+      const off = withItems()
+      off.comm_brands = off.comm_brands.map(b => (b.id === 'brand-2990' ? { ...b, is_active: false } : b))
+      const switchedOff = database(off, undefined, MONEY)
+      const loaded = await loadCommissionInput('2026-09-01', 'sub-1', switchedOff.client)
+      expect(switchedOff.rpcs).toEqual([])
+      // Its bills are ordinary bills again, and its item is nobody's.
+      expect(loaded.input).not.toHaveProperty('ownSchemeBrands')
+      expect(loaded.input.kpiItems).toEqual([{ source: 'option', optionPool: 'sofa_specials', optionValue: 'Latex Seat', label: null, kpiAmount: 40 }])
     })
   })
 
