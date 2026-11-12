@@ -47,8 +47,11 @@ export function defaultRepaymentAccount(
   fundSourceAccount: string | null | undefined,
   hasAccount: (code: string) => boolean,
 ): string {
+  // In suspense (its own account 4300-4599, IIS 2026-11-13), the interest comes off the deal's own account; the
+  // month-end run moves it from IIS into 6000.
+  const inSuspense = !!fundSourceAccount && fundSourceAccount >= '4300' && fundSourceAccount <= '4599'
   const code =
-    role === 'principal' ? fundSourceAccount ?? '' : role === 'interest' ? INTEREST_EXPENSE_ACCOUNT : PENALTY_EXPENSE_ACCOUNT
+    role === 'principal' || (role === 'interest' && inSuspense) ? fundSourceAccount ?? '' : role === 'interest' ? INTEREST_EXPENSE_ACCOUNT : PENALTY_EXPENSE_ACCOUNT
   return code && hasAccount(code) ? code : ''
 }
 
