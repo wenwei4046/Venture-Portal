@@ -47,6 +47,8 @@ export interface PanelCtx {
   teamOfStaff: (id: string | null | undefined) => Team | undefined;
   /** Open someone's own CRM (View as / a tapped chat): the salesperson screens, on their customers. */
   openCrmOf: (staffId: string, customerId?: string) => void;
+  /** View as's people in the CRM with no CRM role (CRM · View — mig 20261112010000): opened on their own Team side with their own cells. */
+  viewers?: CrmPerson[];
   /** View as somebody's Team side: read-only, their line. */
   viewingAs?: boolean;
   /** The Director: Control panel ⇄ My CRM — on `tab` (the phone's round button: Mine's first page), else the same page. */

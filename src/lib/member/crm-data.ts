@@ -12,6 +12,18 @@ import type { CrmContactRow, CrmMessageRow, CrmPeopleRow } from "./crm-live";
 
 export type CrmChannel = "whatsapp" | "messenger";
 
+/**
+ * Somebody opened to the CRM across teams (2026-11-12 — the owner: "不能view as" Josiah and Wei Jie, Marketing's
+ * managers given CRM · View in People › Permissions): no CRM role, so never in `people` — no picker, team, split or
+ * count meets them — but View as lists them, read-only, with what their own cells give.
+ */
+export interface CrmViewer {
+  id: string;
+  name: string;
+  title: string;
+  can: CrmCan;
+}
+
 export interface CrmPerson {
   id: string;
   name: string;
@@ -317,6 +329,8 @@ export interface CrmData {
   can: CrmCan;
   setup: "not_linked" | "no_role" | null;
   people: CrmPerson[];
+  /** View as's cross-team viewers (CrmViewer) — only for whoever sees everybody's CRM; none before mig 20261112010000. */
+  viewers?: CrmViewer[];
   customers: CrmCustomer[];
   visits: CrmVisit[];
   rooms: CrmRoom[];
@@ -709,6 +723,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
     people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "", login: p.login ?? true, paused: !!p.paused })),
+    viewers: (rows.people.viewers ?? []).map(v => ({ id: v.id, name: personName(v.name), title: v.title ?? "",
+      can: { viewAll: v.reach === "all", editOwn: !!v.editOwn, editAll: !!v.editAll, manage: !!v.manage } })),
     // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read
     // a customer's `ad` (the owner, 2026-10-16: "顯示廣告的名稱，不然業務也看不懂"); Meta's headline stays in adHeadline.
     customers: rows.contacts.map(c => {
