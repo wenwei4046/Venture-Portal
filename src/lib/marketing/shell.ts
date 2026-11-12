@@ -50,7 +50,7 @@ export interface MktNotice {
   /** What it says: 'plan' (put on an Assignment plan), 'approve', 'changes' … (its data's `type`). */
   type: string | null
   /** What it opens: a project, or (2026-10-29, the claim process's PR ③) a payment request on the Claim page. */
-  refKind: 'mkt_project' | 'payment_request'
+  refKind: 'mkt_project' | 'payment_request' | 'mkt_quote'
 }
 
 export interface MktSearchHit {
@@ -148,7 +148,7 @@ export function mktNoticesFromRow(v: unknown): MktNotice[] {
     .map(n => ({
       id: str(n.id), title: str(n.title), body: str(n.body), ref: strOrNull(n.ref), at: str(n.at), read: n.read === true,
       type: isObj(n.data) ? strOrNull(n.data.type) : null,
-      refKind: n.refKind === 'payment_request' ? ('payment_request' as const) : ('mkt_project' as const),
+      refKind: n.refKind === 'payment_request' ? ('payment_request' as const) : n.refKind === 'mkt_quote' ? ('mkt_quote' as const) : ('mkt_project' as const),
     }))
 }
 

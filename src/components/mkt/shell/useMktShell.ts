@@ -28,10 +28,35 @@ export function useMktShell(pathname: string): { data: MktShellData | null; relo
     const back = () => {
       if (document.visibilityState === 'visible') void read()
     }
+    // A page that changed what the shell counts (an accepted quotation's notice, 2026-11-12) asks it to read again.
+    const again = () => void read()
     document.addEventListener('visibilitychange', back)
-    return () => document.removeEventListener('visibilitychange', back)
+    window.addEventListener('mkt:shell-reload', again)
+    return () => {
+      document.removeEventListener('visibilitychange', back)
+      window.removeEventListener('mkt:shell-reload', again)
+    }
   }, [read])
   return { data, reload: () => void read() }
+}
+
+export interface QuoteState { status: string; tasks: number | null }
+
+/** Whether each accepted quotation the bell names has its work assigned yet (`mkt_quote_states`, mig 20261113100000) —
+ * read with the bell's list; nothing for anybody but Marketing's managers. */
+export async function readQuoteStates(ids: string[]): Promise<Record<string, QuoteState>> {
+  try {
+    const db = createClient() as unknown as SupabaseClient
+    const { data, error } = await db.rpc('mkt_quote_states', { p_ids: ids })
+    if (error || !data || typeof data !== 'object') return {}
+    const out: Record<string, QuoteState> = {}
+    for (const [id, v] of Object.entries(data as Record<string, { status?: unknown; tasks?: unknown }>)) {
+      out[id] = { status: String(v?.status ?? ''), tasks: typeof v?.tasks === 'number' ? v.tasks : null }
+    }
+    return out
+  } catch {
+    return {}
+  }
 }
 
 /** The bell's list (`mkt_notices()`), read when the panel opens. */
