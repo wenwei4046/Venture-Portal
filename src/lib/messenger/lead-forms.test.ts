@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { parseMessengerDelivery, summaryAnswers } from "./webhook";
-import { instantLeadRow, messengerLeadRow, readInstantLead } from "./lead-forms";
+import { instantAdLink, instantLeadRow, messengerLeadRow, readInstantLead, withInstantAdLink } from "./lead-forms";
 
 const PAGE = "102351059576534";
 const page = (messaging: unknown[]) => ({ object: "page", entry: [{ id: PAGE, time: 1, messaging }] });
@@ -63,5 +63,40 @@ describe("an Instant Form lead", () => {
     const refused = (async () => new Response(JSON.stringify({ error: { message: "(#200) Requires leads_retrieval permission" } }), { status: 403 })) as unknown as typeof fetch;
     expect(await readInstantLead(ref, "page-token", refused)).toEqual({ kind: "instant", pageId: PAGE, leadId: "123123123123", error: "(#200) Requires leads_retrieval permission" });
     expect(await readInstantLead(ref, null)).toMatchObject({ error: "no Page token" });
+  });
+});
+
+// 2026-11-13, the owner: "为什么customer info又看不到新上的2支广告的链接了" — the two were Instant Form leads, which kept only
+// the ad's id. The answers are Meta's for those two ads that day (system user's and Page's tokens).
+describe("an Instant Form lead's ad link", () => {
+  const meta = (answers: Record<string, unknown>) => (async (url: string | URL) => {
+    const u = String(url);
+    const key = Object.keys(answers).find(k => u.includes(k));
+    return key ? new Response(JSON.stringify(answers[key]), { status: 200 }) : new Response("{}", { status: 404 });
+  }) as unknown as typeof fetch;
+  const IMAGE = meta({ "52625308746464?fields=creative": { creative: { effective_object_story_id: "102351059576534_1022474350894993", object_type: "SHARE" } },
+    "102351059576534_1022474350894993?fields=permalink_url": { permalink_url: "https://www.facebook.com/1022331100909318/posts/1022474350894993" } });
+  const VIDEO = meta({ "52625304217664?fields=creative": { creative: { effective_object_story_id: "102351059576534_1022459437563151", object_type: "VIDEO", video_id: "2448042485687291" } },
+    "102351059576534_1022459437563151?fields=permalink_url": { permalink_url: "https://www.facebook.com/reel/2448042485687291/" } });
+
+  it("opens an image ad at <page>/posts/<post>, never its permalink", async () => {
+    expect(await instantAdLink("52625308746464", "sys", "page", IMAGE)).toEqual({ sourceUrl: "https://www.facebook.com/102351059576534/posts/1022474350894993", media: "image" });
+  });
+  it("opens a video ad as its reel; without the Page's token, at the post", async () => {
+    expect(await instantAdLink("52625304217664", "sys", "page", VIDEO)).toEqual({ sourceUrl: "https://www.facebook.com/reel/2448042485687291/", media: "video" });
+    expect(await instantAdLink("52625304217664", "sys", null, VIDEO)).toEqual({ sourceUrl: "https://www.facebook.com/102351059576534/posts/1022459437563151", media: "video" });
+  });
+  it("gives nothing when Meta will not say, or there is no ad or token", async () => {
+    expect(await instantAdLink("52625304217664", "sys", "page", meta({}))).toBeNull();
+    expect(await instantAdLink(null, "sys", "page", IMAGE)).toBeNull();
+    expect(await instantAdLink("52625308746464", undefined, "page", IMAGE)).toBeNull();
+  });
+  it("puts the link on the row, leaving an unreadable lead alone", async () => {
+    const ref = { pageId: PAGE, leadId: "1014002851749611", formId: null, adId: "52625308746464", createdAt: "2026-11-13T11:16:00.000Z" };
+    const row = instantLeadRow(ref, { field_data: [{ name: "whatsapp_number", values: ["+60123456789"] }] });
+    expect(await withInstantAdLink(row, "sys", "page", IMAGE)).toMatchObject({ ad: { sourceId: "52625308746464", headline: null,
+      sourceUrl: "https://www.facebook.com/102351059576534/posts/1022474350894993", media: "image" } });
+    const err = { kind: "instant" as const, pageId: PAGE, leadId: "1", error: "no Page token" };
+    expect(await withInstantAdLink(err, "sys", "page", IMAGE)).toBe(err);
   });
 });

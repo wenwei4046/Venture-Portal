@@ -8,12 +8,13 @@
  */
 import { GRAPH_VERSION } from "@/lib/whatsapp/send";
 import { BRAND_WHATSAPP, brandOf } from "@/lib/member/crm-source";
-import type { InstantLeadRef, MsgLead } from "./webhook";
+import { adPostUrl, type InstantLeadRef, type MsgLead } from "./webhook";
+import { postPermalink, reelOf } from "./send";
 
 export type LeadRow =
   | { kind: "messenger"; pageId: string; psid: string; name: string | null; at: string; ad: MsgLead["ad"]; complete: boolean; answers: { q: string; a: string }[] }
   | { kind: "instant"; pageId: string; leadId: string; formId: string | null; at: string; name: string | null; phone: string | null; waAccount: string | null;
-      ad: { sourceId: string | null; headline: string | null } | null; complete: true; answers: { q: string; a: string }[] }
+      ad: { sourceId: string | null; headline: string | null; sourceUrl?: string | null; media?: string | null } | null; complete: true; answers: { q: string; a: string }[] }
   | { kind: "instant"; pageId: string; leadId: string; error: string };
 
 export const messengerLeadRow = (l: MsgLead): LeadRow => ({ kind: "messenger", pageId: l.pageId, psid: l.psid, name: l.name, at: l.sentAt, ad: l.ad, complete: l.complete, answers: l.answers });
@@ -53,4 +54,36 @@ export async function readInstantLead(ref: InstantLeadRef, pageToken: string | n
   } catch (e) {
     return { kind: "instant", pageId: ref.pageId, leadId: ref.leadId, error: e instanceof Error ? e.message.slice(0, 300) : "unreachable" };
   }
+}
+
+/**
+ * An Instant Form lead's ad on Facebook (2026-11-13, the owner: "为什么customer info又看不到新上的2支广告的链接了").
+ * Meta's leadgen notice and the lead carry only the ad's id, so its post is asked of the ad's creative with the system
+ * user's token (`effective_object_story_id`, "<page>_<post>") and opened the way a Messenger ad's is: `adPostUrl`'s
+ * `<page>/posts/<post>` for an image or carousel, the reel for a video (its `permalink_url`, read with the Page's
+ * token, taken only when it is a reel — see send.ts). Null when Meta will not say (another portfolio, slow — 3 s).
+ */
+export async function instantAdLink(adId: string | null | undefined, systemToken: string | null | undefined, pageToken: string | null,
+  fetchImpl: typeof fetch = fetch): Promise<{ sourceUrl: string; media: "video" | "image" } | null> {
+  if (!adId || !/^\d{5,32}$/.test(adId) || !systemToken) return null;
+  try {
+    const r = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}?fields=creative{effective_object_story_id,object_type,video_id}`,
+      { headers: { Authorization: `Bearer ${systemToken}` }, cache: "no-store", signal: AbortSignal.timeout(3000) });
+    const j = r.ok ? ((await r.json().catch(() => null)) as { creative?: { effective_object_story_id?: unknown; object_type?: unknown; video_id?: unknown } } | null) : null;
+    const story = typeof j?.creative?.effective_object_story_id === "string" ? j.creative.effective_object_story_id : undefined;
+    const posts = adPostUrl(story);
+    if (!story || !posts) return null;
+    const video = j?.creative?.object_type === "VIDEO" || j?.creative?.video_id != null;
+    const reel = video && pageToken ? reelOf(await postPermalink(story, pageToken, fetchImpl)) : null;
+    return { sourceUrl: reel ?? posts, media: video ? "video" : "image" };
+  } catch {
+    return null;
+  }
+}
+
+/** The row with its ad's link (instantAdLink) when it has an ad; anything else as it was. */
+export async function withInstantAdLink(row: LeadRow, systemToken: string | null | undefined, pageToken: string | null, fetchImpl: typeof fetch = fetch): Promise<LeadRow> {
+  if (row.kind !== "instant" || "error" in row || !row.ad?.sourceId) return row;
+  const link = await instantAdLink(row.ad.sourceId, systemToken, pageToken, fetchImpl);
+  return link ? { ...row, ad: { ...row.ad, ...link } } : row;
 }
