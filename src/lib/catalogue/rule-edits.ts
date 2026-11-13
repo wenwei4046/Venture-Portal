@@ -132,8 +132,12 @@ export type KpiItemAdd =
 
 export interface KpiItemsEdit {
   adds: ReadonlyArray<KpiItemAdd>
-  /** `tiers`: a brand's own item's, sent whole when they changed — absent, they stay as stored. */
-  changes: ReadonlyArray<{ id: string; amount: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput> }>
+  /**
+   * `amount` absent = the amount stays as stored (a brand's item whose tiers alone changed — only what changed is
+   * sent); null = the box was emptied, which is refused. `tiers`: a brand's own item's, sent whole when they
+   * changed — absent, they stay as stored.
+   */
+  changes: ReadonlyArray<{ id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput> }>
   removes: ReadonlyArray<string>
 }
 
@@ -152,7 +156,7 @@ export type KpiAddRow =
 
 export interface KpiItemsPlan {
   adds: KpiAddRow[]
-  changes: Array<{ id: string; kpi_amount: number; unit_tiers?: KpiTierRow[] }>
+  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[] }>
   removes: string[]
 }
 
@@ -220,9 +224,15 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
     if (changed.has(c.id)) throw new EditError(`${name} is changed twice`)
     if (removing.has(c.id)) throw new EditError(`${name} is both changed and removed`)
     changed.add(c.id)
-    // A brand's own item's tiers go whole when they changed; whose item it is, the database knows (it refuses
-    // tiers on the sub-department's own).
-    return { id: c.id, kpi_amount: kpiAmount(c.amount, name), ...(c.tiers === undefined ? {} : { unit_tiers: kpiTiers(c.tiers, name) }) }
+    if (c.amount === undefined && c.tiers === undefined) throw new EditError(`${name}: nothing changed`)
+    // What the row does not name stays as stored (the database reads it so): the amount when the tiers alone
+    // changed. A brand's own item's tiers go whole when they changed; whose item it is, the database knows (it
+    // refuses tiers on the sub-department's own).
+    return {
+      id: c.id,
+      ...(c.amount === undefined ? {} : { kpi_amount: kpiAmount(c.amount, name) }),
+      ...(c.tiers === undefined ? {} : { unit_tiers: kpiTiers(c.tiers, name) }),
+    }
   })
 
   const added = new Set<string>()

@@ -33,6 +33,8 @@ const CHANGED = 'border-accent bg-accent-bg'
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 const COUNTED = kpiItemKind({ source: 'option', optionPool: 'sofa_specials', brandCode: 'brand' }).counted
+const NO_ITEMS: KpiItemRow[] = []
+const NO_SPECIALS: BrandKpiSpecialRow[] = []
 
 /**
  * The KPI items of the brands on their own commission scheme (2026-11-12 —
@@ -41,12 +43,45 @@ const COUNTED = kpiItemKind({ source: 'option', optionPool: 'sofa_specials', bra
  * on its bills where the bill charges for it — what it charged off the bill's
  * sales, the bonus a unit paid, at the tier the month's units reach. Paid
  * whatever the sub-department's KPI switch says, so the head says *Always
- * paid*. One block a brand, each with its own draft and its own Save; whoever
- * may not manage the rules reads the list.
+ * paid*.
+ *
+ * One block a brand, each with its own draft and its own Save (2026-11-13):
+ * the bonus retyped, tiers added, retyped or dropped, an item taken off, a
+ * special of the brand's pool added under a name of its own. Whoever may not
+ * manage the rules reads the list — and sees a brand only once it has an item.
  */
 export default function BrandKpiItems({ data, scheme, canManage }: { data: CommissionSettingsData; scheme: SchemeRow; canManage: boolean }) {
-  const items = data.brandKpiItems ?? []
-  const brands = data.brands.filter(b => b.own_scheme && b.is_active !== false && (canManage || items.some(i => i.brand_id === b.id)))
+  // Each brand's rows keep one identity until the page's data changes: a block waits on it after its Save.
+  const items = data.brandKpiItems ?? NO_ITEMS
+  const itemsOf = useMemo(() => {
+    const by = new Map<string, KpiItemRow[]>()
+    for (const item of items) {
+      if (!item.brand_id) continue
+      const list = by.get(item.brand_id)
+      if (list) list.push(item)
+      else by.set(item.brand_id, [item])
+    }
+    return by
+  }, [items])
+  // The specials a brand's item may be: its own ERP company's sofa specials — the ERP's first company's (the
+  // sub-department's own picker reads those) for a brand that names no company, as the database reads it.
+  const brandSpecials = data.brandKpiSpecials ?? NO_SPECIALS
+  const ownSpecials = data.kpiSpecials
+  const poolOf = useMemo(() => {
+    const by = new Map<number, BrandKpiSpecialRow[]>()
+    for (const row of brandSpecials) {
+      const list = by.get(row.companyId)
+      if (list) list.push(row)
+      else by.set(row.companyId, [row])
+    }
+    if (!by.has(1)) {
+      by.set(1, ownSpecials.filter(o => o.pool === 'sofa_specials')
+        .map(o => ({ companyId: 1, value: o.value, label: o.label, sort_order: o.sort_order, removed: o.removed })))
+    }
+    return by
+  }, [brandSpecials, ownSpecials])
+
+  const brands = data.brands.filter(b => b.own_scheme && b.is_active !== false && (canManage || itemsOf.has(b.id)))
   if (brands.length === 0) return null
   return (
     <>
@@ -55,8 +90,8 @@ export default function BrandKpiItems({ data, scheme, canManage }: { data: Commi
           key={brand.id}
           brand={brand}
           scheme={scheme}
-          items={items.filter(i => i.brand_id === brand.id)}
-          pool={(data.brandKpiSpecials ?? []).filter(s => s.companyId === (brand.erp_company_id ?? null))}
+          items={itemsOf.get(brand.id) ?? NO_ITEMS}
+          pool={poolOf.get(brand.erp_company_id ?? 1) ?? NO_SPECIALS}
           canManage={canManage}
         />
       ))}
@@ -101,7 +136,8 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
 
   const changes = brandKpiChanges(listed, draft)
   const left = useMemo(() => specialsLeft(pool, listed, draft), [pool, listed, draft])
-  const labelOf = useMemo(() => new Map(pool.map(o => [valueKey(o.value), o.label])), [pool])
+  const poolByKey = useMemo(() => new Map(pool.map(o => [valueKey(o.value), o])), [pool])
+  const picked = left.includes(pick) ? pick : left[0] ?? ''
 
   // A page closed or reloaded with changes not saved asks first.
   useEffect(() => {
@@ -133,9 +169,8 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
     })
   }
   function add() {
-    const special = pick || left[0]
-    if (!special) return
-    update(d => ({ ...d, added: [...d.added, { key: `new:${valueKey(special)}`, special, name: pickName, amount: pickAmount, tiers: [] }] }))
+    if (!picked) return
+    update(d => ({ ...d, added: [...d.added, { key: `new:${valueKey(picked)}`, special: picked, name: pickName, amount: pickAmount, tiers: [] }] }))
     setPick('')
     setPickName('')
     setPickAmount('')
@@ -239,11 +274,17 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                 const going = draft.removing.has(item.id)
                 const amount = draft.amounts.get(item.id)
                 const tiers = draft.tiers.get(item.id)
+                // Said only when known: a pool that could not be read names nothing gone.
+                const inPool = poolByKey.get(valueKey(item.special))
+                const outOfErp = pool.length > 0 && (!inPool || inPool.removed)
                 return (
                   <tr key={item.id}>
                     <td>
                       <span className={`font-medium ${going ? 'line-through' : ''}`}>{title}</span>
                       {going ? <span className="chip danger ml-2">Coming off</span> : null}
+                      {outOfErp && !going ? (
+                        <span className="chip alert ml-2" title="The ERP no longer has it, so no new bill can carry it">Gone from the ERP</span>
+                      ) : null}
                       {/* The ERP's own name of the special the item is found by. */}
                       {item.name ? <div className="text-[11px] mt-0.5">{item.special}</div> : null}
                     </td>
@@ -323,10 +364,10 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
             <span className="inline-flex flex-wrap items-center gap-2">
               {left.length > 0 ? (
                 <>
-                  <select value={pick || left[0]} onChange={e => setPick(e.target.value)} disabled={saving}
+                  <select value={picked} onChange={e => setPick(e.target.value)} disabled={saving}
                     aria-label={`${brand.name} special to add`} className={`${INPUT} max-w-[14rem]`}>
                     {left.map(value => {
-                      const label = labelOf.get(valueKey(value))
+                      const label = poolByKey.get(valueKey(value))?.label
                       return <option key={value} value={value}>{label && label !== value ? `${value} · ${label}` : value}</option>
                     })}
                   </select>
@@ -334,7 +375,10 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                     placeholder="Name" aria-label={`${brand.name} new item name`} className={`${INPUT} w-40`} />
                   <input value={pickAmount} onChange={e => setPickAmount(e.target.value)} disabled={saving} inputMode="decimal"
                     placeholder="0.00" aria-label={`${brand.name} new item bonus a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
-                  <button type="button" className={BUTTON_QUIET} disabled={saving} onClick={add}>Add item</button>
+                  <button type="button" className={BUTTON_QUIET} disabled={saving} onClick={add}
+                    aria-label={`Add ${brand.name} item`}>
+                    Add item
+                  </button>
                 </>
               ) : (
                 <span>{plural(count, 'item')}</span>
@@ -342,7 +386,8 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
               {changes > 0 ? <span>{plural(changes, 'change')} not saved</span> : null}
             </span>
             <span className="inline-flex items-center gap-2">
-              <button type="button" className={BUTTON_QUIET} disabled={saving || changes === 0} onClick={cancel}>
+              <button type="button" className={BUTTON_QUIET} disabled={saving || changes === 0} onClick={cancel}
+                aria-label={`Cancel ${brand.name} KPI item changes`}>
                 Cancel
               </button>
               <button type="button" className={BUTTON_QUIET} disabled={saving || changes === 0} onClick={save}

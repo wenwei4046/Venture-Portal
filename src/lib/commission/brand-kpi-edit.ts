@@ -131,8 +131,10 @@ const tierInputs = (tiers: readonly TierDraft[]): KpiTierInput[] => typedTiers(t
 
 /**
  * What the Save sends for one brand's block: only what changed. A changed item
- * goes with its bonus and — when they changed — its tiers whole; an item
- * coming off is never also changed.
+ * goes with its bonus when that changed and its tiers, whole, when those did —
+ * what it does not name stays as stored, so a bonus somebody else has just
+ * retyped on another computer is not written back over by a change of tiers
+ * here. An item coming off is never also changed.
  */
 export function brandKpiEditOf(brandId: string, listed: readonly BrandKpiListed[], draft: BrandKpiDraft): KpiItemsEdit {
   const live = listed.filter(item => !draft.removing.has(item.id))
@@ -142,10 +144,11 @@ export function brandKpiEditOf(brandId: string, listed: readonly BrandKpiListed[
       brandId, name: a.name.trim() || null, tiers: tierInputs(a.tiers), label: a.name.trim() || a.special,
     })),
     changes: live.filter(item => brandItemEdited(item, draft)).map(item => {
+      const amount = draft.amounts.get(item.id)
       const tiers = draft.tiers.get(item.id)
       return {
         id: item.id,
-        amount: (draft.amounts.get(item.id) ?? String(item.amount)).trim() || null,
+        ...(amount !== undefined && bonusDiffers(amount, item.amount) ? { amount: amount.trim() || null } : {}),
         label: brandKpiTitle(item),
         ...(tiers !== undefined && tiersDiffer(tiers, item.tiers) ? { tiers: tierInputs(tiers) } : {}),
       }

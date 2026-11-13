@@ -113,11 +113,14 @@ export default function KpiItemsSection({
   scheme,
   subName,
   onSchemeRules,
+  canManage,
 }: {
   data: CommissionSettingsData
   scheme: SchemeRow
   subName: string
   onSchemeRules: () => void
+  /** Revenue · Manage — whether a brand's own items below can be edited, or are only listed. */
+  canManage: boolean
 }) {
   const router = useRouter()
   const items = data.kpiItems
