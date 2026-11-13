@@ -12,6 +12,8 @@ import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
 import { minPayPlanFrom, minPayStartYM } from '@/lib/min-pay'
+import { owedNowOf } from '@/lib/deal-print'
+import { actualsOf, dueOfEntries, monthsTo, type DealFacts, type DealMonth } from '@/lib/schedule-by-company'
 import type { SchedRow, NoTermRow, CompoundRow, MinInterestRow } from '../_components/ScheduleView'
 
 // The Repayment Schedule's month (2026-10-10, lifted out of its page so the
@@ -40,6 +42,11 @@ export interface RepaymentSchedule {
   events: CalendarEntry[]
   /** The office's month only: earlier instalments still owed in cash (the We collect / We pay list shows them, overdue). */
   arrears: CalendarEntry[]
+  /** Every deal of both sides, for By company (2026-11-13): who it is with, its tag, its next and last, what is owed
+   *  on it, and the six months to this one by right and actual. */
+  deals: DealFacts[]
+  /** The six months the deals carry, oldest first. */
+  window: string[]
 }
 
 /** `month` as the page's URL names it (?month=YYYY-MM); anything else is this month. */
@@ -271,7 +278,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
+    supabase.from('fund_sources').select('id, status, notes, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -510,13 +517,48 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   const today = officeToday()
   const events: CalendarEntry[] = []
   const arrears: CalendarEntry[] = []
+  // By company (2026-11-13): each deal's six months to this one — by right off its plan, actual off its repayments.
+  const window = monthsTo(currentYM, 6)
+  const deals: DealFacts[] = []
+  const factsOf = (
+    plan: RepaymentPlan,
+    deal: Parameters<typeof monthEvents>[1],
+    status: string,
+    payments: Array<{ date: string; type: string; amount: number }>,
+    compounding: boolean,
+    head: Pick<DealFacts, 'side' | 'company' | 'tag' | 'words'>,
+  ): DealFacts => {
+    const { byMonth, last } = actualsOf(payments)
+    const months: Record<string, DealMonth> = {}
+    for (const ym of window) {
+      const due = dueOfEntries(shownForStatus(monthEvents(plan, deal, ym, today), status), compounding)
+      const act = byMonth[ym] ?? { got: 0, gotInterest: 0 }
+      months[ym] = { ...due, ...act }
+    }
+    const repaid = status === 'fully_repaid' || status === 'repaid'
+    return {
+      ...head,
+      id: deal.id ?? '',
+      href: deal.href,
+      next: !repaid && plan.next ? { due: plan.next.due, amount: plan.next.amount } : null,
+      last,
+      owe: repaid ? 0 : owedNowOf(plan).total,
+      months,
+    }
+  }
+  const dealTag = (text: unknown) => /\[((?:LO|BI)[^\]]{0,20})\]/.exec(String(text ?? ''))?.[1]?.trim() ?? null
+  const dealWords = (principal: number, rate: number, months: number | null, compound: boolean) =>
+    `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo${months ? ` · ${months}mo` : ''}${compound ? ' · compound' : ''}`
+  const collectCompoundIds = new Set(collectCompound.map((r) => r.key))
+  const repayCompoundIds = new Set(repayCompound.map((r) => r.key))
   for (const l of loans ?? []) {
     const co = l.company_id ? coById.get(l.company_id as string) : null
+    const payments = (loanReps ?? [])
+      .filter((rp) => rp.loan_id === l.id)
+      .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null }))
     const plan = buildRepaymentPlan({
       terms: termsForLoan(l, loanHist.get(l.id as string) ?? []),
-      payments: (loanReps ?? [])
-        .filter((rp) => rp.loan_id === l.id)
-        .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
+      payments,
       isPrincipal: isLoanPrincipal,
       today,
       // Each instalment on the repayment start's day (2026-10-12).
@@ -527,6 +569,15 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     const deal = { kind: 'collect' as const, id: l.id as string, name: (co?.short_code ?? co?.name ?? '—') as string, href: fromCalendar(`/fund-out/${l.id}`, month), rate: Number(l.effective_rate), principal: Number(l.principal) }
     events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), l.status as string))
     if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), l.status as string))
+    const compound = (l as { compound_interest?: boolean }).compound_interest === true
+    deals.push(
+      factsOf(plan, deal, l.status as string, payments, collectCompoundIds.has(l.id as string), {
+        side: 'collect',
+        company: deal.name,
+        tag: dealTag(l.repayment_terms),
+        words: dealWords(Number(l.principal), Number(l.effective_rate), plan.months, compound),
+      }),
+    )
   }
   const fsDeptName = new Map(((fsDepts ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
   const fsDirectorName = new Map(((fsDirectors ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
@@ -540,6 +591,9 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       (m.from_director_id ? fsDirectorName.get(m.from_director_id as string) : null) ??
       (m.from_department_id ? fsDeptName.get(m.from_department_id as string) : null) ??
       'Fund source') as string
+    const payments = (fsReps ?? [])
+      .filter((rp) => rp.fund_source_id === id)
+      .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null }))
     const plan = buildRepaymentPlan({
       terms: termsForFundSource(
         {
@@ -554,9 +608,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
         },
         fsHist.get(id) ?? [],
       ),
-      payments: (fsReps ?? [])
-        .filter((rp) => rp.fund_source_id === id)
-        .map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
+      payments,
       isPrincipal: isFundSourcePrincipal,
       today,
       dueDay: fundSourceStart(m).day,
@@ -566,6 +618,14 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     const deal = { kind: 'pay' as const, id, name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }
     events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), m.status as string))
     if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), m.status as string))
+    deals.push(
+      factsOf(plan, deal, m.status as string, payments, repayCompoundIds.has(id), {
+        side: 'pay',
+        company: name,
+        tag: dealTag(m.notes),
+        words: dealWords(Number(m.amount), Number(m.cost_rate), plan.months, m.compound_interest === true),
+      }),
+    )
   }
 
   return {
@@ -582,6 +642,8 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     repayNoTerm,
     events,
     arrears,
+    deals,
+    window,
   }
 }
 

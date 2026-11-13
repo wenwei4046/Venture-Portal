@@ -6,7 +6,11 @@ import { formatMoney } from '@/lib/utils'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import RepayCalendar, { type CalendarEvent } from './RepayCalendar'
 import MonthList from './MonthList'
+import ByCompany, { ByCompanyCards } from './ByCompany'
+import InOutChart from './InOutChart'
 import type { ListRow } from '@/lib/schedule-list'
+import type { Basis, Company, HistMonth } from '@/lib/schedule-by-company'
+import bc from './by-company.module.css'
 
 export interface SchedRow {
   key: string
@@ -85,7 +89,11 @@ type Mode = 'all' | 'outstanding'
 // Outstanding only toggle — fold away under it, for what that table does not
 // show (the compounding balance, the outstanding of a deal with no term). The
 // cards are the page's, one row per tab.
-type Tab = 'cal' | 'collect' | 'pay'
+// 2026-11-13 (the mockup approved: "照这个做"): We collect and We pay become one tab, By company — a row a company with
+// both its sides, the six months' chart over it, and one Actual / By right switch on the tabs' row for the cards, the
+// chart and the table. The two instalment lists and the full plans fold away under it, a side at a time.
+type Tab = 'cal' | 'company'
+type Side = 'collect' | 'pay'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -116,8 +124,13 @@ export default function ScheduleView({
   repayCompoundTotals,
   collectList,
   payList,
+  companies,
+  history,
   tools = null,
 }: {
+  /** By company (2026-11-13, lib/schedule-by-company): the month's companies and the six months' chart. */
+  companies: Company[]
+  history: HistMonth[]
   /** We collect / We pay a month at a time, one row an instalment (2026-11-04, lib/schedule-list). */
   collectList: ListRow[]
   payList: ListRow[]
@@ -154,44 +167,80 @@ export default function ScheduleView({
 }) {
   const [mode, setMode] = useState<Mode>('all')
   const [tab, setTab] = useState<Tab>('cal')
+  // Actual is the default (the user: "Actual 就好").
+  const [basis, setBasis] = useState<Basis>('act')
+  const [side, setSide] = useState<Side>('collect')
 
   const visible = (rows: SchedRow[]) => (mode === 'all' ? rows : rows.filter((r) => !r.done))
   const collectCount = collectList.length
   const payCount = payList.length
   const first = dayjs(`${month}-01`)
+  const sideButton = (key: Side, label: string, n: number) => (
+    <button key={key} type="button" aria-pressed={side === key} onClick={() => setSide(key)} className={side === key ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
+      {label} · {n}
+    </button>
+  )
 
   return (
     <div>
-      {cards?.[tab] ?? null}
+      {tab === 'company' ? <ByCompanyCards companies={companies} basis={basis} month={month} /> : (cards?.[tab] ?? null)}
 
       <div className="sch-tabrow">
         <SlidingTabs
           items={[
             { key: 'cal', label: 'Calendar' },
-            { key: 'collect', label: 'We collect', count: collectCount },
-            { key: 'pay', label: 'We pay', count: payCount },
+            { key: 'company', label: 'By company', count: companies.length },
           ]}
           active={tab}
           onTabChange={(key) => setTab(key as Tab)}
           variant="control"
         />
-        {tools ? <div className="sch-tabrow-tools">{tools}</div> : null}
+        {tab === 'company' || tools ? (
+          <div className="sch-tabrow-tools">
+            {tab === 'company' ? (
+              <div className={bc.seg} role="group" aria-label="Actual or by right">
+                <button type="button" aria-pressed={basis === 'act'} onClick={() => setBasis('act')} title="What really came in and went out">
+                  Actual
+                </button>
+                <button type="button" aria-pressed={basis === 'due'} onClick={() => setBasis('due')} title="What the month asks, paid or not">
+                  By right
+                </button>
+              </div>
+            ) : null}
+            {tools}
+          </div>
+        ) : null}
       </div>
 
       {tab === 'cal' ? (
         <RepayCalendar month={month} today={today} events={events} />
       ) : (
         <>
-          <MonthList
-            key={tab}
-            side={tab}
-            rows={tab === 'collect' ? collectList : payList}
-            today={today}
-            monthLong={first.format('MMMM YYYY')}
-            linkMonth={linkMonth}
-            canRecord={canRecord}
-            canSetDefault={canSetDefault}
-          />
+          <InOutChart history={history} basis={basis} />
+          <ByCompany companies={companies} basis={basis} monthLong={first.format('MMMM YYYY')} canRecord={canRecord} />
+
+          <details className="fin-fold">
+            <summary>
+              Instalments
+              <small>WE COLLECT · WE PAY · ONE ROW AN INSTALMENT</small>
+            </summary>
+            <div className="fin-fold-inner">
+              <div className="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Side">
+                {sideButton('collect', 'We collect', collectCount)}
+                {sideButton('pay', 'We pay', payCount)}
+              </div>
+              <MonthList
+                key={side}
+                side={side}
+                rows={side === 'collect' ? collectList : payList}
+                today={today}
+                monthLong={first.format('MMMM YYYY')}
+                linkMonth={linkMonth}
+                canRecord={canRecord}
+                canSetDefault={canSetDefault}
+              />
+            </div>
+          </details>
 
           <details className="fin-fold">
             <summary>
@@ -199,17 +248,21 @@ export default function ScheduleView({
               <small>MINIMUM INTEREST · SCHEDULED · COMPOUNDING · NO FIXED TERM</small>
             </summary>
             <div className="fin-fold-inner">
+              <div className="flex flex-wrap items-center gap-2 mb-4" role="group" aria-label="Side of the full plans">
+                {sideButton('collect', 'We collect', collectCount)}
+                {sideButton('pay', 'We pay', payCount)}
+              </div>
               {/* Toggle — only affects the scheduled tables */}
               <div className="flex flex-wrap items-center gap-2 mb-6" role="group" aria-label="View">
                 <button type="button" aria-pressed={mode === 'all'} onClick={() => setMode('all')} className={mode === 'all' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
-                  Full plan (incl. {tab === 'collect' ? 'collected' : 'paid'})
+                  Full plan (incl. {side === 'collect' ? 'collected' : 'paid'})
                 </button>
                 <button type="button" aria-pressed={mode === 'outstanding'} onClick={() => setMode('outstanding')} className={mode === 'outstanding' ? 'btn-pri-sheet' : 'btn-quiet-sheet'}>
                   Outstanding only
                 </button>
               </div>
     
-              {tab === 'collect' ? (
+              {side === 'collect' ? (
                 <>
                   {collectMin.length > 0 ? (
                     <MinInterestSection title="Minimum interest — to collect" rows={collectMin} paidLabel="Received" monthLabel={monthLabel} />
