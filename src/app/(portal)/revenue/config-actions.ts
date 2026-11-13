@@ -315,9 +315,9 @@ async function cloneSchemeChildren(
   }
 
   // A brand's own KPI items (2026-11-12 — a brand on its own scheme), under the
-  // copied brands' ids, tiers and all.
+  // copied brands' ids, tiers, cost and all.
   const { data: brandItems, error: brandItemsError } = await supabase.from('comm_kpi_items')
-    .select('brand_id, source, product_code, product_name, erp_product_id, option_pool, option_value, kpi_amount, unit_tiers, effective_from, effective_to')
+    .select('brand_id, source, product_code, product_name, erp_product_id, option_pool, option_value, kpi_amount, unit_tiers, cost_amount, effective_from, effective_to')
     .eq('scheme_id', fromSchemeId).not('brand_id', 'is', null)
   check(brandItemsError, "Could not read the brands' KPI items to clone")
   const brandItemCopies = ((brandItems ?? []) as unknown as Array<Record<string, unknown>>).flatMap(item => {

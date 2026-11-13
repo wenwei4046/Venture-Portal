@@ -46,16 +46,27 @@
  * 他有没有收钱" — the price is sometimes written in the remark and the
  * special's own amount left empty; until then it was found only where the
  * special order charged for it). It differs in the money: what comes OFF the
- * bill is what the bill charged for the special (`KpiLine.specialMoney`: the
- * ERP's special order on the line; nothing where it charges nothing — "升级的
- * 钱只拿 bonus"), and what is PAID is the item's amount a unit — or its tier's, by
- * the month's units (`kpiUnitPay`: 1–4 RM 50, 5–9 RM 70 → six are 6 × 70).
- * Counted once per sofa SET, as a fabric series is. Paid whatever the
- * sub-department's own KPI switch says.
+ * bill is the item's COST a unit, set on Rules › KPI items (`KpiItem.cost` — the
+ * user, the same evening, told that an upgrade priced in the remark would earn
+ * the whole bill's commission and the bonus: "i need a place at kpi item rules
+ * set there fill in cost, so that it can dedecut the cost out and change to kpi
+ * amount only"; a brand on its own scheme has no Product List to price an
+ * upgrade on) — or what the bill charged for the special when that is more
+ * (`KpiLine.specialMoney`: the ERP's special order on the line; a corner sofa
+ * charged double) — "升级的钱只拿 bonus". An item with no cost takes off what
+ * the bill charged alone, nothing where it charges nothing. What is PAID is the
+ * item's amount a unit — or its tier's, by the month's units (`kpiUnitPay`:
+ * 1–4 RM 50, 5–9 RM 70 → six are 6 × 70). Counted once per sofa SET, as a
+ * fabric series is. Paid whatever the sub-department's own KPI switch says.
  *
  *   RM 3,240 bill (sofa 2,990 + Sofa Full Fabric 250), rate 4%, bonus RM 50
  *     main   2,990 × 4% = 119.60
  *     KPI    RM 50                    → RM 169.60
+ *
+ *   RM 3,490 bill, Latex Seat named and its RM 500 written in the remark
+ *   (the special order charges nothing), cost RM 500, rate 4%, bonus RM 50
+ *     main   2,990 × 4% = 119.60
+ *     KPI    RM 50                    → RM 169.60   (RM 189.60 with no cost)
  *
  * The twin of the SQL in migrations 20260927050000, 20261030010000 and
  * 20261112200000 (`comm_kpi_hits`); the run, the month page, the member app
@@ -128,6 +139,32 @@ export interface KpiItem {
   brandCode?: string | null
   /** A brand's own item alone: what a unit pays once the month's units reach a tier. */
   unitTiers?: readonly KpiUnitTier[]
+  /**
+   * A brand's own item alone (2026-11-13, `comm_kpi_items.cost_amount`): RM a
+   * unit taken OFF the bill's commissionable sales — the upgrade's price, set on
+   * Rules › KPI items, whatever the bill's special order says of it (its price
+   * is sometimes written in the remark). A special order charging MORE takes
+   * that off instead (`kpiUnitOff`). Absent, null or 0 = no cost: what the
+   * special order charges alone.
+   */
+  cost?: number | null
+}
+
+/** A brand's own item's cost a unit; 0 = none set. */
+export function kpiItemCost(item: Pick<KpiItem, 'cost'>): number {
+  const cost = Number(item.cost ?? 0)
+  return Number.isFinite(cost) && cost > 0 ? cost : 0
+}
+
+/**
+ * What a unit of a brand's own item takes off its bill: the item's cost, or
+ * what the bill's special order charges for it when that is more — never less
+ * than the rule says, so an amount left empty or typed short pays no commission
+ * on the upgrade's money (补钱容易、扣钱难), and a dearer one (a corner sofa's)
+ * is taken off whole. The twin of `comm_kpi_hits`' GREATEST.
+ */
+export function kpiUnitOff(item: Pick<KpiItem, 'cost'>, charged: number): number {
+  return Math.max(charged > 0 ? charged : 0, kpiItemCost(item))
 }
 
 /** A step of a brand's own item (`comm_kpi_items.unit_tiers`): from `minQty` units in a month EVERY unit pays `amount`. */
@@ -389,7 +426,8 @@ export interface KpiHit {
   qty: number
   /**
    * What it takes OFF the bill's commissionable sales: qty × the item's amount
-   * — a brand's own item, qty × what the bill charged for it.
+   * — a brand's own item, qty × its cost, or what the bill charged for it when
+   * that is more (`kpiUnitOff`).
    */
   amount: number
   /**
@@ -544,10 +582,11 @@ export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
       hits.push(own(set.item, set.lineId, qty))
       continue
     }
-    // A brand's own item: what the bill charged comes off its sales, the item's amount a unit is what it pays.
+    // A brand's own item: its cost — what the bill charged, when that is more — comes off its sales, the item's
+    // amount a unit is what it pays.
     hits.push({
       item: set.item, itemKey: set.itemKey, lineId: set.lineId, qty,
-      amount: round2(qty * set.charged), paid: round2(qty * set.item.kpiAmount),
+      amount: round2(qty * kpiUnitOff(set.item, set.charged)), paid: round2(qty * set.item.kpiAmount),
     })
   }
   return hits

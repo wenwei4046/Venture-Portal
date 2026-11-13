@@ -11,6 +11,7 @@ import {
   brandKpiChanges,
   brandKpiEditOf,
   brandKpiTitle,
+  costDiffers,
   EMPTY_BRAND_KPI_DRAFT,
   specialsLeft,
   tierDrafts,
@@ -36,20 +37,25 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 const COUNTED = kpiItemKind({ source: 'option', optionPool: 'sofa_specials', brandCode: 'brand' }).counted
 const NO_ITEMS: KpiItemRow[] = []
 const NO_SPECIALS: BrandKpiSpecialRow[] = []
+/** An item with no cost: what the bill's special order charges for it comes off the bill. */
+const NO_COST = 'As billed'
 
 /**
  * The KPI items of the brands on their own commission scheme (2026-11-12 —
  * 2990s; the user: "这个 KPI item 是独立的，属于 2990 专属的 KPI item … KPI item
  * 那边我是可以手动去加的"): a sofa special of the brand's own ERP company, found
- * on its bills where the bill charges for it — what it charged off the bill's
- * sales, the bonus a unit paid, at the tier the month's units reach. Paid
- * whatever the sub-department's KPI switch says, so the head says *Always
- * paid*.
+ * on its bills wherever the sofa names it — its cost a unit off the bill's
+ * sales (2026-11-13, the user: "i need a place at kpi item rules set there fill
+ * in cost, so that it can dedecut the cost out and change to kpi amount only";
+ * what the bill charged when that is more, or when no cost is set), the bonus a
+ * unit paid, at the tier the month's units reach. Paid whatever the
+ * sub-department's KPI switch says, so the head says *Always paid*.
  *
  * One block a brand, each with its own draft and its own Save (2026-11-13):
- * the bonus retyped, tiers added, retyped or dropped, an item taken off, a
- * special of the brand's pool added under a name of its own. Whoever may not
- * manage the rules reads the list — and sees a brand only once it has an item.
+ * the cost or the bonus retyped, tiers added, retyped or dropped, an item
+ * taken off, a special of the brand's pool added under a name of its own.
+ * Whoever may not manage the rules reads the list — and sees a brand only once
+ * it has an item.
  */
 export default function BrandKpiItems({ data, scheme, canManage }: { data: CommissionSettingsData; scheme: SchemeRow; canManage: boolean }) {
   // Each brand's rows keep one identity until the page's data changes: a block waits on it after its Save.
@@ -112,6 +118,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
   const [draft, setDraft] = useState<BrandKpiDraft>(EMPTY_BRAND_KPI_DRAFT)
   const [pick, setPick] = useState('')
   const [pickName, setPickName] = useState('')
+  const [pickCost, setPickCost] = useState('')
   const [pickAmount, setPickAmount] = useState('')
   const [pending, startSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -156,6 +163,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
     setError(null)
     setNotice(null)
   }
+  const setCost = (id: string, text: string) => update(d => ({ ...d, costs: new Map(d.costs).set(id, text) }))
   const setAmount = (id: string, text: string) => update(d => ({ ...d, amounts: new Map(d.amounts).set(id, text) }))
   const setTiers = (item: BrandKpiListed, change: (tiers: TierDraft[]) => TierDraft[]) =>
     update(d => ({ ...d, tiers: new Map(d.tiers).set(item.id, change([...(d.tiers.get(item.id) ?? tierDrafts(item.tiers))])) }))
@@ -171,9 +179,13 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
   }
   function add() {
     if (!picked) return
-    update(d => ({ ...d, added: [...d.added, { key: `new:${valueKey(picked)}`, special: picked, name: pickName, amount: pickAmount, tiers: [] }] }))
+    update(d => ({
+      ...d,
+      added: [...d.added, { key: `new:${valueKey(picked)}`, special: picked, name: pickName, cost: pickCost, amount: pickAmount, tiers: [] }],
+    }))
     setPick('')
     setPickName('')
+    setPickCost('')
     setPickAmount('')
   }
   function cancel() {
@@ -187,7 +199,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
     try {
       validateKpiItems(edit)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Check the bonus and the tiers.')
+      setError(e instanceof Error ? e.message : 'Check the cost, the bonus and the tiers.')
       return
     }
     setError(null)
@@ -264,6 +276,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
               <tr>
                 <th>Item</th>
                 <th className="whitespace-nowrap">Counted</th>
+                <th className="right whitespace-nowrap">Cost a unit · RM</th>
                 <th className="right whitespace-nowrap">Bonus a unit · RM</th>
                 <th>By the month&apos;s units</th>
                 {canManage ? <th className="w-24 relative"><span className="sr-only">Remove</span></th> : null}
@@ -273,6 +286,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
               {listed.map(item => {
                 const title = brandKpiTitle(item)
                 const going = draft.removing.has(item.id)
+                const cost = draft.costs.get(item.id)
                 const amount = draft.amounts.get(item.id)
                 const tiers = draft.tiers.get(item.id)
                 // Said only when known: a pool that could not be read names nothing gone.
@@ -290,6 +304,23 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                       {item.name ? <div className="text-[11px] mt-0.5">{item.special}</div> : null}
                     </td>
                     <td className="whitespace-nowrap">{COUNTED}</td>
+                    <td className="num">
+                      {!canManage || going ? (
+                        <span className={going ? 'line-through' : undefined}>
+                          {item.cost === null ? NO_COST : formatMoneyBare(item.cost)}
+                        </span>
+                      ) : (
+                        <input
+                          value={cost ?? (item.cost === null ? '' : String(item.cost))}
+                          onChange={e => setCost(item.id, e.target.value)}
+                          disabled={saving}
+                          inputMode="decimal"
+                          placeholder={NO_COST}
+                          aria-label={`${title} cost a unit`}
+                          className={`${INPUT} w-24 text-right tabular-nums ${cost !== undefined && costDiffers(cost, item.cost) ? CHANGED : ''}`}
+                        />
+                      )}
+                    </td>
                     <td className="num">
                       {!canManage || going ? (
                         <span className={going ? 'line-through' : undefined}>{formatMoneyBare(item.amount)}</span>
@@ -333,6 +364,17 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                     <td className="whitespace-nowrap">{COUNTED}</td>
                     <td className="num">
                       <input
+                        value={a.cost}
+                        onChange={e => setAdded(a.key, row => ({ ...row, cost: e.target.value }))}
+                        disabled={saving}
+                        inputMode="decimal"
+                        placeholder={NO_COST}
+                        aria-label={`${title} cost a unit`}
+                        className={`${INPUT} w-24 text-right tabular-nums ${CHANGED}`}
+                      />
+                    </td>
+                    <td className="num">
+                      <input
                         value={a.amount}
                         onChange={e => setAdded(a.key, row => ({ ...row, amount: e.target.value }))}
                         disabled={saving}
@@ -354,7 +396,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
               })}
               {listed.length + draft.added.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 5 : 4} className="text-center text-sm py-6">{brand.name} has no KPI items yet.</td>
+                  <td colSpan={canManage ? 6 : 5} className="text-center text-sm py-6">{brand.name} has no KPI items yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -375,8 +417,10 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                   </Select>
                   <input value={pickName} onChange={e => setPickName(e.target.value)} disabled={saving} maxLength={120}
                     placeholder="Name" aria-label={`${brand.name} new item name`} className={`${INPUT} w-40`} />
+                  <input value={pickCost} onChange={e => setPickCost(e.target.value)} disabled={saving} inputMode="decimal"
+                    placeholder="Cost" aria-label={`${brand.name} new item cost a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
                   <input value={pickAmount} onChange={e => setPickAmount(e.target.value)} disabled={saving} inputMode="decimal"
-                    placeholder="0.00" aria-label={`${brand.name} new item bonus a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
+                    placeholder="Bonus" aria-label={`${brand.name} new item bonus a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
                   <button type="button" className={BUTTON_QUIET} disabled={saving} onClick={add}
                     aria-label={`Add ${brand.name} item`}>
                     Add item

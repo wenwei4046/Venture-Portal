@@ -128,6 +128,8 @@ export type KpiItemAdd =
       brandId?: string
       name?: string | null
       tiers?: ReadonlyArray<KpiTierInput>
+      /** A brand's own item (2026-11-13): RM a unit taken off the bill. Blank = none — what the bill's special order charges. */
+      cost?: string | null
     }
 
 export interface KpiItemsEdit {
@@ -135,9 +137,12 @@ export interface KpiItemsEdit {
   /**
    * `amount` absent = the amount stays as stored (a brand's item whose tiers alone changed — only what changed is
    * sent); null = the box was emptied, which is refused. `tiers`: a brand's own item's, sent whole when they
-   * changed — absent, they stay as stored.
+   * changed — absent, they stay as stored. `cost` (2026-11-13): a brand's own item's, sent when it changed —
+   * absent, it stays as stored; null or blank = the box was emptied, and the item has no cost again.
    */
-  changes: ReadonlyArray<{ id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput> }>
+  changes: ReadonlyArray<{
+    id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput>; cost?: string | null
+  }>
   removes: ReadonlyArray<string>
 }
 
@@ -152,11 +157,14 @@ export type KpiAddRow =
   | {
       source: 'option'; option_pool: KpiOptionPool; option_value: string; kpi_amount: number
       brand_id?: string; label?: string; unit_tiers?: KpiTierRow[]
+      /** Above 0 only: an item added with no cost names none. */
+      cost_amount?: number
     }
 
 export interface KpiItemsPlan {
   adds: KpiAddRow[]
-  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[] }>
+  /** `cost_amount`: the new cost; 0 = none any more (`catalogue_save_kpi_items` stores NULL — a key left out stays). */
+  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[]; cost_amount?: number }>
   removes: string[]
 }
 
@@ -205,6 +213,18 @@ function kpiAmount(raw: string | null | undefined, name: string): number {
   return amount
 }
 
+/**
+ * A brand's own item's cost a unit (2026-11-13) — what comes off the bill: RM 0.01 – 1,000,000 (the column's CHECK),
+ * or 0 for a box left blank: no cost, the bill's special order says what comes off.
+ */
+export function kpiCost(raw: string | null | undefined, name: string): number {
+  const cost = parseMoney(raw, `${name}: cost`, true)
+  if (cost === null) return 0
+  if (cost < 0) throw new EditError(`${name}: a cost cannot be negative`)
+  if (cost > 1_000_000) throw new EditError(`${name}: a cost is at most RM 1,000,000 a unit`)
+  return cost
+}
+
 export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
   const addsIn = edit.adds ?? []
   const changesIn = edit.changes ?? []
@@ -224,14 +244,15 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
     if (changed.has(c.id)) throw new EditError(`${name} is changed twice`)
     if (removing.has(c.id)) throw new EditError(`${name} is both changed and removed`)
     changed.add(c.id)
-    if (c.amount === undefined && c.tiers === undefined) throw new EditError(`${name}: nothing changed`)
+    if (c.amount === undefined && c.tiers === undefined && c.cost === undefined) throw new EditError(`${name}: nothing changed`)
     // What the row does not name stays as stored (the database reads it so): the amount when the tiers alone
-    // changed. A brand's own item's tiers go whole when they changed; whose item it is, the database knows (it
-    // refuses tiers on the sub-department's own).
+    // changed. A brand's own item's tiers go whole when they changed, its cost when it did (0 = none any more);
+    // whose item it is, the database knows (it refuses tiers and a cost on the sub-department's own).
     return {
       id: c.id,
       ...(c.amount === undefined ? {} : { kpi_amount: kpiAmount(c.amount, name) }),
       ...(c.tiers === undefined ? {} : { unit_tiers: kpiTiers(c.tiers, name) }),
+      ...(c.cost === undefined ? {} : { cost_amount: kpiCost(c.cost, name) }),
     }
   })
 
@@ -264,12 +285,16 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
       if (added.has(key)) throw new EditError(`${name} is added twice`)
       added.add(key)
       const tiers = kpiTiers(a.tiers, name)
+      const cost = kpiCost(a.cost, name)
       return {
         source: 'option', option_pool: a.optionPool, option_value: value, kpi_amount: kpiAmount(a.amount, name),
         brand_id: a.brandId, ...(own ? { label: own } : {}), ...(tiers.length > 0 ? { unit_tiers: tiers } : {}),
+        ...(cost > 0 ? { cost_amount: cost } : {}),
       }
     }
-    if (a.tiers !== undefined || a.name !== undefined) throw new EditError("Only a brand's own KPI item has a name and tiers of its own")
+    if (a.tiers !== undefined || a.name !== undefined || a.cost !== undefined) {
+      throw new EditError("Only a brand's own KPI item has a name, tiers and a cost of its own")
+    }
     const name = a.label?.trim() || value
     const key = kpiAddKey({ source: 'option', optionPool: a.optionPool, optionValue: value })
     if (added.has(key)) throw new EditError(`${name} is added twice`)
