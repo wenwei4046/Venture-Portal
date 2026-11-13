@@ -6,6 +6,7 @@ import { flash } from '@/components/hrv/toast'
 import { HeadButton } from '@/components/finv/Hub'
 import FundHub, { type FundCan } from '@/components/treasury/FundHub'
 import FundContraDialog from '@/components/treasury/FundContraDialog'
+import IisMonthDialog from '@/components/treasury/IisMonthDialog'
 import type { FundCardKey, FundRecord } from '@/lib/fund-hub'
 import { withdrawFundSource } from '../actions'
 import RecordFundInDialog from './RecordFundInDialog'
@@ -35,6 +36,8 @@ export default function FundInHub({
   const router = useRouter()
   const [creating, setCreating] = useState(false)
   const [contra, setContra] = useState(false)
+  // Month-end interest (IIS, 2026-11-13): Treasury · Approve.
+  const [iis, setIis] = useState(false)
   return (
     <>
       <FundHub
@@ -47,12 +50,15 @@ export default function FundInHub({
         canSetDefault={canSetDefault}
         onWithdraw={withdrawFundSource}
         head={
-          canCreate ? (
+          canCreate || can.amend ? (
             <>
-              <HeadButton primary onClick={() => setCreating(true)}>
-                Record fund in
-              </HeadButton>
-              <HeadButton onClick={() => setContra(true)}>Contra</HeadButton>
+              {canCreate ? (
+                <HeadButton primary onClick={() => setCreating(true)}>
+                  Record fund in
+                </HeadButton>
+              ) : null}
+              {canCreate ? <HeadButton onClick={() => setContra(true)}>Contra</HeadButton> : null}
+              {can.amend ? <HeadButton onClick={() => setIis(true)}>Month-end interest</HeadButton> : null}
             </>
           ) : null
         }
@@ -72,6 +78,17 @@ export default function FundInHub({
         <FundContraDialog
           open={contra}
           onClose={() => setContra(false)}
+          onSaved={(message) => {
+            flash(message)
+            router.refresh()
+          }}
+          today={today}
+        />
+      ) : null}
+      {can.amend ? (
+        <IisMonthDialog
+          open={iis}
+          onClose={() => setIis(false)}
           onSaved={(message) => {
             flash(message)
             router.refresh()

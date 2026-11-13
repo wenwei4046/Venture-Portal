@@ -171,7 +171,7 @@ export function productSections(p: Pick<Product, 'name' | 'code' | 'groups' | 'i
   const items = p.groups.flatMap(g => g.items)
   return [
     { label: 'Basics', done: !!p.name.trim() && !!p.code },
-    { label: "What's included", done: items.some(it => it.qty > 0 && !!it.name.trim()) },
+    { label: 'Items', done: items.some(it => it.qty > 0 && !!it.name.trim()) },
     { label: 'Linked templates', done: !!p.intake && items.length > 0 && items.every(it => !!it.workflow) },
     { label: 'Pricing', done: (p.price ?? 0) > 0 },
     { label: 'Publish', done: !!p.effectiveFrom },
@@ -184,7 +184,7 @@ export function productProblems(p: Product, book: Pick<ProductBook, 'workflows' 
   if (p.status === 'retired') return ['A retired product is read-only — reactivate it first']
   if (!p.name.trim()) out.push('Name the product')
   const items = p.groups.flatMap(g => g.items)
-  if (p.groups.some(g => !g.name.trim()) || items.some(it => !it.name.trim())) out.push('Name each category and action')
+  if (p.groups.some(g => !g.name.trim()) || items.some(it => !it.name.trim())) out.push('Name each category and item')
   if (!items.some(it => it.qty > 0 && it.name.trim())) out.push('Add what the product includes')
   // An action need not run on a published workflow (2026-11-13 — the user: a product publishes on its basics);
   // `productWarnings` says so, never a refusal.
@@ -204,7 +204,7 @@ export function productWarnings(p: Pick<Product, 'groups' | 'status'>, book: Pic
   const unlinked = items.filter(it => !it.workflow).length
   const unpublished = items.filter(it => it.workflow && (book.workflows.find(w => w.id === it.workflow)?.version ?? 0) === 0).length
   const out: string[] = []
-  if (unlinked) out.push(`${unlinked} action${unlinked === 1 ? '' : 's'} not linked to a workflow — its work is not made`)
+  if (unlinked) out.push(`${unlinked} item${unlinked === 1 ? '' : 's'} not linked to a workflow — its work is not made`)
   if (unpublished) out.push(`${unpublished} linked workflow${unpublished === 1 ? ' is' : 's are'} not published yet — its work is not made`)
   return out
 }

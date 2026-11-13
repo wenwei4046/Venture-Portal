@@ -34,6 +34,8 @@ export interface TermsAsk {
   principalPerMonth?: number | null
   /** 'YYYY-MM' — the fixed term ends then, the interest kept on the same amount (BI#7's October, asked with January's terms). */
   openFromYM?: string | null
+  /** How the rate was typed (2026-11-13, "要可以年息"): a year's is said "12.000% /yr · 1.000% /mo"; absent — a month's. */
+  rateBasis?: 'month' | 'year' | null
 }
 
 /** A `treasury_terms_requests` row. */
@@ -61,10 +63,12 @@ export interface TermsRequestRow {
   /** mig 20261027210000. */
   principal_per_month?: number | string | null
   open_from?: string | null
+  /** mig 20261113130000. */
+  rate_basis?: string | null
 }
 
 const COLUMNS =
-  'id, record_kind, record_id, effective_from, rate, remaining_months, compound_interest, no_fixed_term, interest_on_original, interest_keeps_base, reason, status, approval_id, created_by, created_at, decided_by, decided_at, decision_note, whole_deal, principal_per_month, open_from'
+  'id, record_kind, record_id, effective_from, rate, remaining_months, compound_interest, no_fixed_term, interest_on_original, interest_keeps_base, reason, status, approval_id, created_by, created_at, decided_by, decided_at, decision_note, whole_deal, principal_per_month, open_from, rate_basis'
 
 /** A decided request stays on its deal's page this long. */
 export const DECIDED_SHOWN_DAYS = 30
@@ -73,6 +77,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /** 'YYYY-MM' → "Oct 2026". */
 export const monthWords = (ym: string) => (/^\d{4}-\d{2}$/.test(ym) ? `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}` : ym)
 const pct = (r: number) => `${(r * 100).toFixed(3)}%`
+/** A monthly rate as it was typed: "12.000% /yr · 1.000% /mo", or "1.000% /mo". */
+const rateSaid = (r: number, basis?: 'month' | 'year' | null) => (basis === 'year' ? `${pct(r * 12)} /yr · ${pct(r)} /mo` : `${pct(r)} /mo`)
 const rm = (n: number) => `RM ${formatMoneyBare(n)}`
 
 export function askOf(r: TermsRequestRow): TermsAsk {
@@ -87,6 +93,7 @@ export function askOf(r: TermsRequestRow): TermsAsk {
     wholeDeal: r.whole_deal === true,
     principalPerMonth: r.principal_per_month == null || !(Number(r.principal_per_month) > 0) ? null : Number(r.principal_per_month),
     openFromYM: r.open_from ? r.open_from.slice(0, 7) : null,
+    rateBasis: r.rate_basis === 'year' || r.rate_basis === 'month' ? r.rate_basis : null,
   }
 }
 
@@ -98,7 +105,7 @@ export function askWords(a: TermsAsk): string {
   const scope = askScope(a)
   return [
     scope.charAt(0).toUpperCase() + scope.slice(1),
-    a.rate != null ? `${pct(a.rate)} /mo` : null,
+    a.rate != null ? rateSaid(a.rate, a.rateBasis) : null,
     a.noFixedTerm
       ? 'no fixed term'
       : a.principalPerMonth != null
@@ -117,12 +124,15 @@ export function askWords(a: TermsAsk): string {
 /**
  * The deal's terms once the change is applied — the amend's arithmetic: the terms now close the month before; from
  * the month on the record carries the rate, months and compounding asked. Months left not asked keep the end month;
- * a loan once without a fixed term stays so (its terms' words say it, and the amend never takes them back).
+ * a loan without a fixed term stays so unless a number of months (or an amount a month) is asked — then it is fixed
+ * (2026-11-13, "填月数就转"; amend_loan / amend_loan_from take its words' 未定 out), the months it already holds too
+ * (LO#7's 51: the form sends months only when A number of months was picked).
  */
 export function termsAfterAsk(kind: TermsRecordKind, t: PositionTerms, ask: TermsAsk): PositionTerms {
-  // A loan once without a fixed term stays so; otherwise an amount a month asked, or — neither months nor no fixed
-  // term asked — the one the terms had (the amend keeps it).
-  const open = ask.noFixedTerm || (kind === 'loan' && t.current.months == null)
+  // A loan without a fixed term stays so unless months, or an amount a month, are asked; otherwise an amount a month
+  // asked, or — neither months nor no fixed term asked — the one the terms had.
+  const asksFixed = ask.principalPerMonth != null || ask.remainingMonths != null
+  const open = ask.noFixedTerm || (kind === 'loan' && t.current.months == null && !asksFixed)
   const fixed = open || ask.remainingMonths != null ? null : (ask.principalPerMonth ?? t.current.principalPerMonth ?? null)
   if (ask.wholeDeal) {
     // The terms in force themselves, from when they began (amend_fund_source / amend_loan): no new segment, no history.
@@ -212,8 +222,8 @@ export function termsAskView(
 }
 
 /** The new terms in a line: "0.833% /mo · no fixed term · interest RM 424.83 a month on RM 51,000.00 as before". */
-export function askLine(s: TermsSegment): string {
-  const parts = [`${pct(s.rate)} /mo`, s.months == null ? 'no fixed term' : s.fixedPrincipal != null ? `${rm(s.fixedPrincipal)} a month, ${s.months} months` : `${s.months} months`]
+export function askLine(s: TermsSegment, basis?: 'month' | 'year' | null): string {
+  const parts = [rateSaid(s.rate, basis), s.months == null ? 'no fixed term' : s.fixedPrincipal != null ? `${rm(s.fixedPrincipal)} a month, ${s.months} months` : `${s.months} months`]
   if (s.compounding) {
     parts.push('compounding')
   } else {
@@ -340,7 +350,7 @@ export function termsRequestNote(args: {
     fromYM: ask.fromYM,
     whole: ask.wholeDeal === true,
     line: view.ok
-      ? askLine(view.after) + (ask.openFromYM ? ` · no fixed term from ${monthWords(ask.openFromYM)}` : '')
+      ? askLine(view.after, ask.rateBasis) + (ask.openFromYM ? ` · no fixed term from ${monthWords(ask.openFromYM)}` : '')
       : askWords(ask).replace(/^(?:Whole deal from|From) [A-Za-z]{3} \d{4}(?: · )?/, ''),
     reason: row.reason,
     by: args.nameOf(row.created_by) ?? 'Finance',

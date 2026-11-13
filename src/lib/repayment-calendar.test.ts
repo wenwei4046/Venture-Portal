@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrearsBefore, monthEvents, overdueOf } from './repayment-calendar'
+import { arrearsBefore, monthEvents, overdueOf, shownForStatus, type CalendarEntry } from './repayment-calendar'
 import { buildRepaymentPlan, type PlanPayment, type RepaymentPlan } from './repayment-plan'
 import { isFundSourcePrincipal, isLoanPrincipal, termsForFundSource, termsForLoan } from './treasury-terms-data'
 
@@ -168,5 +168,17 @@ describe('overdueOf', () => {
 
   it('is nothing when every passed installment is paid', () => {
     expect(overdueOf(plan([row(1, '2026-09-02', 100, 0), row(2, '2026-11-02', 100, 100)]), '2026-10-09')).toBeNull()
+  })
+})
+
+describe('shownForStatus', () => {
+  // 2026-11-13, the user: a repaid deal's never-recorded interest is not shown as owed — "页面不显示（数据不改）".
+  const e = (outstanding: number) => ({ outstanding }) as unknown as CalendarEntry
+  it('a repaid deal keeps only what it paid', () => {
+    expect(shownForStatus([e(0), e(400)], 'fully_repaid').map((x) => x.outstanding)).toEqual([0])
+    expect(shownForStatus([e(0), e(400)], 'repaid').map((x) => x.outstanding)).toEqual([0])
+  })
+  it('a live deal keeps everything', () => {
+    expect(shownForStatus([e(0), e(400)], 'active')).toHaveLength(2)
   })
 })

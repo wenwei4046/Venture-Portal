@@ -37,6 +37,15 @@ export interface CalendarEntry extends CalendarDeal {
   rolled: number
 }
 
+/**
+ * A deal already repaid (2026-11-13 — the user chose "页面不显示（数据不改）"): its instalments still owing something —
+ * interest its terms ask that was never recorded — are not shown as owed; what it paid still is. The deal's own page
+ * and its terms are unchanged.
+ */
+export function shownForStatus(entries: CalendarEntry[], status: string | null | undefined): CalendarEntry[] {
+  return status === 'fully_repaid' || status === 'repaid' ? entries.filter((e) => e.outstanding <= 0.005) : entries
+}
+
 /** A row paid in full before its own month began — paid ahead, or settled early with the deal. */
 const paidAhead = (r: RepaymentPlan['rows'][number]) => r.outstanding <= 0.005 && !!r.paidOn && r.paidOn.slice(0, 7) < r.ym
 

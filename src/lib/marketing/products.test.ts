@@ -91,7 +91,7 @@ describe('the five sections and publishing', () => {
     expect(productProblems(p, book)).toEqual([])
     expect(productProblems(unlinked, book)).toEqual([])
     expect(productWarnings(p, book)).toEqual(['1 linked workflow is not published yet — its work is not made'])
-    expect(productWarnings(unlinked, book)).toEqual(['1 action not linked to a workflow — its work is not made',
+    expect(productWarnings(unlinked, book)).toEqual(['1 item not linked to a workflow — its work is not made',
       '1 linked workflow is not published yet — its work is not made'])
     const published = { ...book, workflows: book.workflows.map(w => ({ ...w, version: 1 })) }
     expect(productWarnings(p, published)).toEqual([])

@@ -56,10 +56,24 @@ describe('the terms once the change is applied', () => {
     expect(termsAfterAsk('fund_source', BI7, { ...OCTOBER, noFixedTerm: false, remainingMonths: 12 }).current.months).toBe(12)
   })
 
-  it('a loan once without a fixed term stays so; a fund source without one may take one', () => {
+  // 2026-11-13 — The Cont LO#6, 60 months asked of a loan whose words said 原表无还款方式: "填月数就转".
+  it('a loan without a fixed term takes the months asked — the ones it already holds too (LO#7)', () => {
     const open: PositionTerms = { ...BI7, current: { ...BI7.current, months: null } }
-    expect(termsAfterAsk('loan', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: 12 }).current.months).toBeNull()
+    expect(termsAfterAsk('loan', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: 12 }).current.months).toBe(12)
+    expect(termsAfterAsk('loan', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: null, rate: 0.04 }).current.months).toBeNull()
+    const whole = { ...OCTOBER, noFixedTerm: false, interestKeepsBase: false, wholeDeal: true }
+    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: 60 }).current.months).toBe(60)
+    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: 51 }).current.months).toBe(51)
+    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: null, rate: 0.04 }).current.months).toBeNull()
+    expect(termsAfterAsk('loan', open, { ...whole, remainingMonths: null, principalPerMonth: 500 }).current.principalPerMonth).toBe(500)
     expect(termsAfterAsk('fund_source', open, { ...OCTOBER, noFixedTerm: false, remainingMonths: 12 }).current.months).toBe(12)
+  })
+})
+
+describe('a rate typed per year (2026-11-13, "要可以年息")', () => {
+  it('says the year first, then the month', () => {
+    expect(askWords({ ...OCTOBER, noFixedTerm: false, interestKeepsBase: false, rate: 0.01, wholeDeal: true, rateBasis: 'year' })).toBe('Whole deal from Oct 2026 · 12.000% /yr · 1.000% /mo')
+    expect(askOf(row({ rate: 0.01, rate_basis: 'year' })).rateBasis).toBe('year')
   })
 })
 

@@ -483,6 +483,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Marketing's Product Builder (mig 20261023235900): the products — and their prices — read, saved, published, retired
   // and reactivated, all by Marketing · Manage.
   'mkt_products', 'mkt_product_save', 'mkt_product_publish', 'mkt_product_status',
+  // The Product Builder's three tabs (mig 20261113100000): the Product List, quotations (sent, accepted, their tasks
+  // assigned), a product duplicated or its status set from the list — all Marketing · Manage; the bell's quotation states.
+  'mkt_quote_book', 'mkt_item_save', 'mkt_item_delete', 'mkt_catalogue_rename', 'mkt_quote_save', 'mkt_quote_send', 'mkt_quote_accept',
+  'mkt_quote_assign', 'mkt_quote_duplicate', 'mkt_quote_states', 'mkt_product_duplicate', 'mkt_product_set_status',
+  'mkt_item_column_save', 'mkt_item_column_delete', 'mkt_item_columns_order',
   // Marketing's product projects (mig 20261024002000): the products on sale and a project started by Marketing · Manage;
   // its page read by View; its intake minutes written and sent, started before approval, resent by Manage; signed by an
   // attendee (Edit).
@@ -603,10 +608,16 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A deal's terms change filed for the Principal (mig 20261025110000): filed and withdrawn on the deal's page
   // (Treasury · Edit; withdrawn by whoever filed it or the queue's Approve), decided in Approvals (Approve).
   'approve_terms_change', 'file_terms_change', 'reject_terms_change', 'withdraw_terms_change',
+  // A rate said per month or per year once amended (mig 20261113130000): the Principal's own change (Treasury · Approve),
+  // or the one who filed a change while it waits (Treasury · Edit).
+  'set_deal_rate_basis', 'set_terms_request_rate_basis',
   // A fund contra (mig 20261104230000): filed / withdrawn / undone on Fund OUT or Fund IN, decided in Approvals.
   'approve_fund_contra', 'file_fund_contra', 'reject_fund_contra', 'undo_fund_contra', 'withdraw_fund_contra',
   // A login turned off or on from the person's page (mig 20261105010000): People · Edit or Permissions · Edit.
   'account_set_login',
+  // Interest in suspense, one account per deal (mig 20261113140000): a deal's own accounts made as it starts (Treasury /
+  // the approval), the month-end run's entries (Treasury · Approve), what it posted and the go-live (Treasury · View).
+  'ensure_deal_accounts', 'iis_post', 'iis_posted', 'iis_live_from',
 ])
 
 /**

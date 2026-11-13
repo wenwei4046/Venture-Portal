@@ -1,6 +1,7 @@
 'use server'
 
 import { monthlyRateOf, rateBasisOf, ratePctCap } from '@/lib/rate-basis'
+import { basisSent, type DealKind } from '@/lib/rate-basis-save'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
@@ -19,6 +20,25 @@ import { loadNewSourceOptions, type NewSourceOptions } from './_lib/new-source-o
 import { amendMonthWords, compoundSent, explainAmendRefusal, openFromSent, principalPerMonthSent } from '@/lib/fund-amend'
 import { sourceEditPatch } from '@/lib/fund-source-edit'
 import { minPayFromDate } from '@/lib/min-pay'
+
+type Db = Awaited<ReturnType<typeof createClient>>
+
+/** The Principal's own change: the deal is said in the basis its rate was typed in (mig 20261113130000). */
+async function keepDealBasis(supabase: Db, kind: DealKind, id: string, fd: FormData): Promise<string | null> {
+  const basis = basisSent(fd)
+  if (!basis) return null
+  const { error } = await supabase.rpc('set_deal_rate_basis' as never, { p_record_kind: kind, p_record_id: id, p_basis: basis } as never)
+  return error ? error.message : null
+}
+
+/** A change filed for the Principal says how its rate was typed, for the approval to keep. */
+async function keepRequestBasis(supabase: Db, kind: DealKind, requestId: unknown, fd: FormData): Promise<string | null> {
+  const basis = basisSent(fd)
+  if (!basis || typeof requestId !== 'string') return null
+  const { error } = await supabase.rpc('set_terms_request_rate_basis' as never, { p_record_kind: kind, p_request: requestId, p_basis: basis } as never)
+  return error ? error.message : null
+}
+
 
 // ─── Amend an ACTIVE fund source: the terms in force recalculated ─────────────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -71,7 +91,7 @@ async function fileWholeFundSource(formData: FormData): Promise<{ error: string 
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
 
-  const { error } = await supabase.rpc('file_terms_change' as never, {
+  const { data: filed, error } = await supabase.rpc('file_terms_change' as never, {
     p_record_kind: 'fund_source',
     p_record_id: id,
     // The database takes the month the terms in force began; a date is asked all the same.
@@ -86,6 +106,8 @@ async function fileWholeFundSource(formData: FormData): Promise<{ error: string 
     p_open_from: openFrom ? `${openFrom}-01` : null,
   } as never)
   if (error) return { error: `Not submitted: ${error.message}` }
+  const basisErr = await keepRequestBasis(supabase, 'fund_source', filed, formData)
+  if (basisErr) return { error: `Submitted, but not that its rate is per year / per month: ${basisErr}` }
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/fund-in')
   revalidatePath('/approvals')
@@ -137,6 +159,8 @@ async function amendFundSourceWork(formData: FormData): Promise<{ error: string 
 
   const { error } = await supabase.rpc('amend_fund_source', { p_fund_source_id: id, p_payload: payload })
   if (error) return { error: `Not saved: ${error.message}` }
+  const basisErr = await keepDealBasis(supabase, 'fund_source', id, formData)
+  if (basisErr) return { error: `The terms were saved, but not that the rate is per year / per month: ${basisErr}` }
   // No fixed term from a later month: the terms just saved end their fixed term there, the interest kept on the same amount.
   const openFrom = openFromSent(formData)
   if (openFrom) {
@@ -211,7 +235,7 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
   if (openFrom && openFrom <= fromYM) return { error: `No fixed term from has to come after ${amendMonthWords(fromYM)}, when the new terms start.` }
 
   if (!direct) {
-    const { error: fileErr } = await supabase.rpc('file_terms_change' as never, {
+    const { data: filed, error: fileErr } = await supabase.rpc('file_terms_change' as never, {
       p_record_kind: 'fund_source',
       p_record_id: id,
       p_effective_from: `${fromYM}-01`,
@@ -226,6 +250,8 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
       p_open_from: openFrom ? `${openFrom}-01` : null,
     } as never)
     if (fileErr) return { error: `Not submitted: ${explainAmendRefusal(fileErr.message) ?? fileErr.message}` }
+    const basisErr = await keepRequestBasis(supabase, 'fund_source', filed, formData)
+    if (basisErr) return { error: `Submitted, but not that its rate is per year / per month: ${basisErr}` }
     revalidatePath(`/fund-in/${id}`)
     revalidatePath('/fund-in')
     revalidatePath('/approvals')
@@ -248,6 +274,8 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
     p_principal_per_month: ppm.value,
   })
   if (error) return { error: `Not saved: ${explainAmendRefusal(error.message) ?? error.message}` }
+  const basisErr = await keepDealBasis(supabase, 'fund_source', id, formData)
+  if (basisErr) return { error: `The terms were saved, but not that the rate is per year / per month: ${basisErr}` }
   // No fixed term from a later month: the terms just applied end their fixed term there, the interest kept on the same amount.
   if (openFrom) {
     const { error: openErr } = await supabase.rpc('amend_fund_source_from', {

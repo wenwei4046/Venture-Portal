@@ -14,6 +14,7 @@ import { mktNoticesFromRow, type MktNotice } from './shell'
 import { minutesFoldersFromRow, minutesTemplatesFromRow, type MinutesFolder, type MinutesTemplate } from './minutes'
 import { optionListsFromRow, type OptionLists } from './options'
 import { productBookFromRow, type ProductBook } from './products'
+import { quoteBookFromRow, type QuoteBook } from './quotes'
 import { productPicksFromRow, productProjectFromRow, type ProductPick, type ProductProjectPage } from './project'
 import { replaceCountsFromRow, replacePlacesFromRow, type ReplaceCount, type ReplacePlaces } from './replace'
 import { lobbyFromRow, petStatsFromRow, spaceFromRow, visitFromRow, type LobbyPet, type PetStats, type Space, type Visit } from './space'
@@ -82,6 +83,15 @@ export async function readProducts(): Promise<ProductBook> {
   const { data, error } = await db.rpc('mkt_products')
   if (error) throw new Error(error.message)
   return productBookFromRow(data)
+}
+
+/** The Product Builder's Product List, packages on sale, quotations, clients and roster (mig 20261113100000) —
+ * Marketing · Manage. */
+export async function readQuoteBook(): Promise<QuoteBook> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_quote_book')
+  if (error) throw new Error(error.message)
+  return quoteBookFromRow(data)
 }
 
 /** New Project's products on sale, each at its version in effect (mig 20261024002000) — Marketing · Manage. */

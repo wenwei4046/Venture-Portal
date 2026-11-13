@@ -1,6 +1,6 @@
 /* The Product Builder (`Product Builder.dc.html`), in Marketing's tokens (globals.css › .mkt-shell). */
 
-.page { padding: 24px 28px 48px; color: rgb(var(--mk-ink)); min-height: 100%; box-sizing: border-box; }
+.page { padding: 24px 28px 48px; color: rgb(var(--mk-ink)); min-height: 100%; box-sizing: border-box; line-height: normal; }
 .grow { flex: 1; }
 .muted { color: rgb(var(--mk-muted)); font-weight: 400; }
 .mono { font-family: var(--mk-mono); font-size: 12px; }
@@ -106,10 +106,10 @@
 .stepper button:disabled { cursor: not-allowed; }
 .stepN { min-width: 26px; text-align: center; font-family: var(--mk-mono); font-size: 12px; }
 .moneyCell, .moneyBig { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgb(var(--mk-line)); border-radius: 7px; height: 32px; padding: 0 8px; background: rgb(var(--mk-white)); }
-.moneyBig { height: 38px; }
+.moneyBig { height: 38px; box-sizing: content-box; }
 .moneyBig .muted { white-space: nowrap; font-size: .84em; }
 .rm { font-size: .78em; color: rgb(var(--mk-muted)); }
-.moneyInput { width: 100%; min-width: 0; border: 0; outline: none; font: inherit; font-family: var(--mk-mono); font-size: 12.5px; background: transparent; color: inherit; }
+.moneyInput { width: 100%; min-width: 0; padding: 1px 2px; border: 0; outline: none; font: inherit; font-family: var(--mk-mono); font-size: 12.5px; background: transparent; color: inherit; }
 .moneyBig .moneyInput { flex: 1; width: auto; font-size: 14px; }
 .wfCell { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .wfCell .select { flex: 1; height: 32px; font-size: .86em; }
@@ -140,8 +140,139 @@
 
 .toast { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 8px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); font-size: 13px; animation: mkIn .2s ease-out; }
 
+/* ── 2026-11-12, docs/design_handoff_product_builder/: the Products tab as `Product Builder.dc.html` draws it ── */
+.nowrap { white-space: nowrap; }
+.center { text-align: center; }
+.pl8 { padding-left: 8px; }
+.pr8 { padding-right: 8px; }
+.dupBtn { height: 22px; padding: 0 8px; border-radius: 6px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); font: inherit; font-size: .78em; font-weight: 600; cursor: pointer; color: rgb(var(--mk-text-3)); white-space: nowrap; }
+.dupBtn:hover:not(:disabled) { background: rgb(var(--mk-surface-2)); }
+.titleBtns { display: flex; gap: 8px; }
+.sectionClip { overflow: hidden; }
+
+/* The right-click menu (220px) */
+.ctxScrim { position: fixed; inset: 0; z-index: 250; }
+.ctx { position: fixed; z-index: 260; width: 220px; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line)); border-radius: 10px; box-shadow: var(--mk-shadow-pop); padding: 6px; animation: mkIn .12s ease-out; }
+.ctxName { padding: 6px 9px; font-size: .84em; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid rgb(var(--mk-line-4)); margin-bottom: 4px; }
+.ctxSect { padding: 4px 9px 2px; font-size: .7em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+.ctxRow { display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; text-align: left; font: inherit; font-size: .92em; color: rgb(var(--mk-text-2)); font-weight: 500; }
+.ctxRow:hover { background: rgb(var(--mk-surface-2)); }
+.ctxOn { color: rgb(var(--mk-ink)); font-weight: 600; }
+.ctxDot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.dotDraft { background: rgb(var(--mk-draft)); }
+.dotActive { background: rgb(var(--mk-done)); }
+.dotRetired { background: rgb(var(--mk-text-3)); }
+.ctxTick { color: rgb(var(--mk-brown)); font-size: .9em; }
+.ctxLine { height: 1px; background: rgb(var(--mk-line-4)); margin: 4px 0; }
+
+/* 2 · Items — one table for every category */
+.iRow { display: grid; grid-template-columns: minmax(180px, 1.5fr) minmax(210px, 1.4fr) 52px 92px 112px 96px 28px; gap: 10px; align-items: center; padding: 0 16px; min-width: 840px; box-sizing: content-box; }
+.iHead { height: 36px; border-bottom: 1px solid rgb(var(--mk-line-2)); font-size: .7em; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgb(var(--mk-muted)); }
+.iCat { height: 40px; background: rgb(var(--mk-surface)); border-bottom: 1px solid rgb(var(--mk-line-4)); }
+.iCatName { display: flex; align-items: center; gap: 8px; min-width: 0; grid-column: 1 / span 5; }
+.catInput { height: 28px; box-sizing: border-box; border: 1px solid transparent; border-radius: 6px; outline: none; background: transparent; min-width: 0; flex: 0 1 260px; padding: 0 8px; font: inherit; font-weight: 600; color: inherit; }
+.catInput:hover:not(:disabled) { border-color: rgb(var(--mk-line)); }
+.catInput:focus { border-color: rgb(var(--mk-focus)); background: rgb(var(--mk-white)); }
+.iCount { font-size: .8em; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.iCatTotal { text-align: right; font-family: var(--mk-mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.iX { width: 24px; height: 24px; border-radius: 6px; cursor: pointer; color: rgb(var(--mk-x)); background: none; border: 0; font: inherit; font-size: 1.05em; padding: 0; }
+.iX:hover { color: rgb(var(--mk-red)); background: rgb(var(--mk-red-soft)); }
+.iXItem { color: rgb(var(--mk-out-num)); }
+.iItem { min-height: 44px; border-bottom: 1px solid rgb(var(--mk-line-4)); }
+.iItem:hover { background: rgb(var(--mk-cell-hover)); }
+.iName { position: relative; min-width: 0; display: flex; }
+.iNameIn { height: 32px; box-sizing: border-box; border: 1px solid transparent; border-radius: 6px; outline: none; background: transparent; min-width: 0; flex: 1; padding: 0 8px; font: inherit; font-size: .92em; color: inherit; }
+.iNameIn:hover:not(:disabled) { border-color: rgb(var(--mk-line)); }
+.iNameIn:focus { border-color: rgb(var(--mk-focus)); background: rgb(var(--mk-white)); }
+.iWf { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.iWfCol { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.wfNote { font-size: .72em; color: rgb(var(--mk-wait)); padding-left: 8px; }
+.iOpen { flex: none; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: rgb(var(--mk-faint)); font-size: .85em; text-decoration: none; }
+.iOpen:hover { background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-ink)); }
+.iDays { text-align: right; font-family: var(--mk-mono); font-size: 12px; color: rgb(var(--mk-muted)); white-space: nowrap; }
+/* Days set from a product (the Product List's own): the flat cell of the table, a figure and "d". */
+.iDaysBox { display: flex; align-items: center; justify-content: flex-end; gap: 1px; height: 32px; box-sizing: border-box; border: 1px solid transparent; border-radius: 6px; padding: 0 5px; min-width: 0; }
+.iDaysBox:hover:not(.iDaysOff) { border-color: rgb(var(--mk-line)); }
+.iDaysBox:focus-within { border-color: rgb(var(--mk-focus)); background: rgb(var(--mk-white)); }
+.iDaysIn { width: 100%; min-width: 0; padding: 1px 0; border: 0; outline: none; font: inherit; background: transparent; color: inherit; text-align: right; }
+.iDaysIn::placeholder { color: rgb(var(--mk-faint)); }
+.iDaysD { font-size: .9em; color: rgb(var(--mk-faint)); }
+.iDaysOff { cursor: default; }
+.iQty { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.sq { width: 24px; height: 24px; border-radius: 6px; border: 0; background: rgb(var(--mk-surface-2)); cursor: pointer; color: rgb(var(--mk-text-3)); font: inherit; line-height: 1; padding: 0; }
+.sq:hover:not(:disabled) { background: rgb(var(--mk-active)); }
+.sq:disabled { cursor: default; }
+.iQtyN { min-width: 26px; text-align: center; font-family: var(--mk-mono); font-size: 12.5px; font-weight: 600; }
+.iPrice { display: flex; align-items: center; gap: 4px; height: 32px; box-sizing: border-box; border: 1px solid transparent; border-radius: 6px; padding: 0 8px; min-width: 0; }
+.iPrice:hover { border-color: rgb(var(--mk-line)); }
+.iPrice:focus-within { border-color: rgb(var(--mk-focus)); background: rgb(var(--mk-white)); }
+.iRm { font-size: .76em; color: rgb(var(--mk-faint)); }
+.iPriceIn { flex: 1; width: 100%; min-width: 0; padding: 1px 2px; border: 0; outline: none; font: inherit; font-family: var(--mk-mono); font-size: 12.5px; background: transparent; text-align: right; color: inherit; }
+.iTotal { text-align: right; font-family: var(--mk-mono); font-size: 12px; white-space: nowrap; }
+.iAddRow { padding: 0 16px; min-width: 840px; box-sizing: content-box; border-bottom: 1px solid rgb(var(--mk-line-2)); }
+.iAdd { height: 34px; padding: 0 8px; font: inherit; font-size: .84em; color: rgb(var(--mk-brown)); background: none; border: 0; cursor: pointer; border-radius: 6px; }
+.iAdd:hover { background: rgb(var(--mk-surface-2)); }
+.iNewCat { display: flex; align-items: center; gap: 8px; padding: 10px 16px; min-width: 840px; box-sizing: border-box; border-bottom: 1px solid rgb(var(--mk-line-2)); }
+.iPlus { color: rgb(var(--mk-faint)); padding-left: 8px; }
+.iNewCatIn { height: 32px; box-sizing: border-box; border: 1px solid transparent; border-radius: 6px; outline: none; background: transparent; min-width: 0; flex: 1; padding: 0 8px; font: inherit; font-size: .9em; color: inherit; }
+.iNewCatIn:hover { border-color: rgb(var(--mk-line)); }
+.iNewCatIn:focus { border-color: rgb(var(--mk-focus)); background: rgb(var(--mk-white)); }
+.iNewCatBtn { height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); font: inherit; font-weight: 600; font-size: .84em; cursor: pointer; color: inherit; white-space: nowrap; }
+.iSum { height: 46px; background: rgb(var(--mk-surface)); }
+.iSumLbl { grid-column: 1 / span 5; font-size: .9em; font-weight: 600; padding-left: 8px; }
+.iSumV { text-align: right; font-family: var(--mk-mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* The item picker: the Product List floating under (or over) the item's name. */
+.pickMenu { position: fixed; width: 360px; z-index: 200; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line)); border-radius: 10px; box-shadow: var(--mk-shadow-pop); padding: 6px; overflow-y: auto; box-sizing: border-box; animation: mkIn .12s ease-out; }
+.pickCatRow { display: flex; align-items: center; gap: 8px; padding: 8px 9px 4px; }
+.pickCat { font-size: .72em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+.pickHere { font-size: .7em; padding: 1px 6px; border-radius: 4px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); }
+.pickOpt { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 7px; cursor: pointer; width: 100%; background: transparent; border: 0; text-align: left; font: inherit; color: inherit; }
+.pickOpt:hover { background: rgb(var(--mk-surface-2)); }
+.pickTwo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pickName { font-weight: 500; font-size: .92em; }
+.pickDesc { font-size: .78em; color: rgb(var(--mk-muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickPrice { font-family: var(--mk-mono); font-size: 12px; white-space: nowrap; }
+.pickNew { padding: 8px 9px; margin-top: 4px; border-top: 1px solid rgb(var(--mk-line-4)); font-size: .84em; color: rgb(var(--mk-brown)); }
+.pickEmpty { padding: 10px 9px; font-size: .86em; color: rgb(var(--mk-muted)); }
+
+/* 🔒 Internal only · not shown to the client */
+.divider { display: flex; align-items: center; gap: 12px; margin: 8px 0 -4px; }
+.divLine { flex: 1; height: 1px; background: rgb(var(--mk-dash)); }
+.divWords { display: inline-flex; align-items: center; gap: 6px; font-size: .76em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-text-3)); white-space: nowrap; }
+
+/* Publish before activating */
+.pubDialog { width: min(480px, 100%); }
+.pubBody { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; font-size: .92em; color: rgb(var(--mk-text-2)); line-height: 1.5; }
+.pubLead { margin: 0; color: rgb(var(--mk-ink)); }
+.pubMissing { padding: 12px 14px; border-radius: 10px; background: rgb(var(--mk-red-soft)); border: 1px solid rgb(var(--mk-red-line)); color: rgb(var(--mk-red)); }
+.pubMissingHead { font-weight: 600; }
+.pubMissing ul { margin: 6px 0 0; padding-left: 18px; }
+.pubReady { margin: 0; }
+.pubFootDlg { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid rgb(var(--mk-line-2)); }
+
 @media (max-width: 900px) {
   .page { padding: 20px 16px 40px; }
   .editor { grid-template-columns: minmax(0, 1fr); }
   .nav { position: static; flex-direction: row; flex-wrap: wrap; }
 }
+
+/* The prototype sizes these without border-box: their border adds to the height and width it gives them. */
+.status, .codeBox, .ctx { box-sizing: content-box; }
+
+/* The manager's own Product List columns in a product's Items (read from the list, like Days). */
+.iExtraHead { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 9px; }
+.iExtra { display: flex; min-width: 0; font-size: .96em; }
+.iExtra > * { flex: 1; min-width: 0; }
+/* Delete from the right-click menu (2026-11-13): red; asked in place; a product once on sale says to retire it. */
+.ctxDel { color: rgb(var(--mk-red)); }
+.ctxOff { cursor: default; color: rgb(var(--mk-faint)); }
+.ctxOff:hover { background: transparent; }
+.ctxHint { font-size: .86em; font-weight: 400; color: rgb(var(--mk-faint)); }
+.ctxAsk { display: flex; flex-direction: column; gap: 8px; padding: 6px 9px 4px; }
+.ctxAskText { font-size: .86em; line-height: 1.35; color: rgb(var(--mk-text-2)); }
+.ctxAskBtns { display: flex; gap: 6px; }
+.ctxDanger, .ctxKeep { height: 28px; padding: 0 12px; border-radius: 7px; font: inherit; font-size: .86em; font-weight: 600; cursor: pointer; }
+.ctxDanger { border: 0; background: rgb(var(--mk-red)); color: rgb(var(--mk-white)); }
+.ctxDanger:disabled { opacity: .5; cursor: default; }
+.ctxKeep { border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); }

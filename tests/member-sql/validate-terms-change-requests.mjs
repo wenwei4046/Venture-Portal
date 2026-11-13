@@ -498,4 +498,80 @@ check(await q(`select to_char(valid_from, 'YYYY-MM') vf, to_char(valid_to, 'YYYY
 check(await q(`select cost_rate::text, lock_in_months, principal_per_month, to_char(terms_effective_from, 'YYYY-MM') tef from fund_sources where id = $1`, [MK]),
   [{ cost_rate: '0.010000', lock_in_months: null, principal_per_month: null, tef: '2026-07' }], 'no fixed term from July')
 
+// ── 2026-11-13 ("填月数就转"): months asked of a loan without a fixed term make it fixed ──
+const L6 = '00000000-0000-4000-8000-0000000000c6'
+const L7 = '00000000-0000-4000-8000-0000000000c7'
+const L8 = '00000000-0000-4000-8000-0000000000c8'
+await as(null)
+await db.exec(`
+  insert into public.loans (id, status, principal, effective_rate, base_rate, risk_premium, tenure_months, disbursement_date, repayment_terms, company_id) values
+    ('${L6}', 'active', 10000, 0, 0, 0, 1, '2026-03-15', '无息垫款 · 0% · 原表无还款方式 · [LO#6] · 资金来源: LOO', '${CONT}'),
+    ('${L7}', 'active', 40000, 0.04, 0.003, 0.037, 1, '2026-10-07', '利滚利挂账(未定还款) · 利息从放款日起算 · 资金来源: HV', '${CONT}'),
+    ('${L8}', 'active', 60000, 0.04, 0.003, 0.037, 51, '2025-04-05', 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)', '${CONT}');
+`)
+const fixedSql = await text(new URL('20261113101000_amend_months_makes_fixed.sql', migrations))
+await db.exec(fixedSql)
+await db.exec(fixedSql)
+check((await q(`select public.terms_words_fixed('新增 · 利息/期数/方式未定 · [LO-NEW]') w`))[0].w, '新增 · 利息/期数/方式已定 · [LO-NEW]', 'any other 未定 reads 已定')
+await as(PRINCIPAL)
+await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "tenure_months": 60, "compound_interest": true}')`, [L6])
+check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L6]), [{ tenure_months: 60, repayment_terms: '无息垫款 · 0% · [LO#6] · 资金来源: LOO' }],
+  'LO#6: 60 months over the whole terms — fixed, its words without 原表无还款方式')
+await q(`select public.amend_loan($1, '{"effective_rate": 0.04, "compound_interest": true}')`, [L7])
+check((await q(`select repayment_terms from loans where id = $1`, [L7]))[0].repayment_terms, '利滚利挂账(未定还款) · 利息从放款日起算 · 资金来源: HV',
+  'no months asked: still without a fixed term')
+await q(`select public.amend_loan($1, '{"tenure_months": 12, "repayment_terms": "未定 · kept as typed"}')`, [L7])
+check((await q(`select repayment_terms from loans where id = $1`, [L7]))[0].repayment_terms, '未定 · kept as typed', 'words sent are kept as sent')
+await q(`select public.amend_loan_from($1, '2026-12-01', null, 24, null, 'fixed from December')`, [L8])
+check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L8]), [{ tenure_months: 24, repayment_terms: 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang' }],
+  'from a later month: fixed from December')
+check((await q(`select was_repayment_terms w, months from treasury_terms_history where record_id = $1 order by valid_from desc limit 1`, [L8]))[0],
+  { w: 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)', months: null }, 'the months before keep their words, no fixed term')
+await q(`select public.revert_terms_change('loan', $1)`, [L8])
+check((await q(`select repayment_terms from loans where id = $1`, [L8]))[0].repayment_terms, 'EMI 分期 · 60期 · [LO#7] · 资金来源: Liang · 未定还款(自 2026-01 起)',
+  'undone: its words back')
+await as(null)
+
+// 2026-11-13 ("这个还是一样？"): LO#7 asked the 51 months it already holds — fixed all the same.
+const L9 = '00000000-0000-4000-8000-0000000000c9'
+await as(null)
+await db.exec(`insert into public.loans (id, status, principal, effective_rate, base_rate, risk_premium, tenure_months, disbursement_date, repayment_terms, company_id) values
+  ('${L9}', 'active', 60000, 0.04, 0.003, 0.037, 51, '2025-04-05', 'EMI 分期 · [LO#7] · 未定还款(自 2026-01 起)', '${CONT}')`)
+const alwaysSql = await text(new URL('20261113110000_amend_months_always_fixed.sql', migrations))
+await db.exec(alwaysSql)
+await db.exec(alwaysSql)
+await as(PRINCIPAL)
+await q(`select public.amend_loan($1, '{"tenure_months": 51}')`, [L9])
+check(await q(`select tenure_months, repayment_terms from loans where id = $1`, [L9]), [{ tenure_months: 51, repayment_terms: 'EMI 分期 · [LO#7]' }],
+  'the months it already holds, asked: fixed')
+await as(null)
+
+// ── 2026-11-13 ("要可以年息" → A): a rate amended per year — the deal is said per year from then on ──
+await as(null)
+await db.exec(`alter table public.loans add column if not exists rate_basis text not null default 'month';
+  alter table public.fund_sources add column if not exists rate_basis text not null default 'month';`)
+const basisSql = await text(new URL('20261113130000_amend_rate_basis.sql', migrations))
+await db.exec(basisSql)
+await db.exec(basisSql)
+// The Principal's own change.
+await as(FINANCE)
+await refuses(`select public.set_deal_rate_basis('fund_source', $1, 'year')`, [MK], /Treasury · Approve/, 'Finance does not set it alone')
+await as(PRINCIPAL)
+await q(`select public.set_deal_rate_basis('fund_source', $1, 'year')`, [MK])
+check((await q(`select rate_basis from fund_sources where id = $1`, [MK]))[0].rate_basis, 'year', 'the Principal: per year from now on')
+await refuses(`select public.set_deal_rate_basis('fund_source', $1, 'week')`, [MK], /per month or per year/, 'a month or a year only')
+// Filed by Finance: the request says it, the approval writes it.
+await as(FINANCE)
+const [{ id: yr }] = await fileOne({ kind: 'loan', id: L6, whole: true, rate: 0.01 })
+await q(`select public.set_terms_request_rate_basis('loan', $1, 'year')`, [yr])
+await as(null)
+check((await q(`select rate_basis from treasury_terms_requests where id = $1`, [yr]))[0].rate_basis, 'year', 'the request says per year')
+check((await q(`select rate_basis from loans where id = $1`, [L6]))[0].rate_basis, 'month', 'the deal waits for the approval')
+const [{ approval_id: yrAp }] = await q(`select approval_id from treasury_terms_requests where id = $1`, [yr])
+await as(PRINCIPAL)
+await refuses(`select public.set_terms_request_rate_basis('loan', $1, 'month')`, [yr], /not yours/, 'only the one who filed it')
+await q(`select public.approve_terms_change($1)`, [yrAp])
+await as(null)
+check(await q(`select effective_rate::text r, rate_basis from loans where id = $1`, [L6]), [{ r: '0.010000', rate_basis: 'year' }], 'approved: 1% a month, said per year')
+
 console.log(`validate-terms-change-requests: ${checks} checks passed`)
