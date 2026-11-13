@@ -104,11 +104,23 @@ const leadTs = (t: unknown) => { const n = Number(t); return Number.isFinite(n) 
 
 const iso = (ms: number | undefined) => (Number.isFinite(ms) && ms! > 0 ? new Date(ms!).toISOString() : new Date().toISOString());
 
-export function adOf(r: Referral | undefined): MsgInbound["ad"] {
+/**
+ * The ad's post as a Facebook address. Meta sends `post_id` as the post alone ("122209887110789684" — every
+ * click-to-Messenger ad seen since 2026-10-29), so it is joined to the Page it came through (`<page>_<post>`, as Lead
+ * View's `lead_ad_posts()` does); a `<page>_<post>` id is taken as it is. Anything else is never made a link.
+ */
+export function adPostUrl(postId: string | undefined, pageId?: string | null): string | null {
+  if (!postId) return null;
+  if (/^\d{5,30}_\d{1,30}$/.test(postId)) return `https://www.facebook.com/${postId}`;
+  if (/^\d{1,30}$/.test(postId) && pageId && /^\d{5,30}$/.test(pageId)) return `https://www.facebook.com/${pageId}_${postId}`;
+  return null;
+}
+
+export function adOf(r: Referral | undefined, pageId?: string | null): MsgInbound["ad"] {
   if (!r || (!r.ad_id && r.source !== "ADS")) return null;
   const x = r.ads_context_data;
   return { sourceId: r.ad_id ?? null, headline: x?.ad_title ?? null,
-    sourceUrl: x?.post_id && /^\d+_\d+$/.test(x.post_id) ? `https://www.facebook.com/${x.post_id}` : null,
+    sourceUrl: adPostUrl(x?.post_id, pageId),
     media: x?.video_url ? "video" : x?.photo_url ? "image" : null };
 }
 
@@ -159,7 +171,7 @@ export function parseMessengerDelivery(body: unknown): MsgDelivery {
       // A Messenger lead ad's answers: the referral with lead.data (LEAD_COMPLETE / LEAD_INCOMPLETE)…
       const ref = e.referral;
       if (e.lead?.data || ref?.type === "LEAD_COMPLETE" || ref?.type === "LEAD_INCOMPLETE") {
-        (out.leads ??= []).push({ pageId, psid, name: null, sentAt: iso(e.timestamp), ad: adOf(ref), complete: ref?.type !== "LEAD_INCOMPLETE",
+        (out.leads ??= []).push({ pageId, psid, name: null, sentAt: iso(e.timestamp), ad: adOf(ref, pageId), complete: ref?.type !== "LEAD_INCOMPLETE",
           answers: (e.lead?.data ?? []).filter(x => x?.question).map(x => ({ q: String(x.question), a: String(x.answer ?? "") })) });
         continue;
       }
@@ -180,14 +192,14 @@ export function parseMessengerDelivery(body: unknown): MsgDelivery {
           ...(["image", "video", "audio", "file"].includes(first?.type ?? "") && metaMediaUrl(first?.payload?.url) ? { mediaUrl: metaMediaUrl(first?.payload?.url) } : {}),
           ...(first?.type === "file" && fileNameOf(first?.payload?.url) ? { fileName: fileNameOf(first?.payload?.url) } : {}),
           ...(e.message.reply_to?.mid ? { replyToMid: e.message.reply_to.mid } : {}),
-          sentAt: iso(e.timestamp), ad: adOf(e.message.referral ?? e.referral),
+          sentAt: iso(e.timestamp), ad: adOf(e.message.referral ?? e.referral, pageId),
         });
         continue;
       }
       if (e.postback?.mid || e.postback?.title) {
         out.messages.push({
           externalId: e.postback.mid ?? `postback.${psid}.${e.timestamp}`, pageId, psid, name: null, kind: "button",
-          body: e.postback.title ?? null, sentAt: iso(e.timestamp), ad: adOf(e.postback.referral ?? e.referral),
+          body: e.postback.title ?? null, sentAt: iso(e.timestamp), ad: adOf(e.postback.referral ?? e.referral, pageId),
         });
         continue;
       }

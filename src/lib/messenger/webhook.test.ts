@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMessengerDelivery } from "./webhook";
+import { adPostUrl, parseMessengerDelivery } from "./webhook";
 
 const page = (messaging: unknown[]) => ({ object: "page", entry: [{ id: "PAGE1", time: 1, messaging }] });
 const T = 1790950000000;
@@ -30,6 +30,21 @@ describe("Messenger deliveries", () => {
     expect(ad({ photo_url: "https://p" })).toMatchObject({ media: "image", sourceUrl: null });
     // A post id that is not one is never made a link.
     expect(ad({ post_id: "evil.com/x" })).toMatchObject({ sourceUrl: null, media: null });
+  });
+
+  it("links an ad whose post id comes alone, through its Page (2026-11-13: Customer info's Ad opened nothing)", () => {
+    // As Meta sent it on 2026-11-13: the post id without its Page — every Messenger ad lead had no link.
+    const d = parseMessengerDelivery({ object: "page", entry: [{ id: "107952168929283", time: 1, messaging: [{ sender: { id: "P" }, recipient: { id: "107952168929283" }, timestamp: T,
+      message: { mid: "x", text: "hi", referral: { source: "ADS", type: "OPEN_THREAD", ad_id: "120254629672670085",
+        ads_context_data: { ad_title: "新家3间房都要床垫？", post_id: "122209887110789684", photo_url: "https://www.facebook.com/ads/image/?d=A" } } } }] }] });
+    expect(d.messages[0].ad).toEqual({ sourceId: "120254629672670085", headline: "新家3间房都要床垫？",
+      sourceUrl: "https://www.facebook.com/107952168929283_122209887110789684", media: "image" });
+    expect(adPostUrl("122209887110789684", "107952168929283")).toBe("https://www.facebook.com/107952168929283_122209887110789684");
+    expect(adPostUrl("102351059576534_88", null)).toBe("https://www.facebook.com/102351059576534_88");
+    // A bare post id with no Page to join it to, or a Page that is not one, is no link.
+    expect(adPostUrl("122209887110789684", null)).toBeNull();
+    expect(adPostUrl("122209887110789684", "evil.com")).toBeNull();
+    expect(adPostUrl("1/../x", "107952168929283")).toBeNull();
   });
 
   it("names a photo, a sticker, a file and a button tap", () => {
