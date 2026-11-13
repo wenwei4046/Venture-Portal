@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { messengerError, messengerRequest, messengerWindow, pageToken, profileName, sendMessengerText } from "./send";
+import { facebookUrl, messengerError, messengerRequest, messengerWindow, pageToken, postPermalink, profileName, reelOf, sendMessengerText } from "./send";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -55,5 +55,37 @@ describe("talking to Meta", () => {
     expect(await sendMessengerText(opts, vi.fn().mockResolvedValue(json(200, { recipient_id: "PSID1", message_id: "m_9" })))).toEqual({ ok: true, mid: "m_9" });
     expect(await sendMessengerText(opts, vi.fn().mockResolvedValue(json(400, { error: { code: 10, error_subcode: 2018278 } })))).toEqual({ ok: false, error: expect.stringMatching(/reply window/) });
     expect(messengerError(403, { error: { code: 200 } })).toMatch(/Human Agent/);
+  });
+});
+
+describe("an ad's post (2026-11-13: the <page>_<post> address answered \"This isn't available\")", () => {
+  it("asks Meta for the post's own permalink and keeps only a facebook.com https address", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(json(200, { permalink_url: "https://www.facebook.com/reel/1131026622809105/", id: "102351059576534_1008213335654428" }));
+    expect(await postPermalink("102351059576534_1008213335654428", "T", fetchImpl)).toBe("https://www.facebook.com/reel/1131026622809105/");
+    expect(String(fetchImpl.mock.calls[0][0])).toMatch(/\/102351059576534_1008213335654428\?fields=permalink_url$/);
+    expect(await postPermalink("102351059576534_1", "T", vi.fn().mockResolvedValue(json(200, { permalink_url: "https://evil.com/x" })))).toBeNull();
+    expect(await postPermalink("102351059576534_1", "T", vi.fn().mockResolvedValue(json(400, { error: { code: 100 } })))).toBeNull();
+    expect(await postPermalink("102351059576534_1", "T", vi.fn().mockRejectedValue(new Error("down")))).toBeNull();
+    // Never asks Meta about anything but a post's key.
+    const never = vi.fn();
+    expect(await postPermalink("../me", "T", never)).toBeNull();
+    expect(never).not.toHaveBeenCalled();
+  });
+  it("takes facebook.com itself only", () => {
+    expect(facebookUrl("https://www.facebook.com/1022331100909318/posts/1008213322321096")).toBe("https://www.facebook.com/1022331100909318/posts/1008213322321096");
+    expect(facebookUrl("https://m.facebook.com/reel/1/")).toBe("https://m.facebook.com/reel/1/");
+    expect(facebookUrl("http://www.facebook.com/x")).toBeNull();
+    expect(facebookUrl("https://facebook.com.evil.com/x")).toBeNull();
+    expect(facebookUrl("javascript:alert(1)")).toBeNull();
+  });
+});
+
+describe("a video ad's reel (2026-11-13: a reel opened, a carousel's permalink did not)", () => {
+  it("takes a reel and nothing else", () => {
+    expect(reelOf("https://www.facebook.com/reel/1131026622809105/")).toBe("https://www.facebook.com/reel/1131026622809105/");
+    // A carousel's permalink, as Meta answered it — Facebook would not open it.
+    expect(reelOf("https://www.facebook.com/1022331100909318/posts/1008213322321096")).toBeNull();
+    expect(reelOf("https://evil.com/reel/1/")).toBeNull();
+    expect(reelOf(null)).toBeNull();
   });
 });

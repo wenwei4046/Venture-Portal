@@ -106,13 +106,17 @@ const iso = (ms: number | undefined) => (Number.isFinite(ms) && ms! > 0 ? new Da
 
 /**
  * The ad's post as a Facebook address. Meta sends `post_id` as the post alone ("122209887110789684" — every
- * click-to-Messenger ad seen since 2026-10-29), so it is joined to the Page it came through (`<page>_<post>`, as Lead
- * View's `lead_ad_posts()` does); a `<page>_<post>` id is taken as it is. Anything else is never made a link.
+ * click-to-Messenger ad seen since 2026-10-29), so it is placed under the Page it came through:
+ * `facebook.com/<page>/posts/<post>`. An ad's post is unpublished, and Facebook opens it there — `facebook.com/
+ * <page>_<post>` answers "This isn't available" (the owner's phone, 2026-11-13; so does Meta's own `permalink_url` for a
+ * carousel). A `<page>_<post>` id is split the same way. Anything else is never made a link. A video ad's reel is asked
+ * of Meta by the webhook (`postPermalink`).
  */
 export function adPostUrl(postId: string | undefined, pageId?: string | null): string | null {
   if (!postId) return null;
-  if (/^\d{5,30}_\d{1,30}$/.test(postId)) return `https://www.facebook.com/${postId}`;
-  if (/^\d{1,30}$/.test(postId) && pageId && /^\d{5,30}$/.test(pageId)) return `https://www.facebook.com/${pageId}_${postId}`;
+  const both = postId.match(/^(\d{5,30})_(\d{1,30})$/);
+  if (both) return `https://www.facebook.com/${both[1]}/posts/${both[2]}`;
+  if (/^\d{1,30}$/.test(postId) && pageId && /^\d{5,30}$/.test(pageId)) return `https://www.facebook.com/${pageId}/posts/${postId}`;
   return null;
 }
 

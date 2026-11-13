@@ -7,7 +7,7 @@ import { sendAutoReplies } from '@/lib/member/crm-auto-reply'
 import { keepCustomerMedia } from '@/lib/member/crm-media-keep'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
-import { pageToken, profileName } from '@/lib/messenger/send'
+import { pageToken, postPermalink, profileName, reelOf } from '@/lib/messenger/send'
 import { messengerLeadRow, readInstantLead } from '@/lib/messenger/lead-forms'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
 import { answerLeads } from '@/lib/leads/ai-answer'
@@ -119,6 +119,19 @@ export async function POST(request: Request) {
       const token = tokens.get(m.pageId)
       if (token && !names.has(m.psid)) names.set(m.psid, await profileName(m.pageId, m.psid, token))
       m.name = names.get(m.psid) ?? null
+    }
+    // A CRM customer's video ad opens as its reel. adPostUrl's `<page>/posts/<post>` opens an image or carousel ad (the
+    // owner's phone, 2026-11-13), but Facebook shows a video ad's post as a reel, which only Meta can name: its
+    // `permalink_url` is taken when it is one (`reelOf`) — for a carousel that permalink is an address Facebook will not
+    // open, so anything else keeps adPostUrl's. Asked once per post.
+    const reels = new Map<string, string | null>()
+    for (const m of messages) {
+      const at = m.ad?.sourceUrl?.match(/^https:\/\/www\.facebook\.com\/(\d{5,30})\/posts\/(\d{1,30})$/)
+      const token = tokens.get(m.pageId)
+      if (!at || !token || !m.ad) continue
+      const key = `${at[1]}_${at[2]}`
+      if (!reels.has(key)) reels.set(key, reelOf(await postPermalink(key, token)))
+      m.ad.sourceUrl = reels.get(key) ?? m.ad.sourceUrl
     }
   }
 

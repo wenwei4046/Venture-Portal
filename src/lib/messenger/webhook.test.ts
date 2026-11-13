@@ -26,7 +26,7 @@ describe("Messenger deliveries", () => {
   it("names the ad's kind and links its post (2026-10-15)", () => {
     const ad = (x: Record<string, string>) => parseMessengerDelivery(page([{ sender: { id: "P" }, recipient: { id: "PAGE1" }, timestamp: T, message: { mid: "v", text: "hi" },
       referral: { source: "ADS", type: "OPEN_THREAD", ad_id: "AD1", ads_context_data: { ad_title: "Sofa", ...x } } }])).messages[0].ad;
-    expect(ad({ video_url: "https://v", post_id: "102351059576534_88" })).toEqual({ sourceId: "AD1", headline: "Sofa", sourceUrl: "https://www.facebook.com/102351059576534_88", media: "video" });
+    expect(ad({ video_url: "https://v", post_id: "102351059576534_88" })).toEqual({ sourceId: "AD1", headline: "Sofa", sourceUrl: "https://www.facebook.com/102351059576534/posts/88", media: "video" });
     expect(ad({ photo_url: "https://p" })).toMatchObject({ media: "image", sourceUrl: null });
     // A post id that is not one is never made a link.
     expect(ad({ post_id: "evil.com/x" })).toMatchObject({ sourceUrl: null, media: null });
@@ -38,9 +38,9 @@ describe("Messenger deliveries", () => {
       message: { mid: "x", text: "hi", referral: { source: "ADS", type: "OPEN_THREAD", ad_id: "120254629672670085",
         ads_context_data: { ad_title: "新家3间房都要床垫？", post_id: "122209887110789684", photo_url: "https://www.facebook.com/ads/image/?d=A" } } } }] }] });
     expect(d.messages[0].ad).toEqual({ sourceId: "120254629672670085", headline: "新家3间房都要床垫？",
-      sourceUrl: "https://www.facebook.com/107952168929283_122209887110789684", media: "image" });
-    expect(adPostUrl("122209887110789684", "107952168929283")).toBe("https://www.facebook.com/107952168929283_122209887110789684");
-    expect(adPostUrl("102351059576534_88", null)).toBe("https://www.facebook.com/102351059576534_88");
+      sourceUrl: "https://www.facebook.com/107952168929283/posts/122209887110789684", media: "image" });
+    expect(adPostUrl("122209887110789684", "107952168929283")).toBe("https://www.facebook.com/107952168929283/posts/122209887110789684");
+    expect(adPostUrl("102351059576534_88", null)).toBe("https://www.facebook.com/102351059576534/posts/88");
     // A bare post id with no Page to join it to, or a Page that is not one, is no link.
     expect(adPostUrl("122209887110789684", null)).toBeNull();
     expect(adPostUrl("122209887110789684", "evil.com")).toBeNull();
