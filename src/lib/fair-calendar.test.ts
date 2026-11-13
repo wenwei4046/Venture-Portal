@@ -78,6 +78,22 @@ describe('saleMonthOf', () => {
   it('is null for a bill no fair claims', () => {
     expect(saleMonthOf('2026-09-18', null)).toBeNull()
   })
+  // 2026-11-14: 2990s' standing booth, 29 Oct – 31 Dec (its fair's month October) — a November bill that names no
+  // day read *Late key-in · Oct 2026 fair*.
+  it('with no day named, is the month of a bill keyed on one of the fair’s days', () => {
+    const standing = fair({ periodMonth: '2026-10-01', startDate: '2026-10-29', endDate: '2026-12-31' })
+    expect(saleMonthOf(null, standing, '2026-11-13')).toBe('2026-11-01')
+    expect(saleMonthOf(undefined, standing, '2026-10-30')).toBe('2026-10-01')
+    // A day named wins over the date it was keyed on.
+    expect(saleMonthOf('2026-10-31', standing, '2026-11-03')).toBe('2026-10-01')
+    // Keyed after its fair, or on no day that reads: the fair's month, as before.
+    const kuching = fair({ periodMonth: '2026-08-01', startDate: '2026-08-28', endDate: '2026-08-31' })
+    expect(saleMonthOf(null, kuching, '2026-09-05')).toBe('2026-08-01')
+    expect(saleMonthOf(null, kuching, 'soon')).toBe('2026-08-01')
+    expect(saleMonthOf(null, kuching)).toBe('2026-08-01')
+    // A fair across two months: keyed on its 1 Sep, September — where the receiver lands a new document.
+    expect(saleMonthOf(null, fair({ periodMonth: '2026-08-01', startDate: '2026-08-30', endDate: '2026-09-01' }), '2026-09-01')).toBe('2026-09-01')
+  })
 })
 
 // 2026-11-13: two organisers at one place on the same days are two fairs — 2990s' standing booth at Penang

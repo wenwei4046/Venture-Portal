@@ -94,7 +94,7 @@ export async function loadCommissionWorkbench(
       booth: placed.get(o.orderId)?.booth ?? null,
       // The month it was sold in by its fair: a bill keyed after its fair's
       // month is that month's late key-in, paid where it sits (2026-10-12).
-      saleMonth: saleMonthOf(placed.get(o.orderId)?.fairDate, fair),
+      saleMonth: saleMonthOf(placed.get(o.orderId)?.fairDate, fair, o.orderDate),
       // A departed salesperson's bill from before the feed window, the
       // collector's on its top-up (2026-11-07): Top up deposit · Mar 2026 bill · Junie.
       oldBill: oldBillOf({ orderDate: o.orderDate, periodMonth: periodOf.get(o.orderId) ?? period, agentName: o.agentName }, feedFloor),
