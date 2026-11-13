@@ -7,7 +7,7 @@ import { buildTermsSegments, compoundRoll, currentSegment, principalDueIn, princ
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { buildRepaymentPlan, compoundsByInstalment, type RepaymentPlan } from '@/lib/repayment-plan'
 import { fundSourceStart, loanStart } from '@/lib/repayment-start'
-import { arrearsBefore, monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
+import { arrearsBefore, monthEvents, shownForStatus, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
@@ -525,8 +525,8 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       minPayFromYM: minPayPlanFrom(l as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
     const deal = { kind: 'collect' as const, id: l.id as string, name: (co?.short_code ?? co?.name ?? '—') as string, href: fromCalendar(`/fund-out/${l.id}`, month), rate: Number(l.effective_rate), principal: Number(l.principal) }
-    events.push(...monthEvents(plan, deal, currentYM, today))
-    if (isCurrentMonth) arrears.push(...arrearsBefore(plan, deal, currentYM, today))
+    events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), l.status as string))
+    if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), l.status as string))
   }
   const fsDeptName = new Map(((fsDepts ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
   const fsDirectorName = new Map(((fsDirectors ?? []) as Array<{ id: string; name: string }>).map((d) => [d.id, d.name]))
@@ -564,8 +564,8 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       minPayFromYM: minPayPlanFrom(m as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
     const deal = { kind: 'pay' as const, id, name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }
-    events.push(...monthEvents(plan, deal, currentYM, today))
-    if (isCurrentMonth) arrears.push(...arrearsBefore(plan, deal, currentYM, today))
+    events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), m.status as string))
+    if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), m.status as string))
   }
 
   return {
