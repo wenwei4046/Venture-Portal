@@ -8,7 +8,7 @@ import { keepCustomerMedia } from '@/lib/member/crm-media-keep'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, postPermalink, profileName, reelOf } from '@/lib/messenger/send'
-import { messengerLeadRow, readInstantLead } from '@/lib/messenger/lead-forms'
+import { messengerLeadRow, readInstantLead, withInstantAdLink } from '@/lib/messenger/lead-forms'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
 import { answerLeads } from '@/lib/leads/ai-answer'
 import { adAccountName } from '@/lib/leads/ad-account'
@@ -200,13 +200,20 @@ export async function POST(request: Request) {
       const token = await tokenOf(l.pageId)
       if (token) l.name = await profileName(l.pageId, l.psid, token)
     }
-    const rows = [...formLeads.map(messengerLeadRow), ...(await Promise.all(instant.map(async ref => readInstantLead(ref, await tokenOf(ref.pageId)))))]
+    // An Instant Form lead's ad keeps its link (2026-11-13; lib/messenger/lead-forms.ts instantAdLink).
+    const rows = [...formLeads.map(messengerLeadRow), ...(await Promise.all(instant.map(async ref => {
+      const token = await tokenOf(ref.pageId)
+      return withInstantAdLink(await readInstantLead(ref, token), systemToken, token)
+    })))]
     const { error: leadError } = await client().rpc('crm_ingest_lead', { p_leads: rows, p_payload: body })
     if (leadError) {
       console.error('crm_ingest_lead failed:', leadError.message)
       return NextResponse.json({ ok: false, error: 'lead form ingest failed' }, { status: 500 })
     }
     pushSoon()
+    // Its ad's name from Ads Manager too, as a chat's ad gets below (crm-ad-names-meta.ts).
+    const formAds = adIdsOf(rows.map(r => ('ad' in r ? { ad: r.ad } : {})))
+    if (formAds.length) after(() => nameAdsFromMeta(client(), formAds, systemToken).then(() => undefined))
   }
   if (leadsFailed) return NextResponse.json({ ok: false, error: 'lead ingest failed' }, { status: 500 })
   // A file's own name beside the message (service role only, mig 20261027100000); a failure only warns.
