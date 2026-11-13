@@ -267,6 +267,8 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
             book={qbook}
             setItems={setItems}
             people={qbook.people}
+            unpublished={products.products.filter(p => p.status !== 'active' && p.status !== 'retired' && !qbook.packages.some(k => k.id === p.id)).map(p => ({ id: p.id, code: p.code, name: p.name }))}
+            onOpenProduct={id => { setQuoteId(null); setProductId(id); setTab('products'); scrollTop() }}
             onBack={() => { setQuoteId(null); scrollTop() }}
             onDuplicate={q => void duplicateQuote(q)}
             onAccepted={accepted}

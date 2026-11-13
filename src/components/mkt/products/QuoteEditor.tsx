@@ -28,7 +28,7 @@ function patchOf(saved: Quote, now: Quote): Record<string, unknown> | null {
   return Object.keys(p).length ? p : null
 }
 
-export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, onDuplicate, onAccepted, onAssign, flash, people }: {
+export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, onDuplicate, onAccepted, onAssign, flash, people, unpublished = [], onOpenProduct }: {
   quote: Quote
   setQuote: (q: Quote) => void
   book: QuoteBook
@@ -39,6 +39,10 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
   onAssign: () => void
   flash: (words: string) => void
   people: QuoteBook['people']
+  /** Products not on sale yet (the user, 2026-11-13: "package 没有自动串接"): listed under the packages, greyed, each
+   * opening its product to publish — a quotation quotes a version published, never a draft. */
+  unpublished?: { id: string; code: string; name: string }[]
+  onOpenProduct?: (id: string) => void
 }) {
   const [q, setQ] = useState<Quote>(quote)
   const [save, setSave] = useState<SaveState>({ state: 'saved' })
@@ -165,6 +169,7 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
     .map(cat => ({ cat, items: book.items.filter(x => x.cat === cat && x.name && match(x.name, x.desc, cat)) }))
     .filter(g => g.items.length)
   const pickPacks = book.packages.filter(p => match(p.name, p.code, packIncl(p)))
+  const pickDrafts = unpublished.filter(p => match(p.name, p.code))
   const rawQ = pickQ.trim()
   const pickNew = rawQ && !book.items.some(x => norm(x.name) === norm(rawQ)) ? rawQ : null
   const addItemNamed = async (name: string) => {
@@ -325,7 +330,22 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
                               <span className={qs.pickPrice}>{rm(p.price)}{p.kind === 'recurring' ? '/mo' : ''}</span>
                             </button>
                           ))}
-                          {!pickPacks.length ? <div className={qs.pickEmpty}>Nothing found</div> : null}
+                          {!pickPacks.length && !pickDrafts.length ? <div className={qs.pickEmpty}>Nothing found</div> : null}
+                          {pickDrafts.length ? (
+                            <>
+                              <div className={qs.pickCat}>Not published yet</div>
+                              {pickDrafts.map(p => (
+                                <button key={p.id} type="button" className={`${qs.pickRow} ${qs.pickOff}`} title="Publish it in Products before it can be quoted"
+                                  onClick={() => { setPicker(false); void flush().then(() => onOpenProduct?.(p.id)) }}>
+                                  <span className={qs.pickPlus}>↗</span>
+                                  <span className={qs.pickTwo}>
+                                    <span className={qs.pickName}>{p.name || 'New product'} <span className={qs.pickCode}>{p.code}</span></span>
+                                    <span className={qs.pickInc}>Publish it first · open in Products</span>
+                                  </span>
+                                </button>
+                              ))}
+                            </>
+                          ) : null}
                         </>
                       )}
                     </div>
