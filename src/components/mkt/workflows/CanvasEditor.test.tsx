@@ -93,6 +93,12 @@ describe('the Canvas Template Editor', () => {
     expect(within(pop).getByRole('radio', { name: 'Any / read-only' })).toBeTruthy()
   })
 
+  it('a section that may go has Remove on its card; a stage’s only section has none (2026-11-14)', () => {
+    editor()
+    expect(within(screen.getByRole('region', { name: 'Script' })).queryByRole('button', { name: /^Remove section/ })).toBeNull()
+    fireEvent.click(within(screen.getByRole('region', { name: 'Notes' })).getByRole('button', { name: 'Remove section Notes' }))
+    expect(last().sections.map(s => s.id)).toEqual(['xs'])
+  })
   it('a field of a stage gone is flagged', () => {
     editor({ ...CANVAS, sections: [{ ...CANVAS.sections[1], fields: [{ ...CANVAS.sections[1].fields[0], stage: 'sgone000' }] }] })
     expect(screen.getByRole('button', { name: /Notes.*🎯 Removed stage/ })).toBeTruthy()

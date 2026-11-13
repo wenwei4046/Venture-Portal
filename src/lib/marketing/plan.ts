@@ -7,7 +7,7 @@
 
 import { addDays, longDay, shortDay, weekdayOf, type MktHoliday, type MktPerson, type MktStageStatus } from './board'
 import { MAX_APPROVALS, MAX_SLA, stageDates } from './tasks'
-import { ASSIGN_ID, PIC_ID, type ApprLevel } from './flow'
+import { ASSIGN_ID, NEXT_ID, PIC_ID, type ApprLevel } from './flow'
 import type { MktTaskPage } from './task'
 
 /** An approval level on the plan: its people (staff ids, 'pic' — the PIC on the link — or 'assign', still to pick), any or
@@ -112,7 +112,7 @@ export function planCrew(d: PlanDraft, team: readonly MktPerson[], pic: string |
   const ids: string[] = []
   for (const s of d.stages) {
     if (s.owner && !ids.includes(s.owner)) ids.push(s.owner)
-    for (const l of s.appr) for (const id of l.ids) if (id !== PIC_ID && id !== ASSIGN_ID && !ids.includes(id)) ids.push(id)
+    for (const l of s.appr) for (const id of l.ids) if (id !== PIC_ID && id !== ASSIGN_ID && id !== NEXT_ID && !ids.includes(id)) ids.push(id)
   }
   const crew = ids.map(id => ({ id, name: team.find(p => p.id === id)?.first || 'someone', pic: false }))
   return d.stages.some(s => s.appr.some(l => l.ids.includes(PIC_ID))) ? [...crew, { id: 'pic', name: `${pic || 'PIC'} (PIC)`, pic: true }] : crew
@@ -149,6 +149,7 @@ export function planProblems(saved: PlanDraft, d: PlanDraft, open: boolean, toda
     const ids = s.appr.flatMap(l => l.ids).filter(id => id !== ASSIGN_ID)
     if (ids.filter(id => id === PIC_ID).length > 1) out.push(`Stage ${s.idx + 1} (${s.name}): the PIC twice`)
     else if (new Set(ids).size < ids.length) out.push(`Stage ${s.idx + 1} (${s.name}): the same approver twice`)
+    if (s.idx === d.stages.length - 1 && ids.includes(NEXT_ID)) out.push(`Stage ${s.idx + 1} (${s.name}): the last stage has no next stage to approve it`)
     if (s.appr.length > MAX_APPROVALS) out.push(`Stage ${s.idx + 1} (${s.name}): at most ${MAX_APPROVALS} approvals`)
     if (s.sla < 1 || s.sla > MAX_SLA) out.push(`Stage ${s.idx + 1} (${s.name}): 1 to ${MAX_SLA} working days`)
   }

@@ -117,6 +117,11 @@ export default function CanvasEditor({
                     onClick={e => e.stopPropagation()} onChange={e => setSection(s.id, x => ({ ...x, title: e.target.value }))} />
                   {badges([...(s.locked ? ['🔒 Locked'] : []), ...(s.req ? ['⭐ Required'] : []), ...(s.stage ? [`🎯 ${stageNameOf(stages, s.stage)}`] : []), ...(s.pic ? ['👁 PIC'] : [])])}
                   <span className={c.grow} />
+                  {/* Remove on the card itself, as a stage's Remove (2026-11-14 — the user could not find it inside Section settings). */}
+                  {mayRemove(s) ? (
+                    <button type="button" className={c.cardRemove} aria-label={`Remove section ${s.title || 'New section'}`}
+                      onClick={e => { e.stopPropagation(); setPop(null); onCanvas({ ...canvas, sections: canvas.sections.filter(x => x.id !== s.id) }) }}>Remove</button>
+                  ) : null}
                   <button type="button" className={`${c.gear}${secOpen(s.id) ? ` ${c.gearOn}` : ''}`} onClick={e => { e.stopPropagation(); toggleSec(s.id) }}>⚙ Section settings</button>
                 </div>
                 <div className={c.fields}>

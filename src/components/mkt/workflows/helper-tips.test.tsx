@@ -45,9 +45,9 @@ describe('helper lines are tooltips', () => {
     expect(tipOn(screen.getByRole('radio', { name: 'Close the task' }))).toBe('Moves to Done right away. XP is given out.')
     expect(tipOn(screen.getByRole('radio', { name: 'Keep open 3 days for PIC feedback' }))).toBe('PIC can still comment on the link. Closes by itself after 3 working days.')
   })
-  it('an approval level: the role words and "Already approves" stay; 🔗 PIC and 👤 Picked at assignment explain on hover', () => {
+  it('an approval level: the role words and "Already approves" stay; 🔗 PIC, 👤 Picked at assignment and ⏭ Next stage’s person explain on hover', () => {
     const approvers: WfPerson[] = [{ id: 'r', first: 'Rachel', title: 'MARKETING MANAGER', load: 0 }, { id: 'd', first: 'Dan', title: 'DIRECTOR', load: 0 }]
-    render(<ApprovalLevel n={1} level={{ ids: [], rule: 'any' }} open approvers={approvers} usedElsewhere={new Set(['d'])}
+    render(<ApprovalLevel n={1} level={{ ids: [], rule: 'any' }} open approvers={approvers} hasNext usedElsewhere={new Set(['d'])}
       nameOf={id => approvers.find(p => p.id === id)?.first ?? id} onToggle={vi.fn()} onChange={vi.fn()} onRemove={null} />)
     expect(screen.getByText('MM')).toBeTruthy()
     expect(screen.getByText('Already approves at another level')).toBeTruthy()
@@ -55,6 +55,7 @@ describe('helper lines are tooltips', () => {
     const opts = screen.getAllByRole('option')
     expect(tipOn(opts[2])).toBe('Client approves through the tracking link')
     expect(tipOn(opts[3])).toBe('MM picks the approver per project')
+    expect(tipOn(opts[4])).toBe('Whoever does the next stage approves')
     expect(PIC_ID).not.toBe(ASSIGN_ID)
   })
   it('the template picker: no line under the list; the names say it on hover', () => {

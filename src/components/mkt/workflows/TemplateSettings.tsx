@@ -71,7 +71,8 @@ export default function TemplateSettings({
   const cands = stage.who.cands
   const isPrev = mode === 'prev'
   const prevOff = at === 0 || locked
-  const approvers = people.filter(p => mayApprove(p.title))
+  // Anybody on the team approves (2026-11-14) — the managers first, as before.
+  const approvers = [...people.filter(p => mayApprove(p.title)), ...people.filter(p => !mayApprove(p.title))]
   const workers = people.filter(p => !mayApprove(p.title) || cands.includes(p.id))
   const levels: (ApprLevel | null)[] = stage.appr.length ? stage.appr : [null]
 
@@ -230,6 +231,7 @@ export default function TemplateSettings({
                 level={l}
                 open={openLvl === li}
                 approvers={approvers}
+                hasNext={at < stages.length - 1}
                 usedElsewhere={new Set(stage.appr.flatMap((x, j) => (j === li ? [] : x.ids)))}
                 nameOf={nameOf}
                 onToggle={() => setOpenLvl(o => (o === li ? null : li))}

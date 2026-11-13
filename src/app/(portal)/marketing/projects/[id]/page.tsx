@@ -25,7 +25,7 @@ export default async function MarketingProjectPage({ params, searchParams }: {
   // Whether a project may be opened from this one (④-4c): New Project's own gate.
   const [{ id }, sp, create] = await Promise.all([params, searchParams, mayActOn('/marketing/new', 'marketing', 'create')])
   const key = decodeURIComponent(id)
-  const can = { edit: canDo(user, 'marketing', 'edit'), approve: canDo(user, 'marketing', 'approve'), manage: canDo(user, 'marketing', 'manage'), create }
+  const can = { edit: canDo(user, 'marketing', 'edit'), approve: canDo(user, 'marketing', 'approve') || canDo(user, 'marketing', 'edit') /* named on a level decides — 2026-11-14 */, manage: canDo(user, 'marketing', 'manage'), create }
   // A Track ID says which; an id is read as a task first, and a product project's read on its own page.
   const page = PRODUCT_TRACK.test(key) ? null : await readTask(key)
   if (page && page.project.kind !== 'product') {

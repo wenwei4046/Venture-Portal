@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
-import { requireActionOn } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn } from '@/lib/auth'
 import { addressFromParts, addressRefusal, cleanAddress, isEmptyAddress } from '@/lib/address/address'
 import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
 import { pushSoon } from '@/lib/push/outbox'
@@ -247,9 +247,11 @@ export async function submitMktStage(project: string, pick?: string | null): Pro
   return { ok: true, page: await fresh(db, project) }
 }
 
-/** The approver's answer: approve, or request changes with a reason. */
+/** The approver's answer: approve, or request changes with a reason. Somebody named on the level decides — Marketing ·
+ * Approve, or Edit (the team's: anybody may be named an approver since 2026-11-14 — the user: "被选上当审批人就能审");
+ * mkt_stage_decide asks the same and that the level waits for them. */
 export async function decideMktStage(project: string, approve: boolean, reason?: string): Promise<Done<{ page: MktTaskPage | null }>> {
-  await requireActionOn('/marketing/projects/[id]', 'marketing', 'approve')
+  await requireAnyActionOn('/marketing/projects/[id]', ['marketing', 'approve'], ['marketing', 'edit'])
   if (!isId(project)) return { ok: false, reason: 'That task is not there.' }
   const db = await client()
   const { error } = await db.rpc('mkt_stage_decide', { p_project: project, p_approve: approve === true, p_reason: reason ?? null })

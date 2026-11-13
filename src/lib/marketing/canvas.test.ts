@@ -43,6 +43,10 @@ describe('the stages change, the canvas follows', () => {
     const c = canvasForStages(CANVAS, [STAGES[0], STAGES[2]])
     expect(c.sections[0].fields[1].cols?.map(x => x.stage)).toEqual(['sscript', null])
     expect(canvasForStages(c, [STAGES[0], STAGES[2]])).toBe(c)
+    // Its own section with nothing in it goes with it (2026-11-14); one holding fields stays, belonging to none.
+    const withEmpty: WfCanvas = { ...CANVAS, sections: [...CANVAS.sections, { id: 'xe', emoji: '🎯', title: 'Edit', stage: 'sedit00', locked: false, req: true, pic: true, fields: [] }] }
+    expect(canvasForStages(withEmpty, [STAGES[0], STAGES[2]]).sections.map(s => s.id)).toEqual(['xs', 'xn'])
+    expect(canvasForStages(withEmpty, [STAGES[2]]).sections.map(s => [s.id, s.stage])).toEqual([['xs', null], ['xn', null]])
     expect(renameStageSection(CANVAS, 'sscript', 'Script', 'Scripting').sections[0].title).toBe('Scripting')
     expect(renameStageSection(CANVAS, 'sscript', 'Other', 'X')).toBe(CANVAS)
   })

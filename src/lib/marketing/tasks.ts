@@ -149,6 +149,8 @@ export const MAX_PIC_TEXT = 120
 export const PIC_LEVEL = 'pic'
 export const PIC_BOTH = 'pic:all'
 export const isPicLevel = (a: string) => a === PIC_LEVEL || a === PIC_BOTH
+/** ⏭ Whoever does the stage after it approves (2026-11-14 — the user: "有的时候是 next step 的人"); never the last stage's. */
+export const NEXT_LEVEL = 'next'
 /** How many of the stages the PIC approves — the builder's foot, "PIC approves 2×". */
 export const picStages = (stages: readonly Pick<DraftStage, 'appr'>[]) => stages.filter(s => s.appr.some(isPicLevel)).length
 
@@ -336,14 +338,14 @@ export function stageProblems(stages: readonly DraftStage[]): string[] {
 
 /** The stages as mkt_task_create takes them — what the PIC reads only on a stage they approve. */
 export function stagesPayload(stages: readonly DraftStage[]): Record<string, unknown>[] {
-  return stages.map(s => {
+  return stages.map((s, i) => {
     const picText = s.appr.some(isPicLevel) ? s.picText.trim().slice(0, MAX_PIC_TEXT) : ''
     return {
       name: s.name.trim(),
       dept: s.dept,
       who: s.who,
       sla: Math.min(MAX_SLA, Math.max(1, Math.trunc(s.sla))),
-      appr: s.appr.slice(0, MAX_APPROVALS),
+      appr: s.appr.filter(a => a !== NEXT_LEVEL || i < stages.length - 1).slice(0, MAX_APPROVALS),
       form: s.form.map(f => (f.type === 'Table' ? { label: f.label.trim(), type: f.type, cols: f.cols ?? [] } : { label: f.label.trim(), type: f.type })),
       back: s.back,
       ...(picText ? { picText } : {}),
@@ -369,7 +371,8 @@ export interface PickPerson {
 }
 
 /** Whom New Project's pickers offer: Marketing's roster (the viewer first, then by group A → Z, the managers last), each
- * with what is on their plate now — and, for the approval levels, its managers (the user: only MM and AMM approve). */
+ * with what is on their plate now — and, for the approval levels, the whole roster with its managers first (the user,
+ * 2026-11-14: "approval 的人可以是全部人" — it was MM and AMM only). */
 export function builderPeople(board: MktBoard): { people: PickPerson[]; approvers: PickPerson[] } {
   const load = new Map<string, number>()
   const open = new Set(board.projects.filter(runsStages).map(p => p.id))
@@ -385,5 +388,5 @@ export function builderPeople(board: MktBoard): { people: PickPerson[]; approver
   const people = [...board.team]
     .sort((a, b) => rank(a) - rank(b) || groupOf(a.title).localeCompare(groupOf(b.title)) || a.first.localeCompare(b.first))
     .map(p => ({ id: p.id, first: p.first || p.full, hint: personHint(p, load.get(p.id) ?? 0), group: groupOf(p.title) }))
-  return { people, approvers: people.filter(p => isManagerTitle(p.group)) }
+  return { people, approvers: [...people.filter(p => isManagerTitle(p.group)), ...people.filter(p => !isManagerTitle(p.group))] }
 }
