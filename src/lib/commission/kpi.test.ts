@@ -260,6 +260,34 @@ describe('orderKpiHits — a fabric series', () => {
     ])
   })
 
+  // 2026-11-13 — the sub-department's KPI switch went on. Until then each holder of a shared bill was given the
+  // whole unit of an item counted once a bill or once a set (TODOS: a shared bill's once-a-bill KPI item).
+  it("gives a part of a shared bill its part of a unit counted once a set or once a bill — the parts add up to one", () => {
+    const share = { parts: [{ staffId: 'owner', pct: 0.5 }, { staffId: 'mate', pct: 0.5 }] }
+    // Half a bill: the lines' quantities are halved (splitOrdersByShares).
+    const half = [
+      piece('s1', 'SOFA', '8030-1A(LHF)', 0.5, 'PC151', ['Wooden Arm']),
+      piece('s2', 'SOFA', '8030-1A(RHF)', 0.5, 'PC151', ['Wooden Arm']),
+      piece('b1', 'BEDFRAME', 'CODY-(Q)', 0.5, 'PC151'),
+    ]
+    for (const staffId of ['owner', 'mate']) {
+      expect(orderKpiHits({ lines: half, staffId, share }, fabricIndex).map(h => [h.itemKey, h.qty, h.amount, h.paid]).sort()).toEqual([
+        ['option:bedframe_fabric_series:pc151', 0.5, 15, 15],
+        ['option:sofa_fabric_series:pc151', 0.5, 25, 25],
+        ['option:sofa_specials:wooden arm', 0.5, 75, 75],
+      ])
+    }
+    // A third of two sofas of one model: two thirds of a unit — and of a returned sofa, as much taken back.
+    const third = { parts: [{ staffId: 'owner', pct: 2 / 3 }, { staffId: 'mate', pct: 1 / 3 }] }
+    const two = orderKpiHits({ lines: [piece('s1', 'SOFA', '8030-2A', 2 / 3, 'PC151')], staffId: 'mate', share: third }, fabricIndex)
+    expect(two[0].qty).toBeCloseTo(2 / 3, 10)
+    expect(two[0].amount).toBe(33.33)
+    const back = orderKpiHits({ lines: [piece('s1', 'SOFA', '8030-2A', -0.5, 'PC151', ['Wooden Arm'])], staffId: 'mate', share }, fabricIndex)
+    expect(back.map(h => [h.itemKey, h.qty]).sort()).toEqual([['option:sofa_fabric_series:pc151', -0.5], ['option:sofa_specials:wooden arm', -0.5]])
+    // A bill nobody shares counts as before.
+    expect(orderKpiHits({ lines: [piece('s1', 'SOFA', '8030-2A', 1, 'PC151', ['Wooden Arm'])] }, fabricIndex).map(h => h.qty)).toEqual([1, 1])
+  })
+
   it('names a series with whose it is, the way the writer stores it', () => {
     expect(kpiItemLabel(PC151_SOFA)).toBe('PC151 · Sofa fabric')
     expect(kpiItemLabel(PC151_BED)).toBe('pc151 · Bed frame fabric')
@@ -331,12 +359,28 @@ describe("a brand's own KPI items — what a bill carries", () => {
     expect(kpiPaidOf(hits)).toBe(50)
   })
 
-  it('finds none where the upgrade was given away, or only typed into the special order', () => {
-    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'])] }, brandIndex)).toEqual([])
-    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { 'latex seat': 0 })] }, brandIndex)).toEqual([])
+  // 2026-11-13 — the user: "主要 detect 到有这个 KPI item，就算他有卖到 KPI，不需要去 detect 他有没有收钱。因为有时候
+  // 他们是直接把价钱写在 remark 栏上，导致他的那个 amount 并没有填写在 KPI item 里". Until then: only where it charged.
+  it('finds one wherever the sofa names it, charged or not — a unit, the bonus, and nothing off a bill that charges nothing', () => {
+    const unit = [{ qty: 1, amount: 0, paid: 50 }]
+    const read = (hits: ReturnType<typeof orderKpiHits>) => hits.map(h => ({ qty: h.qty, amount: h.amount, paid: h.paid }))
+    // No special order at all (the price written in the remark), one that charges RM 0, one that charges for something else.
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'])] }, brandIndex))).toEqual(unit)
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { 'latex seat': 0 })] }, brandIndex))).toEqual(unit)
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { miscellaneous: 10 })] }, brandIndex))).toEqual(unit)
+    expect(kpiAmountOf(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'])] }, brandIndex))).toBe(0)
+    // One piece of the set charged, the other not: the set's dearest copy comes off, once.
+    expect(read(orderKpiHits({ lines: [
+      sofaPiece('a', 'QUBBU-1A(LHF)', 1, ['Latex Seat']),
+      sofaPiece('b', 'QUBBU-2A(RHF)', 1, ['Latex Seat'], { 'latex seat': 500 }),
+    ] }, brandIndex))).toEqual([{ qty: 1, amount: 500, paid: 50 }])
+    // Two sofas of one model, neither charged: two units.
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'LOTTI-2A', 2, ['Sofa Full Fabric'])] }, brandIndex))).toEqual([{ qty: 2, amount: 0, paid: 100 }])
+  })
+
+  it('finds none where the special is only typed into the special order — the sofa does not name it', () => {
     expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, [], { 'latex seat': 500 })] }, brandIndex)).toEqual([])
-    // What the special order charges for something else is no item's.
-    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { miscellaneous: 10 })] }, brandIndex)).toEqual([])
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Nylon Fabric'], { 'latex seat': 500 })] }, brandIndex)).toEqual([])
   })
 
   it('counts each sofa on the bill, at its own surcharge — a corner’s RM 1,000', () => {

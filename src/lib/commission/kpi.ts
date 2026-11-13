@@ -41,11 +41,14 @@
  * A BRAND'S OWN ITEM (2026-11-12 — a brand on its own commission scheme, 2990s;
  * the user: "这个 KPI item 是独立的，属于 2990 专属的 KPI item") is the fourth:
  * a SOFA SPECIAL of that brand's (`KpiItem.brandCode`), found only on that
- * brand's bills — which find none of the sub-department's — and only where the
- * bill CHARGES for it (`KpiLine.specialMoney`: the ERP's special order on the
- * line; an upgrade given away earns nothing). It differs in the money: what
- * comes OFF the bill is what the bill charged for the special ("升级的钱只拿
- * bonus"), and what is PAID is the item's amount a unit — or its tier's, by
+ * brand's bills — which find none of the sub-department's — wherever a piece
+ * of the sofa NAMES it, charged or not (the user, 2026-11-13: "不需要去 detect
+ * 他有没有收钱" — the price is sometimes written in the remark and the
+ * special's own amount left empty; until then it was found only where the
+ * special order charged for it). It differs in the money: what comes OFF the
+ * bill is what the bill charged for the special (`KpiLine.specialMoney`: the
+ * ERP's special order on the line; nothing where it charges nothing — "升级的
+ * 钱只拿 bonus"), and what is PAID is the item's amount a unit — or its tier's, by
  * the month's units (`kpiUnitPay`: 1–4 RM 50, 5–9 RM 70 → six are 6 × 70).
  * Counted once per sofa SET, as a fabric series is. Paid whatever the
  * sub-department's own KPI switch says.
@@ -444,12 +447,15 @@ interface SofaSet {
 /**
  * Every KPI item a bill carries. An upsale HR recorded is never one.
  *
- * A part of a shared bill carries its part of a brand's own item (2026-11-12):
- * half a bill, half the unit and half of what the bill charged — the parts add
- * back up to the bill's own count, as `member_order_facts` counts them
- * (qty × part). The sub-department's own once-a-bill items (a sofa's special,
- * its fabric series) are still counted whole on each part, as they always were
- * (TODOS.md: a shared bill's once-a-bill KPI item).
+ * A part of a shared bill carries its PART of a unit counted once a bill or
+ * once a sofa set — a brand's own item (2026-11-12), and since 2026-11-13 the
+ * sub-department's own sofa special and fabric-series set too: half a bill,
+ * half the unit, half its amount — the parts add back up to the bill's own
+ * count, as `member_order_facts` counts them (qty × part). Until then each
+ * holder of a shared bill was given the sub-department's whole unit; nobody
+ * was, in fact — its KPI switch went on that day with no such bill shared.
+ * A unit counted by quantity (a SKU, a bed frame's special or fabric series)
+ * is its part already: a part's lines carry their quantities scaled.
  */
 export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
   if (index.size === 0 || order.upsale) return []
@@ -492,14 +498,15 @@ export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
       if (POOL_GROUP[poolName] !== group || isFabricSeriesPool(poolName)) continue
       // One line may print a special twice; it is still one add-on.
       const seen = new Set<KpiItem>()
-      // A brand's own item: what this line's special order charges for it (its dearest spelling's).
-      const charged = new Map<KpiItem, number>()
+      // A brand's own item the line names → what this line's special order charges for it (its dearest
+      // spelling's), nothing when it charges nothing.
+      const named = new Map<KpiItem, number>()
       for (const special of line.specials) {
         const item = optionFor(special, pool)
         if (!item) continue
         if (kpiCodeKey(item.brandCode)) {
-          const money = line.specialMoney?.[valueKey(special) ?? ''] ?? 0
-          if (money > 0) charged.set(item, Math.max(charged.get(item) ?? 0, money))
+          const money = Math.max(0, line.specialMoney?.[valueKey(special) ?? ''] ?? 0)
+          named.set(item, Math.max(named.get(item) ?? 0, money))
           continue
         }
         if (seen.has(item)) continue
@@ -514,29 +521,30 @@ export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
           hits.push(own(item, line.id, line.qty))
         }
       }
-      // Found only where the bill charges for it: an upgrade given away is no unit.
-      for (const [item, money] of charged) intoSet(line, item, money)
+      // Found where the line names it, charged or not (the user, 2026-11-13: the price is sometimes written in
+      // the remark and the special's own amount left empty) — what it charged, if anything, comes off the bill.
+      for (const [item, money] of named) intoSet(line, item, money)
     }
   }
 
+  // A shared bill's part: its part of each unit counted once a bill or once a set.
+  const part = billPartOf(order)
   for (const hit of perBill.values()) {
-    const qty = Math.sign(hit.qty)
+    const qty = Math.sign(hit.qty) * part
     if (qty === 0) continue
     hits.push(own(hit.item, hit.lineId, qty))
   }
   // As many sets as the sofa's fewest pieces (×2 everywhere = two sofas), its
   // sign the sofa's: a return takes them back, an exchange of a piece is none.
-  const part = billPartOf(order)
+  // The whole bill's sets (a part's pieces carry their quantities scaled), then this part of them.
   for (const set of perSet.values()) {
-    if (!kpiCodeKey(set.item.brandCode)) {
-      const qty = Math.sign(set.sum) * Math.max(1, Math.floor(set.fewest))
-      if (qty !== 0) hits.push(own(set.item, set.lineId, qty))
-      continue
-    }
-    // A brand's own item: the whole bill's sets, then this part of them; what the bill charged comes off its
-    // sales, the item's amount a unit is what it pays.
     const qty = Math.sign(set.sum) * Math.max(1, Math.floor(set.fewest / part + 1e-9)) * part
     if (qty === 0) continue
+    if (!kpiCodeKey(set.item.brandCode)) {
+      hits.push(own(set.item, set.lineId, qty))
+      continue
+    }
+    // A brand's own item: what the bill charged comes off its sales, the item's amount a unit is what it pays.
     hits.push({
       item: set.item, itemKey: set.itemKey, lineId: set.lineId, qty,
       amount: round2(qty * set.charged), paid: round2(qty * set.item.kpiAmount),

@@ -742,11 +742,15 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                           title={split.uncovered
                             ? "Not paid: the bill's sales do not cover its KPI items"
                             : hit.item.brandCode
-                              ? `What the bill charged for it is off its commissionable sales; its bonus is paid instead${hit.item.unitTiers?.length ? ", at the tier the month's units reach" : ''}`
+                              // Named on the sofa but charged nothing by its special order (2026-11-13: the price is
+                              // sometimes written in the remark) — a unit all the same, with nothing to take off.
+                              ? `${hit.amount === 0
+                                ? "Its special order charges nothing for it, so nothing comes off the bill's commissionable sales; its bonus is paid"
+                                : 'What the bill charged for it is off its commissionable sales; its bonus is paid instead'}${hit.item.unitTiers?.length ? ", at the tier the month's units reach" : ''}`
                               : "Paid flat as KPI, off the bill's commissionable sales"}
                         >
                           <span className="dot" />
-                          KPI · {kpiItemLabel(hit.item)} {formatMoney(hit.amount)}
+                          KPI · {kpiItemLabel(hit.item)}{hit.item.brandCode && hit.amount === 0 ? '' : ` ${formatMoney(hit.amount)}`}
                           {hit.item.brandCode ? ` · bonus ${formatMoney(hit.paid)}` : ''}{split.uncovered ? ' · not paid' : ''}
                         </span>
                       ))}

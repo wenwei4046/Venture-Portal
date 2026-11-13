@@ -2362,11 +2362,17 @@ describe('a brand with its own scheme — 2990s (2026-11-11)', () => {
       expect(find(r.statements, 'ta').lines.find(l => l.component === 'override')).toMatchObject({ basisAmount: 2_990, amount: 59.8, brandCode: '2990S' })
     })
 
-    it('finds it only where the bill charges for it', () => {
-      const given = upgraded('1', 'rs', 2_990, 'Latex Seat', 0)
-      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders: [given] }).statements, 'rs')
-      expect(rs.kpiCommission).toBe(0)
-      expect(rs.productCommission).toBe(119.6) // the whole 2,990 at 4%
+    // 2026-11-13 — the user: "不需要去 detect 他有没有收钱" (the price is sometimes written in the remark). Until then
+    // an upgrade the special order charged nothing for was no unit.
+    it('finds it wherever the bill names it: one the special order charges nothing for pays the bonus beside the whole bill', () => {
+      const unpriced = upgraded('1', 'rs', 2_990, 'Latex Seat', 0)
+      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders: [unpriced] }).statements, 'rs')
+      expect(rs.kpiCommission).toBe(50)
+      expect(rs.productCommission).toBe(119.6) // the whole 2,990 at 4% — nothing is known to take off
+      expect(rs.totalCommission).toBe(169.6)
+      // …and it counts in the month's units, with the ones that charged: five latex seats pay RM 70 each.
+      const five = [unpriced, ...['2', '3', '4', '5'].map(id => upgraded(id, 'rs', 3_490, 'Latex Seat', 500))]
+      expect(find(run({ ...ITEMS, hierarchy: TEAM, orders: five }).statements, 'rs').kpiCommission).toBe(350)
     })
 
     it('pays nothing where the bill’s sales do not cover what it charged', () => {

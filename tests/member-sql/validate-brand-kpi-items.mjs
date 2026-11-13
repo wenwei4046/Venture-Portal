@@ -16,6 +16,8 @@ import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 
 const db = new PGlite({ extensions: { btree_gist } })
 const MIGRATION = new URL('../../supabase/migrations/20261112200000_brand_kpi_items.sql', import.meta.url)
+// 2026-11-13 — the user: an item is found where the bill names it, "不需要去 detect 他有没有收钱".
+const MIGRATION_NAMED = new URL('../../supabase/migrations/20261114030000_brand_kpi_named.sql', import.meta.url)
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const one = async (sql, params = []) => Object.values((await q(sql, params))[0])[0]
 const id = v => `00000000-0000-4000-8000-${String(v).padStart(12, '0')}`
@@ -386,6 +388,56 @@ try {
     "a bill of a brand no longer on its own scheme finds the sub-department's items")
   await q(`UPDATE comm_brands SET is_active = true WHERE id = $1`, [OWN])
 
+  // ── 20261114030000: found where the bill names it, charged or not ──────────
+  // The user, 2026-11-13: "主要 detect 到有这个 KPI item，就算他有卖到 KPI，不需要去 detect 他有没有收钱。因为有时候他们是
+  // 直接把价钱写在 remark 栏上". Two more bills: one piece of the set charged and one not; a model twice with no
+  // special order at all.
+  const n9 = await bill('N9', '2990S', ETHAN, [
+    sofa('QUBBU-1A(LHF)', 1745, ['Latex Seat'], []),
+    sofa('QUBBU-2A(RHF)', 1745, ['Latex Seat'], [charge('Latex Seat', 500)]),
+  ])
+  const n10 = await bill('N10', '2990S', SHELDON, [sofa('TELLUC-2A', 5980, ['Sofa Full Fabric'], null, { qty: 2 })])
+  const foundBefore = await hitsOf(everyBill)
+  check(await hitsOf([n3, n9, n10]), ['N9 brand Upgrade latex seat ×1 @500'],
+    'as 20261112200000 left it: only the piece whose special order charges for it')
+  check((await monthOf()).N10, 5980, 'and the bill that charges for nothing keeps its sales')
+
+  const named = (await readFile(MIGRATION_NAMED, 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(named)
+  await db.exec(named)
+  checks++
+  const NAMED = Object.fromEntries([...named.matchAll(/\('(public\.[^']+)',\s+'([0-9a-f]{32})', '([0-9a-f]{32})'\)/g)]
+    .map(m => [m[1], { from: m[2], makes: m[3] }]))
+  check(NAMED[SIG.hits]?.from, MAKES[SIG.hits]?.makes, 'named: written from the body 20261112200000 made')
+  check(await md5Of(SIG.hits), NAMED[SIG.hits]?.makes, 'named: what stands is what the migration says it makes')
+  check(await one(`SELECT prosrc LIKE '%LEFT JOIN money mo%' AND prosrc NOT LIKE '%only%where it charges.%' FROM pg_proc
+                   WHERE oid = to_regprocedure($1)`, [SIG.hits]), true, 'named: the statement and its comment were swapped')
+
+  check(await hitsOf([n3]), ['N3 brand Upgrade latex seat ×1 @0'],
+    'named and charged nothing: a unit all the same, and nothing off the bill')
+  check(await hitsOf([n9]), ['N9 brand Upgrade latex seat ×1 @500'], 'one piece charged, the other not: the set once, at its dearest copy')
+  check(await hitsOf([n10]), ['N10 brand Upgrade fabric ×2 @0'], 'a model twice with no special order: two units, nothing off')
+  check(await hitsOf([n4, n7]), [], 'typed by hand — the sofa does not name it — or charged more than the bill sold: still none')
+  check((await hitsOf(everyBill)).sort(), [...foundBefore, 'N3 brand Upgrade latex seat ×1 @0'].sort(), 'every other finding exactly as it was')
+  check(await monthOf(), { N1: 3240, N2: 3000, N3: 2990, N4: 3490, N5: 5980, N6: 5980, N7: 400, N8: 2990, N9: 2990, N10: 5980, A1: 3100 },
+    "Comm Cal's month: what a bill charged for the upgrade is off its sales, and a bill that charged nothing keeps them whole")
+  check(await hitsOf([n3], '2026-10-31'), [], "and October's as-at finds none still")
+
+  // A body somebody changed since is not written over.
+  await db.exec(`CREATE OR REPLACE FUNCTION public.comm_kpi_hits(p_scheme uuid, p_order_ids uuid[], p_asat date)
+    RETURNS TABLE(order_id uuid, line_id uuid, item_id uuid, qty numeric, unit_amount numeric)
+    LANGUAGE sql STABLE SET search_path TO 'public' AS $f$ SELECT NULL::uuid, NULL::uuid, NULL::uuid, 0::numeric, 0::numeric WHERE false $f$`)
+  await assert.rejects(() => db.exec(named), /not the body this migration was written from/, 'named: a changed body is refused')
+  await db.exec('ROLLBACK')
+  checks++
+  const kept = (await db.query(`SELECT pg_get_functiondef(to_regprocedure($1)) AS def`, [SIG.hits])).rows[0].def
+  check(/WHERE false/.test(kept), true, 'named: and left as it was found')
+  // Back to the body under test for what follows.
+  await db.exec(`DROP FUNCTION public.comm_kpi_hits(uuid, uuid[], date)`)
+  await db.exec(migration.match(/CREATE OR REPLACE FUNCTION public\.comm_kpi_hits\([\s\S]*?\$function\$;/)[0])
+  await db.exec(named)
+  check(await md5Of(SIG.hits), NAMED[SIG.hits]?.makes, 'named: applied again over the body 20261112200000 makes')
+
   // ── The Quote and the member's KPI card: the sub-department's own ──────────
   const quoteItems = async fn => ((await one(`SELECT ${fn}($1)`, [SCHEME])).kpiItems ?? [])
     .map(k => `${k.source}:${k.option_value ?? k.product_code}@${Number(k.kpi_amount)}`).sort()
@@ -457,13 +509,22 @@ try {
   check((await brandItems(TAB)).length, 1, 'begun today, it never applied and goes; the months already run keep theirs')
 
   // ── Production changed since: nothing is touched ───────────────────────────
+  // comm_kpi_hits is 20261114030000's body now: 20261112200000 run again does not write its own back over it…
+  await assert.rejects(() => db.exec(migration), /comm_kpi_hits\(uuid, uuid\[\], date\) is md5 [0-9a-f]{32}, not the body this migration was written from/,
+    '20261112200000 run again stops at the body 20261114030000 made')
+  await db.exec('ROLLBACK')
+  checks++
+  check(await md5Of(SIG.hits), NAMED[SIG.hits]?.makes, 'and that body stands')
+  // …nor over any other body that is neither production's nor its own.
+  await db.exec(`DROP FUNCTION public.comm_kpi_hits(uuid, uuid[], date)`)
+  await db.exec(migration.match(/CREATE OR REPLACE FUNCTION public\.comm_kpi_hits\([\s\S]*?\$function\$;/)[0])
   await db.exec(`CREATE OR REPLACE FUNCTION public.member_quote_context(p_scheme uuid) RETURNS jsonb LANGUAGE sql STABLE
                  AS $$ SELECT '{}'::jsonb $$`)
   await assert.rejects(() => db.exec(migration), /member_quote_context\(uuid\) is md5 [0-9a-f]{32}, not the body this migration was written from/,
     'a body that is neither production\'s nor the migration\'s own stops it')
   checks++
 
-  console.log(`PASS: ${checks} brand KPI item checks. Production's bodies (md5-checked) + the real migration 20261112200000 (twice); synthetic surroundings. No live database connection.`)
+  console.log(`PASS: ${checks} brand KPI item checks. Production's bodies (md5-checked) + the real migrations 20261112200000 and 20261114030000 (each twice); synthetic surroundings. No live database connection.`)
 } finally {
   await db.close()
 }

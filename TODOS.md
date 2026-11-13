@@ -117,20 +117,18 @@ Shipped: the items, the run, Comm Cal's month and bill page
 app's KPI readings (`revenue-app.md` › 2990s' OWN KPI ITEMS COUNT IN THE APP),
 and Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
 KPI ITEMS ARE EDITED ON RULES). Still owed:
-- **One figure for two ladders.** My team's *KPI hit / KPI pending* and the
-  Championship's threshold bonus compare a person's EVERY KPI unit with the
-  sub-department's own threshold — the scoreboard carries one `kpi_qty`. Exact
-  while Fair's own KPI is off (no threshold) or nobody sells a brand's item;
-  split the figure before Fair's switch goes on beside 2990s' items.
+- **One figure for two ladders — LIVE since 2026-11-13** (the owner switched
+  Fair's own KPI on that evening; threshold 10 units). My team's *KPI hit / KPI
+  pending* and the Championship's threshold bonus compare a person's EVERY KPI
+  unit — a brand's too — with the sub-department's own threshold: the
+  scoreboard carries one `kpi_qty`. Wrong only once somebody's 2990s units and
+  Fair units together pass the threshold while the Fair ones alone do not
+  (nobody on that day: the most Fair units in a month were 3). Split the
+  figure (`kpi_ladder_qty`) in the member facts and the scoreboards.
 - **A brand's item cannot be renamed in place.** The writer keeps an item's
   name through a change; Rules renames by taking the item off and adding its
   special again under the new name, in one Save. A rename of its own needs
   `catalogue_save_kpi_items` to take a change's `label`.
-- **A shared bill's once-a-bill KPI item (the sub-department's own).** A Fair
-  sofa special, or a fabric-series set, on a bill two people share is counted
-  whole for EACH holder (`orderKpiHits` splits a brand's item by the part;
-  `marginBase` reads lines only, so the sub-department's own were left). No
-  effect while Fair's KPI switch is off — settle it before it is switched on.
 - **The app's Commission scheme sheet says nothing of a brand on its own
   scheme.** Profile › Commission scheme lists the member's rate and each
   brand's margin ladder. For 2990s it should say the rate their rung pays on a
