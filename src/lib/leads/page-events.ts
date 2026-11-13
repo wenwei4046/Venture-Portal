@@ -101,7 +101,7 @@ export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: s
   const returns: AdReturn[] = []
   for (const e of entries) for (const ev of e.messaging) {
     if (!ev?.referral || ev.message || ev.postback || !ev.sender?.id || ev.sender.id === e.id) continue
-    const ad = adOf(ev.referral)
+    const ad = adOf(ev.referral, e.id)
     if (ad?.sourceId) returns.push({ pageId: e.id!, psid: ev.sender.id, ad })
   }
   return { messages, replies, receipts: { delivered: parsed.delivered, reads: parsed.reads }, returns }
