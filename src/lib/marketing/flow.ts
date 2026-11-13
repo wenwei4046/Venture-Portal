@@ -6,8 +6,9 @@
 // - Stage order = flow; the last stage is the end. Done = the last stage submitted with no approval, or approved by
 //   its last level.
 // - An approval level names up to everybody it needs (people by staff id, 'pic' — the PIC on the link, 'assign' — one
-//   picked at assignment, resolved to a person when the work is planned). `any` passes on the first approval; `all`
-//   waits for everyone on the level. Levels run in order (≤ 3).
+//   picked at assignment, resolved to a person when the work is planned, 'next' — whoever does the stage after it, kept
+//   as the level's `nextWho` once known: 2026-11-14). `any` passes on the first approval; `all` waits for everyone on
+//   the level. Levels run in order (≤ 3).
 // - Request changes goes back to the stage's `back` (or stays), clearing the approvals from there to here.
 // - Due dates: working days, Monday to Friday (the user, 2026-11-13: "只算周一到周五" — no holidays), ending 18:00
 //   in the office. Late = whole days past due, rounded up.
@@ -15,14 +16,18 @@
 import { addDays, weekdayOf } from './board'
 
 export type ApprRule = 'any' | 'all'
-/** One approval level: who (staff ids, 'pic', 'assign') and whether one of them or all of them must approve. */
+/** One approval level: who (staff ids, 'pic', 'assign', 'next') and whether one of them or all of them must approve;
+ * `nextWho` — the person 'next' stands for now (the database sets it: mkt_levels_next). */
 export interface ApprLevel {
   ids: string[]
   rule: ApprRule
+  nextWho?: string
 }
 
 export const PIC_ID = 'pic'
 export const ASSIGN_ID = 'assign'
+/** The next stage's person (the user, 2026-11-14: "有的时候是 next step 的人"). */
+export const NEXT_ID = 'next'
 export const MAX_LEVELS = 3
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -33,7 +38,9 @@ export function levelFromRow(v: unknown): ApprLevel | null {
   if (!isObj(v)) return null
   if (Array.isArray(v.ids)) {
     const ids = [...new Set(v.ids.filter((x): x is string => typeof x === 'string' && x.length > 0))]
-    return { ids, rule: v.rule === 'all' ? 'all' : 'any' }
+    const lv: ApprLevel = { ids, rule: v.rule === 'all' ? 'all' : 'any' }
+    if (ids.includes(NEXT_ID) && typeof v.nextWho === 'string' && v.nextWho) lv.nextWho = v.nextWho
+    return lv
   }
   if (v.kind === 'person' && typeof v.staff === 'string') return { ids: [v.staff], rule: 'any' }
   if (v.kind === 'pic') return { ids: [PIC_ID], rule: 'any' }
@@ -49,9 +56,15 @@ export type LevelOk = Record<string, string>
 
 /** Who a level still waits for. `any`: everyone on it until one approves, then nobody; `all`: those who have not. */
 export function levelWaits(level: ApprLevel, ok: LevelOk): string[] {
-  const done = level.ids.filter(id => !!ok[id])
-  if (level.rule === 'any') return done.length ? [] : [...level.ids]
-  return level.ids.filter(id => !ok[id])
+  const ids = levelIds(level)
+  const done = ids.filter(id => !!ok[id])
+  if (level.rule === 'any') return done.length ? [] : ids
+  return ids.filter(id => !ok[id])
+}
+
+/** The people on a level now: 'next' read as the next stage's person, none while nobody is on it (mkt_level_ids). */
+export function levelIds(level: ApprLevel): string[] {
+  return [...new Set(level.ids.flatMap(id => (id === NEXT_ID ? (level.nextWho ? [level.nextWho] : []) : [id])))]
 }
 
 /** Has the level passed? (A level with nobody on it passes — the builder refuses to publish one.) */
@@ -59,7 +72,7 @@ export const levelPassed = (level: ApprLevel, ok: LevelOk) => levelWaits(level, 
 
 /** A level in words: "Rachel" · "Rachel & Daniel" (everyone) · "Rachel or Daniel" (any one). */
 export function levelText(level: ApprLevel, nameOf: (id: string) => string): string {
-  const names = level.ids.map(nameOf)
+  const names = [...new Set(level.ids.map(id => (id === NEXT_ID && level.nextWho ? level.nextWho : id)))].map(nameOf)
   if (!names.length) return 'Choose approvers'
   return names.join(level.rule === 'all' ? ' & ' : ' or ')
 }
@@ -232,7 +245,7 @@ export function turnOf(stages: readonly FlowStage[], at: FlowAt, me: string | nu
 
 /** Is the viewer on the task at all — a doer or an approver of any stage? */
 export const isOnTask = (stages: readonly FlowStage[], me: string | null) =>
-  !!me && stages.some(s => s.doer === me || s.levels.some(l => l.ids.includes(me)))
+  !!me && stages.some(s => s.doer === me || s.levels.some(l => levelIds(l).includes(me)))
 
 /** My Space's tile for a task: My turn (theirs now), Waiting (on it, not theirs now), or none. */
 export function tileOf(stages: readonly FlowStage[], at: FlowAt, me: string | null): 'turn' | 'waiting' | null {
@@ -241,7 +254,7 @@ export function tileOf(stages: readonly FlowStage[], at: FlowAt, me: string | nu
   return isOnTask(stages, me) ? 'waiting' : null
 }
 
-const onStage = (s: FlowStage, me: string) => s.doer === me || s.levels.some(l => l.ids.includes(me))
+const onStage = (s: FlowStage, me: string) => s.doer === me || s.levels.some(l => levelIds(l).includes(me))
 
 /** The stage the task page opens on for a viewer: the stage now if it is their turn or their approval; else their
  * next stage; else the last stage they finished; else the stage now (a manager, or nobody on it). */
@@ -260,12 +273,15 @@ export function defaultFocus(stages: readonly FlowStage[], at: FlowAt, me: strin
 }
 
 /** The banner the task page shows a viewer. */
-export type BannerKind = 'done' | 'doer' | 'approver' | 'mm' | 'upcoming' | 'finished' | 'none'
+export type BannerKind = 'done' | 'doer' | 'approver' | 'submitted' | 'mm' | 'upcoming' | 'finished' | 'none'
 export function bannerOf(stages: readonly FlowStage[], at: FlowAt, me: string | null, isManager: boolean): BannerKind {
   if (at.done) return 'done'
   const t = turnOf(stages, at, me)
   if (t === 'doer') return 'doer'
   if (t === 'approve') return 'approver'
+  // Their stage handed in, waiting for its approvers (2026-11-14 — not the prototype's "Up next", which read as if it
+  // were not their turn yet).
+  if (me && at.level >= 0 && stages[at.cur]?.doer === me) return 'submitted'
   if (isManager) return 'mm'
   if (me && stages.some((s, i) => i >= at.cur && onStage(s, me))) return 'upcoming'
   if (me && stages.some((s, i) => i < at.cur && onStage(s, me))) return 'finished'

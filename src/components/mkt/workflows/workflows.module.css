@@ -280,6 +280,7 @@
 .selX:hover { color: rgb(var(--mk-red)); }
 .ddMenu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line)); border-radius: 10px; box-shadow: var(--mk-wb-shadow-lvl); padding: 6px; display: flex; flex-direction: column; }
 .ddLabel { font-size: .76em; color: rgb(var(--mk-muted)); padding: 4px 8px 6px; }
+.ddList { display: flex; flex-direction: column; max-height: 296px; overflow-y: auto; overscroll-behavior: contain; }
 .opt { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 7px; cursor: pointer; font: inherit; color: inherit; background: none; border: 0; text-align: left; width: 100%; }
 .opt:hover { background: rgb(var(--mk-surface-2)); }
 .optOff { cursor: not-allowed; opacity: .45; }

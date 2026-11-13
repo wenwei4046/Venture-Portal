@@ -1,21 +1,26 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ASSIGN_ID, PIC_ID } from '@/lib/marketing/flow'
+import { ASSIGN_ID, NEXT_ID, PIC_ID } from '@/lib/marketing/flow'
 import type { PlanLevel } from '@/lib/marketing/plan'
 import type { PickPerson } from '@/lib/marketing/tasks'
 import s from './plan.module.css'
 
 // A stage's approval on the Assignment Plan (Workflow Builder 2a — the Builder's levels, `Stage Settings.dc.html` ›
-// Approval): up to three levels in turn, each one or more people (the managers and Directors, 🔗 the PIC on the link)
+// Approval): up to three levels in turn, each one or more people (anybody on the team since 2026-11-14, 🔗 the PIC on
+// the link, ⏭ the next stage's person but on the last stage)
 // — picked from a multi-select, each removable — and, with two or more, "Any one" or "Everyone". A person approves on
 // one level only, the PIC once; a level left "picked at assignment" asks who. With two PICs, the PIC's level is either
 // one's approval or both. Only the level touched changes: the others are sent back as they came.
 
-export default function PlanLevels({ levels, editable, approvers, nameOf, pic, two, onChange }: {
+export default function PlanLevels({ levels, editable, approvers, hasNext, nextName, nameOf, pic, two, onChange }: {
   levels: PlanLevel[]
   editable: boolean
   approvers: PickPerson[]
+  /** A stage after this one: ⏭ Next stage's person is offered. */
+  hasNext: boolean
+  /** Who is on the next stage now ("Picked by the stage before" while a 🔓 pick). */
+  nextName: string
   nameOf: (id: string) => string
   /** The PIC's name(s) — "Kelvin" or "Kelvin and Hana". */
   pic: string
@@ -42,8 +47,8 @@ export default function PlanLevels({ levels, editable, approvers, nameOf, pic, t
     const ids = base.includes(id) ? base.filter(x => x !== id) : [...base, id]
     set(k, ids.length ? { ...lv, ids, ...(ids.includes(PIC_ID) ? {} : { picAll: undefined }) } : k < levels.length && lv.ids.includes(ASSIGN_ID) ? { ...lv, ids: [ASSIGN_ID] } : null)
   }
-  const label = (id: string) => (id === PIC_ID ? `PIC · ${pic || 'the PIC'}` : nameOf(id))
-  const opts = [...approvers.map(a => a.id), PIC_ID]
+  const label = (id: string) => (id === PIC_ID ? `PIC · ${pic || 'the PIC'}` : id === NEXT_ID ? `Next stage · ${nextName}` : nameOf(id))
+  const opts = [...approvers.map(a => a.id), PIC_ID, ...(hasNext || levels.some(l => l.ids.includes(NEXT_ID)) ? [NEXT_ID] : [])]
 
   return (
     <div className={s.apprs}>
@@ -61,9 +66,9 @@ export default function PlanLevels({ levels, editable, approvers, nameOf, pic, t
                     onClick={e => { e.stopPropagation(); setOpen(k) }}>👤 Pick who approves</button>
                 ) : (
                   <>
-                    <span>{id === PIC_ID ? '🔗' : '👤'}</span>
+                    <span>{id === PIC_ID ? '🔗' : id === NEXT_ID ? '⏭' : '👤'}</span>
                     <span className={s.apprName} title={label(id)}>{id === PIC_ID && two && lv.picAll ? `Both PICs · ${pic}` : label(id)}</span>
-                    {editable ? <button type="button" className={s.apprX} aria-label={`Remove ${id === PIC_ID ? 'the PIC' : nameOf(id)}`} onClick={() => flip(k, id)}>×</button> : null}
+                    {editable ? <button type="button" className={s.apprX} aria-label={`Remove ${id === PIC_ID ? 'the PIC' : id === NEXT_ID ? 'the next stage’s person' : nameOf(id)}`} onClick={() => flip(k, id)}>×</button> : null}
                   </>
                 )}
               </span>
@@ -104,8 +109,8 @@ export default function PlanLevels({ levels, editable, approvers, nameOf, pic, t
               <button key={id} type="button" role="option" aria-selected={on} aria-disabled={off || undefined}
                 className={`${s.opt}${on ? ` ${s.optOn}` : ''}${off ? ` ${s.optOff}` : ''}`} onClick={() => !off && flip(open, id)}>
                 <span className={s.optCheck}>{on ? '✓' : ''}</span>
-                <span>{id === PIC_ID ? '🔗' : '👤'}</span>
-                <span className={s.optName}>{id === PIC_ID ? `PIC (${pic || 'the PIC'}) via link` : nameOf(id)}</span>
+                <span>{id === PIC_ID ? '🔗' : id === NEXT_ID ? '⏭' : '👤'}</span>
+                <span className={s.optName}>{id === PIC_ID ? `PIC (${pic || 'the PIC'}) via link` : id === NEXT_ID ? `Next stage’s person · ${nextName}` : nameOf(id)}</span>
                 {off ? <span className={s.optRole}>Already approves at another level</span> : null}
               </button>
             )

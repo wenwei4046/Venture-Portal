@@ -32,6 +32,8 @@
 .badge { font-size: .74em; padding: 2px 7px; border-radius: 6px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); border: 1px solid rgb(var(--mk-line-2)); white-space: nowrap; }
 .gear { height: 26px; padding: 0 9px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex; align-items: center; gap: 5px; font: inherit; font-size: .82em; cursor: pointer; white-space: nowrap; color: inherit; }
 .gear:hover, .gearOn { background: rgb(var(--mk-surface-2)); }
+.cardRemove { height: 26px; padding: 0 6px; font: inherit; font-size: .82em; color: rgb(var(--mk-red)); background: none; border: 0; cursor: pointer; white-space: nowrap; }
+.cardRemove:hover { text-decoration: underline; text-underline-offset: 2px; }
 .gearOn { border-color: rgb(var(--mk-ink)); }
 
 .iconWrap { position: relative; display: inline-flex; }

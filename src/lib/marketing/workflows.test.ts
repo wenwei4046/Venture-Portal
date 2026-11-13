@@ -105,9 +105,13 @@ describe('warnings and what publishing refuses', () => {
     const canvas: WfCanvas = { req: { pic: true }, sections: [{ id: 'c1', emoji: '🎯', title: 'S', stage: null, locked: false, req: false, pic: false,
       fields: [{ id: 'f1', label: 'Body', type: 'Text', stage: null, req: true, pic: true }] }] }
     const f = publishFixups([st('sk00001', { appr: [{ ids: [], rule: 'any' }, { ids: [SITI], rule: 'any' }] }), st('sk00002', { who: { mode: 'prev', cands: [DANIEL, SITI] } })], false, team, approvers, canvas)
-    expect([...f].sort()).toEqual(['An approval level with nobody on it is left out', 'An approver who is not a Marketing manager or a Director is left out',
+    expect([...f].sort()).toEqual(['An approval level with nobody on it is left out', 'An approver who left the team is left out',
       'Somebody who left the team comes off a shortlist', 'Canvas: unfinished fields are tidied on publish'].sort())
     expect(publishFixups([st('sl00001', { who: { mode: 'prev', cands: [SITI] } })], false, team, approvers, EMPTY_CANVAS)).toEqual(['Stage 1 runs as MM assigns — no stage before it'])
+    // ⏭ The next stage's person (2026-11-14): kept on a stage with one after it, left out on the last.
+    expect(publishFixups([st('sn00001', { appr: [{ ids: ['next'], rule: 'any' }] }), st('sn00002')], false, team, approvers, EMPTY_CANVAS)).toEqual([])
+    expect(publishFixups([st('sn00003'), st('sn00004', { appr: [{ ids: ['next'], rule: 'any' }] })], false, team, approvers, EMPTY_CANVAS))
+      .toEqual(['The last stage has no next stage — “Next stage’s person” is left out there'])
     expect(publishFixups([st('sn00001'), st('sn00002', { who: { mode: 'prev', cands: [DANIEL] } })], false, team, approvers, EMPTY_CANVAS))
       .toEqual(['A 🔓 handoff whose shortlist has left the team runs as MM assigns'])
   })
