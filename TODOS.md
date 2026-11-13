@@ -131,6 +131,18 @@ KPI ITEMS ARE EDITED ON RULES). Still owed:
   whole for EACH holder (`orderKpiHits` splits a brand's item by the part;
   `marginBase` reads lines only, so the sub-department's own were left). No
   effect while Fair's KPI switch is off — settle it before it is switched on.
+- **The app's Commission scheme sheet says nothing of a brand on its own
+  scheme.** Profile › Commission scheme lists the member's rate and each
+  brand's margin ladder. For 2990s it should say the rate their rung pays on a
+  2990s bill — the rung the MONTH resolves under a variable rate
+  (`brandRateOf` over the engine's answer, not the membership's rate) — and the
+  brand's KPI items (bonus a unit, tiers). My income already shows each 2990s
+  bill at what it paid.
+- **The KPI footnotes speak of Fair's items only.** Insight › KPI items and
+  the Arena's KPI board end *…including eligible giveaway items*
+  (`KpiPage.tsx`, `arena-model.ts`). True of the sub-department's own items; a
+  brand's own count only where the bill charges for them. Reword once a month
+  can hold both.
 
 ## Owed — Revenue Director (2026-09-11)
 
