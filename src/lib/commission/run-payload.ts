@@ -158,6 +158,8 @@ export interface KpiItemRow {
   unit_tiers?: unknown
   /** A brand's own item alone (2026-11-13): RM a unit taken off the bill; null / absent = what the bill charged. */
   cost_amount?: Num | null
+  /** A brand's own item alone (2026-11-14): RM a unit taken off the bill of a sofa with a corner; null / absent = its cost. */
+  corner_cost_amount?: Num | null
 }
 
 /** A SKU's own cost ratio (`comm_cost_ratios`, Product List › Costing Setting). */
@@ -387,16 +389,20 @@ export function toKpiItems(rows: readonly KpiItemRow[], ownBrands: ReadonlyMap<s
   return rows.flatMap((k): KpiItem[] => {
     const kpiAmount = num(k.kpi_amount)
     const label = k.product_name ?? null
-    // A brand's own item (2026-11-12): its brand's code, its tiers and its cost.
+    // A brand's own item (2026-11-12): its brand's code, its tiers, its cost and its corner cost (2026-11-14).
     // One whose brand is not on its own scheme — switched off, or no longer on
     // it — is found on no bill: never read as the sub-department's own.
-    let brand: Pick<KpiItem, 'brandCode' | 'unitTiers' | 'cost'> = {}
+    let brand: Pick<KpiItem, 'brandCode' | 'unitTiers' | 'cost' | 'cornerCost'> = {}
     if (k.brand_id) {
       const brandCode = ownBrands.get(k.brand_id) ?? ownBrands.get(k.brand_id.toLowerCase())
       if (!brandCode) return []
       const unitTiers = toUnitTiers(k.unit_tiers)
       const cost = k.cost_amount === null || k.cost_amount === undefined ? 0 : num(k.cost_amount)
-      brand = { brandCode, ...(unitTiers.length > 0 ? { unitTiers } : {}), ...(cost > 0 ? { cost } : {}) }
+      const cornerCost = k.corner_cost_amount === null || k.corner_cost_amount === undefined ? 0 : num(k.corner_cost_amount)
+      brand = {
+        brandCode, ...(unitTiers.length > 0 ? { unitTiers } : {}), ...(cost > 0 ? { cost } : {}),
+        ...(cornerCost > 0 ? { cornerCost } : {}),
+      }
     }
     if ((k.source ?? 'sku') === 'sku') {
       return k.product_code ? [{ source: 'sku', productCode: k.product_code, label, kpiAmount, ...brand }] : []

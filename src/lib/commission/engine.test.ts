@@ -2407,11 +2407,31 @@ describe('a brand with its own scheme — 2990s (2026-11-11)', () => {
         expect([rs.productRevenue, rs.productCommission, rs.kpiCommission, rs.totalCommission]).toEqual([2_990, 119.6, 50, 169.6])
       })
 
-      it('one charged more — a corner’s RM 1,000 — takes off what it charged; one charged less, the cost', () => {
-        const corner = rsOf(COSTED, upgraded('1', 'rs', 3_990, 'Latex Seat', 1_000))
-        expect([corner.productRevenue, corner.kpiCommission]).toEqual([2_990, 50])
+      it('takes off only the cost, whatever the bill charged (2026-11-14 — "only follow the cost set in venture")', () => {
+        // Charged RM 1,000 on a sofa with no corner piece: RM 500 off, the other RM 500 earns its rate.
+        const more = rsOf(COSTED, upgraded('1', 'rs', 3_990, 'Latex Seat', 1_000))
+        expect([more.productRevenue, more.kpiCommission]).toEqual([3_490, 50])
         const short = rsOf(COSTED, upgraded('1', 'rs', 3_290, 'Latex Seat', 300))
         expect([short.productRevenue, short.kpiCommission]).toEqual([2_790, 50])
+      })
+
+      // 2026-11-14 — the user: "yes need to be corner as well, if that is a compartment of corner sofa".
+      it('takes the corner cost off a sofa with a corner piece, its cost off any other', () => {
+        const CORNERED = { ...ITEMS, kpiItems: [{ ...FABRIC, cost: 125, cornerCost: 250 }, { ...LATEX, cost: 500, cornerCost: 1_000 }, OWN_LATEX, ...KPI_ITEMS] }
+        const cornerSofa = (id: string, amount: number): SalesOrder => {
+          const o = order(id, 'rs', [['SOFA', 'BOOQIT-2A(LHF)', 1, amount / 2], ['SOFA', 'BOOQIT-CNR', 1, amount / 2]], { brandCode: '2990S' })
+          return { ...o, lines: o.lines.map(l => ({ ...l, specials: ['Latex Seat'], specialMoney: { 'latex seat': 1_000 } })) }
+        }
+        // RM 6,500 corner sofa with its RM 1,000 latex seat: 5,500 × 4% + RM 50 = RM 270.
+        const corner = rsOf(CORNERED, cornerSofa('1', 6_500))
+        expect([corner.productRevenue, corner.productCommission, corner.kpiCommission, corner.totalCommission]).toEqual([5_500, 220, 50, 270])
+        expect(corner.lines.find(l => l.component === 'kpi_item')).toMatchObject({ basisAmount: 1_000, amount: 50 })
+        // A sofa with no corner piece takes the cost, RM 500, though it charged RM 1,000.
+        const plain = rsOf(CORNERED, upgraded('2', 'rs', 3_990, 'Latex Seat', 1_000))
+        expect([plain.productRevenue, plain.kpiCommission]).toEqual([3_490, 50])
+        // No corner cost set: the corner sofa takes the cost.
+        const noCorner = rsOf(COSTED, cornerSofa('3', 6_500))
+        expect([noCorner.productRevenue, noCorner.totalCommission]).toEqual([6_000, 290])
       })
 
       it('counts the month’s units as before: five latex seats pay RM 70 each, charged or not', () => {

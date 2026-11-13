@@ -5,7 +5,7 @@ import { toUnitTiers, type KpiUnitTier } from './kpi'
 /**
  * Rules › KPI items — a brand's own items, edited (2026-11-12; a brand on its
  * own commission scheme, 2990s; the user: "KPI item 那边我是可以手动去加的").
- * The draft of one brand's block: a cost or a bonus retyped, tiers retyped, an
+ * The draft of one brand's block: a cost, a corner cost or a bonus retyped, tiers retyped, an
  * item coming off, an item picked to add. Pure — the component holds the state
  * and `saveKpiItems` sends what `brandKpiEditOf` makes of it: only what changed.
  */
@@ -22,6 +22,8 @@ export interface BrandKpiListed {
    * order charges for it comes off instead.
    */
   cost: number | null
+  /** What a unit takes off the bill of a sofa with a corner (2026-11-14); null = none set — its cost. */
+  cornerCost: number | null
   /** What a unit pays below the first tier. */
   amount: number
   tiers: KpiUnitTier[]
@@ -40,6 +42,8 @@ export interface BrandKpiAdded {
   name: string
   /** Blank = no cost. */
   cost: string
+  /** Blank = no corner cost — its cost. */
+  cornerCost: string
   amount: string
   tiers: TierDraft[]
 }
@@ -47,6 +51,8 @@ export interface BrandKpiAdded {
 export interface BrandKpiDraft {
   /** Item id → the cost as typed (blank = none). */
   costs: ReadonlyMap<string, string>
+  /** Item id → the corner cost as typed (blank = none). */
+  cornerCosts: ReadonlyMap<string, string>
   /** Item id → the bonus as typed. */
   amounts: ReadonlyMap<string, string>
   /** Item id → its tiers as typed, once touched. */
@@ -56,20 +62,27 @@ export interface BrandKpiDraft {
 }
 
 export const EMPTY_BRAND_KPI_DRAFT: BrandKpiDraft = {
-  costs: new Map(), amounts: new Map(), tiers: new Map(), removing: new Set(), added: [],
+  costs: new Map(), cornerCosts: new Map(), amounts: new Map(), tiers: new Map(), removing: new Set(), added: [],
+}
+
+/** A stored amount above 0, else none. */
+function storedCost(value: number | string | null | undefined): number | null {
+  const n = value === null || value === undefined ? NaN : Number(value)
+  return Number.isFinite(n) && n > 0 ? n : null
 }
 
 /** A stored item (`comm_kpi_items`) as the block lists it. */
 export function toBrandKpiListed(row: {
   id: string; option_value: string | null; product_name: string | null; kpi_amount: number | string; unit_tiers?: unknown
   cost_amount?: number | string | null
+  corner_cost_amount?: number | string | null
 }): BrandKpiListed {
-  const cost = row.cost_amount === null || row.cost_amount === undefined ? NaN : Number(row.cost_amount)
   return {
     id: row.id,
     special: (row.option_value ?? '').trim(),
     name: row.product_name?.trim() || null,
-    cost: Number.isFinite(cost) && cost > 0 ? cost : null,
+    cost: storedCost(row.cost_amount),
+    cornerCost: storedCost(row.corner_cost_amount),
     amount: Number(row.kpi_amount),
     tiers: toUnitTiers(row.unit_tiers),
   }
@@ -122,12 +135,14 @@ export function tiersDiffer(typed: readonly TierDraft[], saved: readonly KpiUnit
   })
 }
 
-/** Whether a listed item is changed in the draft: its cost, its bonus or its tiers. */
+/** Whether a listed item is changed in the draft: its cost, its corner cost, its bonus or its tiers. */
 export function brandItemEdited(item: BrandKpiListed, draft: BrandKpiDraft): boolean {
   const cost = draft.costs.get(item.id)
+  const cornerCost = draft.cornerCosts.get(item.id)
   const amount = draft.amounts.get(item.id)
   const tiers = draft.tiers.get(item.id)
   return (cost !== undefined && costDiffers(cost, item.cost))
+    || (cornerCost !== undefined && costDiffers(cornerCost, item.cornerCost))
     || (amount !== undefined && bonusDiffers(amount, item.amount))
     || (tiers !== undefined && tiersDiffer(tiers, item.tiers))
 }
@@ -161,11 +176,11 @@ const tierInputs = (tiers: readonly TierDraft[]): KpiTierInput[] => typedTiers(t
 
 /**
  * What the Save sends for one brand's block: only what changed. A changed item
- * goes with its cost when that changed (blank = none any more), its bonus when
- * that did and its tiers, whole, when those did — what it does not name stays
- * as stored, so a bonus somebody else has just retyped on another computer is
- * not written back over by a change of tiers here. An item coming off is never
- * also changed.
+ * goes with its cost when that changed (blank = none any more), its corner cost
+ * when that did, its bonus when that did and its tiers, whole, when those did —
+ * what it does not name stays as stored, so a bonus somebody else has just
+ * retyped on another computer is not written back over by a change of tiers
+ * here. An item coming off is never also changed.
  */
 export function brandKpiEditOf(brandId: string, listed: readonly BrandKpiListed[], draft: BrandKpiDraft): KpiItemsEdit {
   const live = listed.filter(item => !draft.removing.has(item.id))
@@ -174,14 +189,17 @@ export function brandKpiEditOf(brandId: string, listed: readonly BrandKpiListed[
       source: 'option' as const, optionPool: 'sofa_specials', optionValue: a.special, amount: a.amount.trim() || null,
       brandId, name: a.name.trim() || null, tiers: tierInputs(a.tiers), label: a.name.trim() || a.special,
       ...(a.cost.trim() ? { cost: a.cost.trim() } : {}),
+      ...(a.cornerCost.trim() ? { cornerCost: a.cornerCost.trim() } : {}),
     })),
     changes: live.filter(item => brandItemEdited(item, draft)).map(item => {
       const cost = draft.costs.get(item.id)
+      const cornerCost = draft.cornerCosts.get(item.id)
       const amount = draft.amounts.get(item.id)
       const tiers = draft.tiers.get(item.id)
       return {
         id: item.id,
         ...(cost !== undefined && costDiffers(cost, item.cost) ? { cost: cost.trim() || null } : {}),
+        ...(cornerCost !== undefined && costDiffers(cornerCost, item.cornerCost) ? { cornerCost: cornerCost.trim() || null } : {}),
         ...(amount !== undefined && bonusDiffers(amount, item.amount) ? { amount: amount.trim() || null } : {}),
         label: brandKpiTitle(item),
         ...(tiers !== undefined && tiersDiffer(tiers, item.tiers) ? { tiers: tierInputs(tiers) } : {}),

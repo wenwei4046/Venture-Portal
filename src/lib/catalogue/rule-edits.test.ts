@@ -276,6 +276,27 @@ describe('validateKpiItems', () => {
       expect(validateKpiItems({ adds: [], changes: [{ id: ID, amount: '60' }], removes: [] }).changes).toEqual([{ id: ID, kpi_amount: 60 }])
     })
 
+    // 2026-11-14 — the user: "yes need to be corner as well, if that is a compartment of corner sofa": what a unit takes
+    // off the bill of a sofa with a corner.
+    it('takes a corner cost as it takes a cost — added, changed alone, emptied as 0, refused on the sub-department’s own', () => {
+      const ID = '22222222-2222-4222-8222-222222222222'
+      expect(validateKpiItems({ adds: [{ ...latex, cost: '500', cornerCost: ' 1,000 ' }], changes: [], removes: [] }).adds).toEqual([
+        { source: 'option', option_pool: 'sofa_specials', option_value: 'Latex Seat', kpi_amount: 50, brand_id: BRAND, cost_amount: 500, corner_cost_amount: 1000 },
+      ])
+      expect(validateKpiItems({ adds: [{ ...latex, cornerCost: '' }], changes: [], removes: [] }).adds).toEqual([
+        { source: 'option', option_pool: 'sofa_specials', option_value: 'Latex Seat', kpi_amount: 50, brand_id: BRAND },
+      ])
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, cornerCost: '1200' }], removes: [] }).changes).toEqual([{ id: ID, corner_cost_amount: 1200 }])
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, cornerCost: null }], removes: [] }).changes).toEqual([{ id: ID, corner_cost_amount: 0 }])
+      const own = { source: 'option' as const, optionPool: 'sofa_specials', optionValue: 'Nylon Fabric', amount: '50' }
+      expect(() => validateKpiItems({ adds: [{ ...own, cornerCost: '250' }], changes: [], removes: [] }))
+        .toThrow(/Only a brand's own KPI item has a name, tiers and a cost of its own/)
+      const withCorner = (cornerCost: string) => () => validateKpiItems({ adds: [{ ...latex, name: 'Upgrade latex seat', cornerCost }], changes: [], removes: [] })
+      expect(withCorner('-1')).toThrow(/Upgrade latex seat: a corner cost cannot be negative/)
+      expect(withCorner('1000000.01')).toThrow(/Upgrade latex seat: a corner cost is at most RM 1,000,000 a unit/)
+      expect(withCorner('1,000.123')).toThrow(/Upgrade latex seat: corner cost: "1,000.123" is not an amount/)
+    })
+
     it('reads a cost as RM 0.01 to RM 1,000,000 a unit, to the sen', () => {
       const withCost = (cost: string) => () => validateKpiItems({ adds: [{ ...latex, name: 'Upgrade latex seat', cost }], changes: [], removes: [] })
       expect(withCost('-1')).toThrow(/Upgrade latex seat: a cost cannot be negative/)

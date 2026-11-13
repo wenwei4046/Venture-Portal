@@ -808,6 +808,25 @@ describe('a brand with its own scheme — 2990s', () => {
       }
     })
 
+    // 2026-11-14 — the user: "yes need to be corner as well" (`comm_kpi_items.corner_cost_amount`).
+    it('reads a brand’s item’s corner cost a unit — none where the row has none, never one on the sub-department’s own', () => {
+      const withCorner = (corner: unknown) => toEngineInput(baseRows({
+        ranks, brands: BRANDS,
+        kpiItems: [
+          { ...KPI[0], cost_amount: '125.00', corner_cost_amount: corner as never },
+          { ...KPI[2], corner_cost_amount: corner as never },
+        ],
+      })).kpiItems
+      expect(withCorner('250.00')).toEqual([
+        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S', cost: 125, cornerCost: 250 },
+        { source: 'sku', productCode: 'PIL-01', label: 'Pillow', kpiAmount: 50 },
+      ])
+      for (const none of [null, undefined, 0, '0.00']) {
+        expect(withCorner(none)[0]).toEqual(
+          { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S', cost: 125 })
+      }
+    })
+
     it('a bill whose special order charges nothing loses the item’s cost: 4% of 2,990 and the RM 50 bonus, not 4% of 3,490', () => {
       // The same sofa at RM 3,490, its fabric upgrade's RM 250 … and a latex seat whose RM 500 is in the remark.
       const lines = sofa.map(l => (l.item_group === 'SOFA'

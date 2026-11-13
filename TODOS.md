@@ -144,18 +144,12 @@ Shipped: the items, the run, Comm Cal's month and bill page
 app's KPI readings (`revenue-app.md` › 2990s' OWN KPI ITEMS COUNT IN THE APP),
 Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
 KPI ITEMS ARE EDITED ON RULES), an item's cost a unit — what comes off the
-bill (`comm-cal.md` › A BRAND'S KPI ITEM HAS A COST), and My team's KPI hit
-and the Championship's threshold reading Fair's own units (`revenue-app.md` ›
-ONE FIGURE, TWO LADDERS — live from 2026-11-13, when the owner switched Fair's
+bill (`comm-cal.md` › A BRAND'S KPI ITEM HAS A COST) and, since 2026-11-14,
+only that cost — a corner sofa's its corner cost (`comm-cal.md` › A BRAND'S
+KPI ITEM TAKES OFF ONLY ITS COST), and My team's KPI hit and the
+Championship's threshold reading Fair's own units (`revenue-app.md` › ONE
+FIGURE, TWO LADDERS — live from 2026-11-13, when the owner switched Fair's
 KPI on; split 2026-11-14). Still owed:
-- **A brand item's cost is one figure — a corner is not read** (2026-11-13).
-  The owner's list prices a corner sofa's upgrade double (fabric RM 125 / 250,
-  latex RM 500 / 1,000). The cost on Rules is one figure a unit; a corner's
-  dearer price comes off only where the ERP's special order says it (the
-  dearer of the two is taken). A second figure needs a rule for which sofa is
-  a corner — the bills of that day could not give one (every sofa was charged
-  RM 250 / RM 500; the one with a CNR piece named no upgrade). Ask the owner
-  before building it.
 - **A brand's item cannot be renamed in place.** The writer keeps an item's
   name through a change; Rules renames by taking the item off and adding its
   special again under the new name, in one Save. A rename of its own needs

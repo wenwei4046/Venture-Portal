@@ -315,10 +315,10 @@ describe('Rules › KPI items', () => {
       renderSection({ brands: [AKEMI, BRAND_2990S], brandKpiItems: ITEMS })
       const table = screen.getByRole('table', { name: '2990s KPI items' })
       const rows = within(table).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell').map(c => c.textContent))
-      // Neither has a cost: what the bill charged for it comes off the bill.
+      // Neither has a cost: what the bill charged for it comes off the bill — nor a corner cost: its cost, on a corner sofa.
       expect(rows).toEqual([
-        ['Upgrade fabricSofa Full Fabric', 'Once per sofa set', 'As billed', '50.00', '—'],
-        ['Upgrade latex seatLatex Seat', 'Once per sofa set', 'As billed', '50.00', '5+ · 70.00  ·  10+ · 100.00'],
+        ['Upgrade fabricSofa Full Fabric', 'Once per sofa set', 'As billed', 'As cost', '50.00', '—'],
+        ['Upgrade latex seatLatex Seat', 'Once per sofa set', 'As billed', 'As cost', '50.00', '5+ · 70.00  ·  10+ · 100.00'],
       ])
       expect(screen.getByText('2 ITEMS · ALWAYS PAID')).toBeInTheDocument()
       // The sub-department's own list is its own: none of the brand's rows, no amount of theirs to edit.

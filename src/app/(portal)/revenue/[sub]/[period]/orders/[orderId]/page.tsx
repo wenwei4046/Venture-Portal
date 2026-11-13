@@ -19,7 +19,7 @@ import {
   type LineClass,
   type SalesLine,
 } from '@/lib/commission/engine'
-import { EMPTY_FABRIC_SERIES, indexBrandKpiItems, indexFabricSeries, kpiCodeKey, kpiItemCost, kpiItemLabel, lineKpiFactsOf } from '@/lib/commission/kpi'
+import { EMPTY_FABRIC_SERIES, indexBrandKpiItems, indexFabricSeries, kpiCodeKey, kpiItemLabel, lineKpiFactsOf } from '@/lib/commission/kpi'
 import { ownSchemeBrandsOf, specialMoneyByLine, toCostRatiosByBrand, toGwpRules, toKpiItems, type CostRatioBrandRow, type CostRatioRow, type GwpRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { gwpFreeParts } from '@/lib/catalogue/gwp'
 import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
@@ -238,7 +238,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       subDept.schemeId
         ? supabase
             .from('comm_kpi_items')
-            .select('source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers, cost_amount')
+            .select('source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers, cost_amount, corner_cost_amount')
             .eq('scheme_id', subDept.schemeId)
             .lte('effective_from', asAt)
             .or(`effective_to.is.null,effective_to.gte.${asAt}`)
@@ -749,13 +749,16 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                             ? "Not paid: the bill's sales do not cover its KPI items"
                             : hit.item.brandCode
                               // Named on the sofa (2026-11-13: the price is sometimes written in the remark) — a unit
-                              // whatever its special order charges: its cost on Rules comes off the bill, what the
-                              // bill charged when that is more or the item has no cost, nothing when neither says.
-                              ? `${hit.amount === 0
-                                ? "Its special order charges nothing for it and it has no cost on Rules, so nothing comes off the bill's commissionable sales; its bonus is paid"
-                                : Math.abs(Math.abs(hit.amount) - Math.abs(hit.qty) * kpiItemCost(hit.item)) < 0.005
+                              // whatever its special order charges: its cost on Rules comes off the bill — its corner
+                              // cost on a sofa with a corner (2026-11-14) — what the bill charged when it has none,
+                              // nothing when neither says.
+                              ? `${hit.offBy === 'corner'
+                                ? "The sofa has a corner: its corner cost on Rules › KPI items is off the bill's commissionable sales; its bonus is paid instead"
+                                : hit.offBy === 'cost'
                                   ? "Its cost on Rules › KPI items is off the bill's commissionable sales; its bonus is paid instead"
-                                  : 'What the bill charged for it is off its commissionable sales; its bonus is paid instead'}${hit.item.unitTiers?.length ? ", at the tier the month's units reach" : ''}`
+                                  : hit.amount === 0
+                                    ? "Its special order charges nothing for it and it has no cost on Rules, so nothing comes off the bill's commissionable sales; its bonus is paid"
+                                    : "It has no cost on Rules, so what the bill charged for it is off its commissionable sales; its bonus is paid instead"}${hit.item.unitTiers?.length ? ", at the tier the month's units reach" : ''}`
                               : "Paid flat as KPI, off the bill's commissionable sales"}
                         >
                           <span className="dot" />
