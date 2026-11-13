@@ -6,7 +6,7 @@ import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, s
 import { duplicateMktProduct, setMktProductStatusTo } from '@/lib/marketing/quote-actions'
 import { extrasOf, itemNamed, itemsCost, norm, pickerGroups, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
 import {
-  accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections,
+  accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections, workflowAbove,
   type Product, type ProductBook, type ProductEdit, type ProductGroup, type ProductItem, type ProductStatus, type ProductWorkflowOption,
 } from '@/lib/marketing/products'
 import { dmy, rm } from '@/lib/marketing/quotes'
@@ -73,6 +73,9 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   const [busy, setBusy] = useState(false)
   const [acctBusy, setAcctBusy] = useState(false)
   const [catDraft, setCatDraft] = useState('')
+  // An item row just added by "+ Add item": its name box takes the focus, which opens the Product List.
+  const [focusKey, setFocusKey] = useState<string | null>(null)
+  const newCatRef = useRef<HTMLInputElement | null>(null)
   const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null)
   const [ctxDelete, setCtxDelete] = useState(false)
   const [mustPublish, setMustPublish] = useState<string | null>(null)
@@ -539,7 +542,7 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   // The manager's own columns that follow products: after Days, the Product List's values — edited here too (110px each).
   const pcols = columns.filter(c => c.inProducts)
   const igrid = pcols.length
-    ? { gridTemplateColumns: `minmax(180px, 1.5fr) minmax(210px, 1.4fr) 52px ${pcols.map(() => '110px').join(' ')} 92px 112px 96px 28px`, minWidth: 840 + pcols.length * 120 }
+    ? { gridTemplateColumns: `minmax(170px, 1.3fr) minmax(260px, 1.6fr) 52px ${pcols.map(() => '110px').join(' ')} 92px 112px 96px 28px`, minWidth: 880 + pcols.length * 120 }
     : undefined
   const ispan = pcols.length ? { gridColumn: `1 / span ${5 + pcols.length}` } : undefined
   const incl = `${includedText(groups)}${groups.some(g => g.items.some(it => it.qty > 0)) ? per(edit.kind) : ''}`
@@ -555,6 +558,20 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     setPickRect({ left: Math.max(8, Math.min(r.left, window.innerWidth - 372)), top: up ? null : r.bottom + 4, bottom: up ? vh - r.top + 4 : null, max: Math.min(340, Math.max(160, up ? above : below)) })
     setPickFor(key)
   }
+  /** An item picked from the Product List on the "+" row (the user, 2026-11-13: "在 items 点 + 或空格能自动有 product list
+   * 的品项"): into its catalogue's category here — made when there is none — its blank rows replaced. */
+  const NEW_CAT = '__newcat'
+  const addFromList = (x: CatalogItem) => {
+    const it: ProductItem = { ...newItem(), name: x.name, price: x.price, workflow: x.wf }
+    setGroups(gs => {
+      const i = gs.findIndex(g => norm(g.name) === norm(x.cat))
+      if (i < 0) return [...gs, { ...newGroup(x.cat), items: [it] }]
+      return gs.map((g, j) => (j === i ? { ...g, items: [...g.items.filter(t => t.name.trim()), it] } : g))
+    })
+    setCatDraft('')
+    setPickFor(null)
+  }
+  const newCatMenu = pickFor === NEW_CAT && !ro ? pickerGroups(items, '', catDraft) : null
 
   return (
     <div>
@@ -654,6 +671,9 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                   {g.items.map((it, ii) => {
                     const hit = itemNamed(items, it.name)
                     const wf = book.workflows.find(w => w.id === it.workflow) ?? null
+                    // "Same as above" (the user, 2026-11-13): the nearest item above — in this category or one before — with a workflow.
+                    const above = workflowAbove(groups, gi, ii)
+                    const aboveWf = above ? book.workflows.find(w => w.id === above) ?? null : null
                     const menuOn = pickFor === it.key && !ro
                     const menu = menuOn ? pickerGroups(items, g.name, it.name) : null
                     const typed = norm(it.name)
@@ -667,7 +687,8 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                             disabled={ro}
                             placeholder="Pick from the Product List…"
                             aria-label="Item"
-                            onFocus={e => openPicker(it.key, e.currentTarget)}
+                            autoFocus={focusKey === it.key}
+                            onFocus={e => { if (focusKey === it.key) setFocusKey(null); openPicker(it.key, e.currentTarget) }}
                             onChange={e => {
                               const v = e.target.value
                               const x = itemNamed(items, v)
@@ -728,13 +749,19 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                         <span className={pb.iWf}>
                           <span className={pb.iWfCol}>
                             <select
-                              className={`${qs.cellSel}${it.workflow ? '' : ` ${qs.cellSelMiss}`}`}
+                              className={qs.cellSel}
                               value={it.workflow ?? ''}
                               disabled={ro}
                               aria-label="Workflow"
-                              onChange={e => (e.target.value === '__new' ? void newWorkflowFor(gi, ii) : setItem(gi, ii, { workflow: e.target.value || null }))}
+                              title={wf ? wfLabel(wf) : undefined}
+                              onChange={e => {
+                                const v = e.target.value
+                                if (v === '__new') void newWorkflowFor(gi, ii)
+                                else setItem(gi, ii, { workflow: v === '__above' ? above : v || null })
+                              }}
                             >
-                              <option value="">Link a workflow…</option>
+                              <option value="">{it.workflow ? 'No workflow' : 'Link a workflow…'}</option>
+                              {aboveWf && aboveWf.id !== it.workflow ? <option value="__above">↑ Same as above · {wfLabel(aboveWf)}</option> : null}
                               {book.workflows.map(w => <option key={w.id} value={w.id}>{wfLabel(w)}</option>)}
                               <option value="__new">+ New workflow</option>
                             </select>
@@ -775,23 +802,37 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                   })}
                   {ro ? null : (
                     <div className={pb.iAddRow} style={igrid ? { minWidth: igrid.minWidth } : undefined}>
-                      <button type="button" className={pb.iAdd} onClick={() => setGroup(gi, x => ({ ...x, items: [...x.items, newItem()] }))}>+ Add item</button>
+                      <button type="button" className={pb.iAdd} onClick={() => {
+                        // The new row opens the Product List at once (its name box is focused).
+                        const fresh = newItem()
+                        setGroup(gi, x => ({ ...x, items: [...x.items, fresh] }))
+                        setFocusKey(fresh.key)
+                      }}>+ Add item</button>
                     </div>
                   )}
                 </div>
               ))}
               {ro ? null : (
-                <div className={pb.iNewCat} style={igrid ? { minWidth: igrid.minWidth + 32 } : undefined}>
-                  <span className={pb.iPlus}>+</span>
+                <div
+                  className={pb.iNewCat}
+                  style={igrid ? { minWidth: igrid.minWidth + 32 } : undefined}
+                  onClick={e => { if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.plus) newCatRef.current?.focus() }}
+                >
+                  <span className={pb.iPlus} data-plus="1">+</span>
                   <input
+                    ref={newCatRef}
                     className={pb.iNewCatIn}
                     value={catDraft}
                     maxLength={60}
-                    placeholder="New category (a catalogue name, e.g. Video) — press Enter"
+                    placeholder="Pick from the Product List, or type a new category and press Enter"
                     aria-label="New category"
-                    onChange={e => setCatDraft(e.target.value)}
+                    onFocus={e => openPicker(NEW_CAT, e.currentTarget)}
+                    onBlur={() => setTimeout(() => setPickFor(k => (k === NEW_CAT ? null : k)), 120)}
+                    onChange={e => { setCatDraft(e.target.value); if (pickFor !== NEW_CAT) openPicker(NEW_CAT, e.currentTarget) }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && catDraft.trim()) {
+                        const x = itemNamed(items, catDraft)
+                        if (x) return addFromList(x)
                         setGroups(gs => [...gs, newGroup(catDraft)])
                         setCatDraft('')
                       }
@@ -808,6 +849,35 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                   >
                     Add category
                   </button>
+                  {newCatMenu && pickRect ? (
+                    <div
+                      ref={menuRef}
+                      className={pb.pickMenu}
+                      style={{ left: pickRect.left, top: pickRect.top ?? 'auto', bottom: pickRect.bottom ?? 'auto', maxHeight: pickRect.max }}
+                      role="listbox"
+                      aria-label="The Product List"
+                    >
+                      {newCatMenu.groups.map(mg => (
+                        <div key={mg.cat}>
+                          <div className={pb.pickCatRow}><span className={pb.pickCat}>{mg.cat}</span></div>
+                          {mg.items.map(x => (
+                            <button key={x.id} type="button" role="option" aria-selected={false} className={pb.pickOpt}
+                              onMouseDown={e => { e.preventDefault(); addFromList(x) }}>
+                              <span className={pb.pickTwo}>
+                                <span className={pb.pickName}>{x.name}</span>
+                                {x.desc ? <span className={pb.pickDesc}>{x.desc}</span> : null}
+                              </span>
+                              <span className={pb.pickPrice}>{rm(x.price)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                      {catDraft.trim() && !newCatMenu.exact ? (
+                        <div className={pb.pickNew}>Press Enter to add “{catDraft.trim()}” as a new category</div>
+                      ) : null}
+                      {!newCatMenu.groups.length && !catDraft.trim() ? <div className={pb.pickEmpty}>The Product List is empty</div> : null}
+                    </div>
+                  ) : null}
                 </div>
               )}
               <div className={`${pb.iRow} ${pb.iSum}`} style={igrid}>

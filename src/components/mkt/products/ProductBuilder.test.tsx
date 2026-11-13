@@ -332,4 +332,31 @@ describe('the Product Builder', () => {
     builder('p3')
     expect(screen.getByRole('combobox', { name: 'Revenue account' })).toHaveProperty('disabled', false)
   })
+
+  it("the + row opens the Product List: an item picked joins its catalogue’s category (2026-11-13)", async () => {
+    builder("p2")
+    const box = await screen.findByRole("textbox", { name: "New category" })
+    fireEvent.focus(box)
+    const list = screen.getByRole("listbox", { name: "The Product List" })
+    fireEvent.mouseDown(within(list).getByRole("option", { name: /Reels video/ }))
+    expect(screen.getByDisplayValue("Video")).toBeTruthy()
+    expect(screen.getByDisplayValue("Reels video")).toBeTruthy()
+    // An exact name and Enter adds the item, not a category of that name.
+    fireEvent.change(box, { target: { value: "Image posts" } })
+    fireEvent.keyDown(box, { key: "Enter" })
+    expect(screen.getByDisplayValue("Graphic design")).toBeTruthy()
+    expect(screen.getByDisplayValue("Image posts")).toBeTruthy()
+  })
+
+  it("“Same as above” links the workflow of the item above; no workflow is no problem (2026-11-13)", async () => {
+    builder("p1")
+    const add = await screen.findByRole("button", { name: "+ Add item" })
+    fireEvent.click(add)
+    const sels = screen.getAllByRole("combobox", { name: "Workflow" })
+    const last = sels[sels.length - 1] as HTMLSelectElement
+    expect(within(last).getByRole("option", { name: /Same as above · Design photo/ })).toBeTruthy()
+    fireEvent.change(last, { target: { value: "__above" } })
+    expect(last.value).toBe("w1")
+    expect(screen.queryByText("Link a workflow to each item")).toBeNull()
+  })
 })
