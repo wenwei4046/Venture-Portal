@@ -276,8 +276,9 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
               <tr>
                 <th>Item</th>
                 <th className="whitespace-nowrap">Counted</th>
-                <th className="right whitespace-nowrap">Cost a unit · RM</th>
-                <th className="right whitespace-nowrap">Bonus a unit · RM</th>
+                {/* The two money headings may wrap: on a narrow screen the boxes set their columns' width, not the words. */}
+                <th className="right">Cost a unit · RM</th>
+                <th className="right">Bonus a unit · RM</th>
                 <th>By the month&apos;s units</th>
                 {canManage ? <th className="w-24 relative"><span className="sr-only">Remove</span></th> : null}
               </tr>
