@@ -9,7 +9,7 @@
 
 import { canvasFromRow, canvasPayload, canvasProblems, type WfCanvas } from './canvas'
 import {
-  ASSIGN_ID, finishFromRow, levelsFromRow, levelText, MAX_LEVELS, overdueFromRow, PIC_ID,
+  ASSIGN_ID, finishFromRow, levelsFromRow, levelText, MAX_LEVELS, NEXT_ID, overdueFromRow, PIC_ID,
   type ApprLevel, type FinishCfg, type OverdueCfg,
 } from './flow'
 import { groupTone, isManagerTitle } from './groups'
@@ -189,7 +189,8 @@ export function roleOf(title: string): string {
   return title
 }
 
-/** Who may approve a stage (decision 7): Marketing's managers (MM / AMM) and a Director, on the roster. */
+/** Who manages: Marketing's managers (MM / AMM) and a Director — never on a 🔓 shortlist (they assign). Anybody on the
+ * team may be named an approver since 2026-11-14 (the user: "approval 的人可以是全部人"). */
 export const mayApprove = (title: string) => isManagerTitle(title) || /DIRECTOR/i.test(title)
 
 /** The builder's people from New Project's picker list (lib/marketing/tasks.ts › builderPeople): their load is the
@@ -199,11 +200,14 @@ export function wfPeople(people: readonly PickPerson[]): WfPerson[] {
 }
 
 /** A level's person as a card or the diff names them: 'pic' → PIC, 'assign' → Assigned (the prototype's). */
-export const idLabel = (id: string, nameOf: (id: string) => string) => (id === PIC_ID ? 'PIC' : id === ASSIGN_ID ? 'Assigned' : nameOf(id))
+export const idLabel = (id: string, nameOf: (id: string) => string) =>
+  (id === PIC_ID ? 'PIC' : id === ASSIGN_ID ? 'Assigned' : id === NEXT_ID ? 'Next stage' : nameOf(id))
 /** …as the Approval dropdown and its chips name them. */
-export const idLong = (id: string, nameOf: (id: string) => string) => (id === PIC_ID ? 'PIC via link' : id === ASSIGN_ID ? 'Picked at assignment' : nameOf(id))
+export const idLong = (id: string, nameOf: (id: string) => string) =>
+  (id === PIC_ID ? 'PIC via link' : id === ASSIGN_ID ? 'Picked at assignment' : id === NEXT_ID ? 'Next stage’s person' : nameOf(id))
 /** …as the Approval section's one-line summary names them. */
-export const idShort = (id: string, nameOf: (id: string) => string) => (id === PIC_ID ? '🔗 PIC' : id === ASSIGN_ID ? '👤 Picked at assignment' : nameOf(id))
+export const idShort = (id: string, nameOf: (id: string) => string) =>
+  (id === PIC_ID ? '🔗 PIC' : id === ASSIGN_ID ? '👤 Picked at assignment' : id === NEXT_ID ? '⏭ Next stage’s person' : nameOf(id))
 
 /** "Rachel & Daniel → PIC" — a stage's approval as its card says it; "—" without one. */
 export const apprText = (appr: readonly ApprLevel[], nameOf: (id: string) => string) =>
@@ -266,8 +270,9 @@ export function publishFixups(stages: readonly WfStage[], locked: boolean, team:
     out.push('A 🔓 handoff whose shortlist has left the team runs as MM assigns')
   else if (run.some(s => s.who.mode === 'prev' && s.who.cands.some(c => !team.has(c)))) out.push('Somebody who left the team comes off a shortlist')
   if (run.some(s => s.appr.some(l => !l.ids.length))) out.push('An approval level with nobody on it is left out')
-  const persons = run.flatMap(s => s.appr.flatMap(l => l.ids.filter(id => id !== PIC_ID && id !== ASSIGN_ID)))
-  if (persons.some(id => !approvers.has(id))) out.push('An approver who is not a Marketing manager or a Director is left out')
+  const persons = run.flatMap(s => s.appr.flatMap(l => l.ids.filter(id => id !== PIC_ID && id !== ASSIGN_ID && id !== NEXT_ID)))
+  if (persons.some(id => !approvers.has(id))) out.push('An approver who left the team is left out')
+  if (run.at(-1)?.appr.some(l => l.ids.includes(NEXT_ID))) out.push('The last stage has no next stage — “Next stage’s person” is left out there')
   if (canvasProblems(stages, canvas).length) out.push('Canvas: unfinished fields are tidied on publish')
   return out
 }

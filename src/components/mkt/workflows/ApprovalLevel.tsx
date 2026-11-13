@@ -1,20 +1,22 @@
 'use client'
 
-import { ASSIGN_ID, PIC_ID, type ApprLevel } from '@/lib/marketing/flow'
+import { ASSIGN_ID, NEXT_ID, PIC_ID, type ApprLevel } from '@/lib/marketing/flow'
 import { idLong, roleOf, type WfPerson } from '@/lib/marketing/workflows'
 import { personBg } from '../builder/people'
 import Tip from '../ui/Tip'
 import w from './workflows.module.css'
 
-// One approval level (`Stage Settings.dc.html` › Approval): "Level n approves", a multi-select dropdown (the managers
-// and a Director, 🔗 PIC via link, 👤 Picked at assignment — somebody already on another level greyed, "Already approves
-// at another level"), the picked as removable chips, and with two or more "Needs: Any one of them | Everyone".
+// One approval level (`Stage Settings.dc.html` › Approval): "Level n approves", a multi-select dropdown (the managers,
+// then the rest of the team — anybody approves since 2026-11-14 — 🔗 PIC via link, 👤 Picked at assignment, ⏭ Next
+// stage's person but on the last stage — somebody already on another level greyed, "Already approves at another
+// level"), the picked as removable chips, and with two or more "Needs: Any one of them | Everyone".
 
 export default function ApprovalLevel({
   n,
   level,
   open,
   approvers,
+  hasNext,
   usedElsewhere,
   nameOf,
   onToggle,
@@ -26,6 +28,8 @@ export default function ApprovalLevel({
   level: ApprLevel | null
   open: boolean
   approvers: WfPerson[]
+  /** A stage after this one: ⏭ Next stage's person is offered. */
+  hasNext: boolean
   /** Ids on the stage's other levels. */
   usedElsewhere: ReadonlySet<string>
   nameOf: (id: string) => string
@@ -36,16 +40,19 @@ export default function ApprovalLevel({
   const ids = level?.ids ?? []
   const rule = level?.rule ?? 'any'
   const flip = (id: string) => onChange({ ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id], rule })
-  const icon = (id: string) => (id === PIC_ID ? '🔗' : id === ASSIGN_ID ? '👤' : nameOf(id).charAt(0).toUpperCase())
+  const icon = (id: string) => (id === PIC_ID ? '🔗' : id === ASSIGN_ID ? '👤' : id === NEXT_ID ? '⏭' : nameOf(id).charAt(0).toUpperCase())
   const bg = (id: string) => {
     const p = approvers.find(x => x.id === id)
     return p ? personBg({ group: p.title }) : undefined
   }
-  const opts = [...approvers.map(p => p.id), PIC_ID, ASSIGN_ID]
-  // The role words (MM / AMM / Director) are facts and stay on the option; what 🔗 PIC and 👤 Picked at assignment mean
-  // is help — a tooltip on the option (the user, 2026-11-13).
-  const role = (id: string) => (id === PIC_ID || id === ASSIGN_ID ? '' : roleOf(approvers.find(p => p.id === id)?.title ?? ''))
-  const help = (id: string) => (id === PIC_ID ? 'Client approves through the tracking link' : id === ASSIGN_ID ? 'MM picks the approver per project' : '')
+  // ⏭ stays listed while picked on a stage that became the last (so it can be taken off).
+  const opts = [...approvers.map(p => p.id), PIC_ID, ASSIGN_ID, ...(hasNext || ids.includes(NEXT_ID) ? [NEXT_ID] : [])]
+  const special = (id: string) => id === PIC_ID || id === ASSIGN_ID || id === NEXT_ID
+  // The role words (MM / AMM / Director) are facts and stay on the option; what 🔗 PIC, 👤 Picked at assignment and ⏭ Next
+  // stage's person mean is help — a tooltip on the option (the user, 2026-11-13).
+  const role = (id: string) => (special(id) ? '' : roleOf(approvers.find(p => p.id === id)?.title ?? ''))
+  const help = (id: string) => (id === PIC_ID ? 'Client approves through the tracking link' : id === ASSIGN_ID ? 'MM picks the approver per project'
+    : id === NEXT_ID ? 'Whoever does the next stage approves' : '')
   return (
     <div className={w.level}>
       <div className={w.railCol}><span className={w.railLine} /><span className={w.lv}>L{n}</span><span className={w.railFill} /></div>
@@ -79,10 +86,13 @@ export default function ApprovalLevel({
           {open ? (
             <div className={w.ddMenu} role="listbox" aria-multiselectable aria-label={`Level ${n} approvers`} onClick={e => e.stopPropagation()}>
               <span className={w.ddLabel}>Select one or more</span>
+              {/* The whole team is a long list (2026-11-14): it scrolls, Done stays in view. */}
+              <div className={w.ddList}>
               {opts.map(id => {
                 const on = ids.includes(id)
                 const off = !on && id !== ASSIGN_ID && usedElsewhere.has(id)
-                const sub = off ? 'Already approves at another level' : role(id)
+                const sub0 = id === NEXT_ID && !hasNext ? 'The last stage has no next stage' : ''
+                const sub = off ? 'Already approves at another level' : sub0 || role(id)
                 const opt = (
                   <button key={id} type="button" role="option" aria-selected={on} aria-disabled={off || undefined}
                     className={`${w.opt}${off ? ` ${w.optOff}` : ''}`} onClick={() => !off && flip(id)}>
@@ -96,6 +106,7 @@ export default function ApprovalLevel({
                 )
                 return !off && help(id) ? <Tip key={id} text={help(id)}>{opt}</Tip> : opt
               })}
+              </div>
               <div className={w.ddFoot}><button type="button" className={w.ddDone} onClick={onToggle}>Done</button></div>
             </div>
           ) : null}

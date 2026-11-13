@@ -4,7 +4,7 @@
 // strings, the office's (the database answers today in Asia/Kuala_Lumpur).
 
 import type { AdsEvery } from './ads'
-import { levelFromRow, levelsFromRow, levelWaits, PIC_ID, type ApprLevel, type LevelOk } from './flow'
+import { levelFromRow, levelIds, levelsFromRow, levelWaits, PIC_ID, type ApprLevel, type LevelOk } from './flow'
 import { groupOf } from './groups'
 import type { MktTeam } from './shell'
 
@@ -222,7 +222,7 @@ function approver(v: unknown): MktApprover | null {
   if (v.kind === 'person' && str(v.staff)) return { kind: 'person', staff: str(v.staff) }
   // A level of the 2a shape: its first id stands for it here (the levels themselves are `levels`).
   const lv = Array.isArray(v.ids) ? levelFromRow(v) : null
-  return lv ? idApprover(lv.ids[0], v.picAll === true) : null
+  return lv ? idApprover(levelIds(lv)[0], v.picAll === true) : null
 }
 
 /** One id of a level as an approver: the PIC, or a person (never one still to be picked at assignment). */

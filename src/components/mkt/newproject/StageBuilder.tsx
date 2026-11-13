@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { longDay } from '@/lib/marketing/board'
 import {
-  isPicLevel, MAX_APPROVALS, MAX_PIC_TEXT, MAX_SLA, MAX_STAGES, moveStage, newStage, PIC_BOTH, PIC_LEVEL, picStages, removeStage, stageDates, stageProblems,
+  isPicLevel, MAX_APPROVALS, NEXT_LEVEL, MAX_PIC_TEXT, MAX_SLA, MAX_STAGES, moveStage, newStage, PIC_BOTH, PIC_LEVEL, picStages, removeStage, stageDates, stageProblems,
   type DraftStage,
 } from '@/lib/marketing/tasks'
 import FieldsEditor from '../builder/FieldsEditor'
@@ -61,7 +61,7 @@ export default function StageBuilder({
     return `${one} ${a === PIC_BOTH ? 'and' : 'or'} ${pics.name2.trim()} (PIC)`
   }
   const apprText = (x: DraftStage) => (x.appr.length
-    ? x.appr.map(a => (isPicLevel(a) ? (a === PIC_BOTH && two ? '🔗 Both PICs' : '🔗 PIC') : `👤 ${name(a)}`)).join(' → ')
+    ? x.appr.map(a => (isPicLevel(a) ? (a === PIC_BOTH && two ? '🔗 Both PICs' : '🔗 PIC') : a === NEXT_LEVEL ? '⏭ Next stage’s person' : `👤 ${name(a)}`)).join(' → ')
     : '— No approval')
   const upd = (patch: Partial<DraftStage>) => onChange(stages.map((x, i) => (i === at ? { ...x, ...patch } : x)))
   const toggle = (k: string) => setDd(cur => (cur === k ? null : k))
@@ -186,6 +186,10 @@ export default function StageBuilder({
                   const picA = a !== null && isPicLevel(a) ? a : null
                   const pic = picA !== null
                   const cur = a && !pic ? approvers.find(x => x.id === a) : null
+                  const nx = a === NEXT_LEVEL
+                  // ⏭ The next stage's person once a stage, never on the last stage (2026-11-14).
+                  const nextFree = at < stages.length - 1 && !st.appr.some((x, j) => j !== li && x === NEXT_LEVEL)
+                  const nextWho = name(stages[at + 1]?.who ?? null) ?? 'Not picked yet'
                   // 🔗 The PIC once a stage (②a-5): offered on this level unless another one is theirs.
                   const picFree = !st.appr.some((x, j) => j !== li && isPicLevel(x))
                   return (
@@ -215,8 +219,13 @@ export default function StageBuilder({
                           }}
                           aria-expanded={dd === key}
                         >
-                          {cur ? <span className={b.wbAv} style={{ background: personBg(cur) }}>{cur.first.charAt(0).toUpperCase()}</span> : <span className={b.wbDDIcon}>{pic ? '🔗' : '—'}</span>}
-                          {picA ? (
+                          {cur ? <span className={b.wbAv} style={{ background: personBg(cur) }}>{cur.first.charAt(0).toUpperCase()}</span> : <span className={b.wbDDIcon}>{pic ? '🔗' : nx ? '⏭' : '—'}</span>}
+                          {nx ? (
+                            <span className={b.wbDDText}>
+                              <span className={b.wbDDLabel} style={{ display: 'block' }}>Next stage’s person</span>
+                              <span className={b.wbDDHint} style={{ display: 'block' }}>{at < stages.length - 1 ? nextWho : 'The last stage has no next stage'}</span>
+                            </span>
+                          ) : picA ? (
                             <span className={b.wbDDText}>
                               <span className={b.wbDDLabel} style={{ display: 'block' }}>PIC via link</span>
                               <span className={b.wbDDHint} style={{ display: 'block' }}>{picWords(picA)}</span>
@@ -249,6 +258,14 @@ export default function StageBuilder({
                                 <span className={b.wbOptText}><span className={b.wbOptLabel}>PIC via link</span></span>
                                 <span className={b.wbOptHint}>{picWords(picA ?? PIC_LEVEL)}</span>
                                 <span className={b.wbTick}>{pic ? '✓' : ''}</span>
+                              </button>
+                            ) : null}
+                            {nextFree || nx ? (
+                              <button type="button" className={`${b.wbOpt}${nx ? ` ${b.wbOptOn}` : ''}`} onClick={() => setLevel(li, NEXT_LEVEL)}>
+                                <span className={b.wbDDIcon}>⏭</span>
+                                <span className={b.wbOptText}><span className={b.wbOptLabel}>Next stage’s person</span></span>
+                                <span className={b.wbOptHint}>{nextWho}</span>
+                                <span className={b.wbTick}>{nx ? '✓' : ''}</span>
                               </button>
                             ) : null}
                           </div>

@@ -7,7 +7,7 @@
 import { officeTime } from '@/lib/office-time'
 import { addDays } from './board'
 import {
-  ASSIGN_ID, addWorkDays, defaultFinish, dueAt, finishFromRow, isWorkDay, levelFromRow, overdueFromRow, step,
+  ASSIGN_ID, NEXT_ID, addWorkDays, defaultFinish, dueAt, finishFromRow, isWorkDay, levelFromRow, overdueFromRow, step,
   type ApprLevel, type FlowAt,
 } from './flow'
 import type { FlowCol, FlowField, FlowLog, FlowPerson, FlowRow, FlowSection, FlowStageIn, FlowTask, FlowValue } from './task-flow-view'
@@ -82,6 +82,14 @@ export function sampleTask(draft: PreviewDraft, people: readonly FlowPerson[], n
       enteredAt = st.doneAt
     }
     return st
+  })
+  // ⏭ The next stage's person approves: whoever is on it (in the sample, its likely doer when it is still a 🔓 pick).
+  stages.forEach((st, i) => {
+    const nx = stages[i + 1]
+    const who = nx ? nx.doer ?? nx.cands[0] ?? pickStaff(i + 1) : null
+    st.levels = st.levels
+      .map(l => (l.ids.includes(NEXT_ID) ? (who ? { ...l, nextWho: who } : { ...l, ids: l.ids.filter(x => x !== NEXT_ID) }) : l))
+      .filter(l => l.ids.length > 0)
   })
 
   // The canvas: its sections and fields, each by the stage that fills it in (by sid → index).

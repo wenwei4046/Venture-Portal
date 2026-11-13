@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   actorsNow, backTarget, bannerOf, defaultFocus, dueAt, finishFromRow, flowDates, lateDays, levelFromRow, levelPassed,
-  levelText, levelWaits, overdueFires, overdueFromRow, overdueSummary, step, tileOf, turnOf, type FlowAt, type FlowStage,
+  levelIds, levelText, levelWaits, overdueFires, overdueFromRow, overdueSummary, step, tileOf, turnOf, type FlowAt, type FlowStage,
 } from './flow'
 
 const S = (doer: string | null, levels: FlowStage['levels'] = [], extra: Partial<FlowStage & { back: number | null }> = {}) =>
@@ -34,6 +34,23 @@ describe('approval levels', () => {
     expect(backTarget(3, 1)).toBe(1)
     expect(backTarget(3, null)).toBe(3)
     expect(backTarget(3, 5)).toBe(3)
+  })
+})
+
+describe('the next stage’s person approves (2026-11-14)', () => {
+  it('keeps who it stands for, waits for them once known, and for nobody before', () => {
+    const lv = levelFromRow({ ids: ['next', 'r'], rule: 'all', nextWho: 'm' })!
+    expect(lv).toEqual({ ids: ['next', 'r'], rule: 'all', nextWho: 'm' })
+    expect(levelIds(lv)).toEqual(['m', 'r'])
+    expect(levelWaits(lv, { r: 'x' })).toEqual(['m'])
+    expect(levelText(lv, id => ({ m: 'Mei', r: 'Rachel', next: 'Next stage’s person' })[id] ?? id)).toBe('Mei & Rachel')
+    const before = levelFromRow({ ids: ['next'], rule: 'any' })!
+    expect(levelIds(before)).toEqual([])
+    expect(levelPassed(before, {})).toBe(true)
+    expect(levelText(before, id => (id === 'next' ? 'Next stage’s person' : id))).toBe('Next stage’s person')
+    // Named on the level too: once.
+    expect(levelIds({ ids: ['m', 'next'], rule: 'any', nextWho: 'm' })).toEqual(['m'])
+    expect(levelFromRow({ ids: ['r'], rule: 'any', nextWho: 'm' })).toEqual({ ids: ['r'], rule: 'any' })
   })
 })
 
@@ -109,6 +126,8 @@ describe('a running task', () => {
     expect(bannerOf(flow, at(1), 'josiah', true)).toBe('mm')
     expect(bannerOf(flow, at(1), 'siti', false)).toBe('upcoming')
     expect(bannerOf(flow, at(1), 'mei', false)).toBe('finished')
+    // Handed in, waiting for its approver: "Submitted", never "Up next" (2026-11-14).
+    expect(bannerOf(flow, at(1, 0), 'ali', false)).toBe('submitted')
     expect(bannerOf(flow, at(2, -1, {}, true), 'mei', false)).toBe('done')
   })
 })

@@ -171,12 +171,16 @@ export function ensureStageSections(c: WfCanvas, stages: readonly StageRef[]): W
   return { ...c, sections }
 }
 
-/** The canvas once stages went: a section, field or column of a stage no longer there belongs to none. */
+/** The canvas once stages went: a section, field or column of a stage no longer there belongs to none — and a section
+ * of that stage with nothing in it goes with it (2026-11-14 — the user, of the empty "New stage" sections a removed
+ * stage left behind: "我要删除 new stage 不能删"). */
 export function canvasForStages(c: WfCanvas, stages: readonly StageRef[]): WfCanvas {
   const has = new Set(stages.map(s => s.sid))
   const keep = (sid: string | null) => (sid && has.has(sid) ? sid : null)
   let changed = false
-  const sections = c.sections.map(s => {
+  const gone = c.sections.filter(s => s.stage && !has.has(s.stage) && !s.fields.length)
+  if (gone.length) changed = true
+  const sections = c.sections.filter(s => !gone.includes(s)).map(s => {
     const fields = s.fields.map(f => {
       const cols = f.cols?.map(col => (keep(col.stage) === col.stage ? col : { ...col, stage: null }))
       const same = keep(f.stage) === f.stage && (!cols || cols.every((x, i) => x === f.cols![i]))

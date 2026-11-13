@@ -14,7 +14,7 @@ import { GIF_MAX_BYTES, GIF_TYPES } from '@/lib/marketing/flow'
 import type { OptionLists } from '@/lib/marketing/options'
 import type { PreviewDraft } from '@/lib/marketing/task-flow-sample'
 import {
-  activeNote, asRun, duplicateStage, editOf, endWhen, firstWfStage, gifPath, groupNameOf, insertWfStage, lockNote, mayApprove,
+  activeNote, asRun, duplicateStage, editOf, endWhen, firstWfStage, gifPath, groupNameOf, insertWfStage, lockNote,
   moveWfStage, newWfStage, nextIcon, nextTemplateName, publishDiff, publishImpact, removeWfStage, timeBar, wfCategories, wfPatch,
   publishFixups, wfProblems, wfStagesPayload, wfWarnings, WF_MAX_STAGES, type WfBook, type WfEdit, type WfFix, type WfPerson, type WfStage, type WfTemplate,
 } from '@/lib/marketing/workflows'
@@ -237,7 +237,8 @@ export default function WorkflowBuilder({
   const run = useMemo(() => asRun(stages, locked), [stages, locked])
   const at = typeof sel === 'number' ? Math.min(sel, Math.max(0, stages.length - 1)) : null
   const teamSet = useMemo(() => new Set(team), [team])
-  const approverSet = useMemo(() => new Set(people.filter(p => mayApprove(p.title)).map(p => p.id)), [people])
+  // Anybody on the team may approve (2026-11-14): the fixup only drops somebody who left.
+  const approverSet = useMemo(() => new Set(people.map(p => p.id)), [people])
   const nameOf = useCallback((id: string) => people.find(p => p.id === id)?.first ?? 'Someone who left', [people])
   const groupName = (key: string) => groupNameOf(book.groups, key)
   const visible = wfCategories({

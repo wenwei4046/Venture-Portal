@@ -233,6 +233,8 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
                     <div className={s.col}>
                       <span className={s.label}>Approver</span>
                       <PlanLevels levels={st.appr} editable={ed.people} approvers={approvers} nameOf={id => nameOf(id)} pic={pic} two={two}
+                        hasNext={i < draft.stages.length - 1}
+                        nextName={draft.stages[i + 1]?.owner ? nameOf(draft.stages[i + 1].owner) : 'picked when this stage is done'}
                         onChange={appr => upd(i, { appr })} />
                     </div>
 

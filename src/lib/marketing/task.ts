@@ -164,6 +164,8 @@ function planAppr(a: Record<string, unknown>): PlanAppr[] {
   if (Array.isArray(a.ids)) {
     const id = a.ids.find((x): x is string => typeof x === 'string' && x.length > 0)
     if (!id) return []
+    // The next stage's person: the one it stands for now, none before they are known.
+    if (id === 'next') return typeof a.nextWho === 'string' && a.nextWho ? [{ kind: 'person', staff: a.nextWho }] : []
     return id === PIC_ID ? [a.picAll === true ? { kind: 'pic', all: true } : { kind: 'pic' }] : id === 'assign' ? [{ kind: 'assign' }] : [{ kind: 'person', staff: id }]
   }
   return []

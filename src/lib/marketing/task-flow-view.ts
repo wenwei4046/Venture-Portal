@@ -7,7 +7,7 @@
 import { officeTime } from '@/lib/office-time'
 import { shortDay } from './board'
 import {
-  actorsNow, addWorkDays, bannerOf, defaultFocus, isWorkDay, lateDays, levelWaits, overdueFires, PIC_ID, turnOf,
+  actorsNow, addWorkDays, bannerOf, defaultFocus, isWorkDay, lateDays, levelWaits, NEXT_ID, overdueFires, PIC_ID, turnOf,
   type ApprLevel, type FinishCfg, type FlowAt, type FlowStage, type OverdueCfg,
 } from './flow'
 
@@ -128,6 +128,7 @@ const timeText = (at: string) => officeTime(at).format('D MMM HH:mm')
 export function personName(task: Pick<FlowTask, 'people' | 'pic'>, id: string | null | undefined): string {
   if (!id) return '—'
   if (id === PIC_ID) return `${task.pic || 'PIC'} (PIC)`
+  if (id === NEXT_ID) return 'Next stage’s person'
   return task.people.find(p => p.id === id)?.name ?? '—'
 }
 const shortName = (task: Pick<FlowTask, 'people' | 'pic'>, id: string) => (id === PIC_ID ? '🔗 PIC' : personName(task, id))
@@ -141,6 +142,10 @@ export function hueOf(id: string | null | undefined): number {
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360
   return h
 }
+
+/** A level's people as the page names them: 'next' as the next stage's person once known (else its words). */
+const shownIds = (task: Pick<FlowTask, 'stages'>, i: number, l: ApprLevel) =>
+  [...new Set(l.ids.map(id => (id === NEXT_ID ? (l.nextWho ?? task.stages[i + 1]?.doer ?? NEXT_ID) : id)))]
 
 /** The stages as the rules (flow.ts) take them. */
 export const flowStages = (task: Pick<FlowTask, 'stages' | 'at'>): FlowStage[] =>
@@ -344,9 +349,9 @@ export function panelView(task: FlowTask, i: number, isManager: boolean, now: Da
     const ok = active ? task.at.ok : {}
     return {
       n: j + 1,
-      rule: l.ids.length > 1 ? l.rule : '',
+      rule: shownIds(task, i, l).length > 1 ? l.rule : '',
       tone: passed ? 'passed' : active ? 'active' : 'later',
-      people: l.ids.map(id => ({
+      people: shownIds(task, i, l).map(id => ({
         text: `${shortName(task, id)}${ok[id] ? ' ✓' : active ? ' …' : ''}`,
         tone: ok[id] ? 'ok' : active ? 'wait' : 'plain',
         strong: active && !ok[id],
@@ -497,7 +502,7 @@ export function bannerView(task: FlowTask, me: string | null, isManager: boolean
   }
   if (kind === 'approver') {
     const lv = cur.levels[task.at.level]
-    const how = lv && lv.ids.length > 1 ? (lv.rule === 'all' ? 'Everyone on this level must approve.' : 'Any one approval moves it on.') : 'Approve to move it on, or send it back.'
+    const how = lv && shownIds(task, task.at.cur, lv).length > 1 ? (lv.rule === 'all' ? 'Everyone on this level must approve.' : 'Any one approval moves it on.') : 'Approve to move it on, or send it back.'
     return {
       tone: 'me', icon: '👀', title: `Your approval · ${cur.name}`, text: `${personName(task, cur.doer)} submitted it. ${how}`,
       actions: [{ key: 'changes', label: 'Request changes', primary: false }, { key: 'approve', label: 'Approve', primary: true }],
@@ -506,12 +511,20 @@ export function bannerView(task: FlowTask, me: string | null, isManager: boolean
   if (kind === 'doer') {
     const next = task.stages[task.at.cur + 1]
     const first = cur.levels[0]
-    const then = first ? `${first.ids.map(id => personName(task, id)).join(' & ')} is notified to approve`
+    const then = first ? `${shownIds(task, task.at.cur, first).map(id => personName(task, id)).join(' & ')} is notified to approve`
       : next ? (next.doer ? `${personName(task, next.doer)} is notified to start ${next.name}` : `you pick who does ${next.name}`) : 'the task is done'
     return {
       tone: late ? 'late' : 'me', icon: late ? '⏰' : '👉', title: `Your turn · ${cur.name}${late ? ` · ${late}d overdue` : ''}`,
       text: missing ? `Fill ${missing} required field${missing > 1 ? 's' : ''} below, then submit.` : `Everything required is filled. When you submit, ${then}.`,
       actions: [{ key: 'submit', label: `Submit ${cur.name}`, primary: true }],
+    }
+  }
+  if (kind === 'submitted') {
+    const n = cur.levels.length
+    return {
+      tone: 'calm', icon: '📨', title: `Submitted · ${cur.name}`,
+      text: `Waiting for ${actNames} to approve${n > 1 ? ` (level ${task.at.level + 1} of ${n})` : ''}. You’ll get a notification when it’s approved or sent back.`,
+      actions: [],
     }
   }
   if (kind === 'mm') {
@@ -532,7 +545,7 @@ export function bannerView(task: FlowTask, me: string | null, isManager: boolean
   // On a later 🔓 stage's shortlist: up next too (the rules count doers and approvers only).
   const listed = !!me && task.stages.some((s, i) => i > task.at.cur && !s.doer && s.cands.includes(me))
   if ((kind === 'upcoming' || ((kind === 'none' || kind === 'finished') && listed)) && me) {
-    const mine = task.stages.findIndex((s, i) => i > task.at.cur && (s.doer === me || s.cands.includes(me) || s.levels.some(l => l.ids.includes(me))))
+    const mine = task.stages.findIndex((s, i) => i > task.at.cur && (s.doer === me || s.cands.includes(me) || s.levels.some(l => shownIds(task, i, l).includes(me))))
     const at = mine > -1 ? mine : task.at.cur
     const steps = at - task.at.cur
     return {
@@ -565,13 +578,13 @@ export function nextUpView(task: FlowTask, now: Date): NextView {
   const lv = task.at.level >= 0 ? cur.levels[task.at.level] : null
   const pend = lv ? levelWaits(lv, task.at.ok) : []
   const proj = projected(task, now)
-  if (lv && lv.rule === 'all' && pend.length && pend.length < lv.ids.length) {
+  if (lv && lv.rule === 'all' && pend.length && pend.length < shownIds(task, task.at.cur, lv).length) {
     return { title: `Waiting for ${pend.map(id => personName(task, id)).join(' & ')}`, sub: `Level ${task.at.level + 1} needs everyone`, init: initialOf(task, pend[0]), hue: hueOf(pend[0]), when: `Already notified · “Please approve ${cur.name}.”` }
   }
   const nextLv = task.at.level < 0 ? cur.levels[0] : cur.levels[task.at.level + 1]
   const verb = task.at.level < 0 ? 'submits' : 'approves'
   if (nextLv) {
-    const ids = nextLv.ids
+    const ids = shownIds(task, task.at.cur, nextLv)
     return {
       title: `${ids.map(id => personName(task, id)).join(nextLv.rule === 'all' ? ' & ' : ' or ')} approve${ids.length > 1 ? '' : 's'} ${cur.name}`,
       sub: `Level ${task.at.level + 2} of ${cur.levels.length}${ids.length > 1 ? (nextLv.rule === 'all' ? ' · all must approve' : ' · any one is enough') : ''}`,
