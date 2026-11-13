@@ -6,6 +6,7 @@ import {
   brandKpiChanges,
   brandKpiEditOf,
   brandKpiTitle,
+  costDiffers,
   EMPTY_BRAND_KPI_DRAFT,
   specialsLeft,
   tierDrafts,
@@ -20,9 +21,10 @@ import {
 const BRAND = '383ddd53-18fd-4dfd-b31e-57df4e1d42d9'
 const FABRIC_ID = '11111111-1111-4111-8111-111111111111'
 const LATEX_ID = '22222222-2222-4222-8222-222222222222'
-const FABRIC: BrandKpiListed = { id: FABRIC_ID, special: 'Sofa Full Fabric', name: 'Upgrade fabric', amount: 50, tiers: [] }
+// Neither had a cost that day (the box came the same evening: what a unit takes off its bill).
+const FABRIC: BrandKpiListed = { id: FABRIC_ID, special: 'Sofa Full Fabric', name: 'Upgrade fabric', cost: null, amount: 50, tiers: [] }
 const LATEX: BrandKpiListed = {
-  id: LATEX_ID, special: 'Latex Seat', name: 'Upgrade latex seat', amount: 50,
+  id: LATEX_ID, special: 'Latex Seat', name: 'Upgrade latex seat', cost: null, amount: 50,
   tiers: [{ minQty: 5, amount: 70 }, { minQty: 10, amount: 100 }],
 }
 const LISTED = [FABRIC, LATEX]
@@ -43,6 +45,15 @@ describe("a brand's KPI items as Rules lists them", () => {
     expect(brandKpiTitle(FABRIC)).toBe('Upgrade fabric')
   })
 
+  it('reads its cost a unit — none where the row has none, or nothing above 0', () => {
+    const row = { id: LATEX_ID, option_value: 'Latex Seat', product_name: 'Upgrade latex seat', kpi_amount: 50 }
+    expect(toBrandKpiListed({ ...row, cost_amount: '500.00' }).cost).toBe(500)
+    expect(toBrandKpiListed({ ...row, cost_amount: 250 }).cost).toBe(250)
+    for (const none of [null, undefined, 0, '0.00', '', 'abc', -5]) {
+      expect(toBrandKpiListed({ ...row, cost_amount: none as never }).cost).toBeNull()
+    }
+  })
+
   it('shows stored tiers as the inputs hold them', () => {
     expect(tierDrafts(LATEX.tiers)).toEqual([{ minQty: '5', amount: '70' }, { minQty: '10', amount: '100' }])
     expect(tierDrafts([])).toEqual([])
@@ -57,6 +68,24 @@ describe('what counts as a change', () => {
     expect(bonusDiffers('60', 50)).toBe(true)
     expect(bonusDiffers('', 50)).toBe(true)
     expect(bonusDiffers('fifty', 50)).toBe(true)
+  })
+
+  it('a cost retyped to the same is none; a blank or a 0 is one only where the item has a cost', () => {
+    expect(costDiffers('500', 500)).toBe(false)
+    expect(costDiffers(' 500.00 ', 500)).toBe(false)
+    expect(costDiffers('1,000', 1000)).toBe(false)
+    expect(costDiffers('', null)).toBe(false)
+    expect(costDiffers('  ', null)).toBe(false)
+    expect(costDiffers('0', null)).toBe(false)
+    expect(costDiffers('0.00', null)).toBe(false)
+    // A cost typed, changed, or taken away.
+    expect(costDiffers('500', null)).toBe(true)
+    expect(costDiffers('250', 500)).toBe(true)
+    expect(costDiffers('', 500)).toBe(true)
+    expect(costDiffers('0', 500)).toBe(true)
+    // Words: a change, which the Save then refuses by name.
+    expect(costDiffers('five hundred', null)).toBe(true)
+    expect(costDiffers('five hundred', 500)).toBe(true)
   })
 
   it('tiers retyped to the same steps are none — a wholly blank row is no step', () => {
@@ -91,8 +120,22 @@ describe('what counts as a change', () => {
     expect(brandKpiChanges(LISTED, draft({
       amounts: new Map([[FABRIC_ID, '55']]),
       removing: new Set([LATEX_ID]),
-      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: '', amount: '30', tiers: [] }],
+      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: '', cost: '', amount: '30', tiers: [] }],
     }))).toBe(3)
+  })
+
+  it('a cost typed is a change of its item — one with its bonus and its tiers', () => {
+    const cost = draft({ costs: new Map([[LATEX_ID, '500']]) })
+    expect(brandItemEdited(LATEX, cost)).toBe(true)
+    expect(brandItemEdited(FABRIC, cost)).toBe(false)
+    expect(brandKpiChanges(LISTED, cost)).toBe(1)
+    expect(brandKpiChanges(LISTED, draft({
+      costs: new Map([[LATEX_ID, '500']]), amounts: new Map([[LATEX_ID, '60']]), tiers: new Map([[LATEX_ID, []]]),
+    }))).toBe(1)
+    // Touched and left blank on an item with no cost: nothing to save.
+    expect(brandKpiChanges(LISTED, draft({ costs: new Map([[LATEX_ID, ' '], [FABRIC_ID, '0']]) }))).toBe(0)
+    // Typed back to the cost it has.
+    expect(brandKpiChanges([{ ...LATEX, cost: 500 }], draft({ costs: new Map([[LATEX_ID, '500.00']]) }))).toBe(0)
   })
 })
 
@@ -103,7 +146,7 @@ describe('the specials still to pick', () => {
 
   it('never one the ERP removed, one picked already, or a second spelling of one', () => {
     const pool = [...POOL, { value: 'Wooden Arm', removed: true }, { value: ' nylon  FABRIC ', removed: false }, { value: '  ', removed: false }]
-    const picked = draft({ added: [{ key: 'new:neylon fabric', special: 'Neylon Fabric', name: '', amount: '', tiers: [] }] })
+    const picked = draft({ added: [{ key: 'new:neylon fabric', special: 'Neylon Fabric', name: '', cost: '', amount: '', tiers: [] }] })
     expect(specialsLeft(pool, LISTED, picked)).toEqual(['Nylon Fabric', 'Separate Backrest Packing'])
     // An item is matched to the pool whatever its spelling.
     expect(specialsLeft(POOL, [{ ...LATEX, special: 'LATEX  seat' }], EMPTY_BRAND_KPI_DRAFT)).not.toContain('Latex Seat')
@@ -137,6 +180,29 @@ describe('what a Save sends', () => {
     ])
   })
 
+  it('a cost alone: the item with its cost, its bonus and its tiers not sent', () => {
+    const edit = brandKpiEditOf(BRAND, LISTED, draft({ costs: new Map([[LATEX_ID, ' 500 '], [FABRIC_ID, '250']]) }))
+    expect(edit).toEqual({
+      adds: [],
+      changes: [{ id: FABRIC_ID, cost: '250', label: 'Upgrade fabric' }, { id: LATEX_ID, cost: '500', label: 'Upgrade latex seat' }],
+      removes: [],
+    })
+    expect(validateKpiItems(edit).changes).toEqual([{ id: FABRIC_ID, cost_amount: 250 }, { id: LATEX_ID, cost_amount: 500 }])
+  })
+
+  it('a cost emptied goes as null: the item has no cost any more (the database is sent 0)', () => {
+    const withCost = [{ ...LATEX, cost: 500 }]
+    const edit = brandKpiEditOf(BRAND, withCost, draft({ costs: new Map([[LATEX_ID, '  ']]) }))
+    expect(edit.changes).toEqual([{ id: LATEX_ID, cost: null, label: 'Upgrade latex seat' }])
+    expect(validateKpiItems(edit).changes).toEqual([{ id: LATEX_ID, cost_amount: 0 }])
+    // Typed 0: the same.
+    expect(validateKpiItems(brandKpiEditOf(BRAND, withCost, draft({ costs: new Map([[LATEX_ID, '0']]) }))).changes)
+      .toEqual([{ id: LATEX_ID, cost_amount: 0 }])
+    // Words are refused by the item's name.
+    expect(() => validateKpiItems(brandKpiEditOf(BRAND, withCost, draft({ costs: new Map([[LATEX_ID, 'five hundred']]) }))))
+      .toThrow(/Upgrade latex seat: cost: "five hundred" is not an amount/)
+  })
+
   it('an emptied bonus goes as null, so the Save is refused by name', () => {
     const edit = brandKpiEditOf(BRAND, LISTED, draft({ amounts: new Map([[FABRIC_ID, '  ']]) }))
     expect(edit.changes).toEqual([{ id: FABRIC_ID, amount: null, label: 'Upgrade fabric' }])
@@ -149,17 +215,17 @@ describe('what a Save sends', () => {
     })
   })
 
-  it("an added item goes under the brand: the special, its name when one was typed, its bonus and its tiers", () => {
+  it("an added item goes under the brand: the special, its name when one was typed, its cost when one was, its bonus and its tiers", () => {
     const edit = brandKpiEditOf(BRAND, LISTED, draft({
       added: [
-        { key: 'new:nylon fabric', special: 'Nylon Fabric', name: ' Upgrade nylon ', amount: ' 30 ', tiers: [{ minQty: '5', amount: '40' }, { minQty: ' ', amount: '' }] },
-        { key: 'new:separate backrest packing', special: 'Separate Backrest Packing', name: '  ', amount: '', tiers: [] },
+        { key: 'new:nylon fabric', special: 'Nylon Fabric', name: ' Upgrade nylon ', cost: ' 125 ', amount: ' 30 ', tiers: [{ minQty: '5', amount: '40' }, { minQty: ' ', amount: '' }] },
+        { key: 'new:separate backrest packing', special: 'Separate Backrest Packing', name: '  ', cost: ' ', amount: '', tiers: [] },
       ],
     }))
     expect(edit.adds).toEqual([
       {
         source: 'option', optionPool: 'sofa_specials', optionValue: 'Nylon Fabric', amount: '30', brandId: BRAND,
-        name: 'Upgrade nylon', tiers: [{ minQty: '5', amount: '40' }], label: 'Upgrade nylon',
+        name: 'Upgrade nylon', tiers: [{ minQty: '5', amount: '40' }], label: 'Upgrade nylon', cost: '125',
       },
       {
         source: 'option', optionPool: 'sofa_specials', optionValue: 'Separate Backrest Packing', amount: null, brandId: BRAND,
@@ -172,16 +238,17 @@ describe('what a Save sends', () => {
 
   it('is what the database takes once checked', () => {
     const edit = brandKpiEditOf(BRAND, LISTED, draft({
+      costs: new Map([[LATEX_ID, '500']]),
       amounts: new Map([[FABRIC_ID, '60']]),
       tiers: new Map([[LATEX_ID, [{ minQty: '5', amount: '70' }]]]),
-      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: 'Upgrade nylon', amount: '30', tiers: [{ minQty: '3', amount: '40' }] }],
+      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: 'Upgrade nylon', cost: '125', amount: '30', tiers: [{ minQty: '3', amount: '40' }] }],
     }))
     expect(validateKpiItems(edit)).toEqual({
       adds: [{
         source: 'option', option_pool: 'sofa_specials', option_value: 'Nylon Fabric', kpi_amount: 30, brand_id: BRAND,
-        label: 'Upgrade nylon', unit_tiers: [{ min_qty: 3, amount: 40 }],
+        label: 'Upgrade nylon', unit_tiers: [{ min_qty: 3, amount: 40 }], cost_amount: 125,
       }],
-      changes: [{ id: FABRIC_ID, kpi_amount: 60 }, { id: LATEX_ID, unit_tiers: [{ min_qty: 5, amount: 70 }] }],
+      changes: [{ id: FABRIC_ID, kpi_amount: 60 }, { id: LATEX_ID, unit_tiers: [{ min_qty: 5, amount: 70 }], cost_amount: 500 }],
       removes: [],
     })
   })

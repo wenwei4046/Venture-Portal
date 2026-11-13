@@ -5,10 +5,12 @@ import {
   indexFabricSeries,
   indexKpiItems,
   kpiAmountOf,
+  kpiItemCost,
   kpiItemKey,
   kpiItemKind,
   kpiItemLabel,
   kpiPaidOf,
+  kpiUnitOff,
   kpiUnitPay,
   lineKpiFactsOf,
   lineSpecialsOf,
@@ -433,6 +435,85 @@ describe("a brand's own KPI items — what a bill carries", () => {
       ['option:sofa_specials:wooden arm', 150, 150],
     ])
     expect(orderKpiHits({ lines }, brandIndex).map(h => [h.itemKey, h.amount, h.paid])).toEqual([['brand:2990S:option:sofa_specials:latex seat', 500, 50]])
+  })
+})
+
+// 2026-11-13, the same evening — told that an upgrade whose price is written in the remark would earn the whole
+// bill's commission AND the bonus (more than one keyed properly), the user: "i need a place at kpi item rules set
+// there fill in cost, so that it can dedecut the cost out and change to kpi amount only".
+describe("a brand's own KPI items — the cost a unit comes off the bill", () => {
+  const LATEX_500: KpiItem = { ...UPGRADE_LATEX, cost: 500 }
+  const FABRIC_250: KpiItem = { ...UPGRADE_FABRIC, cost: 250 }
+  const costed = indexBrandKpiItems([LATEX_500, FABRIC_250]).get('2990S')!
+  const read = (hits: ReturnType<typeof orderKpiHits>) => hits.map(h => ({ qty: h.qty, amount: h.amount, paid: h.paid }))
+
+  it('reads an item’s cost: above 0, else none', () => {
+    expect(kpiItemCost(LATEX_500)).toBe(500)
+    for (const none of [undefined, null, 0, -5, Number.NaN]) expect(kpiItemCost({ cost: none })).toBe(0)
+    // What a unit takes off: the cost, or what the bill charged when that is more.
+    expect(kpiUnitOff(LATEX_500, 0)).toBe(500)
+    expect(kpiUnitOff(LATEX_500, 300)).toBe(500)
+    expect(kpiUnitOff(LATEX_500, 500)).toBe(500)
+    expect(kpiUnitOff(LATEX_500, 1_000)).toBe(1_000)
+    // No cost: what the bill charged alone.
+    expect(kpiUnitOff(UPGRADE_LATEX, 0)).toBe(0)
+    expect(kpiUnitOff(UPGRADE_LATEX, 500)).toBe(500)
+    expect(kpiUnitOff(UPGRADE_LATEX, -20)).toBe(0)
+  })
+
+  it('takes the cost off a bill whose special order charges nothing — the price in the remark', () => {
+    // No special order at all, one that charges RM 0, one that charges for something else.
+    const unit = [{ qty: 1, amount: 500, paid: 50 }]
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'])] }, costed))).toEqual(unit)
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { 'latex seat': 0 })] }, costed))).toEqual(unit)
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Latex Seat'], { miscellaneous: 10 })] }, costed))).toEqual(unit)
+    // Two sofas of one model, neither charged: two units, the cost twice.
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'LOTTI-2A', 2, ['Sofa Full Fabric'])] }, costed))).toEqual([{ qty: 2, amount: 500, paid: 100 }])
+  })
+
+  it('is the same where the bill charged what the item costs — and never less than the cost where it charged less', () => {
+    const charged = (rm: number) => read(orderKpiHits({ lines: [
+      sofaPiece('a', 'BOAAT-1A(P)(LHF)', 1, ['Latex Seat'], { 'latex seat': rm }),
+      sofaPiece('b', 'BOAAT-1A(P)(RHF)', 1, ['Latex Seat'], { 'latex seat': rm }),
+    ] }, costed))
+    expect(charged(500)).toEqual([{ qty: 1, amount: 500, paid: 50 }])
+    expect(charged(300)).toEqual([{ qty: 1, amount: 500, paid: 50 }])
+  })
+
+  it('takes off what the bill charged when that is more than the cost — a corner’s RM 1,000', () => {
+    const hits = orderKpiHits({ lines: [
+      sofaPiece('a', 'BOAAT-2A', 1, ['Latex Seat']),
+      sofaPiece('b', 'KABBIN-2A(LHF)', 1, ['Latex Seat'], { 'latex seat': 1_000 }),
+      sofaPiece('c', 'KABBIN-L(RHF)', 1, ['Latex Seat'], { 'latex seat': 1_000 }),
+    ] }, costed)
+    expect(hits.map(h => [h.lineId, h.qty, h.amount, h.paid])).toEqual([['a', 1, 500, 50], ['b', 1, 1_000, 50]])
+  })
+
+  it('takes a returned sofa’s cost back, and gives a part of a shared bill its part of it', () => {
+    expect(read(orderKpiHits({ lines: [sofaPiece('a', 'LOTTI-2A(LHF)', -1, ['Latex Seat'])] }, costed))).toEqual([{ qty: -1, amount: -500, paid: -50 }])
+    const share = { parts: [{ staffId: 'owner', pct: 0.5 }, { staffId: 'mate', pct: 0.5 }] }
+    const half = [sofaPiece('a', 'TELLUC-2A(LHF)', 0.5, ['Sofa Full Fabric']), sofaPiece('b', 'TELLUC-L(RHF)', 0.5, ['Sofa Full Fabric'])]
+    for (const staffId of ['owner', 'mate']) {
+      expect(read(orderKpiHits({ lines: half, staffId, share }, costed))).toEqual([{ qty: 0.5, amount: 125, paid: 25 }])
+    }
+  })
+
+  it('still finds none where the sofa does not name the special, whatever the item costs', () => {
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, [], { 'latex seat': 500 })] }, costed)).toEqual([])
+    expect(orderKpiHits({ lines: [sofaPiece('a', 'QUBBU-2A', 1, ['Nylon Fabric'])] }, costed)).toEqual([])
+  })
+
+  it('leaves the sub-department’s own item alone: its one amount comes off the bill and is paid', () => {
+    // A cost on an item that is not a brand's is not read.
+    const own = indexKpiItems([{ ...OWN_LATEX, cost: 500 }])
+    expect(orderKpiHits({ lines: [sofaPiece('a', '8030-2A', 1, ['Latex Seat'])] }, own).map(h => [h.amount, h.paid])).toEqual([[40, 40]])
+  })
+
+  it('a bill pays its KPI items only when its sales cover the cost', () => {
+    // RM 400 sofa naming a RM 500 upgrade: not covered — paid as the sales it has.
+    const hits = orderKpiHits({ lines: [sofaPiece('a', 'BOAAT-2A', 1, ['Latex Seat'])] }, costed)
+    expect(coverKpi(400, kpiAmountOf(hits))).toEqual({ main: 400, covered: false })
+    expect(coverKpi(3_490, kpiAmountOf(hits))).toEqual({ main: 2_990, covered: true })
   })
 })
 
