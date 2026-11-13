@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from 'react'
 import dayjs from 'dayjs'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import type { RepaymentPlan } from '@/lib/repayment-plan'
+import { owedNowOf } from '@/lib/deal-print'
 
 // The Repayment schedule on a fund source's and a loan's page (2026-10-09,
 // the user's Claude Design handoff — it replaces the repayment history, with
@@ -33,15 +34,10 @@ export function scheduleCount(plan: RepaymentPlan): string {
  * the fourth "改成 next installment"): overdue now, owed now, paid to date, the next installment.
  */
 function ScheduleFacts({ plan }: { plan: RepaymentPlan }) {
-  const c = plan.compound
   const last = plan.rows[plan.rows.length - 1]
   const r2 = (n: number) => Math.round(n * 100) / 100
-  // Owed now: a 利滚利 deal's whole balance (rolled into); else — and a 利滚利 deal paid along the way, its money on the
-  // oldest interest first — the principal still owed and the interest already due but unpaid.
-  // Every instalment paid (2026-11-04, HC's 300,000 paid at 1,666.67 where the stored rate asks 1,666.80): nothing is
-  // owed — what the rate's rounding leaves over is not a debt, as the header's Outstanding RM 0.00 already says.
-  const paidUp = plan.rows.length > 0 && plan.rows.every((r) => r.outstanding <= 0.005) && plan.principalOwed <= 0.005
-  const unpaidInterest = paidUp ? 0 : r2(Math.max(0, plan.rows.filter((r) => !plan.next || r.due < plan.next.due).reduce((s, r) => s + r.interest, 0) - plan.interestPaid))
+  // Owed now (lib/deal-print owedNowOf — the printed sheet's Total owed is the same figure).
+  const owed = owedNowOf(plan)
   const next = plan.next ?? null
   const facts: Array<{ key: string; label: string; value: string; sub: string; bad?: boolean }> = [
     {
@@ -51,13 +47,13 @@ function ScheduleFacts({ plan }: { plan: RepaymentPlan }) {
       sub: plan.overdueSince ? `since ${dayjs(plan.overdueSince).format('D MMM YYYY')} · ${plural(plan.overdueDays, 'day', 'days')}` : 'nothing past its day',
       bad: plan.overdue > 0.005,
     },
-    c && !c.interestFirst
-      ? { key: 'owed', label: 'Owed now', value: formatMoney(c.owedNow), sub: last ? `balance after ${monthWords(last.ym)}` : '' }
+    owed.rolled
+      ? { key: 'owed', label: 'Owed now', value: formatMoney(owed.total), sub: last ? `balance after ${monthWords(last.ym)}` : '' }
       : {
           key: 'owed',
           label: 'Owed now',
-          value: formatMoney(r2(plan.principalOwed + unpaidInterest)),
-          sub: `principal ${formatMoneyBare(plan.principalOwed)} + interest ${formatMoneyBare(unpaidInterest)}`,
+          value: formatMoney(owed.total),
+          sub: `principal ${formatMoneyBare(owed.principal)} + interest ${formatMoneyBare(owed.interest)}`,
         },
     {
       key: 'paid',
