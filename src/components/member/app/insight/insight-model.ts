@@ -63,6 +63,12 @@ export interface InsightInput {
    * "you" it says of them (`How JAMES reached 12`, `JAMES’s part 50%`).
    */
   of?: string;
+  /**
+   * Month only (2026-11-14): each person's units of a brand on its own scheme (2990s), by staff id — the same month's
+   * Arena's per-brand scores. My team reads KPI hit against the sub-department's threshold with them taken out, as
+   * the person's own card reads it (`kpiLadderUnits`). Absent, or nobody in it: every unit, as before.
+   */
+  ownSchemeKpi?: ReadonlyMap<string, number>;
 }
 
 // ── shared derivations ─────────────────────────────────────────────────────
@@ -352,13 +358,18 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const teamOrders = team.reduce((s, r) => s + r.orders, 0);
   const members = team.length;
   const kpiCounts = kpiEnabled && threshold !== null;
-  const hits = kpiCounts ? team.filter(r => r.kpiQty >= threshold!).length : 0;
+  // A person's units toward the sub-department's threshold: every unit but a brand's own (2990s', 2026-11-14) — the
+  // reader's own, from their KPI summary, as their card above reads them.
+  const ladderOf = (r: (typeof team)[number]) => r.mine && monthly && input.kpi
+    ? kpiLadderUnits(input.kpi)
+    : Math.max(0, r.kpiQty - (input.ownSchemeKpi?.get(r.staffId) ?? 0));
+  const hits = kpiCounts ? team.filter(r => ladderOf(r) >= threshold!).length : 0;
   const rows: TeamRowVM[] = [...team].sort((a, b) => b.sales - a.sales || a.name.localeCompare(b.name)).map(r => {
     const m = r.marginRevenue > 0 ? ((r.marginRevenue - r.marginCost) / r.marginRevenue) * 100 : null;
     const marginText = m === null ? noMarginTag(r.blindOrders > 0, ownOnlyScore(r)) : `${m.toFixed(1)}%`;
     return {
       id: r.staffId || (r.mine ? "me" : r.name), ini: initials(r.name), name: r.mine ? `${r.name} (you)` : r.name, title: r.title,
-      sales: rm(r.sales), meta: kpiCounts ? `${marginText} · ${r.kpiQty >= threshold! ? "KPI hit" : "KPI pending"}` : marginText, mine: r.mine,
+      sales: rm(r.sales), meta: kpiCounts ? `${marginText} · ${ladderOf(r) >= threshold! ? "KPI hit" : "KPI pending"}` : marginText, mine: r.mine,
       ...(input.canView?.has(r.staffId) ? { open: true } : {}),
     };
   });

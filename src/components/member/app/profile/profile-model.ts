@@ -1,5 +1,5 @@
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberOrgPerson, MemberRequest } from "@/lib/member/types";
-import { arenaMonthFridays, arenaWeekendLabel, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaMonthFridays, arenaWeekendLabel, ladderKpiQty, type ArenaPerson, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { claimPayoutLine, readClaimPayout } from "@/lib/member/claim-payout";
 import { canEditRequest, EDIT_FIELDS, editValues, lockedNote } from "@/lib/member/request-edit";
 import { placeOf, type WaitingQueue } from "@/lib/member/waiting-queue";
@@ -408,6 +408,11 @@ export interface TeamInput {
   people: readonly ArenaPerson[];
   month: string;
   kpi: { enabled: boolean; threshold: number | null };
+  /**
+   * The brands on their own commission scheme (2990s; the snapshot's `ownScheme` brands): their units count on no
+   * threshold of the sub-department's (2026-11-14). Absent: none.
+   */
+  ownSchemeBrands?: readonly string[];
   capacity: number | null;
   occupied: number;
   /** Ranks of the member's own tree, by staff id (the snapshot's people). */
@@ -439,7 +444,8 @@ export function teamVM(input: TeamInput): TeamVM | null {
   const status = (staffId: string): [string, TeamDot] => {
     const p = score.get(staffId);
     if (input.kpi.enabled) {
-      const hit = input.kpi.threshold !== null && (p?.kpiQty ?? 0) >= input.kpi.threshold;
+      // The sub-department's threshold, read against its own units: a brand's own (2990s') are no part of it.
+      const hit = input.kpi.threshold !== null && !!p && ladderKpiQty(p, input.ownSchemeBrands ?? []) >= input.kpi.threshold;
       return hit ? ["KPI hit", "good"] : ["KPI pending", "wait"];
     }
     if (!p || !(p.sales > 0)) return ["No sales yet", "wait"];

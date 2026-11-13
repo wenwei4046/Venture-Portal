@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ArenaPerson, ArenaScore, ArenaTier } from "./arena";
+import { ladderKpiQty, ownSchemeBrandCodes, ownSchemeKpiQty, type ArenaPerson, type ArenaScore, type ArenaTier } from "./arena";
 import type { ArenaHistorySnapshot } from "./arena-history";
 import { boardPoints, championshipMonth, championshipStandings, mainBrand, placePoints, tiedPoints } from "./championship";
 
@@ -139,5 +139,31 @@ describe("championshipMonth — a brand on its own scheme", () => {
   it("without the margin brands named, every brand is one — as before", () => {
     const before = championshipMonth(input).find(r => r.id === "a")!;
     expect(before.parts.marginByBrand).toMatchObject({ position: null, points: 0, note: "2990s" });
+  });
+
+  // 2026-11-14 — one figure for two ladders: Fair's KPI switch went on (threshold 10) beside 2990s' own items. A brand's
+  // own units rank on the KPI board and count toward no threshold of the sub-department's.
+  it("reads the KPI threshold against the sub-department's own units — a brand's own count on the board only", () => {
+    const kpiPeople = [
+      // Six of Fair's own and five 2990s upgrades: eleven on the board, six toward the threshold.
+      person("a", { sales: 4300, kpiQty: 11 }, { "2990S": { sales: 4000, kpiQty: 5 }, AKEMI: { sales: 300, kpiQty: 6 } }),
+      // Ten of Fair's own.
+      person("b", { sales: 200, kpiQty: 10 }, { AKEMI: { sales: 200, kpiQty: 10 } }),
+    ];
+    const kpi = { enabled: true, threshold: 10 };
+    const k = championshipMonth({ ...input, people: kpiPeople, kpi, marginBrands: ["AKEMI"] });
+    expect(k.find(r => r.id === "a")!.parts.kpi).toMatchObject({ position: 1, bonus: 0, note: "" });
+    expect(k.find(r => r.id === "b")!.parts.kpi).toMatchObject({ position: 2, note: "Threshold hit" });
+    // No margin brands named: every unit, as before.
+    expect(championshipMonth({ ...input, people: kpiPeople, kpi }).find(r => r.id === "a")!.parts.kpi.note).toBe("Threshold hit");
+  });
+
+  it("knows a person's units of a brand on its own scheme, and the rest", () => {
+    const p = person("a", { kpiQty: 11 }, { "2990S": { kpiQty: 5 }, AKEMI: { kpiQty: 6 } });
+    expect([ownSchemeKpiQty(p, ["2990S"]), ladderKpiQty(p, ["2990S"]), ladderKpiQty(p, []), ladderKpiQty(person("b", { kpiQty: 2 }), ["2990S"])])
+      .toEqual([5, 6, 11, 2]);
+    // Never below nothing: a read whose total and parts disagree.
+    expect(ladderKpiQty(person("c", { kpiQty: 1 }, { "2990S": { kpiQty: 3 } }), ["2990S"])).toBe(0);
+    expect(ownSchemeBrandCodes([{ code: "AKEMI", name: "Akemi" }, { code: "2990S", name: "2990s", ownScheme: true }])).toEqual(["2990S"]);
   });
 });
