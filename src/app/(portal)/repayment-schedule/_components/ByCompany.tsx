@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -28,6 +28,11 @@ const EXTRAS: Array<{ key: Extra; label: string }> = [
   { key: 'pos', label: 'Total owed both ways' },
 ]
 const COLS_KEY = 'repayment.by-company.columns'
+// The order the figures stand in (2026-11-13 — the user: "我不能自己拖着排？"): drag a heading onto another, as the hub
+// tables do; kept by the browser. Company stays first, the row's button last.
+const ORDER_KEY = 'repayment.by-company.order'
+const DEFAULT_ORDER = ['collect', 'pay', 'net', 'profit', 'earlier', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
+type ColKey = (typeof DEFAULT_ORDER)[number]
 
 type Filter = 'all' | 'both' | 'late' | 'loss'
 type SortKey = 'name' | 'collect' | 'pay' | 'net' | 'profit' | 'earlier'
@@ -105,7 +110,18 @@ export default function ByCompany({
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'name', dir: 1 })
   const [extra, setExtra] = useState<Extra[]>([])
   const [menu, setMenu] = useState(false)
+  const [order, setOrder] = useState<ColKey[]>([...DEFAULT_ORDER])
+  const [drag, setDrag] = useState<{ from: ColKey | null; over: ColKey | null }>({ from: null, over: null })
   useEffect(() => {
+    try {
+      const o = JSON.parse(window.localStorage.getItem(ORDER_KEY) ?? '[]') as ColKey[]
+      if (Array.isArray(o) && o.length) {
+        const known = o.filter((k) => (DEFAULT_ORDER as readonly string[]).includes(k))
+        setOrder([...known, ...DEFAULT_ORDER.filter((k) => !known.includes(k))])
+      }
+    } catch {
+      // Private mode — the order simply is not kept.
+    }
     try {
       const v = JSON.parse(window.localStorage.getItem(COLS_KEY) ?? '[]') as Extra[]
       if (Array.isArray(v)) setExtra(v.filter((x) => EXTRAS.some((e) => e.key === x)))
@@ -123,6 +139,23 @@ export default function ByCompany({
     }
   }
   const has = (k: Extra) => extra.includes(k)
+  const keepOrder = (next: ColKey[]) => {
+    setOrder(next)
+    try {
+      if (next.join() === DEFAULT_ORDER.join()) window.localStorage.removeItem(ORDER_KEY)
+      else window.localStorage.setItem(ORDER_KEY, JSON.stringify(next))
+    } catch {
+      // Private mode.
+    }
+  }
+  const drop = (to: ColKey) => {
+    const from = drag.from
+    setDrag({ from: null, over: null })
+    if (!from || from === to) return
+    const next = order.filter((k) => k !== from)
+    next.splice(next.indexOf(to) + (order.indexOf(from) < order.indexOf(to) ? 1 : 0), 0, from)
+    keepOrder(next)
+  }
 
   const figs = useMemo(() => new Map(companies.map((c) => [c.name, figuresOf(c.deals, basis)])), [companies, basis])
   const fig = (c: Company) => figs.get(c.name) as Figures
@@ -143,28 +176,143 @@ export default function ByCompany({
   const total = (k: keyof Figures) => shown.reduce((t, c) => t + fig(c)[k], 0)
   const position = shown.reduce((t, c) => t + c.position, 0)
 
-  const th = (label: string, key: SortKey | null, num = false) => (
+  const tone = (n: number) => (n >= EPS ? s.good : n <= -EPS ? s.bad : s.quiet)
+  const sortGlyph = (key: SortKey) => (
+    <span className={s.sortGlyph} data-on={sort.key === key ? 'true' : undefined}>
+      {sort.key === key ? (sort.dir === 1 ? '▲' : '▼') : '↕'}
+    </span>
+  )
+  const toggleSort = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, dir: cur.dir === 1 ? -1 : 1 } : { key, dir: key === 'name' ? 1 : -1 }))
+
+  // Each figure's column: its heading, what a company row, a deal row and the foot say in it.
+  type Col = {
+    key: ColKey
+    label: string
+    num?: boolean
+    sort?: SortKey
+    extra?: Extra
+    co: (c: Company, f: Figures) => ReactNode
+    deal: (d: CoDeal) => ReactNode
+    foot: () => ReactNode
+  }
+  const shownFig = (d: CoDeal) => (A ? d.got : d.due)
+  const shownInt = (d: CoDeal) => (A ? d.gotInterest : d.dueInterest)
+  const cell = (cls: string, v: ReactNode) => <td className={cls}>{v}</td>
+  const COLS: Record<ColKey, Col> = {
+    collect: {
+      key: 'collect', label: A ? 'Received' : 'We collect', num: true, sort: 'collect',
+      co: (_, f) => cell(`${s.num} ${f.collect >= EPS ? s.good : s.quiet}`, bare(f.collect)),
+      deal: (d) => cell(s.num, d.side === 'collect' ? bare(shownFig(d)) : ''),
+      foot: () => cell(s.num, bare(total('collect'))),
+    },
+    pay: {
+      key: 'pay', label: A ? 'Paid' : 'We pay', num: true, sort: 'pay',
+      co: (_, f) => cell(`${s.num} ${f.pay >= EPS ? s.bad : s.quiet}`, bare(f.pay)),
+      deal: (d) => cell(s.num, d.side === 'pay' ? bare(shownFig(d)) : ''),
+      foot: () => cell(s.num, bare(total('pay'))),
+    },
+    net: {
+      key: 'net', label: 'Net', num: true, sort: 'net',
+      co: (_, f) => cell(`${s.num} ${tone(f.net)}`, signed(f.net)),
+      deal: () => cell(s.num, ''),
+      foot: () => cell(s.num, signed(total('net'))),
+    },
+    profit: {
+      key: 'profit', label: 'Interest profit', num: true, sort: 'profit',
+      co: (_, f) => cell(`${s.num} ${tone(f.profit)}`, signed(f.profit)),
+      deal: (d) => {
+        const v = d.side === 'collect' ? shownInt(d) : -shownInt(d)
+        return cell(`${s.num} ${tone(v)}`, signed(v))
+      },
+      foot: () => cell(s.num, signed(total('profit'))),
+    },
+    earlier: {
+      key: 'earlier', label: 'Earlier unpaid', num: true, sort: 'earlier',
+      co: (_, f) => cell(`${s.num} ${f.earlier >= EPS ? s.bad : s.quiet}`, bare(f.earlier)),
+      deal: (d) => cell(`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`, bare(d.earlier)),
+      foot: () => cell(s.num, bare(total('earlier'))),
+    },
+    gotCollect: {
+      key: 'gotCollect', label: 'Received so far', num: true, extra: 'sofar',
+      co: (_, f) => cell(`${s.num} ${s.good}`, bare(f.gotCollect)),
+      deal: (d) => cell(s.num, d.side === 'collect' ? bare(d.got) : ''),
+      foot: () => cell(s.num, bare(total('gotCollect'))),
+    },
+    gotPay: {
+      key: 'gotPay', label: 'Paid so far', num: true, extra: 'sofar',
+      co: (_, f) => cell(`${s.num} ${s.bad}`, bare(f.gotPay)),
+      deal: (d) => cell(s.num, d.side === 'pay' ? bare(d.got) : ''),
+      foot: () => cell(s.num, bare(total('gotPay'))),
+    },
+    pi: {
+      key: 'pi', label: 'Interest in / out', num: true, extra: 'pi',
+      co: (_, f) => cell(s.num, `${formatMoneyBare(f.interestIn)} / ${formatMoneyBare(f.interestOut)}`),
+      deal: (d) => cell(s.num, `P ${formatMoneyBare(Math.max(0, shownFig(d) - shownInt(d)))} · I ${formatMoneyBare(shownInt(d))}`),
+      foot: () => cell(s.num, `${formatMoneyBare(total('interestIn'))} / ${formatMoneyBare(total('interestOut'))}`),
+    },
+    next: {
+      key: 'next', label: 'Next due', extra: 'next',
+      co: () => <td />,
+      deal: (d) => <td>{d.next ? `${dayjs(d.next.due).format('D MMM')} · ${formatMoneyBare(d.next.amount)}` : '—'}</td>,
+      foot: () => <td />,
+    },
+    last: {
+      key: 'last', label: 'Last received / paid', extra: 'last',
+      co: () => <td />,
+      deal: (d) => <td>{day(d.last)}</td>,
+      foot: () => <td />,
+    },
+    pos: {
+      key: 'pos', label: 'Total owed both ways', num: true, extra: 'pos',
+      co: (c) => (
+        <td className={`${s.num} ${tone(c.position)}`}>
+          {signed(c.position)}
+          {Math.abs(c.position) >= EPS ? <div className={s.sub}>{c.position > 0 ? 'they owe us' : 'we owe them'}</div> : null}
+        </td>
+      ),
+      deal: (d) => cell(s.num, bare(d.owe)),
+      foot: () => cell(s.num, signed(position)),
+    },
+  }
+  const cols = order.map((k) => COLS[k]).filter((c) => !c.extra || has(c.extra))
+
+  const head = (c: Col) => (
     <th
-      data-num={num ? 'true' : undefined}
-      data-sort={key ?? undefined}
-      aria-sort={key && sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}
-      onClick={key ? () => setSort((cur) => (cur.key === key ? { key, dir: cur.dir === 1 ? -1 : 1 } : { key, dir: key === 'name' ? 1 : -1 })) : undefined}
+      key={c.key}
+      data-num={c.num ? 'true' : undefined}
+      data-sort={c.sort ?? undefined}
+      data-dragging={drag.from === c.key ? 'true' : undefined}
+      data-drop={drag.over === c.key && drag.from && drag.from !== c.key ? 'true' : undefined}
+      aria-sort={c.sort && sort.key === c.sort ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}
+      title="Drag to move · click to sort"
+      draggable
+      onDragStart={(e) => {
+        try {
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', c.key)
+        } catch {
+          // Some browsers refuse data on a drag start; the state carries it.
+        }
+        setDrag({ from: c.key, over: null })
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        if (drag.over !== c.key) setDrag((d) => ({ ...d, over: c.key }))
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        drop(c.key)
+      }}
+      onDragEnd={() => setDrag({ from: null, over: null })}
+      onClick={c.sort ? () => toggleSort(c.sort!) : undefined}
     >
-      {label}
-      {key ? (
-        <span className={s.sortGlyph} data-on={sort.key === key ? 'true' : undefined}>
-          {sort.key === key ? (sort.dir === 1 ? '▲' : '▼') : '↕'}
-        </span>
-      ) : null}
+      {c.label}
+      {c.sort ? sortGlyph(c.sort) : null}
     </th>
   )
-  const tone = (n: number) => (n >= EPS ? s.good : n <= -EPS ? s.bad : s.quiet)
 
   const dealRow = (d: CoDeal) => {
     const c1 = d.side === 'collect'
-    const fig = A ? d.got : d.due
-    const intr = A ? d.gotInterest : d.dueInterest
-    const owedNow = d.open
     return (
       <tr key={`${d.side}:${d.id}`} className={s.deal}>
         <td className={s.dealCell}>
@@ -179,23 +327,9 @@ export default function ByCompany({
           {d.pending ? <span className="chip wait ml-2">pending PV</span> : null}
           <div className={s.sub}>{d.words}</div>
         </td>
-        <td className={s.num}>{c1 ? bare(fig) : ''}</td>
-        <td className={s.num}>{c1 ? '' : bare(fig)}</td>
-        <td className={s.num} />
-        <td className={`${s.num} ${tone(c1 ? intr : -intr)}`}>{signed(c1 ? intr : -intr)}</td>
-        <td className={`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`}>{bare(d.earlier)}</td>
-        {has('sofar') ? (
-          <>
-            <td className={s.num}>{c1 ? bare(d.got) : ''}</td>
-            <td className={s.num}>{c1 ? '' : bare(d.got)}</td>
-          </>
-        ) : null}
-        {has('pi') ? <td className={s.num}>{`P ${formatMoneyBare(Math.max(0, fig - intr))} · I ${formatMoneyBare(intr)}`}</td> : null}
-        {has('next') ? <td>{d.next ? `${dayjs(d.next.due).format('D MMM')} · ${formatMoneyBare(d.next.amount)}` : '—'}</td> : null}
-        {has('last') ? <td>{day(d.last)}</td> : null}
-        {has('pos') ? <td className={s.num}>{bare(d.owe)}</td> : null}
+        {cols.map((c) => <Fragment key={c.key}>{c.deal(d)}</Fragment>)}
         <td className="text-right whitespace-nowrap">
-          {canRecord && !d.pending && owedNow >= EPS && d.href ? (
+          {canRecord && !d.pending && d.open >= EPS && d.href ? (
             <Link href={`${d.href}${c1 ? '#repayment-form' : '#repay_principal'}`} className="sch-row-btn border-0">
               {c1 ? 'Record receipt' : 'Record payment'}
             </Link>
@@ -236,7 +370,14 @@ export default function ByCompany({
               <>
                 <div className={s.away} onClick={() => setMenu(false)} aria-hidden="true" />
                 <div className={s.colMenu} role="menu">
-                  <div className={s.colMenuHint}>Add columns</div>
+                  <div className={s.colMenuHint}>
+                    Add columns · drag a heading to move it
+                    {order.join() !== DEFAULT_ORDER.join() ? (
+                      <button type="button" className={s.colReset} onClick={() => keepOrder([...DEFAULT_ORDER])}>
+                        Reset order
+                      </button>
+                    ) : null}
+                  </div>
                   {EXTRAS.map((e) => (
                     <label key={e.key}>
                       <input type="checkbox" checked={has(e.key)} onChange={() => toggleExtra(e.key)} /> {e.label}
@@ -251,22 +392,11 @@ export default function ByCompany({
           <table className={s.table}>
             <thead>
               <tr>
-                {th('Company', 'name')}
-                {th(A ? 'Received' : 'We collect', 'collect', true)}
-                {th(A ? 'Paid' : 'We pay', 'pay', true)}
-                {th('Net', 'net', true)}
-                {th('Interest profit', 'profit', true)}
-                {th('Earlier unpaid', 'earlier', true)}
-                {has('sofar') ? (
-                  <>
-                    {th('Received so far', null, true)}
-                    {th('Paid so far', null, true)}
-                  </>
-                ) : null}
-                {has('pi') ? th('Interest in / out', null, true) : null}
-                {has('next') ? th('Next due', null) : null}
-                {has('last') ? th('Last received / paid', null) : null}
-                {has('pos') ? th('Total owed both ways', null, true) : null}
+                <th data-sort="name" aria-sort={sort.key === 'name' ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} onClick={() => toggleSort('name')}>
+                  Company
+                  {sortGlyph('name')}
+                </th>
+                {cols.map(head)}
                 <th aria-label="Actions" />
               </tr>
             </thead>
@@ -299,26 +429,7 @@ export default function ByCompany({
                           {c.both ? ' · both sides' : ''}
                         </div>
                       </td>
-                      <td className={`${s.num} ${f.collect >= EPS ? s.good : s.quiet}`}>{bare(f.collect)}</td>
-                      <td className={`${s.num} ${f.pay >= EPS ? s.bad : s.quiet}`}>{bare(f.pay)}</td>
-                      <td className={`${s.num} ${tone(f.net)}`}>{signed(f.net)}</td>
-                      <td className={`${s.num} ${tone(f.profit)}`}>{signed(f.profit)}</td>
-                      <td className={`${s.num} ${f.earlier >= EPS ? s.bad : s.quiet}`}>{bare(f.earlier)}</td>
-                      {has('sofar') ? (
-                        <>
-                          <td className={`${s.num} ${s.good}`}>{bare(f.gotCollect)}</td>
-                          <td className={`${s.num} ${s.bad}`}>{bare(f.gotPay)}</td>
-                        </>
-                      ) : null}
-                      {has('pi') ? <td className={s.num}>{`${formatMoneyBare(f.interestIn)} / ${formatMoneyBare(f.interestOut)}`}</td> : null}
-                      {has('next') ? <td /> : null}
-                      {has('last') ? <td /> : null}
-                      {has('pos') ? (
-                        <td className={`${s.num} ${tone(c.position)}`}>
-                          {signed(c.position)}
-                          {Math.abs(c.position) >= EPS ? <div className={s.sub}>{c.position > 0 ? 'they owe us' : 'we owe them'}</div> : null}
-                        </td>
-                      ) : null}
+                      {cols.map((col) => <Fragment key={col.key}>{col.co(c, f)}</Fragment>)}
                       <td />
                     </tr>
                     {isOpen ? c.deals.map(dealRow) : null}
@@ -330,21 +441,7 @@ export default function ByCompany({
                   <td>
                     Total · {shown.length} {shown.length === 1 ? 'company' : 'companies'}
                   </td>
-                  <td className={s.num}>{bare(total('collect'))}</td>
-                  <td className={s.num}>{bare(total('pay'))}</td>
-                  <td className={s.num}>{signed(total('net'))}</td>
-                  <td className={s.num}>{signed(total('profit'))}</td>
-                  <td className={s.num}>{bare(total('earlier'))}</td>
-                  {has('sofar') ? (
-                    <>
-                      <td className={s.num}>{bare(total('gotCollect'))}</td>
-                      <td className={s.num}>{bare(total('gotPay'))}</td>
-                    </>
-                  ) : null}
-                  {has('pi') ? <td className={s.num}>{`${formatMoneyBare(total('interestIn'))} / ${formatMoneyBare(total('interestOut'))}`}</td> : null}
-                  {has('next') ? <td /> : null}
-                  {has('last') ? <td /> : null}
-                  {has('pos') ? <td className={s.num}>{signed(position)}</td> : null}
+                  {cols.map((col) => <Fragment key={col.key}>{col.foot()}</Fragment>)}
                   <td />
                 </tr>
               ) : null}
