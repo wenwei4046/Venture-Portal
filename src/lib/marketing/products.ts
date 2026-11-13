@@ -186,12 +186,26 @@ export function productProblems(p: Product, book: Pick<ProductBook, 'workflows' 
   const items = p.groups.flatMap(g => g.items)
   if (p.groups.some(g => !g.name.trim()) || items.some(it => !it.name.trim())) out.push('Name each category and action')
   if (!items.some(it => it.qty > 0 && it.name.trim())) out.push('Add what the product includes')
-  if (items.some(it => !it.workflow)) out.push('Link a workflow to each action')
-  else if (items.some(it => (book.workflows.find(w => w.id === it.workflow)?.version ?? 0) === 0)) out.push('A linked workflow is not published yet')
+  // An action need not run on a published workflow (2026-11-13 — the user: a product publishes on its basics);
+  // `productWarnings` says so, never a refusal.
   if (!p.intake) out.push('Pick its intake minutes template')
   else if ((book.minutes.find(t => t.id === p.intake)?.version ?? 0) === 0) out.push('Its intake minutes template is not published yet')
   if ((p.price ?? 0) <= 0) out.push('Set its list price')
   if (!p.effectiveFrom) out.push('Pick the day it takes effect')
+  return out
+}
+
+/** What publishing lets through but the builder warns of: an action (of quantity 1 or more) with no workflow, or one
+ * whose workflow is not published yet — its work is not made when a project starts (`mkt_product_begin` skips it,
+ * telling the owner). */
+export function productWarnings(p: Pick<Product, 'groups' | 'status'>, book: Pick<ProductBook, 'workflows'>): string[] {
+  if (p.status === 'retired') return []
+  const items = p.groups.flatMap(g => g.items).filter(it => it.qty > 0 && it.name.trim())
+  const unlinked = items.filter(it => !it.workflow).length
+  const unpublished = items.filter(it => it.workflow && (book.workflows.find(w => w.id === it.workflow)?.version ?? 0) === 0).length
+  const out: string[] = []
+  if (unlinked) out.push(`${unlinked} action${unlinked === 1 ? '' : 's'} not linked to a workflow — its work is not made`)
+  if (unpublished) out.push(`${unpublished} linked workflow${unpublished === 1 ? ' is' : 's are'} not published yet — its work is not made`)
   return out
 }
 

@@ -532,6 +532,8 @@ export function productEventText(e: { actor: string; action: string; reason: str
     // A project opened from this one (④-4c — answer 23).
     : e.action === 'opened project' ? openedProjectText(who, e.data)
     : e.action === 'work started' ? `${who} started the work · ${n} deliverable${n === 1 ? '' : 's'}${Number(e.data?.runDay) ? ` · every month on the ${ordinal(Number(e.data?.runDay))}` : ''}`
+    // An action with no published workflow made no deliverable (2026-11-13 — a product publishes on its basics).
+    : e.action === 'not made' ? `Not made: ${e.reason}`
     // A recurring one's months (②b-2f).
     : e.action === 'run made' ? runMadeText(e.data)
     : e.action === 'run day' ? `${who} moved the monthly run to the ${ordinal(Number(e.data?.to) || 1)}`

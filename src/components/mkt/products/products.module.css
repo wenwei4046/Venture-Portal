@@ -136,6 +136,7 @@
 .pubFoot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
 .pubNote { font-size: .84em; color: rgb(var(--mk-text-2)); }
 .pubNoteBad { font-size: .84em; color: rgb(var(--mk-red)); }
+.pubWarn { font-size: .84em; color: rgb(var(--mk-warn-ink)); }
 
 .toast { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 8px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); font-size: 13px; animation: mkIn .2s ease-out; }
 

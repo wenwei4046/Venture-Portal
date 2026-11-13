@@ -66,7 +66,7 @@ const ACTION: Record<string, string> = {
   'pic changes': 'Changes requested via link', signed: 'Minutes signed', 'minutes completed': 'Minutes completed',
   'edited after approval': 'Edited after approval', 'started before approval': 'Started before approval',
   attached: 'Attached from the Library', detached: 'Taken off the task',
-  'work started': 'Work started', planned: 'Plan saved', replanned: 'Plan changed before it opened', 'plan changed': 'Plan changed',
+  'work started': 'Work started', 'not made': 'Not made', planned: 'Plan saved', replanned: 'Plan changed before it opened', 'plan changed': 'Plan changed',
   reassigned: 'Reassigned', replaced: 'Replaced',
   subtask: 'Subtask created', delivered: 'Delivered', 'delivery returned': 'Delivery returned', 'delivery approved': 'Delivery approved',
   'subtask removed': 'Subtask taken back',

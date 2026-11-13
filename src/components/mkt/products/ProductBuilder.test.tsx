@@ -116,6 +116,24 @@ describe('the Product Builder', () => {
     expect(screen.getByText('Add what the product includes')).toBeTruthy()
   })
 
+  // 2026-11-13 — the user: a product publishes on its basics. An action with no workflow is a warning beside the
+  // note and in Publish's tooltip, never a refusal; its work is not made when a project starts (mkt_product_begin).
+  it('publishes on its basics — an action with no workflow is warned of, Publish stays lit', async () => {
+    const LOOSE = { ...DRAFT, id: 'p4', code: 'PRD-26004', name: 'Starter', intake: 'm1', price: 900, effectiveFrom: '2026-11-20',
+      groups: [{ name: 'Design', items: [{ name: 'Poster', qty: 2, price: 450, workflow: null }] }] }
+    render(<ProductBuilder initial={productBookFromRow({ ...BOOK, products: [...BOOK.products, LOOSE] })} first="p4" />)
+    const publish = screen.getByRole('button', { name: 'Publish v1' })
+    expect(publish).toHaveProperty('disabled', false)
+    expect(screen.getByRole('note').textContent).toBe('⚠️ 1 action not linked to a workflow — its work is not made')
+    expect(publish.getAttribute('title')).toBe('1 action not linked to a workflow — its work is not made')
+    expect(screen.queryByText('Link a workflow to each action')).toBeNull()
+    actions.publishMktProduct.mockResolvedValue({ ok: true, version: 1, effectiveFrom: '2026-11-20', live: 0, book: null })
+    await act(async () => {
+      fireEvent.click(publish)
+    })
+    await waitFor(() => expect(actions.publishMktProduct).toHaveBeenCalledWith('p4', 1))
+  })
+
   it('publishes the draft as saved', async () => {
     builder('p1')
     fireEvent.click(screen.getByRole('button', { name: 'One more' }))

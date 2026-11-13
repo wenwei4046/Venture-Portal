@@ -56,6 +56,8 @@ export default function TaskFlowPic({ view, title, sub, answer }: {
                   {x.table.cells.flatMap((row, ri) => row.map((c, ci) => (
                     <span key={`${ri}-${ci}`} className={`${s.picTd}${c.filled ? '' : ` ${s.picSoon}`}`}>{c.text}</span>
                   )))}
+                  {/* No rows yet: one line across the table, as an empty field says it. */}
+                  {x.table.cells.length === 0 ? <span className={`${s.picTd} ${s.picSoon}`} style={{ gridColumn: '1 / -1' }}>Coming soon</span> : null}
                 </div>
               </div>
             ) : null}

@@ -39,11 +39,23 @@ export default function Tip({ text, children }: { /** Nothing: no tip (the wrapp
     const h = box.offsetHeight
     const vw = window.innerWidth || document.documentElement.clientWidth
     const vh = window.innerHeight || document.documentElement.clientHeight
-    const below = r.bottom + GAP + h <= vh - EDGE || r.top - GAP - h < EDGE
-    // An option as tall as the screen (the celebration): kept on the screen, at its foot.
-    const top = Math.max(EDGE, Math.min(below ? r.bottom + GAP : r.top - GAP - h, vh - h - EDGE))
-    box.style.top = `${Math.round(top)}px`
-    box.style.left = `${Math.round(Math.max(EDGE, Math.min(r.left, vw - w - EDGE)))}px`
+    // A wide option (a card, a row of a list) has neighbours under it: the tip goes beside it, where there is room —
+    // the left first (the settings panel sits at the screen's right), so it never covers another option. A small one
+    // (an icon, a name) takes it under it, or over it when the screen ends first.
+    const sideTop = Math.max(EDGE, Math.min(r.top + r.height / 2 - h / 2, vh - h - EDGE))
+    if (r.width >= 160 && r.height < vh / 2 && r.left - GAP - w >= EDGE) {
+      box.style.top = `${Math.round(sideTop)}px`
+      box.style.left = `${Math.round(r.left - GAP - w)}px`
+    } else if (r.width >= 160 && r.height < vh / 2 && r.right + GAP + w <= vw - EDGE) {
+      box.style.top = `${Math.round(sideTop)}px`
+      box.style.left = `${Math.round(r.right + GAP)}px`
+    } else {
+      const below = r.bottom + GAP + h <= vh - EDGE || r.top - GAP - h < EDGE
+      // An option as tall as the screen (the celebration): kept on the screen, at its foot.
+      const top = Math.max(EDGE, Math.min(below ? r.bottom + GAP : r.top - GAP - h, vh - h - EDGE))
+      box.style.top = `${Math.round(top)}px`
+      box.style.left = `${Math.round(Math.max(EDGE, Math.min(r.left, vw - w - EDGE)))}px`
+    }
     a.setAttribute('aria-describedby', id)
     return () => a.removeAttribute('aria-describedby')
   }, [open, id])

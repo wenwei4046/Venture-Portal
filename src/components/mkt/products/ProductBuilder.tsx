@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductAccount, setMktProductStatus } from '@/lib/marketing/actions'
 import {
-  accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections,
+  accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections, productWarnings,
   type Product, type ProductBook, type ProductEdit, type ProductGroup, type ProductItem, type ProductStatus, type ProductWorkflowOption,
 } from '@/lib/marketing/products'
 import { firstWfStage, wfStagesPayload } from '@/lib/marketing/workflows'
@@ -291,6 +291,8 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
   const sections = productSections({ ...edit, code: sel.code })
   const draftProduct: Product = { ...sel, ...edit }
   const problems = productProblems(draftProduct, book)
+  // Warned of, never refused (2026-11-13): an action with no published workflow publishes; its work is not made.
+  const warnings = productWarnings(draftProduct, book)
   const sum = itemsSum(groups)
   const m = margin(edit.price, edit.cost)
   const nextVer = sel.version + 1
@@ -558,6 +560,9 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
                 {sel.status === 'active' ? <button type="button" className={pb.danger} disabled={busy} onClick={() => void setStatus('retire')}>Retire product</button> : null}
                 {sel.status === 'draft' ? <DeleteDraft key={sel.id} what="product" busy={busy} onDelete={() => void remove()} /> : null}
                 <span className={pb.grow} />
+                {ro || problems.length || !warnings.length ? null : (
+                  <span className={pb.pubWarn} role="note">⚠️ {warnings.join(' · ')}</span>
+                )}
                 {ro ? null : (
                   <span className={problems.length ? pb.pubNoteBad : pb.pubNote}>
                     {problems.length ? problems[0] : `New projects from ${day(edit.effectiveFrom)} use v${nextVer}. ${sel.live} running project${sel.live === 1 ? '' : 's'} stay on v${sel.version || '—'}.`}
@@ -565,7 +570,7 @@ export default function ProductBuilder({ initial, first }: { initial: ProductBoo
                 )}
                 {ro ? null : <button type="button" className={pb.ghost} disabled={busy} onClick={() => void saveDraft()}>Save draft</button>}
                 {ro ? null : (
-                  <button type="button" className={pb.primary} disabled={!canPublish} title={!changed ? `Nothing has changed since v${sel.version}` : problems[0]} onClick={() => void publish()}>
+                  <button type="button" className={pb.primary} disabled={!canPublish} title={!changed ? `Nothing has changed since v${sel.version}` : problems[0] ?? (warnings.length ? warnings.join(' · ') : undefined)} onClick={() => void publish()}>
                     Publish v{nextVer}
                   </button>
                 )}
