@@ -1926,7 +1926,7 @@ await db.exec(`
   await q(`insert into public.crm_channel_events (channel, status, payload) values ('messenger', 'ok', $1::jsonb)`, [JSON.stringify({ ...postPayload, entry: [{ id: P, messaging: [{ referral: { ad_id: '999', ads_context_data: { post_id: '1' } } }] }] })])
   const adPosts = (await q(`select public.lead_ad_posts() p`))[0].p
   const adPost = adPosts.find(x => x.adId === AI_AD)
-  check([adPost?.postUrl, adPost?.picture], [`https://www.facebook.com/${P}_122151015069199078`, 'https://www.facebook.com/ads/image/?d=x'], 'an ad’s post and picture as Meta sent them')
+  check([adPost?.postUrl, adPost?.picture], [`https://www.facebook.com/${P}/posts/122151015069199078`, 'https://www.facebook.com/ads/image/?d=x'], 'an ad’s post and picture as Meta sent them')
   check(adPosts.some(x => x.adId === '999'), false, 'an ad no chat came from is left out')
   await as(CS_USER, [])
   await refuses(`select public.lead_ad_posts()`, [], /Lead View · View/, 'reading them needs Lead View · View')
