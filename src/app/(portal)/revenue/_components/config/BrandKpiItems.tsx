@@ -263,8 +263,8 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
             <thead>
               <tr>
                 <th>Item</th>
-                <th>Counted</th>
-                <th className="right">Bonus a unit · RM</th>
+                <th className="whitespace-nowrap">Counted</th>
+                <th className="right whitespace-nowrap">Bonus a unit · RM</th>
                 <th>By the month&apos;s units</th>
                 {canManage ? <th className="w-24 relative"><span className="sr-only">Remove</span></th> : null}
               </tr>
@@ -289,7 +289,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                       {/* The ERP's own name of the special the item is found by. */}
                       {item.name ? <div className="text-[11px] mt-0.5">{item.special}</div> : null}
                     </td>
-                    <td>{COUNTED}</td>
+                    <td className="whitespace-nowrap">{COUNTED}</td>
                     <td className="num">
                       {!canManage || going ? (
                         <span className={going ? 'line-through' : undefined}>{formatMoneyBare(item.amount)}</span>
@@ -330,7 +330,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                       <span className="chip accent ml-2">New</span>
                       {a.name.trim() ? <div className="text-[11px] mt-0.5">{a.special}</div> : null}
                     </td>
-                    <td>{COUNTED}</td>
+                    <td className="whitespace-nowrap">{COUNTED}</td>
                     <td className="num">
                       <input
                         value={a.amount}
