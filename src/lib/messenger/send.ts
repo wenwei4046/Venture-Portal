@@ -49,6 +49,40 @@ export async function pageToken(pageId: string, systemToken: string, fetchImpl: 
 }
 
 /**
+ * Where Facebook shows an ad's post (2026-11-13). An ad's post is usually never published ("dark"), and Facebook opens
+ * it only at its own permalink — `facebook.com/<page>_<post>` answers "This isn't available" (the owner's phone, signed
+ * in). The Page's token reads `permalink_url` (`/<id>/posts/<post>` or `/reel/<id>/`); null when Meta does not say or
+ * answers anything but a facebook.com https address.
+ */
+export async function postPermalink(postKey: string, token: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  if (!/^\d{5,30}_\d{1,30}$/.test(postKey)) return null;
+  try {
+    const r = await fetchImpl(graph(`${postKey}?fields=permalink_url`), { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(3000) });
+    const j = r.ok ? ((await r.json().catch(() => null)) as { permalink_url?: string } | null) : null;
+    return facebookUrl(j?.permalink_url);
+  } catch {
+    return null;
+  }
+}
+
+/** A facebook.com reel's address (`/reel/<id>/`, a video ad's), else null — the only permalink the webhook takes. */
+export function reelOf(u: string | null | undefined): string | null {
+  const x = facebookUrl(u);
+  return x && /^https:\/\/(www\.|m\.)?facebook\.com\/reel\/\d{1,30}\/?$/.test(x) ? x : null;
+}
+
+/** An https address on facebook.com itself (www. or m.), else null. */
+export function facebookUrl(u: unknown): string | null {
+  if (typeof u !== "string" || u.length > 500) return null;
+  try {
+    const x = new URL(u);
+    return x.protocol === "https:" && /^(www\.|m\.)?facebook\.com$/.test(x.hostname) ? x.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The customer's name, or null when Meta does not say. The profile API
  * (first_name/last_name) needs Meta's "Business Asset User Profile Access"
  * review, which the app does not have yet — so, failing that, the name is
