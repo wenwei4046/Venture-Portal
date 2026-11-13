@@ -5,9 +5,9 @@ import { toUnitTiers, type KpiUnitTier } from './kpi'
 /**
  * Rules › KPI items — a brand's own items, edited (2026-11-12; a brand on its
  * own commission scheme, 2990s; the user: "KPI item 那边我是可以手动去加的").
- * The draft of one brand's block: a bonus retyped, tiers retyped, an item
- * coming off, an item picked to add. Pure — the component holds the state and
- * `saveKpiItems` sends what `brandKpiEditOf` makes of it: only what changed.
+ * The draft of one brand's block: a cost or a bonus retyped, tiers retyped, an
+ * item coming off, an item picked to add. Pure — the component holds the state
+ * and `saveKpiItems` sends what `brandKpiEditOf` makes of it: only what changed.
  */
 
 /** A brand's own KPI item as Rules lists it. */
@@ -17,6 +17,11 @@ export interface BrandKpiListed {
   special: string
   /** The name it is listed under (*Upgrade fabric*); null = the special's own. */
   name: string | null
+  /**
+   * What a unit takes off the bill's commissionable sales (2026-11-13); null = none set — what the bill's special
+   * order charges for it comes off instead.
+   */
+  cost: number | null
   /** What a unit pays below the first tier. */
   amount: number
   tiers: KpiUnitTier[]
@@ -33,11 +38,15 @@ export interface BrandKpiAdded {
   key: string
   special: string
   name: string
+  /** Blank = no cost. */
+  cost: string
   amount: string
   tiers: TierDraft[]
 }
 
 export interface BrandKpiDraft {
+  /** Item id → the cost as typed (blank = none). */
+  costs: ReadonlyMap<string, string>
   /** Item id → the bonus as typed. */
   amounts: ReadonlyMap<string, string>
   /** Item id → its tiers as typed, once touched. */
@@ -46,16 +55,21 @@ export interface BrandKpiDraft {
   added: readonly BrandKpiAdded[]
 }
 
-export const EMPTY_BRAND_KPI_DRAFT: BrandKpiDraft = { amounts: new Map(), tiers: new Map(), removing: new Set(), added: [] }
+export const EMPTY_BRAND_KPI_DRAFT: BrandKpiDraft = {
+  costs: new Map(), amounts: new Map(), tiers: new Map(), removing: new Set(), added: [],
+}
 
 /** A stored item (`comm_kpi_items`) as the block lists it. */
 export function toBrandKpiListed(row: {
   id: string; option_value: string | null; product_name: string | null; kpi_amount: number | string; unit_tiers?: unknown
+  cost_amount?: number | string | null
 }): BrandKpiListed {
+  const cost = row.cost_amount === null || row.cost_amount === undefined ? NaN : Number(row.cost_amount)
   return {
     id: row.id,
     special: (row.option_value ?? '').trim(),
     name: row.product_name?.trim() || null,
+    cost: Number.isFinite(cost) && cost > 0 ? cost : null,
     amount: Number(row.kpi_amount),
     tiers: toUnitTiers(row.unit_tiers),
   }
@@ -84,6 +98,19 @@ export function bonusDiffers(text: string, saved: number): boolean {
   return !Number.isFinite(n) || Math.abs(n - saved) > 0.0000001
 }
 
+/**
+ * Whether a typed cost is another cost than the stored one. A box left blank — or 0 — is no cost; text that is no
+ * number counts as a change (the Save says what is wrong with it).
+ */
+export function costDiffers(text: string, saved: number | null): boolean {
+  const typed = text.trim()
+  if (typed === '') return saved !== null
+  const n = Number(typed.replace(/,/g, ''))
+  if (!Number.isFinite(n)) return true
+  if (n === 0) return saved !== null
+  return saved === null || Math.abs(n - saved) > 0.0000001
+}
+
 /** Whether the tiers typed are other tiers than the stored ones. */
 export function tiersDiffer(typed: readonly TierDraft[], saved: readonly KpiUnitTier[]): boolean {
   const rows = typedTiers(typed)
@@ -95,11 +122,14 @@ export function tiersDiffer(typed: readonly TierDraft[], saved: readonly KpiUnit
   })
 }
 
-/** Whether a listed item is changed in the draft: its bonus or its tiers. */
+/** Whether a listed item is changed in the draft: its cost, its bonus or its tiers. */
 export function brandItemEdited(item: BrandKpiListed, draft: BrandKpiDraft): boolean {
+  const cost = draft.costs.get(item.id)
   const amount = draft.amounts.get(item.id)
   const tiers = draft.tiers.get(item.id)
-  return (amount !== undefined && bonusDiffers(amount, item.amount)) || (tiers !== undefined && tiersDiffer(tiers, item.tiers))
+  return (cost !== undefined && costDiffers(cost, item.cost))
+    || (amount !== undefined && bonusDiffers(amount, item.amount))
+    || (tiers !== undefined && tiersDiffer(tiers, item.tiers))
 }
 
 /** How many changes the draft holds: items coming off, items changed, items added. */
@@ -131,10 +161,11 @@ const tierInputs = (tiers: readonly TierDraft[]): KpiTierInput[] => typedTiers(t
 
 /**
  * What the Save sends for one brand's block: only what changed. A changed item
- * goes with its bonus when that changed and its tiers, whole, when those did —
- * what it does not name stays as stored, so a bonus somebody else has just
- * retyped on another computer is not written back over by a change of tiers
- * here. An item coming off is never also changed.
+ * goes with its cost when that changed (blank = none any more), its bonus when
+ * that did and its tiers, whole, when those did — what it does not name stays
+ * as stored, so a bonus somebody else has just retyped on another computer is
+ * not written back over by a change of tiers here. An item coming off is never
+ * also changed.
  */
 export function brandKpiEditOf(brandId: string, listed: readonly BrandKpiListed[], draft: BrandKpiDraft): KpiItemsEdit {
   const live = listed.filter(item => !draft.removing.has(item.id))
@@ -142,12 +173,15 @@ export function brandKpiEditOf(brandId: string, listed: readonly BrandKpiListed[
     adds: draft.added.map(a => ({
       source: 'option' as const, optionPool: 'sofa_specials', optionValue: a.special, amount: a.amount.trim() || null,
       brandId, name: a.name.trim() || null, tiers: tierInputs(a.tiers), label: a.name.trim() || a.special,
+      ...(a.cost.trim() ? { cost: a.cost.trim() } : {}),
     })),
     changes: live.filter(item => brandItemEdited(item, draft)).map(item => {
+      const cost = draft.costs.get(item.id)
       const amount = draft.amounts.get(item.id)
       const tiers = draft.tiers.get(item.id)
       return {
         id: item.id,
+        ...(cost !== undefined && costDiffers(cost, item.cost) ? { cost: cost.trim() || null } : {}),
         ...(amount !== undefined && bonusDiffers(amount, item.amount) ? { amount: amount.trim() || null } : {}),
         label: brandKpiTitle(item),
         ...(tiers !== undefined && tiersDiffer(tiers, item.tiers) ? { tiers: tierInputs(tiers) } : {}),

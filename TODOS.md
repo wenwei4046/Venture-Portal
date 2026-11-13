@@ -90,6 +90,33 @@ right today only because Vercel runs in UTC with a US locale):
   the serials with `cellDates: false`, as the InfoTech and ERP imports do,
   would end it.
 
+## Owed — fairs by organiser, the rest (2026-11-13)
+
+Shipped: two organisers at one place on the same days are two fairs
+(`.claude/rules/revenue/comm-cal.md` › TWO ORGANISERS AT ONE PLACE ARE TWO
+FAIRS). Still owed:
+- **A standing booth has one Arena board, once it closes.** 2990s' booth at
+  Penang Waterfront (29 Oct – 31 Dec) is a brand week every weekend it is open
+  (`revenue-app.md` › A BOOTH IS A BRAND WEEK EVERY WEEKEND IT IS OPEN), but a
+  Fair result is a booth at a COMPLETED fair: nothing until 31 December, then
+  one board for two months. Ranking it weekend by weekend means events per
+  (fair, booth, weekend) in `member_arena_booth_history_for_staff`, each bill
+  in its sale day's weekend — and its two or three sellers a medal every week.
+  Asked 2026-11-14; not built.
+- **HR's Brand weeks foot lists a standing booth's unmatched names in its
+  first month only.** `member_admin_brand_weeks.unlisted` reads the booths
+  OPENING in the month's weekends; *Dexon*, listed at the 2990s booth and
+  matched to nobody, is said on October's grid and not on November's.
+- **The guess does not read the bill's brand.** A bill the ERP names no fair on
+  is guessed by place and day (`venue_event_for_order`): two fairs open on the
+  day → the shorter. A 2990s bill written during another organiser's fair at
+  its hall, with no fair picked in the ERP, is read at that fair until HR pins
+  it. Every bill at the two fairs split on 2026-11-14 names its fair.
+- **One organiser per place and month in `revenue_month_orders`.** Its
+  `organizer` is the earliest fair's at the place that month — only the
+  fallback for a bill no fair claims (Comm Cal's lists and the bill page read
+  the bill's own fair first).
+
 ## Owed — sub-departments per person (2026-10-16)
 
 The owner: permission ticked "按 sub-department" on the CRM and the Revenue
@@ -115,22 +142,24 @@ Build the data's before anybody is narrowed on a Revenue page.
 Shipped: the items, the run, Comm Cal's month and bill page
 (`.claude/rules/revenue/comm-cal.md` › 2990s' OWN KPI ITEMS), the Revenue
 app's KPI readings (`revenue-app.md` › 2990s' OWN KPI ITEMS COUNT IN THE APP),
-and Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
-KPI ITEMS ARE EDITED ON RULES). Still owed:
-- **One figure for two ladders.** My team's *KPI hit / KPI pending* and the
-  Championship's threshold bonus compare a person's EVERY KPI unit with the
-  sub-department's own threshold — the scoreboard carries one `kpi_qty`. Exact
-  while Fair's own KPI is off (no threshold) or nobody sells a brand's item;
-  split the figure before Fair's switch goes on beside 2990s' items.
+Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
+KPI ITEMS ARE EDITED ON RULES), an item's cost a unit — what comes off the
+bill (`comm-cal.md` › A BRAND'S KPI ITEM HAS A COST), and My team's KPI hit
+and the Championship's threshold reading Fair's own units (`revenue-app.md` ›
+ONE FIGURE, TWO LADDERS — live from 2026-11-13, when the owner switched Fair's
+KPI on; split 2026-11-14). Still owed:
+- **A brand item's cost is one figure — a corner is not read** (2026-11-13).
+  The owner's list prices a corner sofa's upgrade double (fabric RM 125 / 250,
+  latex RM 500 / 1,000). The cost on Rules is one figure a unit; a corner's
+  dearer price comes off only where the ERP's special order says it (the
+  dearer of the two is taken). A second figure needs a rule for which sofa is
+  a corner — the bills of that day could not give one (every sofa was charged
+  RM 250 / RM 500; the one with a CNR piece named no upgrade). Ask the owner
+  before building it.
 - **A brand's item cannot be renamed in place.** The writer keeps an item's
   name through a change; Rules renames by taking the item off and adding its
   special again under the new name, in one Save. A rename of its own needs
   `catalogue_save_kpi_items` to take a change's `label`.
-- **A shared bill's once-a-bill KPI item (the sub-department's own).** A Fair
-  sofa special, or a fabric-series set, on a bill two people share is counted
-  whole for EACH holder (`orderKpiHits` splits a brand's item by the part;
-  `marginBase` reads lines only, so the sub-department's own were left). No
-  effect while Fair's KPI switch is off — settle it before it is switched on.
 - **The app's Commission scheme sheet says nothing of a brand on its own
   scheme.** Profile › Commission scheme lists the member's rate and each
   brand's margin ladder. For 2990s it should say the rate their rung pays on a
@@ -141,8 +170,8 @@ KPI ITEMS ARE EDITED ON RULES). Still owed:
 - **The KPI footnotes speak of Fair's items only.** Insight › KPI items and
   the Arena's KPI board end *…including eligible giveaway items*
   (`KpiPage.tsx`, `arena-model.ts`). True of the sub-department's own items; a
-  brand's own count only where the bill charges for them. Reword once a month
-  can hold both.
+  brand's own count wherever the sofa names them, charged or not. Reword once
+  a month can hold both.
 
 ## Owed — Revenue Director (2026-09-11)
 

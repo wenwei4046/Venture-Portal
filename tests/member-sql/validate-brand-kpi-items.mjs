@@ -16,6 +16,11 @@ import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 
 const db = new PGlite({ extensions: { btree_gist } })
 const MIGRATION = new URL('../../supabase/migrations/20261112200000_brand_kpi_items.sql', import.meta.url)
+// 2026-11-13 — the user: an item is found where the bill names it, "不需要去 detect 他有没有收钱".
+const MIGRATION_NAMED = new URL('../../supabase/migrations/20261114030000_brand_kpi_named.sql', import.meta.url)
+// The same evening — the user: "i need a place at kpi item rules set there fill in cost, so that it can dedecut the
+// cost out and change to kpi amount only".
+const MIGRATION_COST = new URL('../../supabase/migrations/20261114040000_brand_kpi_cost.sql', import.meta.url)
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const one = async (sql, params = []) => Object.values((await q(sql, params))[0])[0]
 const id = v => `00000000-0000-4000-8000-${String(v).padStart(12, '0')}`
@@ -386,6 +391,134 @@ try {
     "a bill of a brand no longer on its own scheme finds the sub-department's items")
   await q(`UPDATE comm_brands SET is_active = true WHERE id = $1`, [OWN])
 
+  // ── 20261114030000: found where the bill names it, charged or not ──────────
+  // The user, 2026-11-13: "主要 detect 到有这个 KPI item，就算他有卖到 KPI，不需要去 detect 他有没有收钱。因为有时候他们是
+  // 直接把价钱写在 remark 栏上". Two more bills: one piece of the set charged and one not; a model twice with no
+  // special order at all.
+  const n9 = await bill('N9', '2990S', ETHAN, [
+    sofa('QUBBU-1A(LHF)', 1745, ['Latex Seat'], []),
+    sofa('QUBBU-2A(RHF)', 1745, ['Latex Seat'], [charge('Latex Seat', 500)]),
+  ])
+  const n10 = await bill('N10', '2990S', SHELDON, [sofa('TELLUC-2A', 5980, ['Sofa Full Fabric'], null, { qty: 2 })])
+  const foundBefore = await hitsOf(everyBill)
+  check(await hitsOf([n3, n9, n10]), ['N9 brand Upgrade latex seat ×1 @500'],
+    'as 20261112200000 left it: only the piece whose special order charges for it')
+  check((await monthOf()).N10, 5980, 'and the bill that charges for nothing keeps its sales')
+
+  const named = (await readFile(MIGRATION_NAMED, 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(named)
+  await db.exec(named)
+  checks++
+  const NAMED = Object.fromEntries([...named.matchAll(/\('(public\.[^']+)',\s+'([0-9a-f]{32})', '([0-9a-f]{32})'\)/g)]
+    .map(m => [m[1], { from: m[2], makes: m[3] }]))
+  check(NAMED[SIG.hits]?.from, MAKES[SIG.hits]?.makes, 'named: written from the body 20261112200000 made')
+  check(await md5Of(SIG.hits), NAMED[SIG.hits]?.makes, 'named: what stands is what the migration says it makes')
+  check(await one(`SELECT prosrc LIKE '%LEFT JOIN money mo%' AND prosrc NOT LIKE '%only%where it charges.%' FROM pg_proc
+                   WHERE oid = to_regprocedure($1)`, [SIG.hits]), true, 'named: the statement and its comment were swapped')
+
+  check(await hitsOf([n3]), ['N3 brand Upgrade latex seat ×1 @0'],
+    'named and charged nothing: a unit all the same, and nothing off the bill')
+  check(await hitsOf([n9]), ['N9 brand Upgrade latex seat ×1 @500'], 'one piece charged, the other not: the set once, at its dearest copy')
+  check(await hitsOf([n10]), ['N10 brand Upgrade fabric ×2 @0'], 'a model twice with no special order: two units, nothing off')
+  check(await hitsOf([n4, n7]), [], 'typed by hand — the sofa does not name it — or charged more than the bill sold: still none')
+  check((await hitsOf(everyBill)).sort(), [...foundBefore, 'N3 brand Upgrade latex seat ×1 @0'].sort(), 'every other finding exactly as it was')
+  check(await monthOf(), { N1: 3240, N2: 3000, N3: 2990, N4: 3490, N5: 5980, N6: 5980, N7: 400, N8: 2990, N9: 2990, N10: 5980, A1: 3100 },
+    "Comm Cal's month: what a bill charged for the upgrade is off its sales, and a bill that charged nothing keeps them whole")
+  check(await hitsOf([n3], '2026-10-31'), [], "and October's as-at finds none still")
+
+  // A body somebody changed since is not written over.
+  await db.exec(`CREATE OR REPLACE FUNCTION public.comm_kpi_hits(p_scheme uuid, p_order_ids uuid[], p_asat date)
+    RETURNS TABLE(order_id uuid, line_id uuid, item_id uuid, qty numeric, unit_amount numeric)
+    LANGUAGE sql STABLE SET search_path TO 'public' AS $f$ SELECT NULL::uuid, NULL::uuid, NULL::uuid, 0::numeric, 0::numeric WHERE false $f$`)
+  await assert.rejects(() => db.exec(named), /not the body this migration was written from/, 'named: a changed body is refused')
+  await db.exec('ROLLBACK')
+  checks++
+  const kept = (await db.query(`SELECT pg_get_functiondef(to_regprocedure($1)) AS def`, [SIG.hits])).rows[0].def
+  check(/WHERE false/.test(kept), true, 'named: and left as it was found')
+  // Back to the body under test for what follows.
+  await db.exec(`DROP FUNCTION public.comm_kpi_hits(uuid, uuid[], date)`)
+  await db.exec(migration.match(/CREATE OR REPLACE FUNCTION public\.comm_kpi_hits\([\s\S]*?\$function\$;/)[0])
+  await db.exec(named)
+  check(await md5Of(SIG.hits), NAMED[SIG.hits]?.makes, 'named: applied again over the body 20261112200000 makes')
+
+  // ── 20261114040000: the item's cost a unit comes off the bill ──────────────
+  // The user, the same evening, told that an upgrade priced in the remark earns the whole bill's commission and the
+  // bonus — more than one keyed properly: "i need a place at kpi item rules set there fill in cost, so that it can
+  // dedecut the cost out and change to kpi amount only".
+  const allBills = [...everyBill, n9, n10]
+  const foundNamed = await hitsOf(allBills)
+  const monthNamed = await monthOf()
+  check(await q(`SELECT 1 FROM information_schema.columns WHERE table_name = 'comm_kpi_items' AND column_name = 'cost_amount'`), [],
+    'cost: before the migration an item has no cost')
+
+  const cost = (await readFile(MIGRATION_COST, 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(cost)
+  await db.exec(cost)
+  checks++
+  const COST = Object.fromEntries([...cost.matchAll(/\('(public\.[^']+)',\s+'([0-9a-f]{32})', '([0-9a-f]{32})'\)/g)]
+    .map(m => [m[1], { from: m[2], makes: m[3] }]))
+  check(COST[SIG.hits]?.from, NAMED[SIG.hits]?.makes, 'cost: the hits are written from the body 20261114030000 made')
+  check(COST[SIG.save]?.from, MAKES[SIG.save]?.makes, 'cost: the writer from the body 20261112200000 made')
+  check(await md5Of(SIG.hits), COST[SIG.hits]?.makes, 'cost: the hits that stand are what the migration says it makes')
+  check(await md5Of(SIG.save), COST[SIG.save]?.makes, 'cost: and the writer')
+  check(await one(`SELECT prosrc LIKE '%GREATEST(COALESCE(MAX(mo.amount), 0), COALESCE(m.cost_amount, 0))%'
+                          AND prosrc LIKE '%m.qty, m.cost_amount%' AND prosrc NOT LIKE '%and then
+        -- nothing comes off the bill.%' FROM pg_proc WHERE oid = to_regprocedure($1)`, [SIG.hits]), true,
+  'cost: the statements and their comment were swapped')
+
+  // No cost is set by the migration: nothing moves.
+  check(await q(`SELECT count(*)::int AS n FROM comm_kpi_items WHERE cost_amount IS NOT NULL`), [{ n: 0 }], 'cost: the migration sets none')
+  check(await hitsOf(allBills), foundNamed, 'cost: with no cost set every finding is as it was')
+  check(await monthOf(), monthNamed, "cost: and so is Comm Cal's month")
+
+  // The table: a brand's item alone, RM 0.01 to RM 1,000,000.
+  const setCost = `UPDATE comm_kpi_items SET cost_amount = $2 WHERE id = (SELECT id FROM comm_kpi_items WHERE scheme_id = $1 AND `
+  await reject(`${setCost} brand_id IS NULL AND source = 'sku')`, [SCHEME, 10], /kpi_item_cost_is_a_brands/,
+    "cost: the sub-department's own item has none — its one amount comes off the bill and is paid")
+  for (const [bad, why] of [[0, 'nothing'], [-5, 'less than nothing'], [1000000.01, 'more than RM 1,000,000']]) {
+    await reject(`${setCost} brand_id = '${OWN}' AND option_value = 'Latex Seat')`, [SCHEME, bad], /kpi_item_cost_in_range/, `cost: never ${why}`)
+  }
+
+  // The user's prices: a latex seat RM 500, full fabric RM 250.
+  await q(`UPDATE comm_kpi_items SET cost_amount = CASE option_value WHEN 'Latex Seat' THEN 500 ELSE 250 END WHERE brand_id = $1`, [OWN])
+  check(await hitsOf([n3]), ['N3 brand Upgrade latex seat ×1 @500'],
+    'cost: named and charged nothing — its price in the remark — the cost comes off the bill')
+  check(await hitsOf([n10]), ['N10 brand Upgrade fabric ×2 @250'], 'cost: a model twice with no special order: two units, RM 250 off for each')
+  check(await hitsOf([n1, n2, n9]), ['N1 brand Upgrade latex seat ×1 @500', 'N2 brand Upgrade fabric ×1 @250', 'N9 brand Upgrade latex seat ×1 @500'],
+    'cost: a bill charged what the item costs is as it was')
+  check(await hitsOf([n5, n8]), ['N5 brand Upgrade latex seat ×1 @500', 'N5 brand Upgrade latex seat ×1 @1000', 'N8 brand Upgrade latex seat ×1 @1000'],
+    'cost: a corner charged RM 1,000 — more than the cost — takes off what the bill charged')
+  // Charged less than the item costs: the cost, never less than the rule says.
+  const n11 = await bill('N11', '2990S', ETHAN, [sofa('BOAAT-2A', 3290, ['Latex Seat'], [charge('Latex Seat', 300)])])
+  check(await hitsOf([n11]), ['N11 brand Upgrade latex seat ×1 @500'], 'cost: charged RM 300 for a RM 500 upgrade — RM 500 off')
+  check(await hitsOf([n4, n7]), [], 'cost: typed by hand — the sofa does not name it — or more than the bill sold: still none')
+  check(await hitsOf([a1]), ['A1 own AKEMI PILLOW ×2 @30', 'A1 own Latex Seat ×1 @40'], "cost: the sub-department's own bill is as it was")
+  check(await monthOf(), { ...monthNamed, N3: 2490, N10: 5480, N11: 2790 },
+    "cost: Comm Cal's month — RM 500 off the bill that charged nothing, RM 250 twice off the two sofas, RM 500 off the one charged RM 300; the rest as they were")
+  check(await hitsOf([n3], '2026-10-31'), [], "cost: and October's as-at finds none still")
+
+  // The cost taken away: what the special order charges, as before.
+  await q(`UPDATE comm_kpi_items SET cost_amount = NULL WHERE brand_id = $1`, [OWN])
+  check(await hitsOf([n3, n11]), ['N11 brand Upgrade latex seat ×1 @300', 'N3 brand Upgrade latex seat ×1 @0'],
+    'cost: an item with no cost takes off what its special order charges — nothing where it charges nothing')
+  check(await hitsOf(allBills), foundNamed, 'cost: and every other finding is back as it was')
+
+  // A body somebody changed since is not written over.
+  await db.exec(`CREATE OR REPLACE FUNCTION public.comm_kpi_hits(p_scheme uuid, p_order_ids uuid[], p_asat date)
+    RETURNS TABLE(order_id uuid, line_id uuid, item_id uuid, qty numeric, unit_amount numeric)
+    LANGUAGE sql STABLE SET search_path TO 'public' AS $f$ SELECT NULL::uuid, NULL::uuid, NULL::uuid, 0::numeric, 0::numeric WHERE false $f$`)
+  await assert.rejects(() => db.exec(cost), /comm_kpi_hits\(uuid, uuid\[\], date\) is md5 [0-9a-f]{32}, not the body this migration was written from/,
+    'cost: a changed body is refused')
+  await db.exec('ROLLBACK')
+  checks++
+  check(await md5Of(SIG.save), COST[SIG.save]?.makes, 'cost: and nothing else was touched')
+  // Back to the bodies under test for what follows.
+  await db.exec(`DROP FUNCTION public.comm_kpi_hits(uuid, uuid[], date)`)
+  await db.exec(migration.match(/CREATE OR REPLACE FUNCTION public\.comm_kpi_hits\([\s\S]*?\$function\$;/)[0])
+  await db.exec(named)
+  await db.exec(cost)
+  check(await md5Of(SIG.hits), COST[SIG.hits]?.makes, 'cost: applied again over the body 20261114030000 makes')
+
   // ── The Quote and the member's KPI card: the sub-department's own ──────────
   const quoteItems = async fn => ((await one(`SELECT ${fn}($1)`, [SCHEME])).kpiItems ?? [])
     .map(k => `${k.source}:${k.option_value ?? k.product_code}@${Number(k.kpi_amount)}`).sort()
@@ -445,25 +578,79 @@ try {
   await refused([], [{ id: ownId, unit_tiers: [{ min_qty: 3, amount: 40 }] }], /Only a brand's own KPI item pays by tier/,
     "the sub-department's own item is given no tier by a change")
 
-  // An item in force before today: the change closes it yesterday and opens today's — its brand, name and tiers with it.
+  // (20261114040000) A brand's item's cost: sent when it changed, 0 taking it away, a key left out leaving it.
+  const costsOf = scheme => q(
+    `SELECT k.option_value AS special, k.cost_amount::float AS cost, (k.effective_to IS NULL) AS live
+       FROM comm_kpi_items k WHERE k.scheme_id = $1 AND k.brand_id IS NOT NULL ORDER BY k.option_value, k.effective_from`, [scheme])
+  check(await save([], [{ id: itemId, cost_amount: 500 }]), 1, 'a cost alone')
+  check(await costsOf(TAB), [{ special: 'Nylon Fabric', cost: 500, live: true }], 'stored where the item stands')
+  check((await brandItems(TAB)).map(r => [r.amount, r.tiers.length]), [[35, 2]], 'its amount and its tiers kept')
+  check(await save([], [{ id: itemId, cost_amount: 500 }]), 0, 'the same cost is no change')
+  check(await save([], [{ id: itemId, kpi_amount: 35 }]), 0, 'nor is a change that names no cost')
+  check(await costsOf(TAB), [{ special: 'Nylon Fabric', cost: 500, live: true }], 'which leaves the cost as stored')
+  check(await save([], [{ id: itemId, cost_amount: 499.996 }]), 0, 'a cost is kept to the sen: RM 499.996 is RM 500.00')
+  await refused([], [{ id: itemId, cost_amount: -1 }], /A cost is RM 0\.01 to RM 1,000,000 a unit/, 'a cost below nothing is refused, in words')
+  await refused([], [{ id: itemId, cost_amount: 1000001 }], /A cost is RM 0\.01 to RM 1,000,000 a unit/, 'and one above RM 1,000,000')
+  await refused([], [{ id: ownId, cost_amount: 100 }], /Only a brand's own KPI item has a cost/,
+    "the sub-department's own item is given no cost by a change")
+  await refused([{ ...nylon, option_value: 'Hand Stitch', cost_amount: 100 }], [], /Only a brand's own KPI item has a cost/, 'nor by an add')
+  check(await save([], [{ id: itemId, cost_amount: 0 }]), 1, 'a cost of 0 takes it away')
+  check(await costsOf(TAB), [{ special: 'Nylon Fabric', cost: null, live: true }], 'no cost again')
+  check(await save([], [{ id: itemId, cost_amount: 500, kpi_amount: 35 }]), 1, 'and back, with the amount it has')
+
+  // An item in force before today: the change closes it yesterday and opens today's — its brand, name, tiers and cost with it.
   await q(`UPDATE comm_kpi_items SET effective_from = '2026-09-01' WHERE id = $1`, [itemId])
   check(await save([], [{ id: itemId, kpi_amount: 50 }]), 1, 'a new amount on an item in force since September')
   check((await brandItems(TAB)).map(r => [r.brand, r.name, r.amount, r.tiers.length, r.from, r.to === null]), [
     ['SOFAZ', 'Upgrade nylon', 35, 2, '2026-09-01', false],
     ['SOFAZ', 'Upgrade nylon', 50, 2, today, true],
   ], "the old amount ends yesterday, the new begins today — still the brand's, by its name, with its tiers")
+  check(await costsOf(TAB), [{ special: 'Nylon Fabric', cost: 500, live: false }, { special: 'Nylon Fabric', cost: 500, live: true }],
+    "and with its cost, on yesterday's row and today's")
   const liveId = await one(`SELECT id FROM comm_kpi_items WHERE scheme_id = $1 AND brand_id = $2 AND effective_to IS NULL`, [TAB, TAB_OWN])
-  check(await save([], [], [liveId]), 1, 'removed')
-  check((await brandItems(TAB)).length, 1, 'begun today, it never applied and goes; the months already run keep theirs')
+  // A new cost on an item in force since September does the same: September's months keep the cost they were run at.
+  await q(`UPDATE comm_kpi_items SET effective_to = '2026-09-30' WHERE scheme_id = $1 AND brand_id = $2 AND id <> $3`, [TAB, TAB_OWN, liveId])
+  await q(`UPDATE comm_kpi_items SET effective_from = '2026-10-01' WHERE id = $1`, [liveId])
+  check(await save([], [{ id: liveId, cost_amount: 600 }]), 1, 'a new cost on an item in force since October')
+  check((await costsOf(TAB)).map(r => [r.cost, r.live]), [[500, false], [500, false], [600, true]],
+    "the old cost ends yesterday, the new begins today")
+  const newestId = await one(`SELECT id FROM comm_kpi_items WHERE scheme_id = $1 AND brand_id = $2 AND effective_to IS NULL`, [TAB, TAB_OWN])
+  check(await save([], [], [newestId]), 1, 'removed')
+  check((await brandItems(TAB)).length, 2, 'begun today, it never applied and goes; the months already run keep theirs')
+
+  // A brand's item added with its cost — and one with none.
+  check(await save([
+    { ...nylon, option_value: 'Latex Seat', brand_id: TAB_OWN, label: 'Upgrade latex', cost_amount: 1000 },
+    { ...nylon, option_value: 'Sofa Full Fabric', brand_id: TAB_OWN, cost_amount: 0 },
+  ]), 2, "two of a brand's items added")
+  check((await costsOf(TAB)).filter(r => r.live), [
+    { special: 'Latex Seat', cost: 1000, live: true }, { special: 'Sofa Full Fabric', cost: null, live: true },
+  ], 'one with its cost, one — sent 0 — with none')
 
   // ── Production changed since: nothing is touched ───────────────────────────
+  // The writer and the hits are 20261114040000's bodies now: 20261112200000 run again does not write its own back
+  // over them (the writer is the first it meets)…
+  await assert.rejects(() => db.exec(migration), /catalogue_save_kpi_items\(uuid, jsonb, jsonb, uuid\[\]\) is md5 [0-9a-f]{32}, not the body this migration was written from/,
+    '20261112200000 run again stops at the body 20261114040000 made')
+  await db.exec('ROLLBACK')
+  checks++
+  check([await md5Of(SIG.save), await md5Of(SIG.hits)], [COST[SIG.save]?.makes, COST[SIG.hits]?.makes], 'and those bodies stand')
+  // …nor does 20261114030000 over the hits…
+  await assert.rejects(() => db.exec(named), /comm_kpi_hits\(uuid, uuid\[\], date\) is md5 [0-9a-f]{32}, not the body this migration was written from/,
+    '20261114030000 run again stops at the body 20261114040000 made')
+  await db.exec('ROLLBACK')
+  checks++
+  // …nor over any other body that is neither production's nor its own.
+  await db.exec(`DROP FUNCTION public.comm_kpi_hits(uuid, uuid[], date)`)
+  await db.exec(migration.match(/CREATE OR REPLACE FUNCTION public\.comm_kpi_hits\([\s\S]*?\$function\$;/)[0])
+  await db.exec(migration.match(/CREATE OR REPLACE FUNCTION public\.catalogue_save_kpi_items\([\s\S]*?\$function\$;/)[0])
   await db.exec(`CREATE OR REPLACE FUNCTION public.member_quote_context(p_scheme uuid) RETURNS jsonb LANGUAGE sql STABLE
                  AS $$ SELECT '{}'::jsonb $$`)
   await assert.rejects(() => db.exec(migration), /member_quote_context\(uuid\) is md5 [0-9a-f]{32}, not the body this migration was written from/,
     'a body that is neither production\'s nor the migration\'s own stops it')
   checks++
 
-  console.log(`PASS: ${checks} brand KPI item checks. Production's bodies (md5-checked) + the real migration 20261112200000 (twice); synthetic surroundings. No live database connection.`)
+  console.log(`PASS: ${checks} brand KPI item checks. Production's bodies (md5-checked) + the real migrations 20261112200000, 20261114030000 and 20261114040000 (each twice); synthetic surroundings. No live database connection.`)
 } finally {
   await db.close()
 }

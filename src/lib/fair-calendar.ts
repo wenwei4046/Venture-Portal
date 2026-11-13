@@ -52,19 +52,54 @@ export interface Fair {
  * ERP says it was sold (`raw.fair.fairDate`) when that day is one of the
  * fair's, else the fair's own month. Null for a bill no fair claims.
  *
+ * With no such day, a bill keyed ON one of the fair's days is that day's
+ * (2026-11-14): `orderDate`, the ERP document's date — the day the receiver
+ * already lands a new document in (`COALESCE(sale day, order date)`). 2990s'
+ * standing booth runs 29 Oct – 31 Dec, its fair's month October, and two in
+ * three of its November bills name no day: each read *Late key-in · Oct 2026
+ * fair* on November's ledgers. A bill keyed after its fair is still its fair's
+ * month. (The SQL twin is read only by the fair-calendar moves no page shows.)
+ *
  * A bill keyed after its fair's month sits where it was keyed and is paid
  * there (2026-10-12); this is how its ledger row knows it is a late key-in.
  */
 export function saleMonthOf(
   fairDate: string | null | undefined,
   fair: Pick<Fair, 'startDate' | 'endDate' | 'periodMonth'> | null | undefined,
+  orderDate?: string | null,
 ): string | null {
   if (!fair) return null
-  const day = typeof fairDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(fairDate) ? fairDate.slice(0, 10) : null
-  if (day && fair.startDate && day >= fair.startDate && day <= (fair.endDate ?? fair.startDate)) {
-    return `${day.slice(0, 7)}-01`
-  }
+  const dayOf = (v: string | null | undefined) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null)
+  const onTheFair = (day: string | null) => !!day && !!fair.startDate && day >= fair.startDate && day <= (fair.endDate ?? fair.startDate)
+  const day = dayOf(fairDate)
+  if (onTheFair(day)) return `${day!.slice(0, 7)}-01`
+  const keyed = dayOf(orderDate)
+  if (onTheFair(keyed)) return `${keyed!.slice(0, 7)}-01`
   return fair.periodMonth.slice(0, 10)
+}
+
+/** A fair's organiser as a bill's embedded read hands it (PostgREST: one object, or a one-row list). */
+export interface FairOrganiserRow {
+  erp_organiser_text: string | null
+  comm_organisers: { name: string | null } | Array<{ name: string | null }> | null
+}
+
+/**
+ * Who ran the fair a bill was written at: its OWN fair's organiser — the register's name, else what the ERP
+ * wrote — and only where that names nobody (or no fair claims the bill) the calendar's answer for its place and
+ * day. Two organisers may stand at one place on the same days (2026-11-13: 2990s' standing booth under MALL MGMT
+ * through BIGHOME's three-day fair at one hall), so the place and the day alone no longer say which.
+ */
+export function billOrganiser(
+  fair: FairOrganiserRow | FairOrganiserRow[] | null | undefined,
+  byPlaceAndDay: string | null | undefined,
+): string | null {
+  const own = Array.isArray(fair) ? fair[0] : fair
+  const register = Array.isArray(own?.comm_organisers) ? own?.comm_organisers[0] : own?.comm_organisers
+  const named = [register?.name, own?.erp_organiser_text, byPlaceAndDay]
+    .map(name => (typeof name === 'string' ? name.trim() : ''))
+    .find(name => name !== '')
+  return named ?? null
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { saleMonthOf, sortFairs, type Fair } from './fair-calendar'
+import { billOrganiser, saleMonthOf, sortFairs, type Fair } from './fair-calendar'
 
 /**
  * The Kuching fair ran 28–31 August 2026 and its bills reached the ERP between
@@ -77,5 +77,44 @@ describe('saleMonthOf', () => {
   })
   it('is null for a bill no fair claims', () => {
     expect(saleMonthOf('2026-09-18', null)).toBeNull()
+  })
+  // 2026-11-14: 2990s' standing booth, 29 Oct – 31 Dec (its fair's month October) — a November bill that names no
+  // day read *Late key-in · Oct 2026 fair*.
+  it('with no day named, is the month of a bill keyed on one of the fair’s days', () => {
+    const standing = fair({ periodMonth: '2026-10-01', startDate: '2026-10-29', endDate: '2026-12-31' })
+    expect(saleMonthOf(null, standing, '2026-11-13')).toBe('2026-11-01')
+    expect(saleMonthOf(undefined, standing, '2026-10-30')).toBe('2026-10-01')
+    // A day named wins over the date it was keyed on.
+    expect(saleMonthOf('2026-10-31', standing, '2026-11-03')).toBe('2026-10-01')
+    // Keyed after its fair, or on no day that reads: the fair's month, as before.
+    const kuching = fair({ periodMonth: '2026-08-01', startDate: '2026-08-28', endDate: '2026-08-31' })
+    expect(saleMonthOf(null, kuching, '2026-09-05')).toBe('2026-08-01')
+    expect(saleMonthOf(null, kuching, 'soon')).toBe('2026-08-01')
+    expect(saleMonthOf(null, kuching)).toBe('2026-08-01')
+    // A fair across two months: keyed on its 1 Sep, September — where the receiver lands a new document.
+    expect(saleMonthOf(null, fair({ periodMonth: '2026-08-01', startDate: '2026-08-30', endDate: '2026-09-01' }), '2026-09-01')).toBe('2026-09-01')
+  })
+})
+
+// 2026-11-13: two organisers at one place on the same days are two fairs — 2990s' standing booth at Penang
+// Waterfront (MALL MGMT, 29 Oct – 31 Dec) through BIGHOME's fair there (30 Oct – 1 Nov). A bill's page asked the
+// place and the day, which answers BIGHOME for a 2990s bill written on 31 October.
+describe('billOrganiser', () => {
+  const MALL = { erp_organiser_text: 'MALL MGMT', comm_organisers: { name: 'MALL MGMT' } }
+  it('is the organiser of the bill’s own fair, whatever the place and the day would answer', () => {
+    expect(billOrganiser(MALL, 'BIGHOME')).toBe('MALL MGMT')
+    expect(billOrganiser([MALL], 'BIGHOME')).toBe('MALL MGMT')
+    expect(billOrganiser({ erp_organiser_text: 'MALL MGMT', comm_organisers: [{ name: 'Mall Management' }] }, null)).toBe('Mall Management')
+  })
+  it('reads what the ERP wrote when the register names nobody', () => {
+    expect(billOrganiser({ erp_organiser_text: ' KAI HAO (KL, CHEN) ', comm_organisers: null }, 'SOLO')).toBe('KAI HAO (KL, CHEN)')
+    expect(billOrganiser({ erp_organiser_text: 'SOLO', comm_organisers: { name: '  ' } }, null)).toBe('SOLO')
+  })
+  it('falls back on the calendar’s answer for a fair that names nobody and a bill no fair claims', () => {
+    expect(billOrganiser({ erp_organiser_text: null, comm_organisers: null }, 'HOMELOVE')).toBe('HOMELOVE')
+    expect(billOrganiser(null, 'HOMELOVE')).toBe('HOMELOVE')
+    expect(billOrganiser([], 'HOMELOVE')).toBe('HOMELOVE')
+    expect(billOrganiser(undefined, null)).toBeNull()
+    expect(billOrganiser(null, '')).toBeNull()
   })
 })

@@ -191,6 +191,21 @@ describe("teamVM", () => {
     expect(vm.sheets["n-k1"]).toMatchObject({ reportsTo: "Reports to you", stats: [{ value: "RM 500" }, { value: "Cost pending" }, { value: "1 direct" }] });
     expect(vm.sheets["n-g1"].reportsTo).toBe("Reports to DARREN");
   });
+  // 2026-11-14 — one figure for two ladders: Fair's threshold (10) is read against Fair's own units; 2990s' upgrades
+  // (a brand on its own scheme) count on the KPI board only.
+  it("reads KPI hit against the sub-department's own units — a brand's own units are no part of it", () => {
+    const withKpi = (id: string, fair: number, own: number): ArenaPerson => ({ ...person(id, 1000), kpiQty: fair + own,
+      brands: { AKEMI: { sales: 500, held: 0, orders: 1, kpiQty: fair, marginRevenue: 500, marginCost: 0, blindOrders: 0 },
+        "2990S": { sales: 500, held: 0, orders: 1, kpiQty: own, marginRevenue: 0, marginCost: 0, blindOrders: 0 } } });
+    const team = (ownSchemeBrands?: string[]) => teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "me",
+      people: [withKpi("me", 6, 5), withKpi("k1", 10, 0)], month: "2026-11", kpi: { enabled: true, threshold: 10 },
+      ...(ownSchemeBrands ? { ownSchemeBrands } : {}), capacity: 27, occupied: 26, ranks: new Map() })!;
+    const vm = team(["2990S"]);
+    expect([vm.me.dot, vm.kids[0].dot]).toEqual(["wait", "good"]);
+    expect(vm.legend[0]).toBe("KPI hit");
+    // No own-scheme brand named: every unit, as before.
+    expect(team().me.dot).toBe("good");
+  });
   // Fair has two directors, KRIS and PETER. Neither reports to the other, so the
   // chart must not stack them as if one did (it drew KRIS above PETER above ANTHONY).
   const twoDirectors: MemberOrgMap = { ...map, departments: [{ ...map.departments[0], directors: [{ id: "d0", name: "KRIS" }, { id: "d1", name: "PETER" }] }] };

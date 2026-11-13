@@ -2362,11 +2362,69 @@ describe('a brand with its own scheme — 2990s (2026-11-11)', () => {
       expect(find(r.statements, 'ta').lines.find(l => l.component === 'override')).toMatchObject({ basisAmount: 2_990, amount: 59.8, brandCode: '2990S' })
     })
 
-    it('finds it only where the bill charges for it', () => {
-      const given = upgraded('1', 'rs', 2_990, 'Latex Seat', 0)
-      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders: [given] }).statements, 'rs')
-      expect(rs.kpiCommission).toBe(0)
-      expect(rs.productCommission).toBe(119.6) // the whole 2,990 at 4%
+    // 2026-11-13 — the user: "不需要去 detect 他有没有收钱" (the price is sometimes written in the remark). Until then
+    // an upgrade the special order charged nothing for was no unit.
+    it('finds it wherever the bill names it: one the special order charges nothing for pays the bonus beside the whole bill', () => {
+      const unpriced = upgraded('1', 'rs', 2_990, 'Latex Seat', 0)
+      const rs = find(run({ ...ITEMS, hierarchy: TEAM, orders: [unpriced] }).statements, 'rs')
+      expect(rs.kpiCommission).toBe(50)
+      expect(rs.productCommission).toBe(119.6) // the whole 2,990 at 4% — nothing is known to take off
+      expect(rs.totalCommission).toBe(169.6)
+      // …and it counts in the month's units, with the ones that charged: five latex seats pay RM 70 each.
+      const five = [unpriced, ...['2', '3', '4', '5'].map(id => upgraded(id, 'rs', 3_490, 'Latex Seat', 500))]
+      expect(find(run({ ...ITEMS, hierarchy: TEAM, orders: five }).statements, 'rs').kpiCommission).toBe(350)
+    })
+
+    // The same evening — told that such a bill earns the whole bill's commission AND the bonus, more than one keyed
+    // properly, the user: "i need a place at kpi item rules set there fill in cost, so that it can dedecut the cost
+    // out and change to kpi amount only".
+    describe('with a cost a unit on the item (2026-11-13)', () => {
+      const COSTED = { ...ITEMS, kpiItems: [{ ...FABRIC, cost: 250 }, { ...LATEX, cost: 500 }, OWN_LATEX, ...KPI_ITEMS] }
+      const rsOf = (items: typeof ITEMS, o: SalesOrder) => find(run({ ...items, hierarchy: TEAM, orders: [o] }).statements, 'rs')
+
+      it('takes the cost off a bill whose special order charges nothing: the upgrade earns the bonus only', () => {
+        // RM 3,490 on the bill — the sofa's 2,990 and a latex seat whose RM 500 is written in the remark.
+        const remark = upgraded('1', 'rs', 3_490, 'Latex Seat', 0)
+        const rs = rsOf(COSTED, remark)
+        expect(rs.productRevenue).toBe(2_990)
+        expect(rs.productCommission).toBe(119.6)
+        expect(rs.kpiCommission).toBe(50)
+        expect(rs.totalCommission).toBe(169.6)
+        expect(rs.lines.find(l => l.component === 'kpi_item')).toMatchObject({
+          sourceOrderId: '1', basisAmount: 500, qty: 1, amount: 50, brandCode: '2990S',
+          note: 'SO-1 · Upgrade latex seat × 1 @ 50 · 500.00 off its sales',
+        })
+        // With no cost the same bill is paid on its whole 3,490 and the bonus beside it: RM 20 more.
+        const without = rsOf(ITEMS, remark)
+        expect([without.productCommission, without.totalCommission]).toEqual([139.6, 189.6])
+        // The upline's override is on the 2,990 that earned commission.
+        const ta = find(run({ ...COSTED, hierarchy: TEAM, orders: [remark] }).statements, 'ta')
+        expect(ta.lines.find(l => l.component === 'override')).toMatchObject({ basisAmount: 2_990, amount: 59.8 })
+      })
+
+      it('a bill charged what the item costs is as it was', () => {
+        const rs = rsOf(COSTED, upgraded('1', 'rs', 3_240, 'Sofa Full Fabric', 250))
+        expect([rs.productRevenue, rs.productCommission, rs.kpiCommission, rs.totalCommission]).toEqual([2_990, 119.6, 50, 169.6])
+      })
+
+      it('one charged more — a corner’s RM 1,000 — takes off what it charged; one charged less, the cost', () => {
+        const corner = rsOf(COSTED, upgraded('1', 'rs', 3_990, 'Latex Seat', 1_000))
+        expect([corner.productRevenue, corner.kpiCommission]).toEqual([2_990, 50])
+        const short = rsOf(COSTED, upgraded('1', 'rs', 3_290, 'Latex Seat', 300))
+        expect([short.productRevenue, short.kpiCommission]).toEqual([2_790, 50])
+      })
+
+      it('counts the month’s units as before: five latex seats pay RM 70 each, charged or not', () => {
+        const five = [upgraded('1', 'rs', 3_490, 'Latex Seat', 0), ...['2', '3', '4', '5'].map(id => upgraded(id, 'rs', 3_490, 'Latex Seat', 500))]
+        const rs = find(run({ ...COSTED, hierarchy: TEAM, orders: five }).statements, 'rs')
+        expect(rs.kpiCommission).toBe(350)
+        expect(rs.productRevenue).toBe(14_950) // 5 × 2,990
+      })
+
+      it('pays nothing where the bill’s sales do not cover the cost', () => {
+        const rs = rsOf(COSTED, upgraded('1', 'rs', 400, 'Latex Seat', 0))
+        expect([rs.kpiCommission, rs.productRevenue]).toEqual([0, 400])
+      })
     })
 
     it('pays nothing where the bill’s sales do not cover what it charged', () => {

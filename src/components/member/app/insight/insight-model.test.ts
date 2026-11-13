@@ -248,6 +248,22 @@ describe("Insight › My team › a person", () => {
     ({ staffId, name, title: "Revenue Specialist", uplineId: null, depth, sales, held: 0, orders: 1, kpiQty: 0, marginRevenue: sales, marginCost: sales * 0.6, blindOrders: 0, lastOrder: null });
   const me = { staffId: "stanley", sales: 900, held: 0, orders: 1, kpiQty: 0, marginRevenue: 900, marginCost: 600, blindOrders: 0, lastOrder: null };
 
+  // 2026-11-14 — one figure for two ladders: My team's KPI hit reads the sub-department's threshold against each
+  // person's own units — a brand's own (2990s') taken out, from the same month's Arena; the reader's from their summary.
+  it("reads My team's KPI hit against the sub-department's own units", () => {
+    const kpiRow = (staffId: string, name: string, kpiQty: number) => ({ ...row(staffId, name, 1000), kpiQty });
+    const pillow = { productCode: "PIL", label: "PILLOW", quantity: 6 };
+    const fabric = { productCode: "2990S · Sofa Full Fabric", label: "Upgrade fabric", quantity: 5, brand: "2990S" };
+    const kpi = { schemeId: "s", period: "2026-09", asOf: "x", enabled: true, items: [pillow, fabric], total: 11, ladderTotal: 6, threshold: 10, hit: false };
+    const at = (ownSchemeKpi?: Map<string, number>) => insightMain(input({ me: { ...me, kpiQty: 11 }, name: "STANLEY", kpi,
+      downline: [kpiRow("lucas", "LUCAS", 12), kpiRow("ethan", "ETHAN", 11)], ...(ownSchemeKpi ? { ownSchemeKpi } : {}) })).team;
+    const vm = at(new Map([["ethan", 5], ["lucas", 0]]));
+    expect(vm.rows.map(r => [r.name, r.meta.endsWith("KPI hit")])).toEqual([["ETHAN", false], ["LUCAS", true], ["STANLEY (you)", false]]);
+    expect(vm.kpiHit).toEqual({ value: "1 of 3", sub: "2 still pending" });
+    // Without the Arena's per-brand units: every unit for the team, as before; the reader's own still from their summary.
+    expect(at().rows.map(r => [r.name, r.meta.endsWith("KPI hit")])).toEqual([["ETHAN", true], ["LUCAS", true], ["STANLEY (you)", false]]);
+  });
+
   it("a member's My team opens everybody it lists — never the member's own row", () => {
     const vm = insightMain(input({ me, name: "STANLEY", downline: [row("lucas", "LUCAS", 2000), row("james", "JAMES SEOW", 1500, 2)],
       canView: new Set(["lucas", "james"]) }));

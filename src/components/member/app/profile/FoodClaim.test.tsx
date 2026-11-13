@@ -272,6 +272,53 @@ describe("Submit food claim — a weekend across two months", () => {
   });
 });
 
+// 2026-11-13 — every weekend a standing booth is open is a brand week (the user: "yes"), and a claim follows the
+// fair's dates ("跟着他的那个 fair date，fair date 是多长，它就是多长"): 2990s' booth at Penang Waterfront, Thursday
+// 29 Oct to Thursday 31 Dec. The read carries the booth's own days on every weekend's row; each weekend offers the
+// days of its own week, so every day of the fair is ticked once.
+describe("Submit food claim — a standing booth", () => {
+  const standing = (key: string, month: string, n: string) => week({ key, month, n, brandWeek: "2990S week", brand: "2990S", dates: "29 Oct – 31 Dec",
+    venue: "PENANG WATERFRONT CONVENTION CENTRE", org: "MALL MGMT", fairId: "booth", start: "2026-10-29", end: "2026-12-31", color: "brown", tint: "sand" });
+  const weeks = [standing("2026-12-04", "DEC", "W1"), standing("2026-11-27", "NOV", "W4"), standing("2026-11-20", "NOV", "W3"),
+    standing("2026-11-13", "NOV", "W2"), standing("2026-11-06", "NOV", "W1"), standing("2026-10-30", "OCT", "W5")];
+
+  it("November lists each of its weekends with its own week's days — all thirty, each once", async () => {
+    const onSubmit = ok();
+    foodForm(onSubmit, { ...options, today: "2026-12-05", foodWeeks: weeks });
+    expect(months().map(b => `${b.textContent}=${b.getAttribute("aria-pressed")}`)).toEqual(["Dec 2026=false", "Nov 2026=true"]);
+    expect(screen.getAllByRole("button", { name: /week · / }).map(b => b.textContent?.replace(/\s+/g, " "))).toEqual([
+      expect.stringContaining("2990S week · 29 Oct – 1 Nov"), expect.stringContaining("2990S week · 2–8 Nov"),
+      expect.stringContaining("2990S week · 9–15 Nov"), expect.stringContaining("2990S week · 16–22 Nov"),
+      expect.stringContaining("2990S week · 23–29 Nov"), expect.stringContaining("2990S week · 30 Nov – 6 Dec"),
+    ]);
+    // The weekend it opens in gives November its 1 Nov; Monday 30 Nov is the weekend of 4 Dec's.
+    expect(weekCard(/2990S week · 29 Oct – 1 Nov/)).toHaveTextContent("1 day");
+    expect(weekCard(/2990S week · 2–8 Nov/)).toHaveTextContent("7 days");
+    expect(weekCard(/2990S week · 30 Nov – 6 Dec/)).toHaveTextContent("1 day");
+    expect(sum("Days")).toHaveTextContent("30 days");
+    expect(screen.getByText("RM 600.00")).toBeInTheDocument();
+    fireEvent.click(weekCard(/2990S week · 30 Nov – 6 Dec/));
+    expect(day(/^Mon 30 Nov$/)).toHaveAttribute("aria-pressed", "true");
+    expect(day(/^Tue 1 Dec, Dec claim$/)).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+    await screen.findByText("Request submitted");
+    const sentWeeks = JSON.parse(String(sent(onSubmit).weeks)) as { week: string; days: string[] }[];
+    expect(sentWeeks.map(w => [w.week, w.days.length])).toEqual([
+      ["2026-10-30", 1], ["2026-11-06", 7], ["2026-11-13", 7], ["2026-11-20", 7], ["2026-11-27", 7], ["2026-12-04", 1],
+    ]);
+    expect(new Set(sentWeeks.flatMap(w => w.days)).size).toBe(30);
+  });
+
+  it("a fair of one weekend still says its own days, a Monday it ends on among them", () => {
+    const pisa = week({ key: "2026-11-06", month: "NOV", n: "W1", brandWeek: "Akemi week", brand: "AKEMI", dates: "6–9 Nov", venue: "PISA SPICE ARENA",
+      fairId: "pisa", start: "2026-11-06", end: "2026-11-09" });
+    foodForm(ok(), { ...options, today: "2026-12-05", foodWeeks: [pisa] });
+    expect(weekCard(/Akemi week · 6–9 Nov/)).toHaveTextContent("4 days");
+    fireEvent.click(weekCard(/Akemi week · 6–9 Nov/));
+    expect(day(/^Mon 9 Nov$/)).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
 describe("Requests offers a food claim only where HR opened it", () => {
   const rows: RequestRowVM[] = [
     { id: "a", kind: "claim", title: "Outstation claim · PENANG", sub: "RQ-2610-001 · 5 Oct", status: "Pending review", tone: "pending" },

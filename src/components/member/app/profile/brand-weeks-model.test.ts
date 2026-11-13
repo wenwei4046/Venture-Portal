@@ -79,6 +79,23 @@ describe("brandWeeksVM — where the member worked, month by month (2026-10-12)"
     ]);
   });
 
+  // 2026-11-13 — every weekend a standing booth is open is a brand week (the user: "yes"): 2990s' booth at Penang
+  // Waterfront, 29 Oct – 31 Dec, as the read carries it — the booth's own days on every weekend's row.
+  it("shows a standing booth on each of its weekends, each with its own week's days", () => {
+    const standing = (friday: string) => week({ week: friday, brand: "2990S", venue: "PENANG WATERFRONT CONVENTION CENTRE", organizer: "MALL MGMT",
+      start: "2026-10-29", end: "2026-12-31", fairId: "g" });
+    const booth = { period: "2026-11", selfId: "me",
+      history: { events: [], weeks: ["2026-10-30", "2026-11-06", "2026-11-13", "2026-11-20"].map(standing) } } as unknown as MemberArenaSnapshot;
+    const vm = brandWeeksVM(booth, "2026-11-14", "me");
+    expect(vm.map(m => [m.period, m.summary])).toEqual([["2026-11", "2 fairs"], ["2026-10", "1 fair"], ["2026-09", "No fair"]]);
+    expect(facts(vm[0])).toEqual([
+      ["W1", "2–8 Nov", "2990S", "PENANG WATERFRONT CONVENTION CENTRE", "MALL MGMT", null],
+      ["W2", "9–15 Nov", "2990S", "PENANG WATERFRONT CONVENTION CENTRE", "MALL MGMT", null],
+    ]);
+    // The weekend it opens in: its first day to that week's Sunday.
+    expect(vm[1].weeks.at(-1)).toMatchObject({ n: "W5", when: "29 Oct – 1 Nov", brandName: "2990S" });
+  });
+
   it("is only the person read's, and reads a snapshot without brand weeks as none", () => {
     const other = brandWeeksVM(snap, "2026-10-12", "other")[0];
     expect(other.weeks.map(w => w.brandName)).toEqual([null, null, "Dunlopillo"]);

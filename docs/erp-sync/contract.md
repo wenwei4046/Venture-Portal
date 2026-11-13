@@ -214,11 +214,19 @@ its start — is treated as no pick: **never** a reason to refuse the order.
 What the portal does with it (`erp_sync_fair`, mig `20260927010000`):
 
 1. **Finds the fair**: the one already holding this project, else the event it is
-   a booth of (same place, overlapping days — the exact window first), else a
-   new `comm_venue_events` row (`source = 'erp'`, month = the start's month).
-2. **The ERP wins**: an existing fair takes the ERP's organiser and days, and its
-   `source` becomes `erp`. Nobody types a fair on the portal any more — Revenue ›
-   Venues was removed the same day.
+   a booth of (same place, overlapping days, THE SAME ORGANISER — or a fair whose
+   organiser nobody has named, or any when the booth names none; the exact window
+   first), else a new `comm_venue_events` row (`source = 'erp'`, month = the
+   start's month). Two organisers at one place on the same days are two fairs
+   (2026-11-13, mig `20261114050000`: a mall's standing booth through another
+   organiser's three-day fair at the same hall).
+2. **The ERP wins**: an existing fair takes the ERP's days and its `source`
+   becomes `erp`; it takes the ERP's organiser where it names none, or where the
+   project is its only booth (the ERP corrected it). A project pinned to a fair of
+   ANOTHER organiser that has other booths — or beside which its own organiser's
+   fair already stands on its days — leaves that fair for its own organiser's.
+   Nobody types a fair on the portal any more — Revenue › Venues was removed the
+   same day.
 3. **Pins it** to the bill (`fair_source = 'erp'`). The calendar never re-guesses
    an ERP pin, and a move into its fair's month is a CONFIRMED move. A later
    delivery without a fair un-pins it (the bill falls back to
@@ -838,11 +846,16 @@ booths changed forgets its kept My honours (`member_honour_months`).
 `member_erp_brand_weeks(sub, staff?)` is the first layer: for each portal
 person, the booth the ERP lists them at for each fair weekend — the weekend
 named by the Friday of the Monday–Sunday week the fair opens in, the Arena's
-weeks. Listed at two booths that weekend → the one they wrote the most bills
-at (the second layer's own measure), then the earlier, then the lower project
-id. A booth is read at the portal's fair for it: the one the order feed pinned
+weeks, and (since 2026-11-13, mig `20261114060000`) every later week in which
+the booth is open on a Friday, Saturday or Sunday: a standing booth of two
+months is a brand week on each of its nine weekends, a fair ending on a Monday
+still one. Listed at two booths that weekend → the one they wrote the most
+bills at (the second layer's own measure; of a booth open several weekends,
+the bills sold in that weekend's own week), then the earlier, then the lower
+project id. A booth is read at the portal's fair for it: the one the order feed pinned
 the project to (`comm_venue_events.erp_project_ids`), else the same place on
-overlapping days (`erp_sync_fair`'s rule); it writes no fair of its own.
+overlapping days under the booth's own organiser (`erp_sync_fair`'s rule, since
+2026-11-13); it writes no fair of its own.
 
 Where the ERP lists somebody at no booth that weekend, the second layer is the
 engine as it was: the brand they opened the most bills for that week, at the

@@ -140,6 +140,8 @@ export interface KpiItemRow {
   brand_id?: string | null
   /** A brand's own item alone: `[{min_qty, amount}]` — from min_qty units in a month every unit pays amount. */
   unit_tiers?: unknown
+  /** A brand's own item alone (2026-11-13): RM a unit taken off the bill; null = what the bill's special order charges. */
+  cost_amount?: number | string | null
 }
 
 /** A special of the Bedframe or Sofa Maintenance pool — what Rules › KPI items picks from. */

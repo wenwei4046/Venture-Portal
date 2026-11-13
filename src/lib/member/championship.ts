@@ -1,4 +1,4 @@
-import { arenaIncentive, arenaRankings, type ArenaPerson, type ArenaScore, type ArenaTier } from "./arena";
+import { arenaIncentive, arenaRankings, ladderKpiQty, type ArenaPerson, type ArenaScore, type ArenaTier } from "./arena";
 import { arenaFairRecords, type ArenaFairEvent, type ArenaHistorySnapshot } from "./arena-history";
 
 /**
@@ -186,6 +186,8 @@ function recordPlaces(month: string, history: ArenaHistorySnapshot | null): Map<
 export function championshipMonth(input: ChampMonthInput): ChampMonth[] {
   const { month, people, brands, tiers, history, kpi } = input;
   const marginBrands = input.marginBrands ?? brands;
+  // The brands on their own commission scheme: those with no Margin board (none when no list was given).
+  const ownCodes = brands.filter(code => !marginBrands.includes(code));
   const sales = boardPoints(arenaRankings(people, "sales"));
   const margin = boardPoints(arenaRankings(people, "margin"));
   const kpiBoard = kpi.enabled ? boardPoints(arenaRankings(people, "kpi")) : new Map<string, ChampPlace>();
@@ -233,7 +235,9 @@ export function championshipMonth(input: ChampMonthInput): ChampMonth[] {
 
       if (kpi.enabled) {
         const k = kpiBoard.get(person.id);
-        const hit = kpi.threshold !== null && person.kpiQty >= kpi.threshold;
+        // The threshold is the sub-department's ladder, read against its own units (2026-11-14): a brand on its own
+        // scheme — every brand with no Margin board — counts on the KPI board and not toward the threshold.
+        const hit = kpi.threshold !== null && ladderKpiQty(person, ownCodes) >= kpi.threshold;
         const kBonus = hit ? CHAMP_KPI_BONUS : 0;
         parts.kpi = { ...emptyPart("kpi", hit ? "Threshold hit" : ""), place: k?.points ?? 0, bonus: kBonus,
           points: round2((k?.points ?? 0) + kBonus), position: k?.position ?? null, of: k?.of ?? 0 };

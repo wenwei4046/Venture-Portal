@@ -787,5 +787,41 @@ describe('a brand with its own scheme — 2990s', () => {
       // …and releases it on what earned commission.
       expect(releasedOrders(input, result).map(r => [r.order_no, r.product_revenue])).toEqual([['SO-001', 2_990]])
     })
+
+    // 2026-11-13 — the user: "i need a place at kpi item rules set there fill in cost, so that it can dedecut the
+    // cost out and change to kpi amount only" (`comm_kpi_items.cost_amount`).
+    it('reads a brand’s item’s cost a unit — none where the row has none, never one on the sub-department’s own', () => {
+      const withCost = (cost: unknown) => toEngineInput(baseRows({
+        ranks, brands: BRANDS,
+        kpiItems: [
+          { ...KPI[0], cost_amount: cost as never },
+          { ...KPI[2], cost_amount: cost as never },
+        ],
+      })).kpiItems
+      expect(withCost('250.00')).toEqual([
+        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S', cost: 250 },
+        { source: 'sku', productCode: 'PIL-01', label: 'Pillow', kpiAmount: 50 },
+      ])
+      for (const none of [null, undefined, 0, '0.00']) {
+        expect(withCost(none)[0]).toEqual(
+          { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S' })
+      }
+    })
+
+    it('a bill whose special order charges nothing loses the item’s cost: 4% of 2,990 and the RM 50 bonus, not 4% of 3,490', () => {
+      // The same sofa at RM 3,490, its fabric upgrade's RM 250 … and a latex seat whose RM 500 is in the remark.
+      const lines = sofa.map(l => (l.item_group === 'SOFA'
+        ? { ...l, line_amount: '1870.00', variants: { specials: ['Sofa Full Fabric', 'Latex Seat'] } } : l))
+      const input = toEngineInput(baseRows({
+        ranks, brands: BRANDS, specialMoney: MONEY,
+        kpiItems: [KPI[0], { ...KPI[1], cost_amount: '500.00' }],
+        itemGroups: [{ item_group: 'SOFA', commissionable: true }, { item_group: 'TRANS', commissionable: false }],
+        scheme: { ...SCHEME, enable_kpi: false },
+        orders: [order({ brand_code: '2990S', order_total: '3990.00', paid_amount: '3990.00', sales_order_lines: lines })],
+      }))
+      const statement = computeCommissionRun(input).statements.find(s => s.staffId === 'staff-a')!
+      // 3,740 of sofa − 250 the bill charged for the fabric − 500 the latex seat costs = 2,990.
+      expect([statement.productRevenue, statement.productCommission, statement.kpiCommission, statement.totalCommission]).toEqual([2_990, 119.6, 100, 219.6])
+    })
   })
 })

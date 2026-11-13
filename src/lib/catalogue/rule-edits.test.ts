@@ -242,12 +242,48 @@ describe('validateKpiItems', () => {
       expect(validateKpiItems({ adds: [{ ...latex, name: 'x'.repeat(120) }], changes: [], removes: [] }).adds).toHaveLength(1)
     })
 
-    it("refuses a name or tiers on an item that is not a brand's", () => {
+    it("refuses a name, tiers or a cost on an item that is not a brand's", () => {
       const own = { source: 'option' as const, optionPool: 'sofa_specials', optionValue: 'Nylon Fabric', amount: '50' }
       expect(() => validateKpiItems({ adds: [{ ...own, tiers: [{ minQty: '5', amount: '70' }] }], changes: [], removes: [] }))
-        .toThrow(/Only a brand's own KPI item has a name and tiers of its own/)
+        .toThrow(/Only a brand's own KPI item has a name, tiers and a cost of its own/)
       expect(() => validateKpiItems({ adds: [{ ...own, name: 'Upgrade' }], changes: [], removes: [] }))
-        .toThrow(/Only a brand's own KPI item has a name and tiers of its own/)
+        .toThrow(/Only a brand's own KPI item has a name, tiers and a cost of its own/)
+      expect(() => validateKpiItems({ adds: [{ ...own, cost: '500' }], changes: [], removes: [] }))
+        .toThrow(/Only a brand's own KPI item has a name, tiers and a cost of its own/)
+    })
+
+    // 2026-11-13 — the user: "i need a place at kpi item rules set there fill in cost, so that it can dedecut the
+    // cost out and change to kpi amount only": what a unit takes off its bill.
+    it('is added with its cost a unit when one was typed — blank or 0 is no cost', () => {
+      expect(validateKpiItems({ adds: [{ ...latex, cost: ' 1,000.00 ' }], changes: [], removes: [] }).adds).toEqual([
+        { source: 'option', option_pool: 'sofa_specials', option_value: 'Latex Seat', kpi_amount: 50, brand_id: BRAND, cost_amount: 1000 },
+      ])
+      for (const none of ['', '  ', '0', '0.00', null]) {
+        expect(validateKpiItems({ adds: [{ ...latex, cost: none }], changes: [], removes: [] }).adds).toEqual([
+          { source: 'option', option_pool: 'sofa_specials', option_value: 'Latex Seat', kpi_amount: 50, brand_id: BRAND },
+        ])
+      }
+    })
+
+    it('changes its cost alone — a cost emptied is sent as 0, which takes it away; one not named is not sent', () => {
+      const ID = '22222222-2222-4222-8222-222222222222'
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, cost: '500', label: 'Upgrade latex seat' }], removes: [] }).changes)
+        .toEqual([{ id: ID, cost_amount: 500 }])
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, cost: null }], removes: [] }).changes).toEqual([{ id: ID, cost_amount: 0 }])
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, cost: ' ' }], removes: [] }).changes).toEqual([{ id: ID, cost_amount: 0 }])
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, amount: '60', cost: '250.5' }], removes: [] }).changes)
+        .toEqual([{ id: ID, kpi_amount: 60, cost_amount: 250.5 }])
+      expect(validateKpiItems({ adds: [], changes: [{ id: ID, amount: '60' }], removes: [] }).changes).toEqual([{ id: ID, kpi_amount: 60 }])
+    })
+
+    it('reads a cost as RM 0.01 to RM 1,000,000 a unit, to the sen', () => {
+      const withCost = (cost: string) => () => validateKpiItems({ adds: [{ ...latex, name: 'Upgrade latex seat', cost }], changes: [], removes: [] })
+      expect(withCost('-1')).toThrow(/Upgrade latex seat: a cost cannot be negative/)
+      expect(withCost('1000000.01')).toThrow(/Upgrade latex seat: a cost is at most RM 1,000,000 a unit/)
+      expect(withCost('500.123')).toThrow(/Upgrade latex seat: cost: "500.123" is not an amount \(up to two decimals\)/)
+      expect(withCost('five hundred')).toThrow(/is not an amount/)
+      expect(withCost('1000000')).not.toThrow()
+      expect(withCost('0.01')).not.toThrow()
     })
 
     it('reads a tier as whole units from 2 up, each above the one before, with what a unit then pays', () => {

@@ -62,6 +62,28 @@ export interface MemberArenaSnapshot {
 /** The brands a Margin board is kept for: every brand of the scheme but one on its own commission scheme (2990s). */
 export const marginBrandCodes = (brands: MemberArenaSnapshot["brands"]): string[] =>
   brands.filter(b => b.ownScheme !== true).map(b => b.code);
+
+/** The brands on their own commission scheme (2990s): their KPI items are theirs, paid by their own tiers. */
+export const ownSchemeBrandCodes = (brands: MemberArenaSnapshot["brands"]): string[] =>
+  brands.filter(b => b.ownScheme === true).map(b => b.code);
+
+/**
+ * A person's units of a brand on its own scheme: what its bills found of that brand's own KPI items (a bill of 2990s
+ * finds only 2990s' items). The Arena's per-brand scores carry each brand's units.
+ */
+export function ownSchemeKpiQty(person: { brands?: Record<string, Pick<ArenaScore, "kpiQty">> }, ownSchemeCodes: readonly string[]): number {
+  return ownSchemeCodes.reduce((sum, code) => sum + (Number(person.brands?.[code]?.kpiQty) || 0), 0);
+}
+
+/**
+ * The KPI units the sub-department's own threshold is read against (2026-11-14 — "one figure for two ladders", live
+ * since Fair's KPI switch went on beside 2990s' items on 2026-11-13): every unit but a brand's own — 2990s' upgrades
+ * are paid by 2990s' tiers and are no part of Fair's ladder, as the engine pays them. The KPI board still ranks every
+ * unit.
+ */
+export function ladderKpiQty(person: Pick<ArenaScore, "kpiQty"> & { brands?: Record<string, Pick<ArenaScore, "kpiQty">> }, ownSchemeCodes: readonly string[]): number {
+  return Math.max(0, person.kpiQty - ownSchemeKpiQty(person, ownSchemeCodes));
+}
 export interface ArenaRankedPerson {
   id: string; name: string; self: boolean; position: number | null; value: number | null;
   pending: boolean; hasActivity: boolean;

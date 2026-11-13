@@ -12,7 +12,7 @@ import PushAsk from "@/components/pwa/PushAsk";
 import { useStatusBar } from "@/components/pwa/status-bar";
 import { reportPushTrouble, savePushSubscription } from "@/lib/push/actions";
 import type { MemberOrderBook } from "@/lib/member/order-book";
-import { arenaRankings, marginBrandCodes, type MemberArenaSnapshot } from "@/lib/member/arena";
+import { arenaRankings, marginBrandCodes, ownSchemeBrandCodes, ownSchemeKpiQty, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
@@ -873,6 +873,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // whole sub-department keeps its own tap (View as them, above); the preview's fixtures open nobody.
   const teamOpens = !deptSource && !fixture && !data.demo && (principal ? !!context : !!source.teamBook);
   const teamOpenIds = useMemo(() => (teamOpens ? new Set(insDownline.map(d => d.staffId).filter(Boolean)) : undefined), [teamOpens, insDownline]);
+  // My team's KPI hit (2026-11-14): each person's units of a brand on its own scheme (2990s), from the same month's
+  // Arena — its per-brand scores — so a brand's own units count toward no threshold of the sub-department's.
+  const insOwnSchemeKpi = useMemo(() => {
+    const snap = insMonthly ? [arena, arenaToday].find(s => s?.period === insPeriod.from) ?? null : null;
+    const codes = snap ? ownSchemeBrandCodes(snap.brands) : [];
+    return snap && codes.length ? new Map(snap.people.map(p => [p.id, ownSchemeKpiQty(p, codes)])) : undefined;
+  }, [insMonthly, arena, arenaToday, insPeriod.from]);
   const insightInput = useMemo<InsightInput>(() => ({
     period: insPeriod,
     book: ins.book,
@@ -885,7 +892,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     name: me.name,
     title: me.title,
     ...(whole ? { whole, canView } : teamOpenIds ? { canView: teamOpenIds } : {}),
-  }), [insPeriod, ins, insMonthly, insDownline, now.kpi?.enabled, data.bands, me.name, me.title, whole, canView, teamOpenIds]);
+    ...(insOwnSchemeKpi ? { ownSchemeKpi: insOwnSchemeKpi } : {}),
+  }), [insPeriod, ins, insMonthly, insDownline, now.kpi?.enabled, data.bands, me.name, me.title, whole, canView, teamOpenIds, insOwnSchemeKpi]);
   const insMain = useMemo(() => fixture?.insight?.main ?? (ins.book ? insightMain(insightInput) : null), [fixture, ins.book, insightInput]);
   const insBills = useMemo(() => fixture?.insight?.bills ?? (ins.book ? billsView(insightInput) : null), [fixture, ins.book, insightInput]);
   const insKpi = useMemo(() => fixture?.insight?.kpi ?? (ins.book ? kpiView(insightInput, membership?.name ?? "this sub-department") : null), [fixture, ins.book, insightInput, membership?.name]);
@@ -1250,7 +1258,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     const staffId = viewed?.id ?? data.profile.id;
     return teamVM({
       map: orgMap, departmentId: membership.id, subName: membership.name, staffId,
-      people: arena?.people ?? [], month: working ?? period, kpi: kpiRule,
+      people: arena?.people ?? [], month: working ?? period, kpi: kpiRule, ownSchemeBrands: ownSchemeBrandCodes(arena?.brands ?? []),
       capacity: membership.capacity, occupied: membership.occupied,
       ranks: new Map(membership.people.map(p => [p.id, p.rank])),
     });
