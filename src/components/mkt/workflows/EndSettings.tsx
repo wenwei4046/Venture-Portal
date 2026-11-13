@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { CELEBRATIONS, GIF_TYPES, type FinishCfg, type FinishNotify } from '@/lib/marketing/flow'
 import { fileRoute } from '@/lib/storage/browser'
+import Tip from '../ui/Tip'
 import RadioCard from './RadioCard'
 import w from './workflows.module.css'
 
@@ -43,8 +44,7 @@ export default function EndSettings({
       </div>
       <div className={w.part}>
         <span className={w.q}>Done when</span>
-        <div className={w.doneWhen}>{doneWhen}</div>
-        <span className={w.tiny}>Change it on the last stage’s Approval.</span>
+        <Tip text="Change it on the last stage’s Approval."><div className={w.doneWhen} tabIndex={0}>{doneWhen}</div></Tip>
       </div>
       <div className={w.part}>
         <span className={w.q}>Notify</span>

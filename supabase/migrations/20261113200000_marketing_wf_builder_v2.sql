@@ -833,6 +833,153 @@ BEGIN
 END
 $fn$;
 
+-- ── Published on the basics (2026-11-13 — the user: "基本资料有了就能 public") ─────────
+-- A version needs only its basics: at least one stage, every stage named. Whatever else is unfinished in the draft is
+-- tidied INTO THE VERSION (the draft keeps it as typed; the builder shows each as a ⚠️ — workflows.ts `publishFixups`,
+-- its TS twin): a 🔓 handoff on stage 1, or with nobody left on its shortlist, runs as MM assigns; somebody no longer
+-- on the team leaves a shortlist; an approver who is not a Marketing manager or a Director on the team leaves their
+-- level, and a level left with nobody goes; on the canvas a field or column with no name goes (a table left with no
+-- column goes), one with no stage (or a stage taken out) is filled in at its section's stage, else the last stage; a
+-- second field of one name in a section is numbered ("Caption (2)"); a choice with no options and no shared list is a
+-- Text; a date's calendar mark of no known kind goes; a section with no name is named for its stage (else "Section n").
+-- Returns {stages, canvas} for mkt_workflow_check / mkt_canvas_check, which then refuse nothing but the basics.
+CREATE OR REPLACE FUNCTION public.mkt_wf_publish_ready(p_stages jsonb, p_canvas jsonb, p_locked boolean)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE
+SET search_path = public
+AS $fn$
+DECLARE
+  v_uuid   text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+  v_roster text[] := ARRAY(SELECT lower(r.staff_id::text) FROM public.mkt_roster() r);
+  v_apprs  text[] := ARRAY(SELECT lower(r.staff_id::text) FROM public.mkt_roster() r
+                            WHERE upper(coalesce(r.title, '')) LIKE '%MARKETING MANAGER%' OR upper(coalesce(r.title, '')) LIKE '%DIRECTOR%');
+  v_kinds  text[] := ARRAY['post', 'shoot', 'meeting', 'ads_live', 'ads_end', 'report'];
+  v_stages jsonb := '[]'::jsonb;
+  v_sids   text[] := '{}';
+  v_names  text[] := '{}';
+  v_st     jsonb;
+  v_who    jsonb;
+  v_cands  jsonb;
+  v_levels jsonb;
+  v_a      jsonb;
+  v_ids    jsonb;
+  i        integer := 0;
+  v_c      jsonb := CASE WHEN jsonb_typeof(p_canvas) = 'object' THEN p_canvas ELSE '{}'::jsonb END;
+  v_secs   jsonb := '[]'::jsonb;
+  v_s      jsonb;
+  v_f      jsonb;
+  v_col    jsonb;
+  v_fields jsonb;
+  v_cols   jsonb;
+  v_labels text[];
+  v_label  text;
+  v_n      integer;
+  v_secst  text;
+  v_title  text;
+  k        integer := 0;
+BEGIN
+  IF jsonb_typeof(p_stages) IS DISTINCT FROM 'array' THEN
+    RETURN jsonb_build_object('stages', p_stages, 'canvas', p_canvas);
+  END IF;
+  FOR v_st IN SELECT x FROM jsonb_array_elements(p_stages) x LOOP
+    IF jsonb_typeof(v_st) <> 'object' THEN
+      v_stages := v_stages || jsonb_build_array(v_st);
+      i := i + 1;
+      CONTINUE;
+    END IF;
+    v_sids := v_sids || coalesce(v_st ->> 'sid', '');
+    v_names := v_names || btrim(coalesce(v_st ->> 'name', ''));
+    -- Who: a handoff with nobody left to pick from (or on stage 1, or locked) runs as MM assigns.
+    v_who := CASE WHEN jsonb_typeof(v_st -> 'who') = 'object' THEN v_st -> 'who' ELSE '{"mode": "assign", "cands": []}'::jsonb END;
+    v_cands := coalesce((SELECT jsonb_agg(x) FROM jsonb_array_elements_text(
+                           CASE WHEN jsonb_typeof(v_who -> 'cands') = 'array' THEN v_who -> 'cands' ELSE '[]'::jsonb END) x
+                          WHERE lower(x) = ANY (v_roster)), '[]'::jsonb);
+    IF v_who ->> 'mode' = 'prev' AND (i = 0 OR p_locked OR jsonb_array_length(v_cands) = 0) THEN
+      v_who := jsonb_build_object('mode', 'assign', 'cands', '[]'::jsonb);
+    ELSE
+      v_who := jsonb_build_object('mode', coalesce(v_who ->> 'mode', 'assign'), 'cands', v_cands);
+    END IF;
+    -- Approval: only the PIC, "picked at assignment", and Marketing's managers / Directors on the team; empty levels go.
+    v_levels := '[]'::jsonb;
+    IF jsonb_typeof(v_st -> 'appr') = 'array' THEN
+      FOR v_a IN SELECT x FROM jsonb_array_elements(v_st -> 'appr') x LOOP
+        IF jsonb_typeof(v_a -> 'ids') = 'array' THEN
+          v_ids := coalesce((SELECT jsonb_agg(x) FROM jsonb_array_elements_text(v_a -> 'ids') x
+                              WHERE x IN ('pic', 'assign') OR (x ~ v_uuid AND lower(x) = ANY (v_apprs))), '[]'::jsonb);
+          IF jsonb_array_length(v_ids) > 0 THEN
+            v_levels := v_levels || jsonb_build_array(jsonb_build_object('ids', v_ids, 'rule', CASE WHEN v_a ->> 'rule' = 'all' THEN 'all' ELSE 'any' END));
+          END IF;
+        ELSIF v_a ->> 'kind' = 'person' THEN
+          IF lower(coalesce(v_a ->> 'staff', '')) = ANY (v_apprs) THEN
+            v_levels := v_levels || jsonb_build_array(v_a);
+          END IF;
+        ELSE
+          v_levels := v_levels || jsonb_build_array(v_a);
+        END IF;
+      END LOOP;
+    END IF;
+    v_stages := v_stages || jsonb_build_array(v_st || jsonb_build_object('who', v_who, 'appr', v_levels));
+    i := i + 1;
+  END LOOP;
+
+  -- The canvas.
+  IF jsonb_typeof(v_c -> 'sections') = 'array' THEN
+    FOR v_s IN SELECT x FROM jsonb_array_elements(v_c -> 'sections') x LOOP
+      k := k + 1;
+      CONTINUE WHEN jsonb_typeof(v_s) <> 'object';
+      v_secst := CASE WHEN coalesce(v_s ->> 'stage', '') = ANY (v_sids) THEN v_s ->> 'stage' END;
+      v_title := btrim(coalesce(v_s ->> 'title', ''));
+      IF v_title = '' THEN
+        v_title := coalesce(nullif(v_names[array_position(v_sids, v_secst)], ''), 'Section ' || k);
+      END IF;
+      v_fields := '[]'::jsonb;
+      v_labels := '{}';
+      FOR v_f IN SELECT x FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v_s -> 'fields') = 'array' THEN v_s -> 'fields' ELSE '[]'::jsonb END) x LOOP
+        CONTINUE WHEN jsonb_typeof(v_f) <> 'object';
+        v_label := btrim(coalesce(v_f ->> 'label', ''));
+        CONTINUE WHEN v_label = '';
+        IF coalesce(v_f ->> 'type', '') <> 'Note' THEN
+          v_n := 1;
+          WHILE (CASE WHEN v_n = 1 THEN v_label ELSE left(v_label, 54) || ' (' || v_n || ')' END) = ANY (v_labels) LOOP
+            v_n := v_n + 1;
+          END LOOP;
+          IF v_n > 1 THEN
+            v_label := left(v_label, 54) || ' (' || v_n || ')';
+          END IF;
+          v_labels := v_labels || v_label;
+        END IF;
+        v_f := v_f || jsonb_build_object('label', v_label, 'stage', to_jsonb(
+          CASE WHEN coalesce(v_f ->> 'stage', '') = ANY (v_sids) THEN v_f ->> 'stage' ELSE coalesce(v_secst, v_sids[cardinality(v_sids)]) END));
+        IF v_f ->> 'type' IN ('Select', 'Multi-select')
+           AND coalesce(v_f ->> 'list', '') = ''
+           AND coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(v_f -> 'opts') = 'array' THEN v_f -> 'opts' END), 0) = 0 THEN
+          v_f := (v_f - 'opts' - 'list') || '{"type": "Text"}'::jsonb;
+        END IF;
+        IF jsonb_typeof(v_f -> 'cal') = 'object' AND NOT (coalesce(v_f -> 'cal' ->> 'kind', '') = ANY (v_kinds)) THEN
+          v_f := v_f - 'cal';
+        END IF;
+        IF v_f ->> 'type' = 'Table' THEN
+          v_cols := '[]'::jsonb;
+          FOR v_col IN SELECT x FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v_f -> 'cols') = 'array' THEN v_f -> 'cols' ELSE '[]'::jsonb END) x LOOP
+            CONTINUE WHEN jsonb_typeof(v_col) <> 'object' OR btrim(coalesce(v_col ->> 'name', '')) = '';
+            v_cols := v_cols || jsonb_build_array(v_col || jsonb_build_object('stage', to_jsonb(
+              CASE WHEN coalesce(v_col ->> 'stage', '') = ANY (v_sids) THEN v_col ->> 'stage' ELSE v_f ->> 'stage' END)));
+          END LOOP;
+          CONTINUE WHEN jsonb_array_length(v_cols) = 0;
+          v_f := v_f || jsonb_build_object('cols', v_cols);
+        END IF;
+        v_fields := v_fields || jsonb_build_array(v_f);
+      END LOOP;
+      v_secs := v_secs || jsonb_build_array(v_s || jsonb_build_object('title', v_title, 'fields', v_fields));
+    END LOOP;
+    v_c := v_c || jsonb_build_object('sections', v_secs);
+  END IF;
+  RETURN jsonb_build_object('stages', v_stages, 'canvas', v_c);
+END
+$fn$;
+REVOKE ALL ON FUNCTION public.mkt_wf_publish_ready(jsonb, jsonb, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.mkt_wf_publish_ready(jsonb, jsonb, boolean) TO service_role;
+
 -- ── Published ────────────────────────────────────────────────────────────────
 -- Production's body + the canvas checked by sid; the version keeps the overdue rule and the finish as published.
 CREATE OR REPLACE FUNCTION public.mkt_workflow_publish(p_id uuid, p_rev integer)
@@ -858,8 +1005,10 @@ BEGIN
   IF v_w.published_rev = v_w.draft_rev THEN
     RAISE EXCEPTION 'Nothing has changed since v%.', v_w.version USING ERRCODE = '22023';
   END IF;
-  v_stages := public.mkt_workflow_check(v_w.draft, true, v_w.locked);
-  v_canvas := public.mkt_canvas_check(v_w.canvas, ARRAY(SELECT s ->> 'sid' FROM jsonb_array_elements(v_stages) s), true);
+  -- The basics only (2026-11-13): the rest of the draft is tidied into the version (mkt_wf_publish_ready).
+  v_canvas := public.mkt_wf_publish_ready(v_w.draft, v_w.canvas, v_w.locked);
+  v_stages := public.mkt_workflow_check(v_canvas -> 'stages', true, v_w.locked);
+  v_canvas := public.mkt_canvas_check(v_canvas -> 'canvas', ARRAY(SELECT s ->> 'sid' FROM jsonb_array_elements(v_stages) s), true);
   INSERT INTO public.mkt_workflow_versions (workflow_id, version, stages, canvas, locked, promise, overdue, finish, published_by)
   VALUES (v_w.id, v_w.version + 1, v_stages, v_canvas, v_w.locked, v_w.promise, public.mkt_wf_overdue(v_w.overdue), v_w.finish, auth.uid());
   UPDATE public.mkt_workflows

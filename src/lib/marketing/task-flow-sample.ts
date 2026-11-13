@@ -1,7 +1,8 @@
 // The Builder's ▶ Preview (Workflow Builder 2a handoff › Interactions: "the ▶ Preview tab shows the Task page built from
 // the current draft, without publishing"): a SAMPLE task made from the draft the manager is editing — half its stages
-// done, the people on it from Marketing's roster, sample answers in the fields the done stages fill — and each decision
-// played on it with flow.ts's `step`, exactly as the database decides. Nothing is saved. Pure.
+// done, the people on it from Marketing's roster — and each decision played on it with flow.ts's `step`, exactly as the
+// database decides. Nothing is saved. Pure. Nothing is made up either (the user, 2026-11-13): its title is the
+// template's own name, its Track ID a placeholder, every field and table empty — no client, no brief, no answers.
 
 import { officeTime } from '@/lib/office-time'
 import { addDays } from './board'
@@ -39,17 +40,13 @@ function backWorkDays(day: string, n: number): string {
   return d
 }
 
-const sampleValue = (type: string, name: string): FlowValue =>
-  type === 'Date' ? '2026-11-05' : type === 'Checkbox' ? true : type === 'File' ? `drive.google.com/…/${name.toLowerCase().replace(/\s+/g, '-')}`
-    : type === 'Number' ? '1' : type === 'Multi-select' ? ['Showroom'] : `Filled · ${name.toLowerCase()}`
-const SAMPLE_ROWS = [['Truck arrives at the mall', 'Mid Valley entrance'], ['Sofa unboxing on stage', 'Truck stage'], ['Crowd + giveaway', 'Truck stage']]
 
 /** The sample task the Preview opens on. `people` is Marketing's roster (the manager first is not needed). */
 export function sampleTask(draft: PreviewDraft, people: readonly FlowPerson[], now: Date): FlowTask {
   const raw = draft.stages.filter(isObj)
   const n = raw.length
   const cur = n <= 1 ? 0 : Math.min(n - 1, Math.ceil(n / 2))
-  const roster = people.length ? people : [{ id: 'sample-1', name: 'Ali', role: 'Editor', load: 2 }]
+  const roster = people.length ? people : [{ id: 'sample-1', name: 'Team member', role: '', load: 0 }]
   const managers = roster.filter(p => /MANAGER|DIRECTOR|\bMM\b|\bAMM\b/i.test(p.role))
   const staff = roster.filter(p => !managers.includes(p))
   const pickStaff = (i: number) => (staff.length ? staff : roster)[i % (staff.length || roster.length)].id
@@ -116,26 +113,16 @@ export function sampleTask(draft: PreviewDraft, people: readonly FlowPerson[], n
     }))
   }
 
-  // Sample answers where a done stage filled them in.
+  // Every field and table starts empty: the Preview shows the layout, not invented answers.
   const values: Record<string, FlowValue> = {}
-  const rows: Record<string, FlowRow[]> = {}
-  for (const sec of sections) {
-    for (const f of sec.fields) {
-      if (f.type === 'Table') {
-        rows[f.id] = SAMPLE_ROWS.map((r, ri) => ({
-          id: `${f.id}r${ri}`, added: false,
-          cells: Object.fromEntries(f.cols.map((c, ci) => [c.id, c.stage !== null && c.stage < cur ? (c.type === 'Checkbox' ? true : r[ci] ?? String(sampleValue(c.type, c.name))) : ''])),
-        }))
-      } else if (f.stage !== null && f.stage < cur && f.type !== 'Note') values[f.id] = sampleValue(f.type, f.label)
-    }
-  }
+  const rows: Record<string, FlowRow[]> = Object.fromEntries(sections.flatMap(sec => sec.fields.filter(f => f.type === 'Table').map(f => [f.id, [] as FlowRow[]])))
 
   const category = draft.category || 'Task'
   const c = stages[cur]
   const prevSt = stages[cur - 1]
   const task: FlowTask = {
-    title: `Red Truck · ${category}`,
-    trackId: 'TSK-SAMPLE-0001',
+    title: draft.tname ? `${category} · ${draft.tname}` : category,
+    trackId: 'TSK-····',
     tplChip: `${category} · ${draft.tname || 'Standard'} v${draft.version ?? 1}`,
     category,
     startOn,
@@ -148,7 +135,7 @@ export function sampleTask(draft: PreviewDraft, people: readonly FlowPerson[], n
     overdue: overdueFromRow(draft.overdue),
     finish: draft.finish ? finishFromRow(draft.finish, category) : defaultFinish(category),
     people: [...roster],
-    pic: 'Carmen',
+    pic: 'Client',
     doneAt: null,
     log: [],
   }

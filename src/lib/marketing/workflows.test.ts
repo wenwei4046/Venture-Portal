@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { EMPTY_CANVAS, type WfCanvas } from './canvas'
 import { DEFAULT_OVERDUE, defaultFinish } from './flow'
 import {
+  publishFixups,
   activeNote, apprSummary, apprText, asRun, editOf, endWhen, firstWfStage, gifPath, insertWfStage, lockNote, mayApprove, moveWfStage, newWfStage,
   nextHue, nextIcon, nextTemplateName, onApprove, publishDiff, publishImpact, removeWfStage, roleOf, timeBar, totalDays, wfPatch, wfPeople,
   wfProblems, wfStageFromRow, wfStagesPayload, wfWarnings, whoSummary, workflowBookFromRow, type WfStage,
@@ -93,14 +94,22 @@ describe('warnings and what publishing refuses', () => {
     expect(lockNote([handoff, st('si00001', { split: true }), st('sj00001')])).toBe(
       'MM assigns every stage when planning. Handoffs and subtasks are off on 2 stages — their settings come back if you switch to “Handoffs allowed”.')
   })
-  it('refuses as the database does: a level with nobody, an approver who is not MM / AMM / Director, a field with no stage', () => {
+  it('refuses only the basics (2026-11-13): a stage, every stage named', () => {
+    expect(wfProblems([], false)).toEqual(['Add a stage'])
+    expect(wfProblems([st('sm00001', { name: ' ' })], false)).toEqual(['A stage has no name'])
+    expect(wfProblems([st('sm00002', { appr: [{ ids: [], rule: 'any' }], who: { mode: 'prev', cands: [] } })], false)).toEqual([])
+  })
+  it('says what publishing will tidy, as mkt_wf_publish_ready does', () => {
     const team = new Set([RACHEL, SITI])
     const approvers = new Set([RACHEL])
     const canvas: WfCanvas = { req: { pic: true }, sections: [{ id: 'c1', emoji: '🎯', title: 'S', stage: null, locked: false, req: false, pic: false,
       fields: [{ id: 'f1', label: 'Body', type: 'Text', stage: null, req: true, pic: true }] }] }
-    const p = wfProblems([st('sk00001', { appr: [{ ids: [], rule: 'any' }, { ids: [SITI], rule: 'any' }] }), st('sk00002', { who: { mode: 'prev', cands: [DANIEL] } })], false, team, approvers, canvas)
-    expect([...p].sort()).toEqual(['Choose who approves each level', 'An approver is not a Marketing manager or a Director on the team', 'Somebody on a shortlist has left the team', 'A field has no stage to fill it in'].sort())
-    expect(wfProblems([st('sl00001', { who: { mode: 'prev', cands: [SITI] } })], false, team, approvers, EMPTY_CANVAS)).toEqual(['Stage 1 has no stage before it to hand it over'])
+    const f = publishFixups([st('sk00001', { appr: [{ ids: [], rule: 'any' }, { ids: [SITI], rule: 'any' }] }), st('sk00002', { who: { mode: 'prev', cands: [DANIEL, SITI] } })], false, team, approvers, canvas)
+    expect([...f].sort()).toEqual(['An approval level with nobody on it is left out', 'An approver who is not a Marketing manager or a Director is left out',
+      'Somebody who left the team comes off a shortlist', 'Canvas: unfinished fields are tidied on publish'].sort())
+    expect(publishFixups([st('sl00001', { who: { mode: 'prev', cands: [SITI] } })], false, team, approvers, EMPTY_CANVAS)).toEqual(['Stage 1 runs as MM assigns — no stage before it'])
+    expect(publishFixups([st('sn00001'), st('sn00002', { who: { mode: 'prev', cands: [DANIEL] } })], false, team, approvers, EMPTY_CANVAS))
+      .toEqual(['A 🔓 handoff whose shortlist has left the team runs as MM assigns'])
   })
 })
 

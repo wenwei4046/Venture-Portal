@@ -2,6 +2,7 @@
 
 import { useRef, useState, type MouseEvent } from 'react'
 import type { WfCategory, WfTemplate } from '@/lib/marketing/workflows'
+import Tip from '../ui/Tip'
 import { longPress } from './longPress'
 import w from './workflows.module.css'
 
@@ -17,6 +18,8 @@ export interface Renaming extends PickTarget {
 }
 
 const PUBLISHED_STAYS = 'A published template stays — its versions are kept'
+/** On a category's or template's name, while pointed at (the user, 2026-11-13: no line under the list). */
+const NAME_TIP = 'Double-click a name to rename · right-click for more'
 
 export default function TemplatePicker({
   categories,
@@ -123,7 +126,7 @@ export default function TemplatePicker({
               <div className={w.catRow} {...menuOn({ type: 'cat', id: cat.id })}>
                 <span className={w.catEmoji}>{cat.emoji}</span>
                 {renaming?.type === 'cat' && renaming.id === cat.id ? nameInput('Category name') : (
-                  <span className={w.catName} title="Double-click to rename" onDoubleClick={e => { e.stopPropagation(); onRenaming({ type: 'cat', id: cat.id, draft: cat.name }) }}>{cat.name}</span>
+                  <Tip text={NAME_TIP}><span className={w.catName} onDoubleClick={e => { e.stopPropagation(); onRenaming({ type: 'cat', id: cat.id, draft: cat.name }) }}>{cat.name}</span></Tip>
                 )}
                 <button type="button" className={w.addTpl} disabled={busy} onClick={() => onAddTemplate(cat.id)}>+ Template</button>
               </div>
@@ -149,7 +152,7 @@ export default function TemplatePicker({
                     {...menuOn({ type: 'tpl', id: t.id })}
                   >
                     {renaming?.type === 'tpl' && renaming.id === t.id ? nameInput('Template name') : (
-                      <span className={w.tplName} title="Double-click to rename" onDoubleClick={e => { e.stopPropagation(); onRenaming({ type: 'tpl', id: t.id, draft: name }) }}>{name}</span>
+                      <Tip text={NAME_TIP}><span className={w.tplName} onDoubleClick={e => { e.stopPropagation(); onRenaming({ type: 'tpl', id: t.id, draft: name }) }}>{name}</span></Tip>
                     )}
                     <div className={`${w.tplIcons}${hover === t.id || isArmed ? ` ${w.tplIconsOn}` : ''}`}>
                       <button type="button" className={w.tplClone} title="Clone" aria-label={`Clone ${name}`} disabled={busy}
@@ -199,7 +202,6 @@ export default function TemplatePicker({
             ) : (
               <button type="button" className={w.newCat} disabled={busy} onClick={() => { addingRef.current = true; setAdding(true); setDraft('') }}>+ New category</button>
             )}
-            <span className={w.hint}>Double-click a name to rename · right-click for more</span>
           </div>
         </div>
       ) : null}

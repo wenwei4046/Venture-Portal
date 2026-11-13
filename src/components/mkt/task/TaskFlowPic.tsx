@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import type { PicView } from '@/lib/marketing/task-flow-view'
+import Tip from '../ui/Tip'
 import s from './taskflow.module.css'
 
 // The PIC's link view (Task Flow.dc.html › isPic): a simpler page, at most 720px on the soft background — the status
 // card in the stage's PIC words (its answer when the PIC is a pending approver), the steps and "Expected by", and only
-// the 👁 sections, fields and table columns ("Coming soon" where empty). No staff names, no prices.
+// the 👁 sections, fields and table columns ("Coming soon" where empty). No staff names, no prices. What the link shows and
+// whom to ask is a tooltip on its sub line (the user, 2026-11-13), not a footer.
 
 export default function TaskFlowPic({ view, title, sub, answer }: {
   view: PicView
@@ -20,7 +22,7 @@ export default function TaskFlowPic({ view, title, sub, answer }: {
         <div className={s.picTop}>
           <span className={s.picLogo} aria-hidden="true">H</span>
           <div className={s.picTopText}>
-            <span className={s.picSub}>{sub}</span>
+            <Tip text="You see team names only. Questions? Reply to the WhatsApp message with this link."><span className={s.picSub} tabIndex={0}>{sub}</span></Tip>
             <span className={s.picTitle}>{title}</span>
           </div>
         </div>
@@ -65,7 +67,6 @@ export default function TaskFlowPic({ view, title, sub, answer }: {
             ))}
           </div>
         ))}
-        <span className={s.picFoot}>You see team names only. Questions? Reply to the WhatsApp message with this link.</span>
       </div>
     </div>
   )

@@ -1846,8 +1846,9 @@ BEGIN
 END
 $fn$;
 
--- ⏰ The overdue sweep (the service role's, from the hourly /api/member-queue): the stage now of each running task whose
--- overdue settings it carries, late by `days` (whole days past 18:00 of its due day, rounded up) — its people told,
+-- ⏰ The overdue sweep (the service role's, from the hourly /api/member-queue): the stage now of each running task — by
+-- the overdue settings it carries, else (a task from before them, a quick task) the default: late 1 day → the person on
+-- it and the managers, once a day (the user, 2026-11-13: "要有逾期提醒，当事人 & manager") — late by `days` (whole days past 18:00 of its due day, rounded up) — its people told,
 -- once, or once a day when `repeat`; from 9:00 office time; a line on the trail. `action: reassign` asks the managers
 -- to reassign it. Answers how many stages were told about.
 CREATE OR REPLACE FUNCTION public.mkt_overdue_sweep(p_at timestamptz DEFAULT now())
@@ -1880,7 +1881,7 @@ BEGIN
            s.late_told_at, s.appr, s.appr_idx, s.appr_ok
       FROM public.mkt_projects p
       JOIN public.mkt_stages s ON s.project_id = p.id AND s.idx = p.cur
-     WHERE p.status = 'active' AND jsonb_typeof(p.overdue) = 'object'
+     WHERE p.status = 'active'
        AND NOT (p.kind = 'recurring' AND p.series_id IS NULL)
        AND coalesce(p.starts_on, v_today) <= v_today
        AND s.status IN ('todo', 'accepted', 'changes', 'review') AND s.due_on IS NOT NULL
@@ -1888,7 +1889,8 @@ BEGIN
      ORDER BY p.track_id
        FOR UPDATE OF s SKIP LOCKED
   LOOP
-    v_cfg := r.overdue;
+    v_cfg := CASE WHEN jsonb_typeof(r.overdue) = 'object' THEN r.overdue
+                  ELSE '{"days": 1, "notify": ["doer", "mm"], "action": "remind", "repeat": true}'::jsonb END;
     v_late := ceil(extract(epoch FROM (coalesce(p_at, now()) - ((r.due_on + time '18:00') AT TIME ZONE 'Asia/Kuala_Lumpur'))) / 86400.0)::integer;
     CONTINUE WHEN v_late <= 0;
     v_days := CASE WHEN coalesce(v_cfg ->> 'days', '') ~ '^[0-9]{1,2}$' THEN least(greatest((v_cfg ->> 'days')::integer, 1), 10) ELSE 1 END;

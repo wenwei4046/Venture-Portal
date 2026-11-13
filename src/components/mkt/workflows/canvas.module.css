@@ -16,8 +16,8 @@
 .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .title { font-size: 1.35em; font-weight: 600; }
 .ver { font-family: var(--mk-mono); font-size: 11px; padding: 2px 7px; border-radius: 5px; border: 1px solid rgb(var(--mk-line)); }
-.headHint { font-size: .84em; color: rgb(var(--mk-muted)); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; padding: 8px 12px; border-radius: 8px; background: rgb(var(--mk-surface)); font-size: .82em; color: rgb(var(--mk-text-2)); }
+.legendKey { cursor: default; border-radius: 4px; padding: 0 2px; }
 
 .sections { display: flex; flex-direction: column; gap: 18px; margin-top: 22px; }
 .card { position: relative; border-radius: 12px; border: 1.5px solid rgb(var(--mk-line-2)); padding: 14px 16px; background: rgb(var(--mk-white)); transition: border-color .15s; }
@@ -41,7 +41,6 @@
 .iconOpt { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 17px; cursor: pointer; border: 0; background: transparent; padding: 0; }
 .iconOpt:hover { background: rgb(var(--mk-hover)); }
 
-.req { margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: rgb(var(--mk-req-bg)); color: rgb(var(--mk-muted)); font-size: .9em; line-height: 1.55; }
 .fields { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .fieldWrap { position: relative; display: flex; flex-direction: column; gap: 6px; }
 .field { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; border: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); cursor: pointer; font: inherit; color: inherit; text-align: left; width: 100%; }
@@ -50,7 +49,6 @@
 .fieldNote { background: rgb(var(--mk-note-bg)); }
 .fieldName { font-size: .92em; font-weight: 500; }
 .noteText { font-size: .88em; font-style: italic; color: rgb(var(--mk-brown)); flex: 1; min-width: 0; }
-.noteHint { margin: -2px 0 4px 28px; padding: 6px 10px; border-radius: 7px; background: rgb(var(--mk-note-bg)); font-size: .82em; font-style: italic; color: rgb(var(--mk-brown)); }
 .flags { font-size: .78em; color: rgb(var(--mk-text-3)); white-space: pre; }
 .flagsWarn { color: rgb(var(--mk-red)); }
 .addField { align-self: flex-start; padding: 6px 4px; font: inherit; font-size: .86em; font-weight: 500; color: rgb(var(--mk-brown)); background: none; border: 0; cursor: pointer; }
@@ -97,7 +95,6 @@
 .freeTop { display: flex; align-items: center; gap: 12px; width: 100%; }
 .freeRule { flex: 1; height: 1px; background: rgb(var(--mk-field-hover)); }
 .freeLabel { font-size: .78em; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: rgb(var(--mk-muted)); }
-.freeText { font-size: .88em; color: rgb(var(--mk-text-2)); }
 
 /* The settings panels. */
 .pop { position: absolute; top: calc(100% + 4px); right: 12px; z-index: 25; width: 330px; max-width: calc(100% - 24px); box-sizing: border-box; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line)); border-radius: 12px; box-shadow: var(--mk-shadow-menu); padding: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; animation: ctIn .12s ease-out; }

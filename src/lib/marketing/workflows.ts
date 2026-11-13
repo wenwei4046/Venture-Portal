@@ -246,20 +246,29 @@ export function wfWarnings(stages: readonly WfStage[], locked: boolean, promise:
   return out
 }
 
-/** What publishing refuses, as the database does (`team`: Marketing's roster now; `approvers`: who of it may
- * approve). Empty = it may be published. */
-export function wfProblems(stages: readonly WfStage[], locked: boolean, team: ReadonlySet<string>, approvers: ReadonlySet<string>, canvas: WfCanvas): string[] {
+/** What publishing refuses, as the database does — the basics only (2026-11-13, the user: "基本资料有了就能
+ * public"): a stage, every stage named. Empty = it may be published. */
+export function wfProblems(stages: readonly WfStage[], locked: boolean): string[] {
   const run = asRun(stages, locked)
   const out: string[] = []
   if (run.length === 0) out.push('Add a stage')
   if (run.some(s => !s.name.trim())) out.push('A stage has no name')
-  if (run[0]?.who.mode === 'prev') out.push('Stage 1 has no stage before it to hand it over')
-  if (run.some((s, i) => i > 0 && s.who.mode === 'prev' && s.who.cands.length === 0)) out.push('A 🔓 handoff has nobody on its shortlist')
-  if (run.some(s => s.who.mode === 'prev' && s.who.cands.some(c => !team.has(c)))) out.push('Somebody on a shortlist has left the team')
-  if (run.some(s => s.appr.some(l => !l.ids.length))) out.push('Choose who approves each level')
+  return out
+}
+
+/** What publishing will tidy in the version (the draft keeps it as typed) — mkt_wf_publish_ready's twin, said as
+ * ⚠️ beside the warnings. (`team`: Marketing's roster now; `approvers`: who of it may approve.) */
+export function publishFixups(stages: readonly WfStage[], locked: boolean, team: ReadonlySet<string>, approvers: ReadonlySet<string>, canvas: WfCanvas): string[] {
+  const run = asRun(stages, locked)
+  const out: string[] = []
+  if (run[0]?.who.mode === 'prev') out.push('Stage 1 runs as MM assigns — no stage before it')
+  if (run.some((s, i) => i > 0 && s.who.mode === 'prev' && s.who.cands.length > 0 && s.who.cands.every(c => !team.has(c))))
+    out.push('A 🔓 handoff whose shortlist has left the team runs as MM assigns')
+  else if (run.some(s => s.who.mode === 'prev' && s.who.cands.some(c => !team.has(c)))) out.push('Somebody who left the team comes off a shortlist')
+  if (run.some(s => s.appr.some(l => !l.ids.length))) out.push('An approval level with nobody on it is left out')
   const persons = run.flatMap(s => s.appr.flatMap(l => l.ids.filter(id => id !== PIC_ID && id !== ASSIGN_ID)))
-  if (persons.some(id => !approvers.has(id))) out.push('An approver is not a Marketing manager or a Director on the team')
-  out.push(...canvasProblems(stages, canvas))
+  if (persons.some(id => !approvers.has(id))) out.push('An approver who is not a Marketing manager or a Director is left out')
+  if (canvasProblems(stages, canvas).length) out.push('Canvas: unfinished fields are tidied on publish')
   return out
 }
 

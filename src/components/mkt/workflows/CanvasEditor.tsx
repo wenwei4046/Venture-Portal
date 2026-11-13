@@ -11,6 +11,7 @@ import CanvasPop from './CanvasPop'
 import CanvasPreview from './CanvasPreview'
 import CanvasSectionPop from './CanvasSectionPop'
 import CanvasTable from './CanvasTable'
+import Tip from '../ui/Tip'
 import c from './canvas.module.css'
 
 // The Canvas Template Editor (`Canvas Template Editor.dc.html`, the Workflow Builder's *Canvas template* tab): the task
@@ -23,6 +24,8 @@ import c from './canvas.module.css'
 type Pop = { kind: 'sec'; sec: string } | { kind: 'field'; sec: string; field: string } | { kind: 'col'; sec: string; field: string; col: string } | null
 
 const BADGE_TIP: Record<string, string> = { '🔒': "Locked — colleagues can't delete", '⭐': 'Required before submit', '🎯': 'Belongs to stage', '👁': 'Visible to PIC' }
+/** The legend: the icons on the page, their words on hover / focus (the user, 2026-11-13). */
+const LEGEND: readonly [string, string][] = [['🔒', "Locked — colleagues can't delete"], ['⭐', 'Required before submit'], ['🎯', 'Belongs to stage'], ['👁', 'Visible to PIC'], ['📅', 'Show on calendar']]
 
 export default function CanvasEditor({
   title,
@@ -67,13 +70,12 @@ export default function CanvasEditor({
     <div className={c.page} onClick={() => { setPop(null); setIcons(null) }}>
       <div className={c.main}>
         <div className={c.head}>
-          <span className={c.title}>{title}</span>
+          <Tip text="Click any section, table or column to set it up"><span className={c.title} tabIndex={0}>{title}</span></Tip>
           <span className={c.ver}>Canvas template · draft v{version}</span>
           <span className={c.grow} />
-          <span className={c.headHint}>Click any section, table or column to set it up</span>
         </div>
-        <div className={c.legend}>
-          <span>🔒 Locked — colleagues can&apos;t delete</span><span>⭐ Required before submit</span><span>🎯 Belongs to stage</span><span>👁 Visible to PIC</span><span>📅 Show on calendar</span>
+        <div className={c.legend} aria-label="Legend">
+          {LEGEND.map(([icon, words]) => <Tip key={icon} text={words}><span className={c.legendKey} tabIndex={0} aria-label={words}>{icon}</span></Tip>)}
         </div>
 
         <div className={c.sections}>
@@ -81,12 +83,12 @@ export default function CanvasEditor({
             <div className={c.cardHead}>
               <span className={c.grip} aria-hidden="true">⋮⋮</span>
               <span className={c.emoji}>📋</span>
-              <span className={c.cardTitle}>Requirements</span>
+              <Tip text="Pulled in automatically from the meeting minutes intake. Read-only for everyone."><span className={c.cardTitle} tabIndex={0}>Requirements</span></Tip>
               {badges(['🔒 Locked', ...(canvas.req.pic ? ['👁 PIC'] : [])])}
               <span className={c.grow} />
               <button type="button" className={`${c.gear}${secOpen('req') ? ` ${c.gearOn}` : ''}`} onClick={e => { e.stopPropagation(); toggleSec('req') }}>⚙ Section settings</button>
             </div>
-            <div className={c.req}>Pulled in automatically from the meeting minutes intake. Read-only for everyone.</div>
+
             {secOpen('req') ? (
               <CanvasSectionPop title="Requirements" sec={{ locked: true, req: false, pic: canvas.req.pic }} only="pic" stages={stages} stage={null}
                 onChange={s => onCanvas({ ...canvas, req: { pic: s.pic } })} onClose={() => setPop(null)} />
@@ -124,6 +126,7 @@ export default function CanvasEditor({
                     const stageOk = !!f.stage && stages.some(x => x.sid === f.stage)
                     return (
                       <div key={f.id} className={c.fieldWrap}>
+                        <Tip text={f.type === 'Note' ? 'Read-only note shown to whoever works on this stage.' : null}>
                         <button type="button" className={`${c.field}${fOpen ? ` ${c.fieldOn}` : ''}${f.type === 'Note' ? ` ${c.fieldNote}` : ''}`}
                           onClick={e => { e.stopPropagation(); setIcons(null); setPop(fOpen ? null : { kind: 'field', sec: s.id, field: f.id }) }}>
                           <span className={c.glyph}>{TYPE_GLYPH[f.type]}</span>
@@ -132,7 +135,7 @@ export default function CanvasEditor({
                           <span className={c.grow} />
                           <span className={`${c.flags}${stageOk ? '' : ` ${c.flagsWarn}`}`}>🎯 {stageNameOf(stages, f.stage)}  {fieldFlags(f)}</span>
                         </button>
-                        {f.type === 'Note' ? <div className={c.noteHint}>Read-only note shown to whoever works on this stage.</div> : null}
+                        </Tip>
                         {f.type === 'Table' ? (
                           <CanvasTable field={f} stages={stages} openCol={colOpen}
                             onCol={cid => { setIcons(null); setPop(colOpen === cid ? null : { kind: 'col', sec: s.id, field: f.id, col: cid }) }}
@@ -193,8 +196,11 @@ export default function CanvasEditor({
           }}>+ Add section</button>
 
           <div className={c.free}>
-            <div className={c.freeTop}><span className={c.freeRule} /><span className={c.freeLabel}>Free space</span><span className={c.freeRule} /></div>
-            <span className={c.freeText}>Always at the bottom 🔒 — the only place colleagues can add their own blocks and tables.</span>
+            <div className={c.freeTop}>
+              <span className={c.freeRule} />
+              <Tip text="Always at the bottom 🔒 — the only place colleagues can add their own blocks and tables."><span className={c.freeLabel} tabIndex={0}>Free space</span></Tip>
+              <span className={c.freeRule} />
+            </div>
           </div>
         </div>
       </div>

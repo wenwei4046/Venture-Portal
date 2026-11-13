@@ -285,20 +285,26 @@ checks++
 check((await save(std.id, 10, { finish: { celebration: 'custom', gifPath: GIF } })).rev, 11, 'a GIF the manager just sent')
 check((await row(std.id)).finish.gifPath, GIF, '…kept, in use')
 
-// ── Published: a manager or a Director approves; overdue and finish snapshotted ───
+// ── Published on the basics (2026-11-13): the rest is tidied into the version, never refused ───
 const publish = (wid, rev) => one(`SELECT public.mkt_workflow_publish($1, $2)`, [wid, rev])
+const tidied = async wid => { const w = await row(wid); return peek1(`SELECT public.mkt_wf_publish_ready($1::jsonb, $2::jsonb, $3)`, [JSON.stringify(w.draft), JSON.stringify(w.canvas), w.locked]) }
 // Stage 2's shortlist is on the roster; its approval is empty — fine. Make an approver not a manager:
 r = await save(std.id, 11, { stages: [{ ...STAGES[0], appr: [{ ids: [S.mei], rule: 'any' }] }, STAGES[1], STAGES[2]] })
-await refuses(`SELECT public.mkt_workflow_publish($1, 12)`, [std.id], /not a Marketing manager or a Director/, 'a designer does not approve')
+check((await tidied(std.id)).stages[0].appr, [], 'a designer does not approve: left out of the version (their level with them)')
 r = await save(std.id, 12, { stages: [{ ...STAGES[0], appr: [{ ids: [], rule: 'any' }] }, STAGES[1], STAGES[2]] })
-await refuses(`SELECT public.mkt_workflow_publish($1, 13)`, [std.id], /choose who approves each level/, 'a level with nobody on it')
+check((await tidied(std.id)).stages[0].appr, [], 'a level with nobody on it: left out')
 r = await save(std.id, 13, { stages: [{ ...STAGES[0], appr: [{ ids: [S.boss, S.weijie], rule: 'all' }] }, STAGES[1], STAGES[2]],
   canvas: { sections: [{ title: 'Loose', fields: [{ label: 'Who knows', type: 'Text', stage: null }] }] } })
-await refuses(`SELECT public.mkt_workflow_publish($1, 14)`, [std.id], /"Who knows" — pick the stage that fills it in/, 'a field with no stage')
+check((await tidied(std.id)).canvas.sections[0].fields[0].stage, STAGES[2].sid, 'a field with no stage: filled in at the last stage')
+check((await tidied(std.id)).stages[0].appr[0].ids.length, 2, '…the managers and the Director stay')
 r = await save(std.id, 14, { canvas: { sections: [{ title: 'T', fields: [{ label: 'Tbl', type: 'Table', stage: 'sedit0001', cols: [{ name: 'c', type: 'Text' }] }] }] } })
-await refuses(`SELECT public.mkt_workflow_publish($1, 15)`, [std.id], /the column "c" — pick the stage/, 'a column with no stage')
-r = await save(std.id, 15, { canvas: CANVAS, locked: true })
-const v1 = await publish(std.id, 16)
+check((await tidied(std.id)).canvas.sections[0].fields[0].cols[0].stage, 'sedit0001', 'a column with no stage: its table’s stage')
+r = await save(std.id, 15, { canvas: { sections: [{ title: '', stage: 'sedit0001', fields: [{ label: '', type: 'Text' }, { label: 'Pick', type: 'Select', stage: 'sedit0001' }, { label: 'Pick', type: 'Text', stage: 'sedit0001' }] }] } })
+let td = await tidied(std.id)
+check([td.canvas.sections[0].title, td.canvas.sections[0].fields.map(f => [f.label, f.type])], [STAGES.find(s => s.sid === 'sedit0001')?.name ?? 'Section 1', [['Pick', 'Text'], ['Pick (2)', 'Text']]],
+  'unnamed section named for its stage; an unnamed field goes; a choice with no options is Text; a second name numbered')
+r = await save(std.id, 16, { canvas: CANVAS, locked: true })
+const v1 = await publish(std.id, 17)
 check([v1.version, v1.live], [1, 0], 'published as v1 — a Director approves beside the AMM')
 const ver = (await peek(`SELECT * FROM public.mkt_workflow_versions WHERE workflow_id = $1`, [std.id]))[0]
 check(ver.stages[1].who, { mode: 'assign', cands: [] }, 'the lock applied to the version')

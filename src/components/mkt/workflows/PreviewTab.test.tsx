@@ -31,6 +31,16 @@ describe('the ▶ Preview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit Edit' }))
     expect(screen.getByTestId('tf-status').textContent).toBe('Waiting for approval')
   })
+  it('makes nothing up (2026-11-13): the template’s own name, no brief, every field empty, no sample client', () => {
+    const { container } = render(<PreviewTab draft={draft} people={people} />)
+    expect(screen.getAllByText('Reels video · Full production').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /Requirements/ }).textContent).toContain('From the intake minutes')
+    expect((screen.getByRole('textbox', { name: 'Cut' }) as HTMLInputElement).value).toBe('')
+    expect(container.textContent).not.toMatch(/Red Truck|Mid Valley|drive\.google|Roadshow|Carmen/)
+    fireEvent.click(screen.getByRole('button', { name: /PIC link/ }))
+    expect(container.textContent).not.toMatch(/Red Truck|Mid Valley|drive\.google|Roadshow|Carmen/)
+    expect(screen.getByText('Coming soon')).toBeTruthy()
+  })
   it('as the PIC: the link view — Approve finishes it, the celebration plays', () => {
     render(<PreviewTab draft={draft} people={people} />)
     fireEvent.change(screen.getByRole('textbox', { name: 'Cut' }), { target: { value: 'v1' } })

@@ -58,6 +58,5 @@
 }
 .wTitle { font-size: 2.2em; font-weight: 600; letter-spacing: -.01em; color: rgb(var(--mk-ink)); }
 .wText { font-size: 1em; color: rgb(var(--mk-text-2)); text-wrap: pretty; }
-.wHint { font-size: .84em; color: rgb(var(--mk-text-2)); margin-top: 8px; }
 .dark .wTitle { color: rgb(var(--mk-white)); }
-.dark .wText, .dark .wHint { color: rgb(var(--mk-celeb-sub-dark)); }
+.dark .wText { color: rgb(var(--mk-celeb-sub-dark)); }

@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from 'react'
 import type { Celebration } from '@/lib/marketing/flow'
+import Tip from '../ui/Tip'
 import c from './celebrate.module.css'
 
 // The celebration (Task Flow.dc.html › art): when the last approval passes, the whole page is covered — 🎆 Fireworks,
@@ -75,14 +76,15 @@ export default function TaskFlowCelebration({ kind, gif, category, finished, tea
   const k: Celebration = kind === 'custom' && !gif ? 'fireworks' : kind
   const dark = k === 'movie' || k === 'fireworks'
   return (
+    <Tip text="Click anywhere to close">
     <button type="button" className={`${c.overlay} ${k === 'movie' ? c.movie : k === 'fireworks' ? c.night : c.light}${dark ? ` ${c.dark}` : ''}`}
       aria-label="Close the celebration" onClick={onClose} data-testid="tf-celebration">
       <div className={c.art}>{art(k, gif)}</div>
       <div className={c.words}>
         <span className={c.wTitle}>{TITLE[k]}</span>
         <span className={c.wText}>{category} is done{finished ? ` · finished ${finished}` : ''}.{team ? ` ${team} each get +60 XP.` : ''}</span>
-        <span className={c.wHint}>Click anywhere to close</span>
       </div>
     </button>
+    </Tip>
   )
 }

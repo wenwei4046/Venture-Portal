@@ -16,7 +16,7 @@ import type { PreviewDraft } from '@/lib/marketing/task-flow-sample'
 import {
   activeNote, asRun, duplicateStage, editOf, endWhen, firstWfStage, gifPath, groupNameOf, insertWfStage, lockNote, mayApprove,
   moveWfStage, newWfStage, nextIcon, nextTemplateName, publishDiff, publishImpact, removeWfStage, timeBar, wfCategories, wfPatch,
-  wfProblems, wfStagesPayload, wfWarnings, WF_MAX_STAGES, type WfBook, type WfEdit, type WfFix, type WfPerson, type WfStage, type WfTemplate,
+  publishFixups, wfProblems, wfStagesPayload, wfWarnings, WF_MAX_STAGES, type WfBook, type WfEdit, type WfFix, type WfPerson, type WfStage, type WfTemplate,
 } from '@/lib/marketing/workflows'
 import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/client'
@@ -248,7 +248,9 @@ export default function WorkflowBuilder({
   const next = (tpl?.version ?? 0) + 1
   const dirty = save.state === 'saving'
   const warnings = edit ? wfWarnings(stages, locked, edit.promise) : []
-  const problems = edit ? wfProblems(stages, locked, teamSet, approverSet, edit.canvas) : []
+  const problems = edit ? wfProblems(stages, locked) : []
+  // What publishing will tidy in the version — said beside the warnings, never a refusal.
+  const fixups = edit ? publishFixups(stages, locked, teamSet, approverSet, edit.canvas) : []
   const changed = !!tpl?.changed || dirty
   const publishOff = !tpl || !changed || problems.length > 0 || save.state === 'error' || busy
   const publishWhy = !tpl ? undefined : !changed ? `Nothing has changed since v${tpl.version}` : problems[0] ?? (save.state === 'error' ? save.reason : undefined)
@@ -699,6 +701,7 @@ export default function WorkflowBuilder({
       {edit && tpl ? (
         <BuilderFoot
           problems={problems}
+          fixups={fixups}
           activeNote={activeNote(tpl.version, tpl.live)}
           next={next}
           dirty={dirty}
@@ -716,7 +719,7 @@ export default function WorkflowBuilder({
           sub={tpl.version ? `Compared with v${tpl.version}, the version running now` : 'First version of this template'}
           changes={publishDiff(tpl.published, { stages: run, promise: edit.promise }, nameOf, groupName)}
           impact={publishImpact(tpl.version, tpl.live)}
-          warnings={warnings.map(x => x.text)}
+          warnings={[...warnings.map(x => x.text), ...fixups]}
           next={next}
           busy={busy || publishOff}
           onCancel={() => setPubOpen(false)}

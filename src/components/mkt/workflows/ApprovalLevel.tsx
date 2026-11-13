@@ -3,6 +3,7 @@
 import { ASSIGN_ID, PIC_ID, type ApprLevel } from '@/lib/marketing/flow'
 import { idLong, roleOf, type WfPerson } from '@/lib/marketing/workflows'
 import { personBg } from '../builder/people'
+import Tip from '../ui/Tip'
 import w from './workflows.module.css'
 
 // One approval level (`Stage Settings.dc.html` › Approval): "Level n approves", a multi-select dropdown (the managers
@@ -41,8 +42,10 @@ export default function ApprovalLevel({
     return p ? personBg({ group: p.title }) : undefined
   }
   const opts = [...approvers.map(p => p.id), PIC_ID, ASSIGN_ID]
-  const hint = (id: string) =>
-    id === PIC_ID ? 'Client approves through the tracking link' : id === ASSIGN_ID ? 'MM picks the approver per project' : roleOf(approvers.find(p => p.id === id)?.title ?? '')
+  // The role words (MM / AMM / Director) are facts and stay on the option; what 🔗 PIC and 👤 Picked at assignment mean
+  // is help — a tooltip on the option (the user, 2026-11-13).
+  const role = (id: string) => (id === PIC_ID || id === ASSIGN_ID ? '' : roleOf(approvers.find(p => p.id === id)?.title ?? ''))
+  const help = (id: string) => (id === PIC_ID ? 'Client approves through the tracking link' : id === ASSIGN_ID ? 'MM picks the approver per project' : '')
   return (
     <div className={w.level}>
       <div className={w.railCol}><span className={w.railLine} /><span className={w.lv}>L{n}</span><span className={w.railFill} /></div>
@@ -79,17 +82,19 @@ export default function ApprovalLevel({
               {opts.map(id => {
                 const on = ids.includes(id)
                 const off = !on && id !== ASSIGN_ID && usedElsewhere.has(id)
-                return (
+                const sub = off ? 'Already approves at another level' : role(id)
+                const opt = (
                   <button key={id} type="button" role="option" aria-selected={on} aria-disabled={off || undefined}
                     className={`${w.opt}${off ? ` ${w.optOff}` : ''}`} onClick={() => !off && flip(id)}>
                     <span className={`${w.check}${on ? ` ${w.checkOn}` : ''}`}>{on ? '✓' : ''}</span>
                     <span className={w.optAv} style={{ background: bg(id) }}>{icon(id)}</span>
                     <span className={w.optText}>
                       <span className={w.optLabel}>{idLong(id, nameOf)}</span>
-                      <span className={w.optHint}>{off ? 'Already approves at another level' : hint(id)}</span>
+                      {sub ? <span className={w.optHint}>{sub}</span> : null}
                     </span>
                   </button>
                 )
+                return !off && help(id) ? <Tip key={id} text={help(id)}>{opt}</Tip> : opt
               })}
               <div className={w.ddFoot}><button type="button" className={w.ddDone} onClick={onToggle}>Done</button></div>
             </div>

@@ -7,6 +7,7 @@ import {
   type WfGroup, type WfPerson, type WfStage,
 } from '@/lib/marketing/workflows'
 import { personBg } from '../builder/people'
+import Tip from '../ui/Tip'
 import ApprovalLevel from './ApprovalLevel'
 import RadioCard from './RadioCard'
 import Stepper from './Stepper'
@@ -272,14 +273,16 @@ export default function TemplateSettings({
               <input className={w.input} value={stage.picText} maxLength={120} placeholder="Department words only — no names, no prices"
                 onChange={e => onPatch({ picText: e.target.value })} />
             </label>
-            <button type="button" className={w.canvasLink} onClick={onOpenCanvas}>
-              <span className={w.canvasLinkIcon}>🎯</span>
-              <span className={w.canvasLinkText}>
-                <span className={w.q}>What this stage fills in</span>
-                <span className={w.canvasLinkSub}>Set in the Canvas template: pick “{stage.name || 'Untitled stage'}” under 🎯 Which stage fills this in? · {fills} now</span>
-              </span>
-              <span className={w.canvasLinkGo}>Open Canvas →</span>
-            </button>
+            <Tip text={`Set in the Canvas template: pick “${stage.name || 'Untitled stage'}” under 🎯 Which stage fills this in?`}>
+              <button type="button" className={w.canvasLink} onClick={onOpenCanvas}>
+                <span className={w.canvasLinkIcon}>🎯</span>
+                <span className={w.canvasLinkText}>
+                  <span className={w.q}>What this stage fills in</span>
+                  <span className={w.canvasLinkSub}>{fills} in the Canvas now</span>
+                </span>
+                <span className={w.canvasLinkGo}>Open Canvas →</span>
+              </button>
+            </Tip>
           </div>
         ) : null}
       </div>

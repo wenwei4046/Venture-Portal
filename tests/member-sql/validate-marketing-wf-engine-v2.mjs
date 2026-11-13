@@ -379,7 +379,12 @@ check(await sweep('2026-11-14T10:00:00+08:00'), 1, 'repeat: again the next day')
 const NOD = await create('No rule', [st('Design', S.ali)])
 await asSystem()
 await db.exec(`UPDATE public.mkt_stages SET due_on = '2026-11-01' WHERE project_id = '${NOD.id}'`)
-check(await sweep('2026-11-20T10:00:00+08:00'), 1, 'a task with no overdue settings (a quick task) is never swept — only the one with a rule')
+await db.exec('DELETE FROM public.app_notifications')
+await sweep('2026-11-20T10:00:00+08:00')
+check((await trail(NOD.id)).at(-1).action, 'overdue', 'a task with no overdue settings (a quick task) gets the default: late 1 day …')
+const noRule = async u => (await notices(u)).filter(n => n.body.endsWith('· No rule')).map(n => n.title)
+check([await noRule(U.ali), await noRule(U.josiah), await noRule(U.mei)], [['⏰ Design is 19d overdue'], ['⏰ Design is 19d overdue'], []],
+  '… the person on it and the managers told (2026-11-13: "当事人 & manager"), nobody else')
 await as(U.josiah, MANAGER)
 await refuses(`SELECT public.mkt_overdue_sweep()`, [], /permission denied/, 'a person cannot call the sweep')
 

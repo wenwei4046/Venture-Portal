@@ -12,7 +12,8 @@ import s from '../task/taskflow.module.css'
 
 // The Builder's ▶ Preview (Workflow Builder 2a handoff › "the ▶ Preview tab shows the Task page built from the current
 // draft, without publishing"): the task page's top drawn from a SAMPLE task made from the draft — nothing is published,
-// nothing saved. At the foot, view it as each person on it, as the manager, or as the PIC on the link; every decision is
+// nothing saved, nothing made up (the user, 2026-11-13: no sample client — the template's own name, empty fields, no
+// brief). At the foot, view it as each person on it, as the manager, or as the PIC on the link; every decision is
 // played with flow.ts's `step`, as the database decides. ⏩ +1 day moves the clock (late stages turn red), ▶ acts as
 // whoever's turn it is, Reset starts the sample again.
 
@@ -28,12 +29,8 @@ export interface PreviewPerson {
   load?: number
 }
 
-/** The canvas hides 📋 Requirements from the PIC. */
-const reqHidden = (c: unknown) => !!c && typeof c === 'object' && (c as { req?: { pic?: unknown } }).req?.pic === false
-
-/** The sample task's brief (the prototype's). */
-const REQUIREMENTS = (category: string) =>
-  `Make a ${category.toLowerCase()} for the Red Truck Roadshow (21–23 Nov). Bright, playful, show the truck and the sofa range. Ends with the store address.`
+/** 📋 Requirements on the sample: where a real task's come from — no brief is made up (the user, 2026-11-13). */
+const REQ_EMPTY = 'From the intake minutes'
 
 export default function PreviewTab({ draft, people = [] }: { draft: PreviewDraft; people?: readonly PreviewPerson[] }) {
   const roster: FlowPerson[] = useMemo(() => people.map(p => ({ id: p.id, name: p.first, role: p.group ?? '', load: p.load ?? 0 })), [people])
@@ -65,7 +62,7 @@ export default function PreviewTab({ draft, people = [] }: { draft: PreviewDraft
   return (
     <div className={s.previewCard}>
       {isPic ? (
-        <TaskFlowPic view={picView(task, now, reqHidden(draft.canvas) ? null : REQUIREMENTS(task.category))} title={task.title} sub="Houzs Marketing · tracking link (sample)"
+        <TaskFlowPic view={picView(task, now, null)} title={task.title} sub="Houzs Marketing · tracking link (sample)"
           answer={(
             <>
               <button type="button" className={s.picBtn} onClick={() => decide('changes', PIC_ID)}>Request changes</button>
@@ -79,7 +76,7 @@ export default function PreviewTab({ draft, people = [] }: { draft: PreviewDraft
           isManager={isMM}
           now={now}
           crumbs={<><span>← My Space</span><span>/</span><span>Sample</span><span>/</span><span>{task.title}</span></>}
-          requirements={{ peek: 'Red Truck Roadshow, 21–23 Nov · bright and playful', body: REQUIREMENTS(task.category) }}
+          requirements={{ peek: REQ_EMPTY, body: <span className={s.reqPeek}>{REQ_EMPTY}</span> }}
           celebrate={celebrate}
           onValue={(f, v) => setState(st => ({ ...st, task: { ...st.task, values: { ...st.task.values, [f.id]: v } } }))}
           onRows={(f, rows) => setState(st => ({ ...st, task: { ...st.task, rows: { ...st.task.rows, [f.id]: rows } } }))}

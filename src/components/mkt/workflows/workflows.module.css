@@ -50,7 +50,6 @@
 .newCat { width: 100%; height: 30px; padding: 0 8px; border-radius: 7px; display: flex; align-items: center; gap: 8px; cursor: pointer; font: inherit; font-size: .9em; font-weight: 500; background: none; border: 0; color: inherit; }
 .newCat:hover { background: rgb(var(--mk-surface-2)); }
 .newCatInput { width: 100%; height: 30px; box-sizing: border-box; border: 1px solid rgb(var(--mk-hover-line)); border-radius: 7px; padding: 0 9px; font: inherit; font-size: .9em; outline: none; color: rgb(var(--mk-ink)); }
-.hint { display: block; padding: 6px 8px 2px; font-size: .76em; color: rgb(var(--mk-muted)); }
 
 .draftChip { font-family: var(--mk-mono); font-size: 11px; padding: 2px 7px; border-radius: 5px; border: 1px solid rgb(var(--mk-line)); white-space: nowrap; }
 .saveLabel { font-size: .78em; color: rgb(var(--mk-muted)); white-space: nowrap; min-width: 108px; }
@@ -161,7 +160,6 @@
 .part { display: flex; flex-direction: column; gap: 6px; }
 .q { font-size: .92em; font-weight: 600; }
 .small { font-size: .88em; color: rgb(var(--mk-muted)); }
-.tiny { font-size: .8em; color: rgb(var(--mk-muted)); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { height: 28px; padding: 0 10px; border-radius: 7px; display: flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; font-size: .86em; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); white-space: nowrap; }
 .chipOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
@@ -178,8 +176,8 @@
 .stepBtn:hover { background: rgb(var(--mk-surface-2)); }
 .stepN { min-width: 30px; text-align: center; font-family: var(--mk-mono); font-size: 12px; }
 .stepNWide { min-width: 34px; }
-.radio { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); cursor: pointer; font: inherit; color: inherit; text-align: left; width: 100%; box-sizing: border-box; }
-.radioBig { padding: 11px 12px; }
+.radio { display: flex; gap: 10px; min-height: 42px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); cursor: pointer; font: inherit; color: inherit; text-align: left; width: 100%; box-sizing: border-box; }
+.radioBig { min-height: 46px; padding: 11px 12px; }
 .radioOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-surface)); }
 .radioOff { cursor: not-allowed; opacity: .55; }
 .radioDot { width: 16px; height: 16px; flex: none; margin-top: 1px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid rgb(var(--mk-radio)); background: rgb(var(--mk-white)); }
@@ -188,8 +186,6 @@
 .radioBig .radioBody { gap: 3px; }
 .radioTitle { font-weight: 600; font-size: .9em; }
 .radioBig .radioTitle { font-size: .92em; }
-.radioText { font-size: .82em; color: rgb(var(--mk-text-2)); text-wrap: pretty; }
-.radioBig .radioText { font-size: .84em; }
 .radioWhy { font-size: .8em; color: rgb(var(--mk-wait)); }
 .toggleRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; width: 100%; }
 .toggleRowTop { align-items: flex-start; }
