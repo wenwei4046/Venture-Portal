@@ -32,7 +32,10 @@
  * product list 是拿来 set costing 的"), and the Product List showed them with
  * the switch off; this is now the only place they are set, so a list waiting
  * for the switch has to stay reachable. Nothing recorded and the switch off
- * (IR) — no tab, as before.
+ * (IR) — no tab, as before. A brand on its own commission scheme (2990s,
+ * 2026-11-12) keeps KPI items of its own on the same tab, paid whatever the
+ * switch says — so the tab is there for whoever may add its first one
+ * (2026-11-13), even with nothing recorded yet.
  *
  * Pure, so the page stays a thin caller and this is tested.
  */
@@ -98,6 +101,8 @@ export interface RulesRecorded {
   kpiItems?: number
   /** Rungs of the KPI threshold ladder. */
   kpiThresholds?: number
+  /** Active brands on their own commission scheme — each keeps KPI items of its own on the KPI items tab. */
+  ownSchemeBrands?: number
 }
 
 export function isRulesTab(s: string | null | undefined): s is RulesTab {
@@ -115,6 +120,7 @@ function tabIsShown(key: RulesTab, scheme: RulesSwitches, recorded: RulesRecorde
       return scheme.enable_kpi || recorded.itemGroups > 0
     case 'kpi':
       return scheme.enable_kpi || (recorded.kpiItems ?? 0) > 0 || (recorded.kpiThresholds ?? 0) > 0
+        || (recorded.ownSchemeBrands ?? 0) > 0
     case 'brands':
       return scheme.enable_margin_penalty || scheme.enable_margin_incentive
     case 'promotion':

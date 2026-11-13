@@ -44,6 +44,15 @@ describe('visibleRulesTabs', () => {
     expect(keys(off)).not.toContain('kpi')
   })
 
+  // 2026-11-13: a brand on its own commission scheme (2990s) keeps KPI items of its own on the tab, paid whatever
+  // the switch says — so the tab is there to add its first one, with nothing recorded and the switch off.
+  it('KPI items stays, switch off and nothing recorded, while a brand on its own scheme may be given items', () => {
+    expect(keys(off, { ...nothing, ownSchemeBrands: 1 })).toEqual(['scheme', 'ladder', 'ranks', 'kpi', 'capacity'])
+    expect(keys(off, { ...nothing, ownSchemeBrands: 0 })).not.toContain('kpi')
+    // It brings the KPI items tab alone — the item groups answer to the switch and their own rows.
+    expect(keys(off, { ...nothing, ownSchemeBrands: 1 })).not.toContain('groups')
+  })
+
   // Open Bill went (2026-10-31), its rates tab with it: a link to it opens Scheme rules.
   it('has no Open Bill rates tab any more', () => {
     expect(RULES_TABS.map(t => t.key)).not.toContain('open-bill')

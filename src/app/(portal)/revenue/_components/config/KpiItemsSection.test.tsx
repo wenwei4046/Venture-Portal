@@ -89,10 +89,10 @@ function dataWith(over: Partial<CommissionSettingsData> = {}): CommissionSetting
   }
 }
 
-function renderSection(over: Partial<CommissionSettingsData> = {}, on = false) {
+function renderSection(over: Partial<CommissionSettingsData> = {}, on = false, canManage = false) {
   const onSchemeRules = vi.fn()
   const view = render(
-    <KpiItemsSection data={dataWith(over)} scheme={{ ...scheme, enable_kpi: on }} subName="Fair" onSchemeRules={onSchemeRules} />,
+    <KpiItemsSection data={dataWith(over)} scheme={{ ...scheme, enable_kpi: on }} subName="Fair" onSchemeRules={onSchemeRules} canManage={canManage} />,
   )
   return { ...view, onSchemeRules }
 }
@@ -127,7 +127,7 @@ describe('Rules › KPI items', () => {
     expect(screen.getByText(/none of its own items below comes off a bill or is paid until it/)).toBeInTheDocument()
     click('Scheme rules')
     expect(onSchemeRules).toHaveBeenCalledOnce()
-    rerender(<KpiItemsSection data={dataWith()} scheme={{ ...scheme, enable_kpi: true }} subName="Fair" onSchemeRules={onSchemeRules} />)
+    rerender(<KpiItemsSection data={dataWith()} scheme={{ ...scheme, enable_kpi: true }} subName="Fair" onSchemeRules={onSchemeRules} canManage={false} />)
     expect(screen.queryByText(/none of its own items below comes off a bill/)).not.toBeInTheDocument()
   })
 
@@ -150,7 +150,7 @@ describe('Rules › KPI items', () => {
     expect(refresh).toHaveBeenCalled()
     // The saved list arrives; the draft gives way to it.
     const saved: KpiItemRow = { ...HB_ROW, id: '33333333-3333-4333-8333-333333333333', option_value: 'No Side Panel', kpi_amount: 120 }
-    rerender(<KpiItemsSection data={dataWith({ kpiItems: [PILLOW_ROW, HB_ROW, saved] })} scheme={{ ...scheme, enable_kpi: true }} subName="Fair" onSchemeRules={vi.fn()} />)
+    rerender(<KpiItemsSection data={dataWith({ kpiItems: [PILLOW_ROW, HB_ROW, saved] })} scheme={{ ...scheme, enable_kpi: true }} subName="Fair" onSchemeRules={vi.fn()} canManage={false} />)
     await waitFor(() => expect(screen.queryByText('New')).not.toBeInTheDocument())
     expect(firstCells().map(c => c[0])).toEqual(['HB Straight', 'No Side Panel', 'AK-CS PIL'])
   })
@@ -294,18 +294,21 @@ describe('Rules › KPI items', () => {
   // 2026-11-12 — a brand on its own commission scheme has KPI items of its own (2990s): listed under the
   // sub-department's, by its brand, never among them.
   describe("a brand's own KPI items", () => {
+    const BRAND = '383ddd53-18fd-4dfd-b31e-57df4e1d42d9'
+    const FABRIC = '55555555-5555-4555-8555-555555555555'
+    const LATEX = '66666666-6666-4666-8666-666666666666'
     const BRAND_2990S = {
-      id: 'brand-2990', code: '2990S', name: '2990s', item_code_prefixes: [], sub_brands: [], ref_prefixes: [], hc_bill_pct: null,
+      id: BRAND, code: '2990S', name: '2990s', item_code_prefixes: [], sub_brands: [], ref_prefixes: [], hc_bill_pct: null,
       note: null, is_active: true, own_scheme: true, erp_company_id: 2,
     }
     const AKEMI = { ...BRAND_2990S, id: 'brand-akemi', code: 'AKEMI', name: 'Akemi', own_scheme: false, erp_company_id: null }
     const brandRow = (id: string, name: string, special: string, unit_tiers: unknown): KpiItemRow => ({
       id, source: 'option', product_code: null, product_name: name, erp_product_id: null, option_pool: 'sofa_specials', option_value: special,
-      kpi_amount: 50, effective_from: '2026-11-01', effective_to: null, brand_id: 'brand-2990', unit_tiers,
+      kpi_amount: 50, effective_from: '2026-11-01', effective_to: null, brand_id: BRAND, unit_tiers,
     })
     const ITEMS = [
-      brandRow('b-fabric', 'Upgrade fabric', 'Sofa Full Fabric', []),
-      brandRow('b-latex', 'Upgrade latex seat', 'Latex Seat', [{ min_qty: 10, amount: 100 }, { min_qty: 5, amount: 70 }]),
+      brandRow(FABRIC, 'Upgrade fabric', 'Sofa Full Fabric', []),
+      brandRow(LATEX, 'Upgrade latex seat', 'Latex Seat', [{ min_qty: 10, amount: 100 }, { min_qty: 5, amount: 70 }]),
     ]
 
     it('lists them under the brand’s name — the special, a unit a sofa set, the bonus and its tiers — and says they are always paid', () => {
@@ -328,6 +331,25 @@ describe('Rules › KPI items', () => {
       cleanup()
       renderSection({ brands: [{ ...BRAND_2990S, own_scheme: false }], brandKpiItems: ITEMS })
       expect(screen.queryByRole('table', { name: '2990s KPI items' })).not.toBeInTheDocument()
+    })
+
+    // 2026-11-13 — whoever may manage the rules edits them there, in a draft and a Save of the brand's own.
+    it("edits them in the brand's own block — its draft and its Save apart from the sub-department's list", async () => {
+      renderSection({ brands: [AKEMI, BRAND_2990S], brandKpiItems: ITEMS }, false, true)
+      fireEvent.change(screen.getByRole('textbox', { name: 'Upgrade latex seat bonus a unit' }), { target: { value: '60' } })
+      // The sub-department's list has nothing to save, and its Save stays the page's one filled button.
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+      fireEvent.change(amountBox('AK-CS PIL'), { target: { value: '55' } })
+      click('Save 2990s KPI items')
+      await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, {
+        adds: [],
+        changes: [{ id: LATEX, amount: '60', label: 'Upgrade latex seat' }],
+        removes: [],
+      }))
+      expect(saveKpiItems).toHaveBeenCalledOnce()
+      // The sub-department's own draft waits for its own Save.
+      expect(amountBox('AK-CS PIL')).toHaveValue('55')
+      expect(screen.getByRole('button', { name: 'Save 1 change' })).toBeEnabled()
     })
   })
 })

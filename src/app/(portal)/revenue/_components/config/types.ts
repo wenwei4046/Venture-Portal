@@ -152,6 +152,19 @@ export interface KpiSpecialRow {
   removed: boolean
 }
 
+/**
+ * A sofa special of another ERP company's Maintenance pool — what a brand on its own commission scheme (2990s,
+ * company 2) picks its own KPI items from (2026-11-12).
+ */
+export interface BrandKpiSpecialRow {
+  /** The ERP company whose pool it is (`comm_brands.erp_company_id`). */
+  companyId: number
+  value: string
+  label: string
+  sort_order: number
+  removed: boolean
+}
+
 /** A fabric series on the ERP's fabric list — what Rules › KPI items picks a bed frame's or a sofa's from (2026-10-29). */
 export interface KpiFabricSeriesRow {
   series: string
@@ -330,6 +343,8 @@ export interface CommissionSettingsData {
    * listed under the sub-department's own, never among them. Absent in older fixtures = none.
    */
   brandKpiItems?: KpiItemRow[]
+  /** The sofa specials of those brands' own ERP companies — what one of their items may be. Absent = none read. */
+  brandKpiSpecials?: BrandKpiSpecialRow[]
   kpiThresholds: KpiThresholdRow[]
   /** The Bedframe and Sofa specials pools, for the KPI items picker. */
   kpiSpecials: KpiSpecialRow[]

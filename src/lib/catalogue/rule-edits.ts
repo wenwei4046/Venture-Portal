@@ -111,29 +111,91 @@ export function teamCost(cost: number, ratio: number): number {
 
 // ─── KPI items (Rules › KPI items since 2026-10-08) ─────────────────────────
 
+/**
+ * A step of a brand's own KPI item, as typed (2026-11-12 — a brand on its own commission scheme, 2990s): from
+ * `minQty` units in a month EVERY unit pays `amount`.
+ */
+export interface KpiTierInput {
+  minQty: string | null
+  amount: string | null
+}
+
 export type KpiItemAdd =
   | { source: 'sku'; erpId: string; amount: string | null; label?: string }
-  | { source: 'option'; optionPool: string; optionValue: string; amount: string | null; label?: string }
+  | {
+      source: 'option'; optionPool: string; optionValue: string; amount: string | null; label?: string
+      /** A brand's own item: the brand (`comm_brands.id`), the name it is listed under, and its tiers. */
+      brandId?: string
+      name?: string | null
+      tiers?: ReadonlyArray<KpiTierInput>
+    }
 
 export interface KpiItemsEdit {
   adds: ReadonlyArray<KpiItemAdd>
-  changes: ReadonlyArray<{ id: string; amount: string | null; label?: string }>
+  /**
+   * `amount` absent = the amount stays as stored (a brand's item whose tiers alone changed — only what changed is
+   * sent); null = the box was emptied, which is refused. `tiers`: a brand's own item's, sent whole when they
+   * changed — absent, they stay as stored.
+   */
+  changes: ReadonlyArray<{ id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput> }>
   removes: ReadonlyArray<string>
+}
+
+/** `comm_kpi_items.unit_tiers`: what the database's CHECK (`comm_kpi_unit_tiers_valid`) takes. */
+export interface KpiTierRow {
+  min_qty: number
+  amount: number
 }
 
 export type KpiAddRow =
   | { source: 'sku'; erp_product_id: string; kpi_amount: number }
-  | { source: 'option'; option_pool: KpiOptionPool; option_value: string; kpi_amount: number }
+  | {
+      source: 'option'; option_pool: KpiOptionPool; option_value: string; kpi_amount: number
+      brand_id?: string; label?: string; unit_tiers?: KpiTierRow[]
+    }
 
 export interface KpiItemsPlan {
   adds: KpiAddRow[]
-  changes: Array<{ id: string; kpi_amount: number }>
+  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[] }>
   removes: string[]
 }
 
-/** One key per item, whichever row names it: a SKU by its id, a special by pool and spelling. */
-export function kpiAddKey(add: { source: 'sku'; erpId: string } | { source: 'option'; optionPool: string; optionValue: string }): string {
-  return add.source === 'sku' ? `sku:${add.erpId}` : `option:${add.optionPool}:${valueKey(add.optionValue) ?? ''}`
+/** One key per item, whichever row names it: a SKU by its id, a special by pool and spelling — a brand's own, by its brand too. */
+export function kpiAddKey(
+  add: { source: 'sku'; erpId: string } | { source: 'option'; optionPool: string; optionValue: string; brandId?: string },
+): string {
+  if (add.source === 'sku') return `sku:${add.erpId}`
+  const key = `option:${add.optionPool}:${valueKey(add.optionValue) ?? ''}`
+  return add.brandId ? `brand:${add.brandId.toLowerCase()}:${key}` : key
+}
+
+/** The most tiers one item takes: more than anybody types, far fewer than would crowd its row. */
+export const MAX_KPI_TIERS = 6
+
+/**
+ * A brand's item's tiers as the database stores them — the twin of its CHECK: whole numbers of units from 2 up,
+ * each above the one before, each with what a unit then pays (RM 0 – 1,000,000). A row left wholly blank is no tier.
+ */
+export function kpiTiers(raw: ReadonlyArray<KpiTierInput> | undefined, name: string): KpiTierRow[] {
+  const rows: KpiTierRow[] = []
+  let last = 1
+  for (const tier of raw ?? []) {
+    const units = (tier?.minQty ?? '').toString().trim()
+    const pay = (tier?.amount ?? '').toString().trim()
+    if (!units && !pay) continue
+    if (!/^\d{1,6}$/.test(units)) throw new EditError(`${name}: a tier starts at a whole number of units`)
+    const minQty = Number(units)
+    if (minQty < 2) throw new EditError(`${name}: a tier starts from 2 units — below that every unit pays the bonus`)
+    if (minQty <= last) throw new EditError(`${name}: each tier starts above the one before`)
+    const amount = parseMoney(pay, `${name}: what a unit pays from ${minQty}`, true)
+    if (amount === null) throw new EditError(`${name}: say what a unit pays from ${minQty} units`)
+    if (amount < 0) throw new EditError(`${name}: a tier cannot pay less than nothing`)
+    if (amount > 1_000_000) throw new EditError(`${name}: a tier pays at most RM 1,000,000 a unit`)
+    rows.push({ min_qty: minQty, amount })
+    last = minQty
+  }
+  if (rows.length > MAX_KPI_TIERS) throw new EditError(`${name}: at most ${MAX_KPI_TIERS} tiers`)
+  return rows
 }
 
 function kpiAmount(raw: string | null | undefined, name: string): number {
@@ -162,7 +224,15 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
     if (changed.has(c.id)) throw new EditError(`${name} is changed twice`)
     if (removing.has(c.id)) throw new EditError(`${name} is both changed and removed`)
     changed.add(c.id)
-    return { id: c.id, kpi_amount: kpiAmount(c.amount, name) }
+    if (c.amount === undefined && c.tiers === undefined) throw new EditError(`${name}: nothing changed`)
+    // What the row does not name stays as stored (the database reads it so): the amount when the tiers alone
+    // changed. A brand's own item's tiers go whole when they changed; whose item it is, the database knows (it
+    // refuses tiers on the sub-department's own).
+    return {
+      id: c.id,
+      ...(c.amount === undefined ? {} : { kpi_amount: kpiAmount(c.amount, name) }),
+      ...(c.tiers === undefined ? {} : { unit_tiers: kpiTiers(c.tiers, name) }),
+    }
   })
 
   const added = new Set<string>()
@@ -183,6 +253,23 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
     if (!value || value.length > 200) {
       throw new EditError(isFabricSeriesPool(a.optionPool) ? 'An added fabric series has no name' : 'An added special has no name')
     }
+    // A brand's own item (2026-11-12): a sofa special of the brand's, with a name of its own and, maybe, tiers.
+    if (a.brandId !== undefined) {
+      if (typeof a.brandId !== 'string' || !UUID.test(a.brandId)) throw new EditError('An added row names no brand')
+      if (a.optionPool !== 'sofa_specials') throw new EditError("A brand's own KPI item is a sofa special")
+      const own = typeof a.name === 'string' ? a.name.trim().replace(/\s+/g, ' ') : ''
+      if (own.length > 120) throw new EditError(`${own.slice(0, 40)}…: a name is at most 120 characters`)
+      const name = own || value
+      const key = kpiAddKey({ source: 'option', optionPool: a.optionPool, optionValue: value, brandId: a.brandId })
+      if (added.has(key)) throw new EditError(`${name} is added twice`)
+      added.add(key)
+      const tiers = kpiTiers(a.tiers, name)
+      return {
+        source: 'option', option_pool: a.optionPool, option_value: value, kpi_amount: kpiAmount(a.amount, name),
+        brand_id: a.brandId, ...(own ? { label: own } : {}), ...(tiers.length > 0 ? { unit_tiers: tiers } : {}),
+      }
+    }
+    if (a.tiers !== undefined || a.name !== undefined) throw new EditError("Only a brand's own KPI item has a name and tiers of its own")
     const name = a.label?.trim() || value
     const key = kpiAddKey({ source: 'option', optionPool: a.optionPool, optionValue: value })
     if (added.has(key)) throw new EditError(`${name} is added twice`)
