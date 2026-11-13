@@ -38,7 +38,7 @@ BEGIN;
 
 CREATE TEMP TABLE arena_booth_weekend_fns (proc text PRIMARY KEY, written_from text NOT NULL, makes text NOT NULL) ON COMMIT DROP;
 INSERT INTO arena_booth_weekend_fns VALUES
-  ('public.member_arena_booth_history_for_staff(uuid, uuid)', '1eb40a99a7c9cc10c133f6e52f64abb8', 'eb1230520cdb60de2418f4dec328de72');
+  ('public.member_arena_booth_history_for_staff(uuid, uuid)', '1eb40a99a7c9cc10c133f6e52f64abb8', '1b0a242f00643f9974e6ce3344160422');
 
 -- Production's body, or this migration's own once it has run — else nothing is touched.
 DO $$
@@ -90,61 +90,69 @@ BEGIN
       so.staff_id IS NOT DISTINCT FROM f.staff_id AS owner,
       -- The booth the salesperson picked in the ERP, while that pick is the
       -- bill's fair (lib/exhibitions.ts boothOf + brandCodeFor).
-      CASE WHEN so.fair_source='erp' AND coalesce(so.raw->'fair'->>'status','')<>'cancelled'
-                AND nullif(btrim(so.raw->'fair'->>'brand'),'') IS NOT NULL
-           THEN coalesce(erp_sync_brand_code(so.raw->'fair'->>'brand'),
-                         upper(regexp_replace(btrim(so.raw->'fair'->>'brand'),'\s+',' ','g'))) END AS booth_pick,
+      CASE WHEN so.fair_source='erp' AND coalesce(x.fair->>'status','')<>'cancelled'
+                AND nullif(btrim(x.fair->>'brand'),'') IS NOT NULL
+           THEN coalesce(erp_sync_brand_code(x.fair->>'brand'),
+                         upper(regexp_replace(btrim(x.fair->>'brand'),'\s+',' ','g'))) END AS booth_pick,
       nullif(btrim(so.brand_code),'') AS own_brand,
-      -- (20261114110000) The day it was sold, as text — so a day that does not read is no day and no error: the day of
-      -- the fair the ERP names (read only when it is one of the fair's days, below), and its order date.
-      CASE WHEN left(coalesce(so.raw->'fair'->>'fairDate',''),10) ~ '^\d{4}-\d{2}-\d{2}$'
-           THEN left(so.raw->'fair'->>'fairDate',10) END AS fair_day,
-      to_char(so.order_date,'YYYY-MM-DD') AS order_day
+      -- (20261114110000) What says the day it was sold: the day of the fair the ERP names, and its order date.
+      x.fair->>'fairDate' AS fair_day,so.order_date
     FROM public.member_order_facts(p_scheme,NULL,NULL) f
     JOIN sales_orders so ON so.id=f.order_id
+    -- (20261114110000) The ERP's fair on the bill, read out of the document once — not once a field.
+    CROSS JOIN LATERAL (SELECT so.raw->'fair' AS fair OFFSET 0) x
     WHERE f.staff_id IN (SELECT id FROM roster)
   ), fairs AS (
-    -- (20261114110000) Every fair that has begun — a weekend of one may be over before the fair is.
+    -- (20261114110000) Every fair that has begun — a weekend of one may be over before the fair is — with its weekends
+    -- (the user, 2026-11-14: "yes need by week as well"), member_erp_brand_weeks' own: the Monday of the weekend the
+    -- fair opens in — named by its Friday, as a fair's week always was — and of every later Monday–Sunday week in which
+    -- it is open on a Friday, Saturday or Sunday; a fair that ends on a Monday is one weekend, the standing booth of two
+    -- months nine. A year at most. Its days and its Mondays also as text: what a bill's sale day is read against.
     SELECT e.id,coalesce(nullif(btrim(v.display_name),''),e.venue_key) AS venue,
       coalesce(nullif(btrim(org.name),''),nullif(btrim(e.erp_organiser_text),'')) AS organizer,
-      e.start_date,e.end_date,e.period_month,
-      date_trunc('week',e.start_date::timestamp)::date AS first_monday
+      e.start_date,e.end_date,e.period_month,w.mondays,array_length(w.mondays,1) AS weekends,w.monday_texts,
+      to_char(e.start_date,'YYYY-MM-DD') AS start_text,to_char(e.end_date,'YYYY-MM-DD') AS end_text
     FROM comm_venue_events e LEFT JOIN comm_venues v ON v.venue_key=e.venue_key
     LEFT JOIN comm_organisers org ON org.id=e.organiser_id
+    CROSS JOIN LATERAL (SELECT date_trunc('week',e.start_date::timestamp) AS first_monday) m
+    CROSS JOIN LATERAL (
+      SELECT array_agg(s.monday ORDER BY s.monday) AS mondays,
+             array_agg(to_char(s.monday,'YYYY-MM-DD') ORDER BY s.monday) AS monday_texts
+        FROM (SELECT gs::date AS monday
+                FROM generate_series(m.first_monday,
+                                     LEAST(GREATEST(date_trunc('week',e.end_date::timestamp),m.first_monday),
+                                           m.first_monday+interval '52 weeks'),
+                                     interval '7 days') AS gs) s
+       WHERE s.monday=m.first_monday::date OR (e.start_date<=s.monday+6 AND e.end_date>=s.monday+4)) w
     WHERE e.start_date IS NOT NULL AND e.end_date IS NOT NULL AND e.start_date<=v_today
   ), fair_weekends AS (
-    -- (20261114110000) A fair's weekends (the user, 2026-11-14: "yes need by week as well"), member_erp_brand_weeks'
-    -- own: the weekend the fair opens in — named by its Friday, as a fair's week always was — and every later
-    -- Monday–Sunday week in which it is open on a Friday, Saturday or Sunday; a fair that ends on a Monday is one
-    -- weekend, the standing booth of two months nine. A weekend's days run from its week's Monday (the fair's first day,
-    -- for its first) to the day before its next weekend's week (the fair's last day, for its last). A year at most.
-    SELECT f.*,g.monday,g.nth::integer AS nth,w.mondays[g.nth::integer+1] AS next_monday,
-      array_length(w.mondays,1) AS weekends,(g.monday+4) AS week,
+    -- (20261114110000) A fair's weekends, one row each. A weekend's days run from its week's Monday (the fair's first
+    -- day, for its first) to the day before its next weekend's week (the fair's last day, for its last).
+    SELECT f.id,f.venue,f.organizer,f.start_date,f.end_date,f.period_month,f.weekends,(g.monday+4) AS week,
       CASE WHEN g.nth=1 THEN f.start_date ELSE g.monday END AS span_start,
-      coalesce(w.mondays[g.nth::integer+1]-1,f.end_date) AS span_end
-    FROM fairs f
-    CROSS JOIN LATERAL (
-      SELECT array_agg(s.monday ORDER BY s.monday) AS mondays
-        FROM (SELECT gs::date AS monday
-                FROM generate_series(f.first_monday::timestamp,
-                                     LEAST(GREATEST(date_trunc('week',f.end_date::timestamp),f.first_monday::timestamp),
-                                           f.first_monday::timestamp+interval '52 weeks'),
-                                     interval '7 days') AS gs) s
-       WHERE s.monday=f.first_monday OR (f.start_date<=s.monday+6 AND f.end_date>=s.monday+4)) w
-    CROSS JOIN LATERAL unnest(w.mondays) WITH ORDINALITY AS g(monday,nth)
+      coalesce(f.mondays[g.nth::integer+1]-1,f.end_date) AS span_end
+    FROM fairs f CROSS JOIN LATERAL unnest(f.mondays) WITH ORDINALITY AS g(monday,nth)
   ), fair_bills AS (
     -- (20261114110000) Each bill at a fair, in the weekend it was sold in: the fair day the ERP names when that is one
     -- of the fair's days, else its order date; before the fair's second weekend's week a bill is its first weekend's,
     -- from its last weekend's week on its last's. A fair of one weekend holds every bill, as before. `done`: the
     -- weekend is over — its board stands from its last day, as a fair's stood from the fair's last day.
-    SELECT o.*,fw.id AS fair_id,fw.week,(fw.span_end<=v_today) AS done
+    SELECT o.*,f.id AS fair_id,f.mondays[k.nth]+4 AS week,
+      (coalesce(f.mondays[k.nth+1]-1,f.end_date)<=v_today) AS done
     FROM order_facts o
-    JOIN fair_weekends fw ON fw.id=o.fair_event_id
+    JOIN fairs f ON f.id=o.fair_event_id
+    -- The sale day, as text — a day that does not read is no day and no error — read only for a fair of several
+    -- weekends: a fair of one is its first and its last, and takes every bill whatever it says.
     CROSS JOIN LATERAL (
-      SELECT CASE WHEN o.fair_day BETWEEN to_char(fw.start_date,'YYYY-MM-DD') AND to_char(fw.end_date,'YYYY-MM-DD')
-                  THEN o.fair_day ELSE o.order_day END AS sold) d
-    WHERE (fw.nth=1 OR d.sold>=to_char(fw.monday,'YYYY-MM-DD'))
-      AND (fw.next_monday IS NULL OR d.sold<to_char(fw.next_monday,'YYYY-MM-DD'))
+      SELECT CASE WHEN f.weekends=1 THEN NULL
+                  WHEN left(coalesce(o.fair_day,''),10) ~ '^\d{4}-\d{2}-\d{2}$'
+                       AND left(o.fair_day,10) BETWEEN f.start_text AND f.end_text THEN left(o.fair_day,10)
+                  ELSE to_char(o.order_date,'YYYY-MM-DD') END AS sold OFFSET 0) d
+    -- Its weekend: the first, and one more for each later weekend whose Monday is on or before that day.
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN f.weekends=1 THEN 1
+                  ELSE (SELECT 1+count(*)::integer FROM unnest(f.monday_texts[2:]) AS t(monday) WHERE t.monday<=d.sold)
+             END AS nth OFFSET 0) k
   ), erp_weeks AS (
     -- The first layer: the booth the ERP's Sales Attending lists each seller
     -- at — each weekend it is open (20261114060000).
@@ -170,15 +178,22 @@ BEGIN
     SELECT e.staff_id,e.week,e.brand,'erp'::text AS source FROM erp_weeks e
     UNION ALL
     SELECT g.staff_id,g.week,g.brand,'auto'::text FROM guessed g
+  ), owned AS (
+    -- (20261114110000) What each seller wrote at each fair each weekend that is over, by the booth it was picked at
+    -- (none: NULL) — added up first, so the guessed brands below meet a few rows, not every bill.
+    SELECT b.fair_id,b.week,b.staff_id,b.booth_pick,sum(b.revenue) AS amount,count(*) AS bills
+    FROM fair_bills b
+    WHERE b.done AND b.owner
+    GROUP BY b.fair_id,b.week,b.staff_id,b.booth_pick
   ), fits AS (
     -- At each fair that weekend, what can be a guessed seller's booth's: the
     -- bills picked at that brand's booth, and the bills with no pick.
-    SELECT b.fair_id,b.week,b.staff_id,wb.brand,
-      sum(b.revenue) AS amount,count(*) AS bills
-    FROM fair_bills b
-    JOIN week_brand wb ON wb.staff_id=b.staff_id AND wb.week=b.week AND wb.source='auto'
-    WHERE b.done AND b.owner AND (b.booth_pick IS NULL OR b.booth_pick=wb.brand)
-    GROUP BY b.fair_id,b.week,b.staff_id,wb.brand
+    SELECT o.fair_id,o.week,o.staff_id,g.brand,
+      sum(o.amount) AS amount,sum(o.bills) AS bills
+    FROM owned o
+    JOIN guessed g ON g.staff_id=o.staff_id AND g.week=o.week
+    WHERE o.booth_pick IS NULL OR o.booth_pick=g.brand
+    GROUP BY o.fair_id,o.week,o.staff_id,g.brand
   ), placed AS (
     -- The ONE booth a week that scores: the one the ERP lists them at; else
     -- their guessed brand, at the fair with the most bills for it.
