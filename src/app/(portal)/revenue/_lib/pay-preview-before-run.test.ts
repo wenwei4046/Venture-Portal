@@ -12,6 +12,8 @@ function mockClient(options: {
   record?: { basic_salary?: number; allowances?: number; non_statutory_allowance?: number }
   /** No payroll row for the month yet. */
   noPayrollRow?: boolean
+  /** Statutory figures typed on HR › Payroll (`*_override_amount`). */
+  overrides?: Record<string, number>
 } = {}) {
   const tableReads: string[] = []
   const rpcReads: { name: string; args: Record<string, unknown> }[] = []
@@ -28,7 +30,7 @@ function mockClient(options: {
         staff_id: 'person-a', status: 'draft', source: 'commission',
         basic_salary: options.salary ?? 3000, statutory_allowance: 100, non_statutory_allowance: 50, unpaid_leave_days: 2,
         ot_amount: 30, deduction_amount: 150, skbbk_amount: 20, commission_amount: 200,
-        commission_adjustment_amount: 75, gross: 190, net: 180,
+        commission_adjustment_amount: 75, gross: 190, net: 180, ...options.overrides,
       }]
       : table === 'comm_statements' ? [{ staff_id: 'person-a', total_commission: 500 }]
       : []
@@ -139,6 +141,25 @@ describe('salary before a saved commission run', () => {
     const rows = await loadPayBeforeRun(db.client, 'sub-1', '2026-09-01')
     expect(rows[0]).toMatchObject({ basic_salary: 12_000, statutory_allowance: 0, non_statutory_allowance: 0, payroll_exists: false })
     expect(db.rpcReads.find(read => read.name === 'lookup_epf')?.args).toMatchObject({ p_wages: 12_000 })
+  })
+
+  // 2026-11-13: HR typed a PCB of 930.00 on HR › Payroll; Comm Cal's salary
+  // calculation still showed the JADUAL lookup's (333.85). A figure typed on
+  // the payroll row wins over the lookup, as compute_hr_monthly_payroll has it.
+  it('takes the statutory figures typed on the payroll row over the lookups', async () => {
+    const db = mockClient({ overrides: { pcb_override_amount: 930, epf_ee_override_amount: 500, socso_er_override_amount: 0 } })
+    const rows = await loadPayBeforeRun(db.client, 'sub-1', '2026-09-01')
+    expect(rows[0]).toMatchObject({ pcb: 930, epf_ee: 500, socso_er: 0, epf_er: 390, socso_ee: 15, eis_er: 6, eis_ee: 6 })
+    // The typed PCB stands — no lookup asked.
+    expect(db.rpcReads.find(read => read.name === 'lookup_pcb')).toBeUndefined()
+  })
+
+  it('looks the PCB up on the basic after the EPF the row pays, when only EPF is typed', async () => {
+    const db = mockClient({ overrides: { epf_ee_override_amount: 500 } })
+    const rows = await loadPayBeforeRun(db.client, 'sub-1', '2026-09-01')
+    expect(rows[0].pcb).toBe(40)
+    // 3,000 × 28 / 30 = 2,800 − the typed 500.
+    expect(db.rpcReads.find(read => read.name === 'lookup_pcb')?.args).toMatchObject({ p_income: 2300 })
   })
 
   it('can read salary inputs for the actual sellers when historical membership is absent', async () => {
