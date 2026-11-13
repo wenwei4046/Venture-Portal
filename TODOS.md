@@ -90,6 +90,28 @@ right today only because Vercel runs in UTC with a US locale):
   the serials with `cellDates: false`, as the InfoTech and ERP imports do,
   would end it.
 
+## Owed — fairs by organiser, the rest (2026-11-13)
+
+Shipped: two organisers at one place on the same days are two fairs
+(`.claude/rules/revenue/comm-cal.md` › TWO ORGANISERS AT ONE PLACE ARE TWO
+FAIRS). Still owed:
+- **A standing booth is one fair and one brand week.** 2990s' booth at Penang
+  Waterfront (29 Oct – 31 Dec) is one fair: its sellers' brand week is the week
+  it opens in (30 Oct) and no later weekend's, its Arena result waits for
+  31 December, and the Arena's week of 30 Oct stays open until 7 Jan 2027
+  (`member_arena_week_closes_on` takes the latest end of the fairs opening in
+  the week). The user's answer (2026-11-13): every weekend the booth is open
+  counts, and a claim follows the fair's own dates. Next to build.
+- **The guess does not read the bill's brand.** A bill the ERP names no fair on
+  is guessed by place and day (`venue_event_for_order`): two fairs open on the
+  day → the shorter. A 2990s bill written during another organiser's fair at
+  its hall, with no fair picked in the ERP, is read at that fair until HR pins
+  it. Every bill at the two fairs split on 2026-11-14 names its fair.
+- **One organiser per place and month in `revenue_month_orders`.** Its
+  `organizer` is the earliest fair's at the place that month — only the
+  fallback for a bill no fair claims (Comm Cal's lists and the bill page read
+  the bill's own fair first).
+
 ## Owed — sub-departments per person (2026-10-16)
 
 The owner: permission ticked "按 sub-department" on the CRM and the Revenue

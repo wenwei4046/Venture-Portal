@@ -67,6 +67,30 @@ export function saleMonthOf(
   return fair.periodMonth.slice(0, 10)
 }
 
+/** A fair's organiser as a bill's embedded read hands it (PostgREST: one object, or a one-row list). */
+export interface FairOrganiserRow {
+  erp_organiser_text: string | null
+  comm_organisers: { name: string | null } | Array<{ name: string | null }> | null
+}
+
+/**
+ * Who ran the fair a bill was written at: its OWN fair's organiser — the register's name, else what the ERP
+ * wrote — and only where that names nobody (or no fair claims the bill) the calendar's answer for its place and
+ * day. Two organisers may stand at one place on the same days (2026-11-13: 2990s' standing booth under MALL MGMT
+ * through BIGHOME's three-day fair at one hall), so the place and the day alone no longer say which.
+ */
+export function billOrganiser(
+  fair: FairOrganiserRow | FairOrganiserRow[] | null | undefined,
+  byPlaceAndDay: string | null | undefined,
+): string | null {
+  const own = Array.isArray(fair) ? fair[0] : fair
+  const register = Array.isArray(own?.comm_organisers) ? own?.comm_organisers[0] : own?.comm_organisers
+  const named = [register?.name, own?.erp_organiser_text, byPlaceAndDay]
+    .map(name => (typeof name === 'string' ? name.trim() : ''))
+    .find(name => name !== '')
+  return named ?? null
+}
+
 /**
  * The fairs, newest first, a dated fair ranking on the day it opened and an
  * undated one on its month. Matches the RPC's own order so the page does not

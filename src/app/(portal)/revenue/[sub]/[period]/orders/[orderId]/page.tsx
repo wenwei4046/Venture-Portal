@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { revenuePath } from '@/lib/revenue'
 import { venueKey } from '@/lib/venues'
+import { billOrganiser, type FairOrganiserRow } from '@/lib/fair-calendar'
 import {
   classifyLine,
   costBasisOf,
@@ -176,7 +177,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       // is ambiguous to PostgREST (PGRST201) and the page read no order.
       // `ref_no` / `paper_no` are computed fields (20261003170000): the ERP's
       // Ref No. and the paper number the double-claim check reads from it.
-      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, source, ref_no, paper_no, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code)',
+      'id, order_no, order_date, event_date, period_month, customer_name, debtor_code, venue, location, brand_code, order_total, paid_amount, balance, manual_margin_pct, cancelled, excluded_reason, erp_status, erp_on_hold, erp_salesperson_id, sequence_in_day, agent_name, staff_id, synced_at, raw, source, ref_no, paper_no, hr_staff_costs!sales_orders_staff_id_fkey (employee_name, employee_code), '
+      // The fair the bill itself was placed at, for its organiser (2026-11-13: two organisers may stand at one
+      // place on the same days, so the place and the day no longer say which).
+      + 'comm_venue_events (erp_organiser_text, comm_organisers (name))',
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -209,6 +213,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     ref_no: string | null
     paper_no: string | null
     hr_staff_costs: { employee_name: string; employee_code: string | null } | null
+    comm_venue_events: FairOrganiserRow | FairOrganiserRow[] | null
   } | null
 
   if (!order || order.period_month !== period) notFound()
@@ -327,7 +332,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       g.commissionable,
     ]),
   )
-  const organiser = (venueData as string | null) || null
+  // The bill's own fair first; the calendar's answer for its place and day only where that names nobody.
+  const organiser = billOrganiser(order.comm_venue_events, venueData as string | null)
   const scheme = schemeData as {
     deposit_threshold_pct: number | string | null
     revenue_cost_divisor: number | string | null
