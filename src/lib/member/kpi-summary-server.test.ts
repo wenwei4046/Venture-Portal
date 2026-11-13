@@ -105,7 +105,7 @@ describe("authenticated KPI summary boundary", () => {
   });
 
   // 2026-11-12 — a brand on its own commission scheme (2990s) has KPI items of its own: counted whatever the
-  // sub-department's KPI switch says, and no part of its ladder (mig 20261112210000).
+  // sub-department's KPI switch says, and no part of its ladder (mig 20261114020000).
   describe("a brand's own items", () => {
     const own = { productCode: "AK-PILLOW", label: "AKEMI PILLOW", quantity: 3 };
     const fabric = { productCode: "2990S · Sofa Full Fabric", label: "Upgrade fabric", quantity: 0.5, brand: "2990S" };

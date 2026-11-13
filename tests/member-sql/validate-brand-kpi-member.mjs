@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261112210000 — 2990s' own KPI items in the Revenue app (2026-11-12; the user, of a
+// Local PostgreSQL regression for 20261114020000 — 2990s' own KPI items in the Revenue app (2026-11-12; the user, of a
 // 2990s bill: "他唯一不会出现的，只是所谓的 margin arena，但他会出现到 sales arena、brand arena，同时还有 KPI item 的
 // arena"; of the switch: "2990s 独立照发").
 //
@@ -17,7 +17,7 @@ import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 
 const db = new PGlite({ extensions: { btree_gist } })
 const KPI_ITEMS = new URL('../../supabase/migrations/20261112200000_brand_kpi_items.sql', import.meta.url)
-const MIGRATION = new URL('../../supabase/migrations/20261112210000_brand_kpi_member.sql', import.meta.url)
+const MIGRATION = new URL('../../supabase/migrations/20261114020000_brand_kpi_member.sql', import.meta.url)
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const one = async (sql, params = []) => Object.values((await q(sql, params))[0])[0]
 const id = v => `00000000-0000-4000-8000-${String(v).padStart(12, '0')}`
@@ -449,7 +449,7 @@ try {
     'a body changed since the migration was written is refused')
   checks++
 
-  console.log(`PASS: ${checks} brand KPI member checks. Production's bodies (md5-checked) + the real migrations 20261112200000 and 20261112210000 (twice); synthetic surroundings. No live database connection.`)
+  console.log(`PASS: ${checks} brand KPI member checks. Production's bodies (md5-checked) + the real migrations 20261112200000 and 20261114020000 (twice); synthetic surroundings. No live database connection.`)
 } finally {
   await db.close()
 }

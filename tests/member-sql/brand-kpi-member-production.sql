@@ -1,4 +1,4 @@
--- Production's bodies (pg_get_functiondef, 2026-11-12) the migration 20261112210000 was written from — read by
+-- Production's bodies (pg_get_functiondef, 2026-11-12) the migration 20261114020000 was written from — read by
 -- validate-brand-kpi-member.mjs, which checks each md5 before the migration runs. Never edited by hand.
 
 -- member_order_facts_with_old_bills(p_scheme uuid, p_from date, p_until date)

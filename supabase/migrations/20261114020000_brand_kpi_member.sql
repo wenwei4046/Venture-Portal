@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261112210000_brand_kpi_member.sql
+-- 20261114020000_brand_kpi_member.sql
 -- 2990s' own KPI items in the Revenue app (2026-11-12).
 -- ============================================================================
 --
@@ -39,11 +39,11 @@ BEGIN;
 
 CREATE TEMP TABLE brand_kpi_member_fns (proc text PRIMARY KEY, written_from text NOT NULL, makes text NOT NULL) ON COMMIT DROP;
 INSERT INTO brand_kpi_member_fns VALUES
-  ('public.member_order_facts_with_old_bills(uuid, date, date)',     'c839f5c6887b77dda97f86898e6f1da3', 'f99143e964e5c299515a24ab5063a6d3'),
-  ('public.member_order_book_for_staff(uuid, uuid, date, date)',     '3a4b29f5ca1f1b674536cc4d606e9993', 'b9c724715bb62031799818b77cdbeead'),
-  ('public.member_principal_department_order_book(uuid, text, text)', '59e5b8cc4abd4586fc02387ccf1d4d9c', '4dcf0bbe8a627107fa54c81fe866710e'),
-  ('public.member_principal_department_insight(uuid, text, text)',   '6cc446a75ff9a772c3c2c332db7f16da', 'a5ef71b6965f42a12cead545ca76132f'),
-  ('public.member_kpi_for_staff(uuid, uuid, date)',                  '2c34201f1ed847022e3bc6b306b574f1', '768efaf49b751da6731d3da1c38a7e93');
+  ('public.member_order_facts_with_old_bills(uuid, date, date)',     'c839f5c6887b77dda97f86898e6f1da3', '33414791db34a741ce9bd6ee84c9687a'),
+  ('public.member_order_book_for_staff(uuid, uuid, date, date)',     '3a4b29f5ca1f1b674536cc4d606e9993', 'aecfce0eb43330edbfe21719b67bf982'),
+  ('public.member_principal_department_order_book(uuid, text, text)', '59e5b8cc4abd4586fc02387ccf1d4d9c', '61a66ec7ccf065ace8e56aa84c309d35'),
+  ('public.member_principal_department_insight(uuid, text, text)',   '6cc446a75ff9a772c3c2c332db7f16da', 'd183435dcd706a9ff8cb6148aae02237'),
+  ('public.member_kpi_for_staff(uuid, uuid, date)',                  '2c34201f1ed847022e3bc6b306b574f1', 'a20392fb1acc51891dee50e72d01de07');
 
 -- A brand's own items are 20261112200000's.
 DO $$
@@ -117,7 +117,7 @@ $fn$;
 -- The facts: every board, Today, Insight and the Arena read a bill's sales and its KPI units here.
 SELECT pg_temp.remake('public.member_order_facts_with_old_bills(uuid, date, date)', ARRAY[
     $o$CROSS JOIN LATERAL (SELECT DISTINCT w.recognition FROM windowed w WHERE c.enable_kpi) m$o$,
-    $n$-- (20261112210000) … or a brand on its own scheme has KPI items of its own: counted whatever the switch says
+    $n$-- (20261114020000) … or a brand on its own scheme has KPI items of its own: counted whatever the switch says
   -- (comm_kpi_hits reads the switch for the sub-department's own).
   CROSS JOIN LATERAL (SELECT DISTINCT w.recognition FROM windowed w WHERE c.enable_kpi
     OR EXISTS(SELECT 1 FROM public.comm_kpi_items bk WHERE bk.scheme_id=c.id AND bk.brand_id IS NOT NULL)) m$n$
@@ -126,7 +126,7 @@ SELECT pg_temp.remake('public.member_order_facts_with_old_bills(uuid, date, date
 -- A member's bills, line by line.
 SELECT pg_temp.remake('public.member_order_book_for_staff(uuid, uuid, date, date)', ARRAY[
     $o$CROSS JOIN LATERAL (SELECT DISTINCT f.recognition_month FROM facts f WHERE c.enable_kpi) m$o$,
-    $n$-- (20261112210000) … or a brand on its own scheme has KPI items of its own.
+    $n$-- (20261114020000) … or a brand on its own scheme has KPI items of its own.
   CROSS JOIN LATERAL (SELECT DISTINCT f.recognition_month FROM facts f WHERE c.enable_kpi
     OR EXISTS(SELECT 1 FROM public.comm_kpi_items bk WHERE bk.scheme_id=c.id AND bk.brand_id IS NOT NULL)) m$n$
 ]);
@@ -134,7 +134,7 @@ SELECT pg_temp.remake('public.member_order_book_for_staff(uuid, uuid, date, date
 -- The whole sub-department's bills (the Principal viewing nobody, a Revenue Director).
 SELECT pg_temp.remake('public.member_principal_department_order_book(uuid, text, text)', ARRAY[
     $o$CROSS JOIN LATERAL (SELECT DISTINCT f.recognition_month FROM facts f WHERE c.enable_kpi) m$o$,
-    $n$-- (20261112210000) … or a brand on its own scheme has KPI items of its own.
+    $n$-- (20261114020000) … or a brand on its own scheme has KPI items of its own.
   CROSS JOIN LATERAL (SELECT DISTINCT f.recognition_month FROM facts f WHERE c.enable_kpi
     OR EXISTS(SELECT 1 FROM public.comm_kpi_items bk WHERE bk.scheme_id=c.id AND bk.brand_id IS NOT NULL)) m$n$
 ]);
@@ -142,7 +142,7 @@ SELECT pg_temp.remake('public.member_principal_department_order_book(uuid, text,
 -- The whole sub-department's reading: whether KPI counts. Its threshold stays the sub-department's own ladder's.
 SELECT pg_temp.remake('public.member_principal_department_insight(uuid, text, text)', ARRAY[
     $o$'kpi',(SELECT jsonb_build_object('enabled',coalesce(c.enable_kpi,false),$o$,
-    $n$-- (20261112210000) … or a brand on its own scheme has KPI items of its own in force that day.
+    $n$-- (20261114020000) … or a brand on its own scheme has KPI items of its own in force that day.
   'kpi',(SELECT jsonb_build_object('enabled',coalesce(c.enable_kpi,false)
      OR EXISTS(SELECT 1 FROM public.comm_kpi_items bk
        JOIN public.comm_brands bb ON bb.id=bk.brand_id AND bb.scheme_id=bk.scheme_id
@@ -199,7 +199,7 @@ BEGIN
   RAISE EXCEPTION 'Choose a month that has started' USING ERRCODE='22023';
  END IF;
 
- -- (20261112210000) A brand on its own commission scheme has KPI items of its own (2990s): counted whatever the
+ -- (20261114020000) A brand on its own commission scheme has KPI items of its own (2990s): counted whatever the
  -- sub-department's switch says.
  v_brand:=EXISTS(SELECT 1 FROM public.comm_kpi_items k
   JOIN public.comm_brands b ON b.id=k.brand_id AND b.scheme_id=k.scheme_id
@@ -213,14 +213,14 @@ BEGIN
 
  -- The commission run selects its configuration at period end. Retain the
  -- FIRST rung even after it is reached; the old MemberKpi.target is next-unmet.
- -- (20261112210000) The ladder is the sub-department's own items': none while its switch is off.
+ -- (20261114020000) The ladder is the sub-department's own items': none while its switch is off.
  SELECT min(k.min_qty) INTO v_threshold FROM public.comm_kpi_thresholds k
  WHERE v_enabled AND k.scheme_id=p_scheme AND k.effective_from<=v_rules_at
   AND (k.effective_to IS NULL OR k.effective_to>=v_rules_at);
 
  WITH configured AS (
   -- A SKU (by its code) or a bed frame's / sofa's special (2026-09-27) — the sub-department's own while its switch
-  -- is on, and (20261112210000) a brand's own on its own scheme, named with the brand. Its code says the brand too:
+  -- is on, and (20261114020000) a brand's own on its own scheme, named with the brand. Its code says the brand too:
   -- the same special may be the sub-department's own item, and the app reads each code once.
   SELECT k.id,
    CASE WHEN b.id IS NOT NULL THEN upper(btrim(b.code))||' · '||btrim(k.option_value)
