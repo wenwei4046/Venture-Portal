@@ -38,7 +38,19 @@ interface PayrollRow {
   commission_adjustment_amount: Num
   gross: Num
   net: Num
+  epf_er_override_amount?: Num
+  epf_ee_override_amount?: Num
+  socso_er_override_amount?: Num
+  socso_ee_override_amount?: Num
+  eis_er_override_amount?: Num
+  eis_ee_override_amount?: Num
+  pcb_override_amount?: Num
 }
+
+/** The statutory figures HR typed on HR › Payroll, kept until Reset to JADUAL clears them. */
+export type TypedStatutory = Pick<PayrollRow,
+  | 'epf_er_override_amount' | 'epf_ee_override_amount' | 'socso_er_override_amount'
+  | 'socso_ee_override_amount' | 'eis_er_override_amount' | 'eis_ee_override_amount' | 'pcb_override_amount'>
 
 interface Contribution { employer: Num; employee: Num }
 const zero: Contribution = { employer: 0, employee: 0 }
@@ -124,13 +136,21 @@ export interface ScheduleStatutory {
  * and the PCB on their basic after employee EPF — the lookups
  * `compute_hr_monthly_payroll` makes, dated the month as revenue_pay_preview
  * dates them. No wage, no contribution and no call.
+ *
+ * `typed` = the payroll row's figures HR typed over the schedules: each one
+ * wins over its lookup, and PCB's lookup reads the basic after the EPF the row
+ * pays — the trigger's own order (2026-11-13: a PCB typed as 930.00 on payroll
+ * while Comm Cal still showed the lookup's 333.85).
  */
 export async function scheduleStatutory(
   lookup: StatutoryLookup,
   person: Pick<StaffRow, 'epf_category' | 'socso_category' | 'pcb_category' | 'children_count' | 'is_epf_exempt' | 'tax_mode'>,
   window: { statutoryWages: number; basicForPcb: number },
   period: string,
+  typed?: TypedStatutory,
 ): Promise<ScheduleStatutory> {
+  const over = (value: Num | undefined, looked: Num): number =>
+    value === null || value === undefined ? num(looked) : num(value)
   async function contribution(name: string, args: Record<string, unknown>): Promise<Contribution> {
     const result = await lookup(name, args)
     return (Array.isArray(result) ? result[0] : result) as Contribution ?? zero
@@ -142,13 +162,18 @@ export async function scheduleStatutory(
     window.statutoryWages > 0 ? contribution('lookup_socso', { ...args, p_category: person.socso_category }) : zero,
     window.statutoryWages > 0 ? contribution('lookup_eis', args) : zero,
   ])
-  const pcb = person.tax_mode === 'pcb' ? num(await lookup('lookup_pcb', {
-    p_income: Math.max(window.basicForPcb - num(epf.employee), 0),
-    p_category: person.pcb_category, p_children: person.children_count, p_period: period,
-  }) as Num) : 0
+  const epfEe = over(typed?.epf_ee_override_amount, epf.employee)
+  const typedPcb = typed?.pcb_override_amount
+  const pcb = person.tax_mode !== 'pcb' ? 0
+    : typedPcb !== null && typedPcb !== undefined ? num(typedPcb)
+      : num(await lookup('lookup_pcb', {
+        p_income: Math.max(window.basicForPcb - epfEe, 0),
+        p_category: person.pcb_category, p_children: person.children_count, p_period: period,
+      }) as Num)
   return {
-    epfEr: num(epf.employer), epfEe: num(epf.employee), socsoEr: num(socso.employer), socsoEe: num(socso.employee),
-    eisEr: num(eis.employer), eisEe: num(eis.employee), pcb,
+    epfEr: over(typed?.epf_er_override_amount, epf.employer), epfEe,
+    socsoEr: over(typed?.socso_er_override_amount, socso.employer), socsoEe: over(typed?.socso_ee_override_amount, socso.employee),
+    eisEr: over(typed?.eis_er_override_amount, eis.employer), eisEe: over(typed?.eis_ee_override_amount, eis.employee), pcb,
   }
 }
 
@@ -181,7 +206,7 @@ export async function loadPayBeforeRun(
     })),
     fetchByKeys<PayrollRow, string>(staffIds, async chunk => ({
       data: await fetchAllRows<PayrollRow>((from, to) => supabase.from('hr_monthly_payroll')
-        .select('staff_id, status, source, basic_salary, statutory_allowance, non_statutory_allowance, unpaid_leave_days, ot_amount, deduction_amount, skbbk_amount, commission_amount, commission_adjustment_amount, gross, net')
+        .select('staff_id, status, source, basic_salary, statutory_allowance, non_statutory_allowance, unpaid_leave_days, ot_amount, deduction_amount, skbbk_amount, commission_amount, commission_adjustment_amount, gross, net, epf_er_override_amount, epf_ee_override_amount, socso_er_override_amount, socso_ee_override_amount, eis_er_override_amount, eis_ee_override_amount, pcb_override_amount')
         .eq('period_month', period).in('staff_id', chunk).order('id').range(from, to)), error: null,
     })),
     fetchByKeys<{ staff_id: string; total_commission: Num }, string>(staffIds, async chunk => ({
@@ -202,7 +227,7 @@ export async function loadPayBeforeRun(
     const pay = payrollByPerson.get(person.id)
     const salary = payrollSalary(person, pay)
     const window = previewWageWindow(period, { ...person, basic_salary: salary.basic, allowances: salary.statutoryAllowance }, pay)
-    const statutory = await scheduleStatutory(lookup, person, window, period)
+    const statutory = await scheduleStatutory(lookup, person, window, period, pay)
     return {
       staff_id: person.id, employee_name: person.employee_name, employee_code: person.employee_code,
       designation: person.designation, employment_type: person.employment_type,
