@@ -114,6 +114,7 @@ export default function CanvasEditor({
                   <input className={c.cardTitleInput} value={s.title} maxLength={60} placeholder="Section name" aria-label="Section name"
                     onClick={e => e.stopPropagation()} onChange={e => setSection(s.id, x => ({ ...x, title: e.target.value }))} />
                   {badges([...(s.locked ? ['🔒 Locked'] : []), ...(s.req ? ['⭐ Required'] : []), ...(s.stage ? [`🎯 ${stageNameOf(stages, s.stage)}`] : []), ...(s.pic ? ['👁 PIC'] : [])])}
+                  <span className={c.grow} />
                   <button type="button" className={`${c.gear}${secOpen(s.id) ? ` ${c.gearOn}` : ''}`} onClick={e => { e.stopPropagation(); toggleSec(s.id) }}>⚙ Section settings</button>
                 </div>
                 <div className={c.fields}>

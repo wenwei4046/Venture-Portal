@@ -28,6 +28,13 @@ export interface PreviewPerson {
   load?: number
 }
 
+/** The canvas hides 📋 Requirements from the PIC. */
+const reqHidden = (c: unknown) => !!c && typeof c === 'object' && (c as { req?: { pic?: unknown } }).req?.pic === false
+
+/** The sample task's brief (the prototype's). */
+const REQUIREMENTS = (category: string) =>
+  `Make a ${category.toLowerCase()} for the Red Truck Roadshow (21–23 Nov). Bright, playful, show the truck and the sofa range. Ends with the store address.`
+
 export default function PreviewTab({ draft, people = [] }: { draft: PreviewDraft; people?: readonly PreviewPerson[] }) {
   const roster: FlowPerson[] = useMemo(() => people.map(p => ({ id: p.id, name: p.first, role: p.group ?? '', load: p.load ?? 0 })), [people])
   const sig = JSON.stringify([draft, roster.map(p => p.id)])
@@ -58,7 +65,7 @@ export default function PreviewTab({ draft, people = [] }: { draft: PreviewDraft
   return (
     <div className={s.previewCard}>
       {isPic ? (
-        <TaskFlowPic view={picView(task, now)} title={task.title} sub="Houzs Marketing · tracking link (sample)"
+        <TaskFlowPic view={picView(task, now, reqHidden(draft.canvas) ? null : REQUIREMENTS(task.category))} title={task.title} sub="Houzs Marketing · tracking link (sample)"
           answer={(
             <>
               <button type="button" className={s.picBtn} onClick={() => decide('changes', PIC_ID)}>Request changes</button>
@@ -72,7 +79,7 @@ export default function PreviewTab({ draft, people = [] }: { draft: PreviewDraft
           isManager={isMM}
           now={now}
           crumbs={<><span>← My Space</span><span>/</span><span>Sample</span><span>/</span><span>{task.title}</span></>}
-          requirements={{ peek: 'Red Truck Roadshow, 21–23 Nov · bright and playful', body: `Make a ${task.category.toLowerCase()} for the Red Truck Roadshow (21–23 Nov). Bright, playful, show the truck and the sofa range. Ends with the store address.` }}
+          requirements={{ peek: 'Red Truck Roadshow, 21–23 Nov · bright and playful', body: REQUIREMENTS(task.category) }}
           celebrate={celebrate}
           onValue={(f, v) => setState(st => ({ ...st, task: { ...st.task, values: { ...st.task.values, [f.id]: v } } }))}
           onRows={(f, rows) => setState(st => ({ ...st, task: { ...st.task, rows: { ...st.task.rows, [f.id]: rows } } }))}

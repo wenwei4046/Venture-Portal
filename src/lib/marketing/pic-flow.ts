@@ -31,7 +31,7 @@ export function picFlowView(page: PicPage, w: PicWork): PicView {
     answer: waiting,
     steps: stepNames(w).map((name, i) => ({ name, state: done || i < cur ? 'done' : i === cur ? 'cur' : 'next' })),
     eta: done ? 'All steps done.' : w.dueOn ? `Expected by ${shortDay(w.dueOn)}` : 'Expected by —',
-    secs: (st && (st.fields.length || st.links.length)
+    secs: [...(w.brief ? [{ id: 'req', emoji: '📋', title: 'Requirements', text: w.brief, fields: [], table: null }] : []), ...(st && (st.fields.length || st.links.length)
       ? [{
           id: 'stage',
           emoji: '🎯',
@@ -50,6 +50,6 @@ export function picFlowView(page: PicPage, w: PicWork): PicView {
             table: { cols: t.cols, cells: t.rows.map(r => t.cols.map((_, j) => (r[j] ? { text: r[j] === 'true' ? '✓' : r[j], filled: true } : { text: 'Coming soon', filled: false }))) },
           }] : []
         })]
-      : []).filter(x => x.fields.length > 0 || !!x.table),
+      : []).filter(x => x.fields.length > 0 || !!x.table)],
   }
 }

@@ -369,6 +369,7 @@
 .picSecHead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
 .picTh { padding: 7px 12px; font-size: .82em; font-weight: 600; background: rgb(var(--mk-surface)); border-bottom: 1px solid rgb(var(--mk-line-2)); }
 .picTd { padding: 8px 12px; font-size: .86em; border-bottom: 1px solid rgb(var(--mk-line-4)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picText { margin: 0; padding: 0 14px 12px; font-size: .92em; color: rgb(var(--mk-text-2)); text-wrap: pretty; }
 .picRow { display: flex; gap: 12px; padding: 9px 14px; border-top: 1px solid rgb(var(--mk-line-4)); }
 .picK { font-size: .88em; color: rgb(var(--mk-muted)); width: 170px; flex: none; }
 .picV { font-size: .88em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

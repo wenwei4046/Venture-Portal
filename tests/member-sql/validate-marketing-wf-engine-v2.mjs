@@ -297,6 +297,7 @@ await submit(U.ali, MIX.id)
 const pageOf = async () => { await as(null, [], 'anon'); return one(`SELECT public.mkt_pic_page($1)`, [code]) }
 check((await pageOf()).work[0].stage.waiting, true, 'the PIC’s page: waiting for them')
 check((await pageOf()).work[0].stageNames, ['Design'], '…every step named for the step bar')
+check((await pageOf()).work[0].brief, 'Do it', '…and 📋 Requirements as written (no template hides them)')
 await decide(U.josiah, MIX.id, true)
 check([(await stagesOf(MIX.id))[0].status, (await pageOf()).work[0].stage.waiting], ['review', true], 'Josiah in, still waiting for the PIC')
 await as(null, [], 'anon')

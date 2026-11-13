@@ -34,7 +34,7 @@
 .up { width: 3px; height: 14px; border-radius: 2px; top: 100%; animation: fwUp .55s ease-out both; }
 .spark { width: 6px; height: 6px; border-radius: 3px; animation: fwBurst 1.3s cubic-bezier(.2, .7, .3, 1) infinite; }
 .confetti { top: 0; border-radius: 2px; animation-name: cfFall; animation-timing-function: cubic-bezier(.3, .6, .5, 1); animation-fill-mode: both; }
-.pop { left: 50%; top: 26%; transform: translateX(-50%); font-size: 96px; animation: celebIn .5s ease-out both; }
+.pop { left: 50%; top: 26%; translate: -50% 0; font-size: 96px; animation: celebIn .5s ease-out both; }
 .mugL { left: calc(50% - 120px); top: 22%; font-size: 110px; animation: clinkL 1.6s ease-in-out infinite; }
 .mugR { left: calc(50% + 10px); top: 22%; font-size: 110px; animation: clinkR 1.6s ease-in-out infinite; }
 .shine { left: calc(50% - 16px); top: 17%; font-size: 34px; animation: celebIn .3s ease-out .7s both; }
@@ -49,11 +49,11 @@
 .clap { left: calc(50% - 60px); top: 16%; font-size: 110px; transform-origin: 20% 30%; animation: clap .9s ease-in-out 3; }
 .corn { top: 0; animation-name: cfFall; animation-timing-function: ease-in; animation-fill-mode: both; }
 .gif {
-  position: absolute; left: 50%; top: 10%; transform: translateX(-50%); max-width: min(420px, 80%); max-height: 44%;
+  position: absolute; left: 50%; top: 10%; translate: -50% 0; max-width: min(420px, 80%); max-height: 44%;
   border-radius: 14px; box-shadow: var(--mk-celeb-gif-shadow); animation: celebIn .45s ease-out both;
 }
 .words {
-  position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center;
+  position: absolute; left: 50%; top: 58%; translate: -50% 0; display: flex; flex-direction: column; align-items: center;
   gap: 8px; text-align: center; animation: celebIn .5s ease-out both; animation-delay: .3s; width: min(520px, 90%);
 }
 .wTitle { font-size: 2.2em; font-weight: 600; letter-spacing: -.01em; color: rgb(var(--mk-ink)); }

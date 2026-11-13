@@ -1483,6 +1483,10 @@ SELECT pg_temp.swap_check('public.mkt_pic_page(text)',
   $q$'id', d.id, 'title', d.title, 'status', d.status, 'startsOn', d.starts_on, 'dueOn', d.due_on,$q$,
   $q$'id', d.id, 'title', d.title, 'status', d.status, 'startsOn', d.starts_on, 'dueOn', d.due_on,
                'stageNames', (SELECT coalesce(jsonb_agg(x.name ORDER BY x.idx), '[]'::jsonb) FROM public.mkt_stages x WHERE x.project_id = d.id),
+               -- 📋 Requirements as written on the task, unless its template's canvas hides them from the PIC.
+               'brief', CASE WHEN coalesce((SELECT wv.canvas -> 'req' ->> 'pic' FROM public.mkt_workflow_versions wv
+                                             WHERE wv.workflow_id = d.workflow_id AND wv.version = d.workflow_version), 'true') <> 'false'
+                             THEN nullif(btrim(coalesce(d.brief, '')), '') END,
                'finish', CASE WHEN d.status = 'done' AND jsonb_typeof(d.finish) = 'object' THEN jsonb_build_object(
                            'picText', nullif(d.finish ->> 'picText', ''), 'celebration', d.finish ->> 'celebration',
                            'feedbackUntil', CASE WHEN d.finish ->> 'after' = 'feedback'

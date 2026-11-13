@@ -46,6 +46,7 @@ export default function TaskFlowPic({ view, title, sub, answer }: {
         {view.secs.map(x => (
           <div key={x.id} className={s.picSec}>
             <div className={s.picSecHead}><span aria-hidden="true">{x.emoji}</span><span className={s.secTitle}>{x.title}</span></div>
+            {x.text ? <p className={s.picText}>{x.text}</p> : null}
             {x.table ? (
               <div className={`${s.tblScroll} ${s.picTblTop}`}>
                 <div className={s.grid} style={{ gridTemplateColumns: `repeat(${Math.max(1, x.table.cols.length)}, minmax(0, 1fr))` }}>

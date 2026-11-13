@@ -630,6 +630,8 @@ export interface PicView {
     id: string
     emoji: string
     title: string
+    /** 📋 Requirements' words. */
+    text?: string
     fields: { name: string; text: string; filled: boolean }[]
     table: { cols: string[]; cells: { text: string; filled: boolean }[][] } | null
   }[]
@@ -637,7 +639,7 @@ export interface PicView {
 
 /** The PIC's simpler page: the stage's PIC text, Approve / Request changes when they are a pending approver, the steps,
  * "Expected by", and only the 👁 sections, fields and columns ("Coming soon" where empty) — no staff names, no prices. */
-export function picView(task: FlowTask, now: Date): PicView {
+export function picView(task: FlowTask, now: Date, requirements: string | null = null): PicView {
   const cur = task.stages[task.at.cur]
   const answer = !!turnOf(flowStages(task), task.at, PIC_ID)
   const proj = projected(task, now)
@@ -651,7 +653,7 @@ export function picView(task: FlowTask, now: Date): PicView {
     answer,
     steps: task.stages.map((s, i) => ({ name: s.name, state: isDone(task, i) ? 'done' : isCur(task, i) ? 'cur' : 'next' })),
     eta: task.at.done ? 'All steps done.' : `Expected by ${dayText(proj[proj.length - 1])}`,
-    secs: task.sections.filter(sec => sec.pic).map(sec => {
+    secs: ([...(requirements ? [{ id: 'req', emoji: '📋', title: 'Requirements', text: requirements, fields: [], table: null }] : []), ...task.sections.filter(sec => sec.pic).map(sec => {
       const table = sec.fields.find(f => f.type === 'Table' && f.pic)
       const cols = table ? table.cols.filter(c => c.pic) : []
       return {
@@ -661,6 +663,6 @@ export function picView(task: FlowTask, now: Date): PicView {
         fields: sec.fields.filter(f => f.pic && f.type !== 'Table' && f.type !== 'Note').map(f => ({ name: f.label, ...cell(task.values[f.id]) })),
         table: table ? { cols: cols.map(c => c.name), cells: (task.rows[table.id] ?? []).map(r => cols.map(c => cell(r.cells[c.id]))) } : null,
       }
-    }),
+    })] as PicView['secs']).filter(x => !!x.text || x.fields.length > 0 || !!x.table),
   }
 }

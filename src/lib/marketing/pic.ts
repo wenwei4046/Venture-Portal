@@ -99,6 +99,8 @@ export interface PicWork {
   done: number
   /** Its stages' names in order (Workflow Builder 2a) — the PIC's step bar. */
   stageNames: string[]
+  /** 📋 Requirements as the task gives them — null when hidden from the PIC. */
+  brief: string | null
   /** Done: what the PIC reads, the celebration, and until when the link takes their feedback (null: it closes). */
   finish: { picText: string | null; celebration: string | null; feedbackUntil: string | null } | null
   stage: {
@@ -211,6 +213,7 @@ function workFromRow(w: Record<string, unknown>): PicWork {
     stages: n(w.stages),
     done: n(w.done),
     stageNames: (Array.isArray(w.stageNames) ? w.stageNames : []).map(x => str(x)),
+    brief: strOrNull(w.brief),
     finish: isObj(w.finish) ? { picText: strOrNull(w.finish.picText), celebration: strOrNull(w.finish.celebration), feedbackUntil: strOrNull(w.finish.feedbackUntil) } : null,
     stage: s ? {
       idx: n(s.idx),
