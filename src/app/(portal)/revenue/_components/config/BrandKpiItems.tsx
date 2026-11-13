@@ -21,6 +21,7 @@ import {
   type TierDraft,
 } from '@/lib/commission/brand-kpi-edit'
 import { SectionHead } from '@/components/RowForm'
+import { Select } from '@/components/hrv/select'
 import { saveKpiItems } from '../../kpi-actions'
 import type { BrandKpiSpecialRow, BrandRow, CommissionSettingsData, KpiItemRow, SchemeRow } from './types'
 
@@ -364,13 +365,14 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
             <span className="inline-flex flex-wrap items-center gap-2">
               {left.length > 0 ? (
                 <>
-                  <select value={picked} onChange={e => setPick(e.target.value)} disabled={saving}
+                  {/* HR's pages draw every select as the soft dropdown (`soft-select-coverage.test.ts`). */}
+                  <Select bare value={picked} onChange={e => setPick(e.target.value)} disabled={saving}
                     aria-label={`${brand.name} special to add`} className={`${INPUT} max-w-[14rem]`}>
                     {left.map(value => {
                       const label = poolByKey.get(valueKey(value))?.label
                       return <option key={value} value={value}>{label && label !== value ? `${value} · ${label}` : value}</option>
                     })}
-                  </select>
+                  </Select>
                   <input value={pickName} onChange={e => setPickName(e.target.value)} disabled={saving} maxLength={120}
                     placeholder="Name" aria-label={`${brand.name} new item name`} className={`${INPUT} w-40`} />
                   <input value={pickAmount} onChange={e => setPickAmount(e.target.value)} disabled={saving} inputMode="decimal"
