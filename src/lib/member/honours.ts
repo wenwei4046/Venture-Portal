@@ -42,6 +42,27 @@ function placed(rows: readonly { id: string; value: number }[]): Map<string, num
   return out;
 }
 
+/** A KPI item's days in force (`comm_kpi_items.effective_from` / `effective_to`). */
+export interface KpiItemWindow {
+  effective_from: string;
+  effective_to: string | null;
+}
+
+/**
+ * Whether KPI counted in a month (`YYYY-MM`): the sub-department's own switch, or (2026-11-12) a brand on its own
+ * commission scheme with a KPI item of its own in force on the month's last day — 2990s' upgrades, counted
+ * whatever the switch says. The Arena's own reading of that month (`member_kpi_for_staff`), so a KPI place it
+ * showed is a finish kept.
+ */
+export function kpiCountedIn(month: string, switchOn: boolean, brandItems: readonly KpiItemWindow[]): boolean {
+  if (switchOn) return true;
+  const [year, monthNo] = month.split("-").map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(monthNo)) return false;
+  // Day 0 of the next month is this month's last day.
+  const end = new Date(Date.UTC(year, monthNo, 0)).toISOString().slice(0, 10);
+  return brandItems.some(i => i.effective_from <= end && (i.effective_to === null || i.effective_to >= end));
+}
+
 /** Everybody's finishes of one final month. */
 export function monthFinishes(input: {
   month: string;

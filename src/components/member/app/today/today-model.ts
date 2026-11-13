@@ -217,7 +217,10 @@ function kpiMetric(input: TodayInput): TodayMetric {
   const kpi = input.kpi;
   if (kpi && !kpi.enabled) return { key: "kpi", label: "KPI", value: "—", tag: "Not counted", tagTone: "good" };
   const total = kpi?.total ?? input.insight?.me.kpiQty ?? 0;
-  return { key: "kpi", label: "KPI", value: String(total), tag: kpi?.hit ? "Threshold hit" : "Below threshold", tagTone: "good" };
+  // No ladder to reach (2026-11-12): the sub-department's KPI is off and the units are a brand's own (2990s' upgrades),
+  // or it has no threshold — said as Insight says it, never *Below threshold*.
+  const tag = kpi?.hit ? "Threshold hit" : kpi && kpi.threshold === null ? "No threshold" : "Below threshold";
+  return { key: "kpi", label: "KPI", value: String(total), tag, tagTone: "good" };
 }
 
 function todos(input: TodayInput): TodayTodo[] {

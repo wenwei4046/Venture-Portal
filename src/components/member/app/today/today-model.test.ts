@@ -176,6 +176,14 @@ describe("Sales / Margin / KPI", () => {
     const off = todayModel({ ...base, kpi: { schemeId: "s", period: "2026-10", asOf: "", enabled: false, items: [], total: 0, threshold: null, hit: null } });
     expect(off.metrics[2]).toMatchObject({ value: "—", tag: "Not counted" });
   });
+  it("says No threshold where there is no ladder to reach — a brand's own items alone (2990s, 2026-11-12)", () => {
+    const fabric = { productCode: "2990S · Sofa Full Fabric", label: "Upgrade fabric", quantity: 2, brand: "2990S" };
+    const m = todayModel({ ...base, kpi: { schemeId: "s", period: "2026-10", asOf: "", enabled: true, items: [fabric], total: 2, ladderTotal: 0, threshold: null, hit: null } });
+    expect(m.metrics[2]).toMatchObject({ value: "2", tag: "No threshold" });
+    // A ladder not reached yet still says so.
+    const below = todayModel({ ...base, kpi: { schemeId: "s", period: "2026-10", asOf: "", enabled: true, items: [fabric], total: 2, ladderTotal: 0, threshold: 10, hit: false } });
+    expect(below.metrics[2]).toMatchObject({ value: "2", tag: "Below threshold" });
+  });
 });
 
 describe("Needs your action", () => {

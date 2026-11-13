@@ -87,6 +87,35 @@ describe("Insight › KPI, brand, the order sheet", () => {
     expect(vm).toMatchObject({ total: "3", pill: "7 to go", need: "10 needed for the threshold", above: "7 to go", orderCount: "1 order" });
     expect(vm.orders[0].items).toBe("PILLOW × 3");
   });
+  // 2026-11-12 — a brand on its own commission scheme (2990s) has KPI items of its own: counted whatever the
+  // sub-department's KPI switch says, named by the item (the unit sits on the sofa's line), no part of its ladder.
+  describe("a brand's own items", () => {
+    const sofa = { name: "TELLUC-2A(LHF)", code: "TELLUC-2A(LHF)", qty: 1, amount: 1495, goods: true, kpiQty: 1 };
+    const bills = [order({ id: "1", brand: "2990S", booth: "2990S", revenue: 2990, margin: null, ownScheme: true, kpiQty: 1, lines: [sofa] })];
+    const fabric = { productCode: "2990S · Sofa Full Fabric", label: "Upgrade fabric", quantity: 1, brand: "2990S" };
+    const latex = { productCode: "2990S · Latex Seat", label: "Upgrade latex seat", quantity: 0, brand: "2990S" };
+    const off = { schemeId: "s", period: "2026-09", asOf: "x", enabled: true, items: [fabric, latex], total: 1, ladderTotal: 0, threshold: null, hit: null };
+
+    it("counts them while the sub-department's KPI is off, with no threshold to reach", () => {
+      const vm = kpiView(input({ book: book(bills), kpi: off }), "Fair");
+      expect(vm).toMatchObject({ enabled: true, total: "1", pill: "No threshold", need: "No threshold this month", above: "", hit: false, orderCount: "1 order" });
+      // Named by the item, not by the sofa that carries it.
+      expect(vm.how?.items.map(i => [i.name, i.n])).toEqual([["Upgrade fabric", 1]]);
+      expect(insightMain(input({ book: book(bills), kpi: off })).personal.kpi).toMatchObject({ value: "1", pill: "No threshold", sub: "Upgrade fabric 1" });
+    });
+
+    it("reads the sub-department's threshold against its own units alone", () => {
+      const pillow = { productCode: "PIL", label: "PILLOW", quantity: 3 };
+      // 4 units in all, three of them its own: a threshold of four is one short.
+      const on = { ...off, items: [pillow, fabric, latex], total: 4, ladderTotal: 3, threshold: 4, hit: false };
+      const vm = kpiView(input({ book: book(bills), kpi: on }), "Fair");
+      expect(vm).toMatchObject({ total: "4", pill: "1 to go", above: "1 to go", hit: false });
+      expect(insightMain(input({ book: book(bills), kpi: on })).personal.kpi).toMatchObject({ value: "4", pill: "1 to go · 4 needed" });
+      const reached = { ...on, threshold: 3, hit: true };
+      expect(kpiView(input({ book: book(bills), kpi: reached }), "Fair")).toMatchObject({ pill: "Threshold hit", above: "0 above", hit: true });
+      expect(insightMain(input({ book: book(bills), kpi: reached })).personal.kpi).toMatchObject({ pill: "Hit · 3 needed" });
+    });
+  });
   it("puts the brand page's next tier on the brand's own thresholds", () => {
     const zanotti = brandPage(input(), "ZANOTTI")!;
     expect(zanotti).toMatchObject({ pct: "35.0%", tier: "Incentive Tier 1", nextTitle: "1.0% more to reach Incentive Tier 2", ladderCount: "All 6 margin tiers" });

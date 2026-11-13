@@ -23,7 +23,7 @@ import { fetchByKeys } from "@/lib/paginate";
 import { startRead } from "@/lib/start-read";
 import { loadCommissionInput } from "@/app/(portal)/revenue/_lib/commission-input";
 import { previewWageWindow, scheduleStatutory, statutoryLookup } from "@/app/(portal)/revenue/_lib/pay-preview-before-run";
-import { monthFinishes, type HonourBoard } from "./honours";
+import { kpiCountedIn, monthFinishes, type HonourBoard, type KpiItemWindow } from "./honours";
 import { formFromRow, type WaitingForm } from "@/lib/commission/waiting-form";
 import { SIGNED_FORM_KINDS, WORD_DOC, WORD_DOCX, WORD_MACROS_REFUSAL, letterKind } from "@/lib/commission/waiting-add";
 import { waitingAnswersFrom, type WaitingAnswer } from "./waiting-answers";
@@ -843,7 +843,22 @@ export async function loadMemberHonours(
         const { data: t } = await admin.from("comm_kpi_thresholds").select("min_qty").eq("scheme_id", s.id).order("min_qty").limit(1).maybeSingle();
         threshold = t ? Number((t as { min_qty: number | string }).min_qty) : null;
       }
-      const kpi = { enabled: !!s?.enable_kpi, threshold };
+      // A brand on its own commission scheme has KPI items of its own (2990s, 2026-11-12): KPI counts in the months
+      // one is in force, whatever the sub-department's switch says — as the Arena read those months.
+      let brandItems: KpiItemWindow[] = [];
+      if (s && !s.enable_kpi) {
+        const { data: ownBrands, error: brandError } = await admin.from("comm_brands").select("id")
+          .eq("scheme_id", s.id).eq("own_scheme", true).eq("is_active", true);
+        if (brandError) throw new Error(brandError.message);
+        const brandIds = ((ownBrands ?? []) as { id: string }[]).map(b => b.id);
+        if (brandIds.length) {
+          const { data: items, error: itemError } = await admin.from("comm_kpi_items").select("effective_from, effective_to")
+            .eq("scheme_id", s.id).in("brand_id", brandIds);
+          if (itemError) throw new Error(itemError.message);
+          brandItems = (items ?? []) as KpiItemWindow[];
+        }
+      }
+      const kpiOf = (month: string) => ({ enabled: kpiCountedIn(month, !!s?.enable_kpi, brandItems), threshold });
       const [snapshots, history] = await Promise.all([
         Promise.all(ask.map(month => rpc<MemberArenaSnapshot>(client, principal ? "member_principal_arena_snapshot" : "member_arena_snapshot", {
           p_sub_department: subDepartmentId, p_period: month, p_window: "monthly", ...(principal ? { p_staff: context!.staffId } : {}),
@@ -855,7 +870,7 @@ export async function loadMemberHonours(
       for (const [i, month] of ask.entries()) {
         const snapshot = snapshots[i];
         if (!snapshot || !Array.isArray(snapshot.people) || !snapshot.final) continue;
-        const finishes = monthFinishes({ month, snapshot, history, kpi });
+        const finishes = monthFinishes({ month, snapshot, history, kpi: kpiOf(month) });
         final.add(month);
         if (!finishes.length) empty.add(month);
         // Paid by hand: read afresh every time, never kept.
