@@ -94,15 +94,9 @@ right today only because Vercel runs in UTC with a US locale):
 
 Shipped: two organisers at one place on the same days are two fairs
 (`.claude/rules/revenue/comm-cal.md` › TWO ORGANISERS AT ONE PLACE ARE TWO
-FAIRS). Still owed:
-- **A standing booth has one Arena board, once it closes.** 2990s' booth at
-  Penang Waterfront (29 Oct – 31 Dec) is a brand week every weekend it is open
-  (`revenue-app.md` › A BOOTH IS A BRAND WEEK EVERY WEEKEND IT IS OPEN), but a
-  Fair result is a booth at a COMPLETED fair: nothing until 31 December, then
-  one board for two months. Ranking it weekend by weekend means events per
-  (fair, booth, weekend) in `member_arena_booth_history_for_staff`, each bill
-  in its sale day's weekend — and its two or three sellers a medal every week.
-  Asked 2026-11-14; not built.
+FAIRS), and a standing booth ranked in the Arena weekend by weekend
+(`revenue-app.md` › A BOOTH OPEN SEVERAL WEEKENDS IS RANKED WEEKEND BY
+WEEKEND, 2026-11-14). Still owed:
 - **HR's Brand weeks foot lists a standing booth's unmatched names in its
   first month only.** `member_admin_brand_weeks.unlisted` reads the booths
   OPENING in the month's weekends; *Dexon*, listed at the 2990s booth and

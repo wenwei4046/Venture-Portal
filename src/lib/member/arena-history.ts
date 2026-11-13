@@ -1,7 +1,9 @@
 /**
  * Read-only results from real, explicitly linked Fair calendar events —
  * booth by booth since 2026-10-03 (`member_arena_booth_history`): one event
- * per brand's booth at a fair, holding every bill written there. A seller is
+ * per brand's booth at a fair, holding every bill written there — and since
+ * 2026-11-14 a booth at a fair open several weekends (2990s' standing booth)
+ * one event a weekend, holding the bills sold in it. A seller is
  * on every board they wrote at, and ONE a week scores (user: 你照样上榜，只是
  * 你上榜了没有拿到积分 … 能算积分的只有一个) — their brand week: since
  * 2026-10-12 the booth the Houzs ERP's Sales Attending lists them at, else
@@ -29,7 +31,10 @@ export interface ArenaFairPerson {
 }
 
 export interface ArenaFairEvent {
-  /** `<fair id>|<brand>` — one booth. */
+  /**
+   * `<fair id>|<brand>` — one booth; `<fair id>|<brand>|<Friday>` — one weekend of a booth at a fair open several
+   * (2026-11-14, `member_arena_booth_history_for_staff`: a standing booth is ranked weekend by weekend).
+   */
   id: string;
   venue: string;
   start: string;
@@ -41,7 +46,7 @@ export interface ArenaFairEvent {
   fairId?: string;
   /** Who ran the fair (`comm_organisers`), when the calendar names one. */
   organizer?: string | null;
-  /** The fair weekend — the Friday of the week the fair opens in. */
+  /** The fair weekend — the Friday of the week the fair opens in; of a fair open several weekends, that weekend's. */
   week?: string;
   /** Seven days after its fairs — the day a week closed when brand weeks were picked (before 2026-10-12). */
   closesOn?: string | null;
