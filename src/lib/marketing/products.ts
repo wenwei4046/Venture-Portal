@@ -172,7 +172,7 @@ export function productSections(p: Pick<Product, 'name' | 'code' | 'groups' | 'i
   return [
     { label: 'Basics', done: !!p.name.trim() && !!p.code },
     { label: 'Items', done: items.some(it => it.qty > 0 && !!it.name.trim()) },
-    { label: 'Linked templates', done: !!p.intake && items.length > 0 && items.every(it => !!it.workflow) },
+    { label: 'Linked templates', done: !!p.intake && items.length > 0 },
     { label: 'Pricing', done: (p.price ?? 0) > 0 },
     { label: 'Publish', done: !!p.effectiveFrom },
   ]
@@ -186,26 +186,12 @@ export function productProblems(p: Product, book: Pick<ProductBook, 'workflows' 
   const items = p.groups.flatMap(g => g.items)
   if (p.groups.some(g => !g.name.trim()) || items.some(it => !it.name.trim())) out.push('Name each category and item')
   if (!items.some(it => it.qty > 0 && it.name.trim())) out.push('Add what the product includes')
-  // An action need not run on a published workflow (2026-11-13 — the user: a product publishes on its basics);
-  // `productWarnings` says so, never a refusal.
+  // A workflow is not a must (the user, 2026-11-13) — an item without one makes no task; one linked is published first.
+  if (items.some(it => it.workflow && (book.workflows.find(w => w.id === it.workflow)?.version ?? 0) === 0)) out.push('A linked workflow is not published yet')
   if (!p.intake) out.push('Pick its intake minutes template')
   else if ((book.minutes.find(t => t.id === p.intake)?.version ?? 0) === 0) out.push('Its intake minutes template is not published yet')
   if ((p.price ?? 0) <= 0) out.push('Set its list price')
   if (!p.effectiveFrom) out.push('Pick the day it takes effect')
-  return out
-}
-
-/** What publishing lets through but the builder warns of: an action (of quantity 1 or more) with no workflow, or one
- * whose workflow is not published yet — its work is not made when a project starts (`mkt_product_begin` skips it,
- * telling the owner). */
-export function productWarnings(p: Pick<Product, 'groups' | 'status'>, book: Pick<ProductBook, 'workflows'>): string[] {
-  if (p.status === 'retired') return []
-  const items = p.groups.flatMap(g => g.items).filter(it => it.qty > 0 && it.name.trim())
-  const unlinked = items.filter(it => !it.workflow).length
-  const unpublished = items.filter(it => it.workflow && (book.workflows.find(w => w.id === it.workflow)?.version ?? 0) === 0).length
-  const out: string[] = []
-  if (unlinked) out.push(`${unlinked} item${unlinked === 1 ? '' : 's'} not linked to a workflow — its work is not made`)
-  if (unpublished) out.push(`${unpublished} linked workflow${unpublished === 1 ? ' is' : 's are'} not published yet — its work is not made`)
   return out
 }
 
@@ -254,4 +240,14 @@ export function ringgitOf(typed: string): number | null | undefined {
   if (!/^\d{0,13}(\.\d{0,2})?$/.test(t)) return undefined
   const n = Number(t)
   return Number.isFinite(n) ? n : undefined
+}
+
+/** "Same as above" (the user, 2026-11-13: "link workflow 增加一个 same as 上面的"): the workflow of the nearest item above
+ * `groups[gi].items[ii]` that has one — up its own category, then the categories before it. Null when none has. */
+export function workflowAbove(groups: ProductGroup[], gi: number, ii: number): string | null {
+  for (let g = gi; g >= 0; g--) {
+    const its = groups[g]?.items ?? []
+    for (let i = (g === gi ? ii : its.length) - 1; i >= 0; i--) if (its[i]?.workflow) return its[i].workflow
+  }
+  return null
 }

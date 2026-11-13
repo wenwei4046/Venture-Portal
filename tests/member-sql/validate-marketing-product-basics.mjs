@@ -1,6 +1,5 @@
-// Local PostgreSQL regression for 20261113220000 (2026-11-13 — the user: a product in the Product Builder publishes on
-// its basics — a name, a type, something included, a list price above 0, the day it takes effect; an action need not
-// be linked to a published workflow). Marketing's migrations through the Workflow Builder 2a's engine
+// Local PostgreSQL regression for 20261113220000 (2026-11-13): #1042's rule — an item with no workflow makes no
+// deliverable, the work still starts — kept through the Workflow Builder 2a engine's rewrite of mkt_product_begin. Marketing's migrations through the Workflow Builder 2a's engine
 // (20261113210000) run, then this one, twice. What is under test: publishing with an action unlinked and one linked to
 // a workflow not published (the version keeps `workflow: null` / no workflowVersion); the basics still refused; the
 // work started — only the actions on a published workflow made, numbered over those, the rest on the trail
@@ -142,16 +141,17 @@ const MIGS = ['20261023214100_marketing_core.sql', '20261023234000_marketing_tas
 for (const m of MIGS) await db.exec(await sql(m))
 for (const m of ['20261025211000_marketing_new_drafts.sql', '20261025221000_marketing_task_minutes.sql', '20261025231000_marketing_task_pic.sql',
   '20261025235000_marketing_task_pic_stage.sql', '20261113200000_marketing_wf_builder_v2.sql']) await db.exec(await sql(m))
+// #1042 (applied to production first): an item's workflow is optional.
+await db.exec(await sql('20261113160000_marketing_product_wf_optional.sql'))
 await db.exec(await sql('20261113210000_marketing_wf_engine_v2.sql'))
-// The body this migration swaps in: mkt_product_groups is production's (md5 b42bba32…, the same as its migration copy).
-check(await peek1(`SELECT md5(prosrc) FROM pg_proc WHERE proname = 'mkt_product_groups'`), 'b42bba32449b01a686b548e44d457488',
-  'mkt_product_groups is production’s body before the swap')
-const mine = await sql('20261113220000_marketing_product_publish_basics.sql')
+check((await peek1(`SELECT prosrc FROM pg_proc WHERE proname = 'mkt_product_begin'`)).includes("coalesce(v_it ->> 'workflow', '') = ''"), false,
+  'the engine rewrote mkt_product_begin whole — #1042\'s rule is gone until this migration')
+const mine = await sql('20261113220000_marketing_product_begin_unlinked.sql')
 await db.exec(mine)
 await db.exec(mine) // twice: nothing changes, nothing breaks
 const src = async fn => peek1(`SELECT prosrc FROM pg_proc WHERE proname = $1`, [fn])
-check([(await src('mkt_product_groups')).includes('link a workflow'), (await src('mkt_product_begin')).includes('v_skip')], [false, true],
-  'the swaps are in')
+check([(await src('mkt_product_groups')).includes('A workflow is not a must'), (await src('mkt_product_begin')).includes('v_skip')], [true, true],
+  '#1042\'s publishing stands; the begin swaps are in')
 
 // ── A workflow published, one not; the intake ─────────────────────────────────────────────────────────────
 const TODAY = await peek1(`SELECT ((now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::text`)
@@ -180,15 +180,14 @@ const GROUPS = [{ name: 'Design', items: [
   { name: 'Poster', qty: 1, price: 200 },
   { name: 'Reel', qty: 3, price: 100, workflow: draftWf.id }] }]
 const one1 = await product('one', GROUPS)
-const pub = await one(`SELECT public.mkt_product_publish($1, $2)`, [one1.id, one1.rev])
-check(pub.version, 1, 'published with an action unlinked and one on a workflow not published')
+await refuses(`SELECT public.mkt_product_publish($1, $2)`, [one1.id, one1.rev], /its workflow is not published yet/, 'a LINKED workflow is published first (#1042)')
+const one1b = (await one(`SELECT public.mkt_product_save($1, $2, $3::jsonb)`, [one1.id, one1.rev,
+  JSON.stringify({ groups: [{ name: 'Design', items: [GROUPS[0].items[0], GROUPS[0].items[1], { name: 'Reel', qty: 3, price: 100 }] }] })])).rev
+const pub = await one(`SELECT public.mkt_product_publish($1, $2)`, [one1.id, one1b])
+check(pub.version, 1, 'published with two items unlinked')
 const items = (await peek(`SELECT groups FROM public.mkt_product_versions WHERE product_id = $1 AND version = 1`, [one1.id]))[0].groups[0].items
 check(items.map(it => [it.name, it.workflow ?? 'none', it.workflowVersion ?? 'none']),
-  [['Image post', cat.id, 1], ['Poster', 'none', 'none'], ['Reel', draftWf.id, 'none']],
-  'the version keeps workflow: null for the unlinked action, and no workflowVersion for the unpublished one')
-check([Object.prototype.hasOwnProperty.call(items[1], 'workflow'), items[1].workflow], [true, null], '…the null key itself kept')
-check(Object.prototype.hasOwnProperty.call((await peek(`SELECT groups FROM public.mkt_products WHERE id = $1`, [one1.id]))[0].groups[0].items[1], 'workflow'),
-  false, 'a draft save stores no null workflow key (as before)')
+  [['Image post', cat.id, 1], ['Poster', 'none', 'none'], ['Reel', 'none', 'none']], 'the version: a workflow only where linked')
 // The basics are still asked.
 const bare = await product('one', [{ name: 'Design', items: [{ name: 'Poster', qty: 0, price: 1 }] }])
 await refuses(`SELECT public.mkt_product_publish($1, $2)`, [bare.id, bare.rev], /Add what the product includes/, 'something included, still')
@@ -229,18 +228,17 @@ check(trail.map(e => [e.action, e.reason, e.data]), [
   ['work started', null, { deliverables: 2, notMade: ['Poster', 'Reel ×3'] }],
   ['not made', 'Poster, Reel ×3 — no workflow linked', { notMade: ['Poster', 'Reel ×3'] }]], 'the trail says what was not made')
 check(await peek(`SELECT title, body FROM public.app_notifications WHERE user_id = $1`, [U.josiah]),
-  [{ title: 'Not made: 2 actions with no workflow', body: `${track} · Poster, Reel ×3` }], 'the owner is told')
+  [{ title: 'Not made: 2 items with no workflow', body: `${track} · Poster, Reel ×3` }], 'the owner is told')
 await refuses(`SELECT public.mkt_product_begin($1)`, [P], /Its work has started already/, 'never twice')
 
-// Nothing on a published workflow: the work is refused, nothing made.
+// Nothing linked at all: the work still starts and makes nothing (#1042).
 const P2 = await start(bare.id)
 await as(U.josiah, MANAGER)
-await refuses(`SELECT public.mkt_product_begin($1)`, [P2], /Nothing on v1 of this product runs on a published workflow yet/, 'nothing to make: refused')
-check([await peek1(`SELECT count(*)::int FROM public.mkt_projects WHERE parent_id = $1`, [P2]), await peek1(`SELECT status FROM public.mkt_projects WHERE id = $1`, [P2])],
-  [0, 'approved'], '…nothing made, the project still approved')
+check((await one(`SELECT public.mkt_product_begin($1)`, [P2])).deliverables, 0, 'nothing linked: the work starts, nothing made (#1042)')
+check(await peek1(`SELECT status FROM public.mkt_projects WHERE id = $1`, [P2]), 'active', '…the project under way')
 
 // ── A recurring product: its next month is made from the month before ─────────────────────────────────────
-const rec = await product('recurring', GROUPS)
+const rec = await product('recurring', [{ name: 'Design', items: [GROUPS[0].items[0], GROUPS[0].items[1], { name: 'Reel', qty: 3, price: 100 }] }])
 await one(`SELECT public.mkt_product_publish($1, $2)`, [rec.id, rec.rev])
 const R = await start(rec.id)
 await as(U.josiah, MANAGER)

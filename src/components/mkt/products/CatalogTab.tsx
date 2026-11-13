@@ -5,6 +5,7 @@ import { deleteMktItem, deleteMktItemColumn, orderMktItemColumns, renameMktCatal
 import { catalogues, COLUMN_KINDS, itemPatch, norm, usedIn, type CatalogItem, type ColumnKind, type ExtraValue, type ItemColumn } from '@/lib/marketing/catalog'
 import ColumnEditor from './ColumnEditor'
 import ColumnKindMenu from './ColumnKindMenu'
+import ColumnMenu from './ColumnMenu'
 import ExtraCell from './ExtraCell'
 import type { ProductBook, ProductWorkflowOption } from '@/lib/marketing/products'
 import type { QuoteBook } from '@/lib/marketing/quotes'
@@ -43,12 +44,18 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
   const [catTyped, setCatTyped] = useState<Record<number, string>>({})
   const [editing, setEditing] = useState<{ id: string; at: { left: number; top: number; above?: number } } | null>(null)
   const [busy, setBusy] = useState(false)
+  // A column head right-clicked (its menu), and one being dragged to a new place (the user, 2026-11-13).
+  const [colMenu, setColMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [dragCol, setDragCol] = useState<{ id: string; over: string | null } | null>(null)
   const [adding, setAdding] = useState<{ el: HTMLElement; at: { left: number; top: number; above?: number } } | null>(null)
   const saved = useRef(new Map<string, CatalogItem>(items.map(i => [i.id, i])))
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const chains = useRef(new Map<string, Promise<void>>())
   const live = useRef(items)
   live.current = items
+  // What the Save button says (the user, 2026-11-13: "在右上角要放一个储存的按钮"): a change waiting or on its way, or all kept.
+  const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving'>('saved')
+  const settle = () => setSaveState(timers.current.size ? 'unsaved' : pending.current ? 'saving' : 'saved')
 
   const flushItem = (id: string) => {
     const t = timers.current.get(id)
@@ -61,9 +68,11 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
       const patch = itemPatch(before, now)
       if (!patch) return
       pending.current++
-      const r = await saveMktItem(id, patch).finally(() => { pending.current-- })
+      setSaveState('saving')
+      const r = await saveMktItem(id, patch).finally(() => { pending.current--; settle() })
       if (!r.ok) {
         flash(r.reason)
+        setSaveState('unsaved')
         return
       }
       saved.current.set(id, now)
@@ -101,6 +110,15 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     const t = timers.current.get(id)
     if (t) clearTimeout(t)
     timers.current.set(id, setTimeout(() => flushItem(id), 700))
+    setSaveState('unsaved')
+  }
+
+  /** Save: whatever waits goes now; told once it is all kept. */
+  const saveAll = async () => {
+    for (const id of [...timers.current.keys()]) flushItem(id)
+    await Promise.all([...chains.current.values()])
+    settle()
+    if (!timers.current.size && !pending.current) flash('Product List saved')
   }
 
   const addInCat = async (cat: string) => {
@@ -191,19 +209,34 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
       }
     }
   }
+  const orderColumns = async (next: ItemColumn[]) => {
+    const before = columns
+    setColumns(() => next)
+    setEditing(null)
+    const r = await orderMktItemColumns(next.map(c => c.id))
+    if (!r.ok) {
+      setColumns(() => before)
+      flash(r.reason)
+    }
+  }
   const moveColumn = async (id: string, by: -1 | 1) => {
     const i = columns.findIndex(c => c.id === id)
     const j = i + by
     if (i < 0 || j < 0 || j >= columns.length) return
     const next = [...columns]
     ;[next[i], next[j]] = [next[j], next[i]]
-    setColumns(() => next)
-    setEditing(null)
-    const r = await orderMktItemColumns(next.map(c => c.id))
-    if (!r.ok) {
-      setColumns(() => columns)
-      flash(r.reason)
-    }
+    await orderColumns(next)
+  }
+  /** A column dropped on another: it takes that one's place. */
+  const dropColumn = (id: string, onto: string) => {
+    if (id === onto) return
+    const next = columns.filter(c => c.id !== id)
+    const moved = columns.find(c => c.id === id)
+    const at = next.findIndex(c => c.id === onto)
+    if (!moved || at < 0) return
+    const from = columns.findIndex(c => c.id === id)
+    next.splice(from < columns.findIndex(c => c.id === onto) ? at + 1 : at, 0, moved)
+    void orderColumns(next)
   }
   const removeColumn = async (c: ItemColumn) => {
     setEditing(null)
@@ -257,6 +290,9 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
         <span className={qs.grow} />
         <input className={qs.search} value={q} onChange={e => setQ(e.target.value)} placeholder="Search items" aria-label="Search items" />
         <button type="button" className={qs.primary} onClick={() => void addInCat(filter !== 'All' ? filter : cats[0] || 'Other')}>+ New item</button>
+        <button type="button" className={`${qs.ghost} ${qs.saveBtn}`} disabled={saveState !== 'unsaved'} onClick={() => void saveAll()} aria-live="polite">
+          {saveState === 'saving' ? 'Saving…' : saveState === 'unsaved' ? 'Save' : 'Saved ✓'}
+        </button>
       </div>
       <div className={qs.note}>The menu every product and quotation picks its items from. An item typed into a product or a quotation is added here, and renaming an item here renames it everywhere.</div>
       <div className={qs.cats}>
@@ -278,7 +314,14 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
               <div className={`${qs.cRow} ${qs.cHead}`} style={grid}>
                 <span>Item</span><span>Description</span><span>Price</span><span>Cost 🔒</span><span>Est. days</span><span>Workflow</span><span>Remarks</span>
                 {columns.map(c => (
-                  <button key={c.id} type="button" className={qs.colHead} title={columnTitle(c)} aria-haspopup="dialog" aria-expanded={editing?.id === c.id}
+                  <button key={c.id} type="button" title={columnTitle(c)} aria-haspopup="dialog" aria-expanded={editing?.id === c.id}
+                    className={`${qs.colHead}${dragCol?.id === c.id ? ` ${qs.colDragging}` : ''}${dragCol && dragCol.over === c.id && dragCol.id !== c.id ? ` ${columns.findIndex(y => y.id === dragCol.id) < columns.findIndex(y => y.id === c.id) ? qs.colDropAfter : qs.colDropAt}` : ''}`}
+                    draggable
+                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); setEditing(null); setDragCol({ id: c.id, over: null }) }}
+                    onDragOver={e => { if (!dragCol) return; e.preventDefault(); if (dragCol.over !== c.id) setDragCol({ ...dragCol, over: c.id }) }}
+                    onDrop={e => { e.preventDefault(); if (dragCol) dropColumn(dragCol.id, c.id); setDragCol(null) }}
+                    onDragEnd={() => setDragCol(null)}
+                    onContextMenu={e => { e.preventDefault(); setEditing(null); setAdding(null); setColMenu({ id: c.id, x: e.clientX, y: e.clientY }) }}
                     onClick={e => openEditor(c.id, e.currentTarget)}>
                     <span className={qs.colHeadName}>{c.name}</span>
                   </button>
@@ -287,7 +330,10 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
                   aria-haspopup="menu" aria-expanded={!!adding}
                   onClick={e => { const el = e.currentTarget; setEditing(null); setAdding(cur => (cur ? null : { el, at: placeUnder(el) })) }}>+</button>
               </div>
-              {g.rows.map(x => {
+              {g.rows.map((x, xi) => {
+                // "Same as above" (the user, 2026-11-13): the nearest row above in this catalogue with a workflow.
+                const above = g.rows.slice(0, xi).reverse().find(r => r.wf)?.wf ?? null
+                const aboveWf = above && above !== x.wf ? workflows.find(w => w.id === above) ?? null : null
                 const u = usedIn(x, products, quotes)
                 return (
                   <div key={x.id} className={qs.cRow} style={grid} onBlur={() => { if (timers.current.has(x.id)) flushItem(x.id) }}>
@@ -316,8 +362,9 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
                       <span className={qs.rm}>d</span>
                     </span>
                     <span style={{ display: 'flex', minWidth: 0 }}>
-                      <select className={`${qs.cellSel}${x.wf ? '' : ` ${qs.cellSelMiss}`}`} value={x.wf ?? ''} aria-label="Workflow" onChange={e => setItem(x.id, { wf: e.target.value || null })}>
-                        <option value="">Link a workflow…</option>
+                      <select className={qs.cellSel} value={x.wf ?? ''} aria-label="Workflow" onChange={e => setItem(x.id, { wf: e.target.value === '__above' ? above : e.target.value || null })}>
+                        <option value="">{x.wf ? 'No workflow' : 'Link a workflow…'}</option>
+                        {aboveWf ? <option value="__above">↑ Same as above · {wfLabel(aboveWf)}</option> : null}
                         {workflows.map(w => <option key={w.id} value={w.id}>{wfLabel(w)}</option>)}
                       </select>
                     </span>
@@ -340,6 +387,23 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
           <button type="button" className={`${qs.newCatBtn}${catNew.trim() ? '' : ` ${qs.faded}`}`} onClick={addCatalogue}>+ Add catalogue</button>
         </div>
       </div>
+      {colMenu && columns.some(c => c.id === colMenu.id) ? (() => {
+        const c = columns.find(x => x.id === colMenu.id) as ItemColumn
+        return (
+          <ColumnMenu
+            column={c}
+            used={items.filter(x => x.extra[c.id] !== undefined).length}
+            x={colMenu.x}
+            y={colMenu.y}
+            first={columns[0]?.id === c.id}
+            last={columns[columns.length - 1]?.id === c.id}
+            onSettings={() => { setColMenu(null); setEditing({ id: c.id, at: { left: colMenu.x, top: colMenu.y + 4 } }) }}
+            onMove={by => { setColMenu(null); void moveColumn(c.id, by) }}
+            onDelete={() => { setColMenu(null); void removeColumn(c) }}
+            onClose={() => setColMenu(null)}
+          />
+        )
+      })() : null}
       {adding ? <ColumnKindMenu at={adding.at} anchor={adding.el} onPick={k => void addColumn(adding.el, k)} onClose={() => setAdding(null)} /> : null}
       {editCol && editing ? (
         <ColumnEditor

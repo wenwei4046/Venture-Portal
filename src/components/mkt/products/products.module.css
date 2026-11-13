@@ -136,7 +136,6 @@
 .pubFoot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
 .pubNote { font-size: .84em; color: rgb(var(--mk-text-2)); }
 .pubNoteBad { font-size: .84em; color: rgb(var(--mk-red)); }
-.pubWarn { font-size: .84em; color: rgb(var(--mk-warn-ink)); }
 
 .toast { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 300; padding: 10px 16px; border-radius: 8px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); font-size: 13px; animation: mkIn .2s ease-out; }
 
@@ -166,7 +165,8 @@
 .ctxLine { height: 1px; background: rgb(var(--mk-line-4)); margin: 4px 0; }
 
 /* 2 · Items — one table for every category */
-.iRow { display: grid; grid-template-columns: minmax(180px, 1.5fr) minmax(210px, 1.4fr) 52px 92px 112px 96px 28px; gap: 10px; align-items: center; padding: 0 16px; min-width: 840px; box-sizing: content-box; }
+/* The workflow's own room (the user, 2026-11-13: "workflow link 按钮被压缩了") — never under 260px; the table scrolls first. */
+.iRow { display: grid; grid-template-columns: minmax(170px, 1.3fr) minmax(260px, 1.6fr) 52px 92px 112px 96px 28px; gap: 10px; align-items: center; padding: 0 16px; min-width: 880px; box-sizing: content-box; }
 .iHead { height: 36px; border-bottom: 1px solid rgb(var(--mk-line-2)); font-size: .7em; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgb(var(--mk-muted)); }
 .iCat { height: 40px; background: rgb(var(--mk-surface)); border-bottom: 1px solid rgb(var(--mk-line-4)); }
 .iCatName { display: flex; align-items: center; gap: 8px; min-width: 0; grid-column: 1 / span 5; }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  accountLabel, editOfProduct, groupsPayload, includedText, itemsSum, margin, newGroup, productBookFromRow, productPatch, productProblems, productSections, productWarnings, ringgitOf,
+  accountLabel, editOfProduct, groupsPayload, includedText, itemsSum, margin, newGroup, productBookFromRow, productPatch, productProblems, productSections, ringgitOf, workflowAbove,
   type Product,
 } from './products'
 
@@ -78,30 +78,12 @@ describe('the five sections and publishing', () => {
   })
 
   it('refuses what the database would', () => {
+    expect(productProblems(p, book)).toEqual(['A linked workflow is not published yet'])
     const published = { ...book, workflows: book.workflows.map(w => ({ ...w, version: 1 })) }
     expect(productProblems(p, published)).toEqual([])
+    expect(productProblems({ ...p, groups: [{ ...p.groups[0], items: [{ ...p.groups[0].items[0], workflow: null }] }] }, published)).toEqual([])
     expect(productProblems({ ...p, intake: null, price: 0, effectiveFrom: null }, published)).toEqual(['Pick its intake minutes template', 'Set its list price', 'Pick the day it takes effect'])
     expect(productProblems({ ...p, status: 'retired' }, published)).toEqual(['A retired product is read-only — reactivate it first'])
-  })
-
-  // 2026-11-13 — the user: a product publishes on its basics (a name, a type, something included, a price, the day);
-  // an action with no workflow, or one not published yet, is a warning — mkt_product_begin does not make its work.
-  it('publishes on its basics: an action unlinked or on an unpublished workflow is warned of, never refused', () => {
-    const unlinked: Product = { ...p, groups: [{ ...p.groups[0], items: [{ ...p.groups[0].items[0], workflow: null }, p.groups[0].items[1]] }, p.groups[1]] }
-    expect(productProblems(p, book)).toEqual([])
-    expect(productProblems(unlinked, book)).toEqual([])
-    expect(productWarnings(p, book)).toEqual(['1 linked workflow is not published yet — its work is not made'])
-    expect(productWarnings(unlinked, book)).toEqual(['1 item not linked to a workflow — its work is not made',
-      '1 linked workflow is not published yet — its work is not made'])
-    const published = { ...book, workflows: book.workflows.map(w => ({ ...w, version: 1 })) }
-    expect(productWarnings(p, published)).toEqual([])
-    // An action of quantity 0 (Banners) or with no name makes nothing: no warning for it.
-    const none: Product = { ...p, groups: [{ key: 'g', name: 'X', items: [{ key: 'a', name: 'Banners', qty: 0, price: 1, workflow: null }, { key: 'b', name: ' ', qty: 2, price: 1, workflow: null }] }] }
-    expect(productWarnings(none, published)).toEqual([])
-    expect(productWarnings({ ...unlinked, status: 'retired' }, book)).toEqual([])
-    // Still refused: the basics, and the intake (a project starts with its intake meeting).
-    const bare: Product = { ...unlinked, name: '', groups: [], price: null, intake: null }
-    expect(productProblems(bare, book)).toEqual(['Name the product', 'Add what the product includes', 'Pick its intake minutes template', 'Set its list price'])
   })
 })
 
@@ -117,5 +99,26 @@ describe('only what changed is saved', () => {
     const groups = [...saved.groups, newGroup('Ads')]
     expect(productPatch(saved, { ...saved, groups })).toEqual({ groups: groupsPayload(groups) })
     expect(groupsPayload([newGroup(' Ads ')])).toEqual([{ name: 'Ads', items: [{ name: '', qty: 1, price: null, workflow: null }] }])
+  })
+})
+
+describe('a workflow is not a must (2026-11-13)', () => {
+  const it2 = (key: string, workflow: string | null) => ({ key, name: key, qty: 1, price: null, workflow })
+  it('publishes an item with no workflow; a linked one must still be published', () => {
+    const p = { status: 'draft', name: 'A', groups: [{ key: 'g', name: 'G', items: [it2('x', null), it2('y', 'w1')] }], intake: 'm', price: 10, effectiveFrom: '2026-11-13' }
+    const book = { workflows: [{ id: 'w1', action: 'A', tname: 'S', version: 0, stages: 1, days: 1, pic: 0 }], minutes: [{ id: 'm', name: 'K', version: 1, fields: 1 }] }
+    expect(productProblems(p as never, book)).toEqual(['A linked workflow is not published yet'])
+    expect(productProblems(p as never, { ...book, workflows: [{ ...book.workflows[0], version: 1 }] })).toEqual([])
+  })
+  it('"Same as above" is the nearest item above with a workflow, across categories', () => {
+    const groups = [
+      { key: 'a', name: 'A', items: [it2('a1', 'w1'), it2('a2', null)] },
+      { key: 'b', name: 'B', items: [it2('b1', null), it2('b2', 'w2'), it2('b3', null)] },
+    ]
+    expect(workflowAbove(groups, 0, 0)).toBeNull()
+    expect(workflowAbove(groups, 0, 1)).toBe('w1')
+    expect(workflowAbove(groups, 1, 0)).toBe('w1')
+    expect(workflowAbove(groups, 1, 2)).toBe('w2')
+    expect(workflowAbove(groups, 1, 3)).toBe('w2')
   })
 })
