@@ -245,18 +245,34 @@ describe('a task’s link for its stages alone', () => {
     work: [{ id: 't1', title: 'Raya visual', status: 'active', stages: 2, done: 0,
       stage: { idx: 0, name: 'Design', status: 'review', ver: 1, waiting: true, note: 'Check the logo size', fields: [], links: [] }, last: null }] })
 
-  it('no minutes card: the stage waiting for them, its answer — the task started, its work', () => {
+  // 2026-11-13 — Workflow Builder 2a: a task's own link is the prototype's simpler page (max 720px): the stage's PIC
+  // words with Approve / Request changes while it waits for them, the steps, "Expected by", the fields they may see.
+  it('the simpler page: the stage’s words, its answer, the steps — no minutes card, no staff names', async () => {
     render(<PicPage code={CODE} initial={task()} />)
-    expect(screen.getByText('Carres · Quick task')).toBeTruthy()
     expect(screen.queryByRole('region', { name: 'Meeting minutes' })).toBeNull()
-    const item = screen.getByLabelText('Raya visual', { selector: 'div' })
-    expect(within(item).getByText('Design · version 1')).toBeTruthy()
-    expect(within(item).getByRole('button', { name: 'Approve' })).toBeTruthy()
-    const progress = screen.getByRole('region', { name: 'Progress' })
-    expect(progress.textContent).toContain('Started')
-    expect(progress.textContent).toContain('0 of 1 done · 1 waiting for you')
-    expect(progress.textContent).not.toContain('Minutes')
+    expect(screen.getByText('Houzs Marketing · tracking link for Carres')).toBeTruthy()
+    const status = screen.getByTestId('pic-status')
+    expect(within(status).getByText('Your approval is needed')).toBeTruthy()
+    expect(within(status).getByText('Check the logo size. Approve, or tell us what to change.')).toBeTruthy()
+    expect(screen.getByText('Design').className).toMatch(/picStepCur/)
+    expect(screen.getByText('Step 2')).toBeTruthy()
+    fireEvent.click(within(status).getByRole('button', { name: 'Approve' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Full name' }), { target: { value: 'Kelvin Tan' } })
+    answerPicStage.mockResolvedValue({ ok: true, page: task() })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm approval' }))
+    })
+    expect(answerPicStage).toHaveBeenCalledWith(CODE, 't1', 1, 'approve', 'Kelvin Tan', '')
   })
+  it('not theirs yet: the stage’s words and when to expect it, no answer', () => {
+    const t = task()
+    t.work[0] = { ...t.work[0], dueOn: '2026-11-20', stage: { ...t.work[0].stage!, waiting: false, status: 'accepted' } }
+    render(<PicPage code={CODE} initial={t} />)
+    expect(screen.getByText('Check the logo size')).toBeTruthy()
+    expect(screen.getByText('Expected by 20 Nov')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+  })
+
 })
 
 // 2026-10-25 — ⑤-3b: the Ads reports the Ads person published (the user's answer 57), on the PIC's link — the handoff's

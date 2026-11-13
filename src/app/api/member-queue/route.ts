@@ -62,6 +62,12 @@ export async function GET(request: Request) {
     const adsDue = await db.rpc('mkt_ads_due')
     if (adsDue.error) console.error('Marketing Ads reports due failed', adsDue.error.code ?? 'unknown')
     else if (adsDue.data) console.info('Marketing Ads reports due told', adsDue.data)
+    // A running task's stage late by its template's rule (mig 20261113210000 — the Workflow Builder 2a's ⏰ When a stage is
+    // late): its people told once, or once a day when the rule repeats, from 9:00 the office's time, a line on its trail —
+    // then sent by the flush below. A count only.
+    const overdue = await db.rpc('mkt_overdue_sweep')
+    if (overdue.error) console.error('Marketing overdue stages failed', overdue.error.code ?? 'unknown')
+    else if (overdue.data) console.info('Marketing overdue stages told', overdue.data)
     // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())

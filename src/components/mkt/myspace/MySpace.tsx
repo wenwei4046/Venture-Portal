@@ -366,9 +366,10 @@ export default function MySpace(p: MySpaceProps) {
           onExercise={() => void care('workout')} />
       ),
     },
-    turn: { body: <TaskTile column={col('turn')} wide={wide('turn')} canAccept={p.canEdit} /> },
-    waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} canAccept={p.canEdit} />, red: col('waiting').anyRed },
-    delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} canAccept={p.canEdit} /> },
+    // The tile goes red with a late card (the Workflow Builder 2a handoff, step 3).
+    turn: { body: <TaskTile column={col('turn')} wide={wide('turn')} />, red: col('turn').anyRed },
+    waiting: { body: <TaskTile column={col('waiting')} wide={wide('waiting')} />, red: col('waiting').anyRed },
+    delegated: { body: <TaskTile column={col('delegated')} wide={wide('delegated')} /> },
     trophies: { body: <TrophiesTile stats={stats} /> },
     lobby: {
       bare: true,

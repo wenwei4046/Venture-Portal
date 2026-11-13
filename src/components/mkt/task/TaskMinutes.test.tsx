@@ -12,6 +12,9 @@ const actions = vi.hoisted(() => ({
   sendMktTaskMinutes: vi.fn(), resendMktTask: vi.fn(), overrideMktTask: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
+// The task page's own writes since the Workflow Builder 2a (⇄ Reassign, a table's columns and rows).
+const taskActions = vi.hoisted(() => ({ reassignMktStage: vi.fn(), addMktTaskColumn: vi.fn(), removeMktTaskColumn: vi.fn(), saveMktTable: vi.fn() }))
+vi.mock('@/lib/marketing/task-actions', () => taskActions)
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ storage: { from: () => ({}) } }) }))
 vi.mock('@/lib/storage/browser', () => ({ fileRoute: (b: string, p: string) => `/files/${b}/${p}` }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
@@ -100,6 +103,8 @@ describe('a task’s meeting minutes on its page', () => {
     expect((screen.getByRole('textbox', { name: 'Agenda' }) as HTMLTextAreaElement).readOnly).toBe(false)
     m.unmount()
     render(<TaskPage initial={page(RACHEL, { status: 'completed', locked: true })} can={ALL} />)
+    // Completed: one line in 📋 Requirements until opened (Workflow Builder 2a).
+    fireEvent.click(screen.getByRole('button', { name: /Requirements/ }))
     expect((screen.getByRole('textbox', { name: 'Agenda' }) as HTMLTextAreaElement).readOnly).toBe(true)
     expect(screen.getByText('Complete · locked')).toBeTruthy()
   })
@@ -211,8 +216,12 @@ describe('the PIC approving a task’s minutes', () => {
   it('approved: the work under way, whose approval it was', () => {
     render(<TaskPage initial={waiting(SITI, 'active', { reply: { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-26T02:00:00Z', pic: 1 } },
       { ...SIGNED, status: 'completed', locked: true, completedAt: '2026-10-26T02:00:00Z' })} can={STAFF} />)
+    // Completed minutes sit in 📋 Requirements, one line until opened (Workflow Builder 2a).
+    fireEvent.click(screen.getByRole('button', { name: /Requirements/ }))
     expect(screen.getByText('Approved by Kelvin Tan via link · locked')).toBeTruthy()
     expect(screen.getByText(/^Approved by Kelvin Tan via link · 26 Oct/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Accept' })).toBeTruthy()
+    // No Accept: the stage is Siti's to work as soon as it opens.
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Submit Design' })).toBeTruthy()
   })
 })

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div onClick="{{ closeMenus }}" style="display:flex;flex-direction:column;color:rgb(51 36 27);font-size:13px">
+  <div style="display:flex;align-items:center;gap:10px;padding:16px 18px 12px">
+    <span style="width:24px;height:24px;border-radius:50%;background:rgb(51 36 27);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ n }}</span>
+    <span style="flex:1;min-width:0;font-weight:600;font-size:1.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ name }}</span>
+    <span onClick="{{ moveUp }}" title="Move earlier" style="width:26px;height:26px;border-radius:6px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;opacity:{{ upOp }}" style-hover="background:rgb(246 244 240)">◀</span>
+    <span onClick="{{ moveDown }}" title="Move later" style="width:26px;height:26px;border-radius:6px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;opacity:{{ downOp }}" style-hover="background:rgb(246 244 240)">▶</span>
+    <span onClick="{{ onRemove }}" style="font-size:0.84em;color:rgb(176 40 34);cursor:pointer;margin-left:4px">Remove</span>
+  </div>
+
+  <sc-if value="{{ isTabs }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;gap:2px;margin:0 18px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.onClick }}" style="flex:1;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;background:{{ t.bg }};box-shadow:{{ t.shadow }};font-weight:{{ t.weight }};font-size:0.88em;white-space:nowrap">{{ t.label }}<sc-if value="{{ t.warn }}"><span style="width:6px;height:6px;border-radius:50%;background:rgb(200 52 42)"></span></sc-if></div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <div style="display:flex;flex-direction:column;padding:6px 0 24px">
+
+    <sc-if value="{{ isAcc }}"><div onClick="{{ sec.basics.onClick }}" style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid rgb(240 236 230);cursor:pointer" style-hover="background:rgb(250 248 244)">
+      <span style="font-weight:600;font-size:0.92em;width:92px">Basics</span>
+      <span style="flex:1;min-width:0;font-size:0.86em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sec.basics.summary }}</span>
+      <span style="font-size:9px;color:rgb(117 100 86)">{{ sec.basics.caret }}</span>
+    </div></sc-if>
+    <sc-if value="{{ sec.basics.open }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;gap:16px;padding:12px 18px 18px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:0.92em;font-weight:600">Stage name</span>
+        <input value="{{ name }}" onChange="{{ onName }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;outline:none;color:rgb(51 36 27)" style-focus="border-color:rgb(150 136 120)">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:0.92em;font-weight:600">Group</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="5"><span onClick="{{ g.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.86em;border:1px solid {{ g.border }};background:{{ g.bg }};color:{{ g.fg }}"><span style="width:8px;height:8px;border-radius:50%;background:{{ g.dot }}"></span>{{ g.label }}</span></sc-for>
+          <sc-if value="{{ addingGroup }}"><input autoFocus="{{ true }}" value="{{ groupDraft }}" onChange="{{ onGroupDraft }}" onKeyDown="{{ onGroupKey }}" onBlur="{{ onGroupBlur }}" placeholder="Group name, Enter" style="height:28px;width:140px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:7px;padding:0 9px;font:inherit;font-size:0.86em;outline:none;color:rgb(51 36 27)"></sc-if>
+          <sc-if value="{{ notAddingGroup }}"><span onClick="{{ startGroup }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;font-size:0.86em;border:1.5px dashed rgb(214 204 190);color:rgb(117 100 86)" style-hover="color:rgb(51 36 27);background:rgb(250 248 244)">+ New group</span></sc-if>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:0.92em;font-weight:600">How long?</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:8px;height:34px">
+            <span onClick="{{ slaDown }}" style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(246 244 240)">−</span>
+            <span style="min-width:34px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px">{{ sla }}</span>
+            <span onClick="{{ slaUp }}" style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(246 244 240)">+</span>
+          </div>
+          <span style="font-size:0.88em;color:rgb(117 100 86)">working days · {{ span }}</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <span style="font-size:0.92em;font-weight:600">Can be split into subtasks</span>
+          <span style="font-size:0.82em;color:{{ splitHintFg }}">{{ splitHint }}</span>
+        </div>
+        <div onClick="{{ toggleSplit }}" style="width:36px;height:20px;flex:none;border-radius:10px;background:{{ splitTrack }};position:relative;cursor:{{ splitCursor }};opacity:{{ splitOp }};transition:background-color .2s"><span style="position:absolute;top:2px;left:{{ splitKnob }}px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></div>
+      </div>
+    </div></sc-if>
+
+    <sc-if value="{{ isAcc }}"><div onClick="{{ sec.who.onClick }}" style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid rgb(240 236 230);cursor:pointer" style-hover="background:rgb(250 248 244)">
+      <span style="font-weight:600;font-size:0.92em;width:92px">Who does it</span>
+      <span style="flex:1;min-width:0;font-size:0.86em;color:{{ sec.who.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sec.who.summary }}</span>
+      <span style="font-size:9px;color:rgb(117 100 86)">{{ sec.who.caret }}</span>
+    </div></sc-if>
+    <sc-if value="{{ sec.who.open }}"><div style="display:flex;flex-direction:column;gap:10px;padding:12px 18px 18px">
+      <sc-for list="{{ whoCards }}" as="c" hint-placeholder-count="2">
+        <div onClick="{{ c.onClick }}" style="display:flex;gap:10px;padding:11px 12px;border-radius:10px;border:1.5px solid {{ c.border }};background:{{ c.bg }};cursor:{{ c.cursor }};opacity:{{ c.op }}">
+          <span style="width:16px;height:16px;flex:none;margin-top:1px;border-radius:50%;box-sizing:border-box;border:{{ c.radio }};background:#fff"></span>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+            <span style="font-weight:600;font-size:0.92em">{{ c.icon }} {{ c.title }}</span>
+            <span style="font-size:0.84em;color:rgb(74 64 58);text-wrap:pretty">{{ c.text }}</span>
+            <sc-if value="{{ c.hasWhy }}"><span style="font-size:0.8em;color:rgb(138 92 10)">{{ c.why }}</span></sc-if>
+          </div>
+        </div>
+      </sc-for>
+      <sc-if value="{{ isPrev }}"><div style="display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:10px;background:rgb(250 248 244)">
+        <div style="font-size:0.84em;font-weight:600">Shortlist <span style="font-weight:400;color:{{ candFg }}">· {{ candHint }}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ cands }}" as="p" hint-placeholder-count="6"><span onClick="{{ p.onClick }}" style="height:30px;padding:0 10px 0 3px;border-radius:999px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.86em;border:1px solid {{ p.border }};background:{{ p.bg }};color:{{ p.fg }}"><span style="width:24px;height:24px;border-radius:50%;background:{{ p.av }};color:rgb(51 36 27);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.init }}</span>{{ p.name }}<span style="font-size:0.85em;opacity:.7">{{ p.load }}</span></span></sc-for>
+        </div>
+      </div></sc-if>
+    </div></sc-if>
+
+    <sc-if value="{{ isAcc }}"><div onClick="{{ sec.appr.onClick }}" style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid rgb(240 236 230);cursor:pointer" style-hover="background:rgb(250 248 244)">
+      <span style="font-weight:600;font-size:0.92em;width:92px">Approval</span>
+      <span style="flex:1;min-width:0;font-size:0.86em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sec.appr.summary }}</span>
+      <span style="font-size:9px;color:rgb(117 100 86)">{{ sec.appr.caret }}</span>
+    </div></sc-if>
+    <sc-if value="{{ sec.appr.open }}"><div style="display:flex;flex-direction:column;padding:12px 18px 18px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:22px;display:flex;justify-content:center"><span style="width:10px;height:10px;border-radius:50%;border:2px solid rgb(180 170 158);box-sizing:border-box"></span></span>
+        <span style="font-size:0.86em;color:rgb(74 64 58)">Doer submits <strong style="font-weight:600">{{ name }}</strong></span>
+      </div>
+      <sc-for list="{{ levels }}" as="l" hint-placeholder-count="1">
+        <div style="display:flex;gap:10px">
+          <div style="width:22px;display:flex;flex-direction:column;align-items:center"><span style="width:1.5px;height:10px;background:rgb(214 206 196)"></span><span style="width:22px;height:22px;flex:none;border-radius:6px;background:rgb(51 36 27);color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">L{{ l.n }}</span><span style="width:1.5px;flex:1;background:rgb(214 206 196)"></span></div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:10px 0 8px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.84em;font-weight:600">Level {{ l.n }} approves</span><span style="flex:1"></span><sc-if value="{{ l.canRemove }}"><span onClick="{{ l.onRemove }}" style="font-size:0.8em;color:rgb(117 100 86);cursor:pointer" style-hover="color:rgb(176 40 34)">Remove</span></sc-if></div>
+            <div style="position:relative">
+              <div onClick="{{ l.onToggle }}" style="min-height:36px;box-sizing:border-box;padding:5px 10px 5px 5px;border:1px solid {{ l.line }};border-radius:8px;display:flex;align-items:center;gap:6px;cursor:pointer;background:#fff" style-hover="border-color:rgb(150 136 120)">
+                <div style="display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0">
+                  <sc-if value="{{ l.empty }}"><span style="padding-left:5px;color:rgb(117 100 86);font-size:0.88em;line-height:24px">{{ l.emptyText }}</span></sc-if>
+                  <sc-for list="{{ l.sel }}" as="o" hint-placeholder-count="1"><span style="height:24px;padding:0 7px 0 2px;border-radius:999px;background:rgb(246 244 240);display:flex;align-items:center;gap:5px;font-size:0.84em;white-space:nowrap"><span style="width:20px;height:20px;border-radius:50%;background:{{ o.av }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ o.icon }}</span>{{ o.label }}<span onClick="{{ o.onRemove }}" style="color:rgb(150 140 130);cursor:pointer;padding-left:2px" style-hover="color:rgb(176 40 34)">×</span></span></sc-for>
+                </div>
+                <span style="font-size:9px;color:rgb(117 100 86)">{{ l.caret }}</span>
+              </div>
+              <sc-if value="{{ l.open }}"><div onClick="{{ stop }}" style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 28px rgb(51 36 27 / 0.16);padding:6px;display:flex;flex-direction:column">
+                <span style="font-size:0.76em;color:rgb(117 100 86);padding:4px 8px 6px">Select one or more</span>
+                <sc-for list="{{ l.opts }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;cursor:{{ o.cursor }};opacity:{{ o.op }}" style-hover="background:rgb(246 244 240)">
+                  <span style="width:16px;height:16px;flex:none;box-sizing:border-box;border-radius:4px;border:1.5px solid {{ o.boxLine }};background:{{ o.boxBg }};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">{{ o.tick }}</span>
+                  <span style="width:24px;height:24px;flex:none;border-radius:50%;background:{{ o.av }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ o.icon }}</span>
+                  <div style="display:flex;flex-direction:column;min-width:0"><span style="font-size:0.9em;font-weight:500">{{ o.label }}</span><span style="font-size:0.76em;color:rgb(117 100 86)">{{ o.hint }}</span></div>
+                </div></sc-for>
+                <div style="display:flex;justify-content:flex-end;padding:6px 2px 0;margin-top:4px;border-top:1px solid rgb(244 241 236)"><span onClick="{{ l.onToggle }}" style="height:28px;padding:0 14px;border-radius:6px;background:rgb(51 36 27);color:#fff;display:flex;align-items:center;font-size:0.84em;font-weight:600;cursor:pointer">Done</span></div>
+              </div></sc-if>
+            </div>
+            <sc-if value="{{ l.multi }}"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.8em;color:rgb(117 100 86)">Needs</span>
+              <div style="display:flex;gap:2px;padding:2px;background:rgb(246 246 244);border-radius:7px">
+                <sc-for list="{{ l.rules }}" as="r" hint-placeholder-count="2"><span onClick="{{ r.onClick }}" style="height:24px;padding:0 10px;border-radius:5px;display:flex;align-items:center;cursor:pointer;font-size:0.8em;white-space:nowrap;background:{{ r.bg }};box-shadow:{{ r.shadow }};font-weight:{{ r.weight }}">{{ r.label }}</span></sc-for>
+              </div>
+            </div></sc-if>
+          </div>
+        </div>
+      </sc-for>
+      <sc-if value="{{ canAddLevel }}"><div style="display:flex;gap:10px"><div style="width:22px;display:flex;justify-content:center"><span style="width:1.5px;height:30px;background:rgb(214 206 196)"></span></div><span onClick="{{ addLevel }}" style="align-self:center;font-size:0.84em;font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px">+ Add level {{ nextLevel }}</span></div></sc-if>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:22px;height:22px;border-radius:50%;background:rgb(232 244 235);color:rgb(40 110 64);font-size:11px;display:flex;align-items:center;justify-content:center">✓</span>
+        <span style="font-size:0.86em;color:rgb(40 110 64)">{{ onApprove }}</span>
+      </div>
+      <sc-if value="{{ hasAppr }}"><div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:rgb(252 236 233);display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:0.84em;font-weight:600;color:rgb(176 40 34)">↩ If changes are requested, go back to</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ backOpts }}" as="o" hint-placeholder-count="3"><span onClick="{{ o.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;font-size:0.84em;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</span></sc-for>
+        </div>
+      </div></sc-if>
+    </div></sc-if>
+
+    <sc-if value="{{ isAcc }}"><div onClick="{{ sec.pic.onClick }}" style="display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid rgb(240 236 230);border-bottom:1px solid rgb(240 236 230);cursor:pointer" style-hover="background:rgb(250 248 244)">
+      <span style="font-weight:600;font-size:0.92em;width:92px">PIC &amp; form</span>
+      <span style="flex:1;min-width:0;font-size:0.86em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sec.pic.summary }}</span>
+      <span style="font-size:9px;color:rgb(117 100 86)">{{ sec.pic.caret }}</span>
+    </div></sc-if>
+    <sc-if value="{{ sec.pic.open }}"><div style="display:flex;flex-direction:column;gap:16px;padding:12px 18px 18px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:0.92em;font-weight:600">What does PIC see on the link?</span>
+        <input value="{{ picText }}" onChange="{{ onPicText }}" placeholder="Department words only — no names, no prices" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;outline:none;color:rgb(51 36 27)" style-focus="border-color:rgb(150 136 120)">
+      </div>
+      <div onClick="{{ openCanvas }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid rgb(236 231 224);background:rgb(250 248 244);cursor:pointer" style-hover="border-color:rgb(150 136 120)">
+        <span style="font-size:16px">🎯</span>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:0.92em;font-weight:600">What this stage fills in</span><span style="font-size:0.82em;color:rgb(117 100 86);text-wrap:pretty">Set in the Canvas template: pick “{{ name }}” under 🎯 Which stage fills this in?</span></div>
+        <span style="font-size:0.86em;font-weight:600;white-space:nowrap">Open Canvas →</span>
+      </div>
+    </div></sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:360,&quot;height&quot;:800},&quot;layout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;tabs&quot;,&quot;accordion&quot;],&quot;default&quot;:&quot;tabs&quot;,&quot;tsType&quot;:&quot;'tabs'|'accordion'&quot;},&quot;stage&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;at&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;},&quot;names&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;locked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;section&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;basics&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startDay&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;tsType&quot;:&quot;number&quot;},&quot;onSection&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(k:string)=&gt;void&quot;},&quot;onPatch&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(p:object)=&gt;void&quot;},&quot;onRemove&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;()=&gt;void&quot;},&quot;onMove&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(from:number,to:number)=&gt;void&quot;}}">
+const DEPT = { content: ['Content', 'oklch(0.94 0.04 295)', 'oklch(0.40 0.12 295)', 'oklch(0.62 0.12 295)'], social: ['Social Media', 'oklch(0.94 0.04 235)', 'oklch(0.40 0.10 235)', 'oklch(0.62 0.10 235)'], design: ['Design', 'oklch(0.94 0.04 350)', 'oklch(0.43 0.13 350)', 'oklch(0.64 0.13 350)'], ads: ['Ads', 'oklch(0.94 0.04 270)', 'oklch(0.40 0.12 270)', 'oklch(0.62 0.12 270)'], brand: ['Brand', 'oklch(0.94 0.04 195)', 'oklch(0.38 0.08 195)', 'oklch(0.60 0.08 195)'] };
+const AVC = { Rachel: 'oklch(0.90 0.05 195)', Daniel: 'oklch(0.90 0.05 60)', Mei: 'oklch(0.90 0.05 295)', 'Ah Kit': 'oklch(0.90 0.05 195)', Ali: 'oklch(0.90 0.05 270)', Jason: 'oklch(0.90 0.05 235)', Siti: 'oklch(0.92 0.04 350)', Aina: 'oklch(0.92 0.04 350)', Hafiz: 'oklch(0.92 0.04 350)', 'Wei Lun': 'oklch(0.90 0.05 270)' };
+const ROLE = { Rachel: 'MM', Daniel: 'AMM', Mei: 'Director' };
+const LOAD = { Mei: 3, 'Ah Kit': 2, Ali: 3, Jason: 5, Siti: 4, Aina: 2, Hafiz: 3, 'Wei Lun': 2 };
+const GLYPH = { Note: '✎', Text: 'Aa', Select: '◉', 'Multi-select': '☰', Date: '▦', Person: '◎', File: '⎘', 'File / link': '⎘', Checkbox: '☑', Number: '#', Table: '▤' };
+const FIELD_TYPES = ['Text', 'Number', 'Select', 'Multi-select', 'Date', 'Person', 'File / link', 'Checkbox', 'Table', 'Note'];
+const INK = 'rgb(51 36 27)';
+const LBL = id => id === 'pic' ? 'PIC via link' : id === 'assign' ? 'Picked at assignment' : id;
+const SHORT = id => id === 'pic' ? '🔗 PIC' : id === 'assign' ? '👤 Picked at assignment' : id;
+const ICO = id => id === 'pic' ? '🔗' : id === 'assign' ? '👤' : id[0];
+const NORM = a => !a ? { kind: 'multi', ids: [], rule: 'any' } : a.kind === 'multi' ? a : { kind: 'multi', ids: [a.kind === 'person' ? a.who : a.kind], rule: 'any' };
+const chip = on => ({ border: on ? INK : 'rgb(229 222 211)', bg: on ? INK : '#fff', fg: on ? '#fff' : INK });
+
+class Component extends DCLogic {
+  state = { fieldDraft: '', fieldType: 'Text', openLvl: null, addingGroup: false, groupDraft: '' };
+  commitGroup() {
+    const name = this.state.groupDraft.trim(), p = this.props;
+    this.setState({ addingGroup: false, groupDraft: '' });
+    if (!name || !p.onAddGroup) return;
+    const k = p.onAddGroup(name);
+    if (k && p.onPatch) p.onPatch({ dept: k });
+  }
+  renderVals() {
+    const p = this.props, st = p.stage || { name: '', dept: 'content', who: { mode: 'assign' }, sla: 1, appr: [], split: false, form: [], back: 'prev', picText: '' };
+    const at = p.at || 0, names = p.names || [], locked = !!p.locked, patch = x => p.onPatch && p.onPatch(x);
+    const sectionKey = p.section || 'basics', isAcc = p.layout === 'accordion';
+    const mode = locked ? 'assign' : st.who.mode, cands = st.who.cands || [];
+    const prevOff = at === 0 || locked, isPrev = mode === 'prev';
+    const lv = a => { const n = NORM(a); return n.ids.map(SHORT).join(n.rule === 'all' ? ' & ' : ' / ') || '—'; };
+    const apprSum = st.appr.length ? st.appr.map(lv).join(' → ') : 'No approval';
+    const whoSum = isPrev ? (cands.length ? `🔓 Stage ${at}'s person picks · ${cands.join(' / ')}` : '🔓 Handoff · shortlist empty') : '👤 MM assigns when planning';
+    const mk = (k, summary, extra = {}) => ({ open: sectionKey === k, caret: sectionKey === k ? '▲' : '▼', summary, fg: 'rgb(117 100 86)', onClick: () => p.onSection && p.onSection(sectionKey === k && isAcc ? '' : k), ...extra });
+    const G = p.groups || DEPT, d = G[st.dept] || Object.values(G)[0];
+    const sec = {
+      basics: mk('basics', `${d[0]} · ${st.sla}d${st.split && !locked ? ' · subtasks' : ''}`),
+      who: mk('who', whoSum, { fg: isPrev && !cands.length ? 'rgb(176 40 34)' : 'rgb(117 100 86)' }),
+      appr: mk('appr', apprSum),
+      pic: mk('pic', st.picText ? '“' + st.picText + '”' : 'Fields are set in Canvas'),
+    };
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const tabs = [['basics', 'Basics'], ['who', 'Who'], ['appr', 'Approval'], ['pic', 'PIC & form']].map(([k, label]) => ({ label, ...seg(sectionKey === k), warn: k === 'who' && isPrev && !cands.length, onClick: () => p.onSection && p.onSection(k) }));
+    const start = p.startDay || 0;
+    const lvls = st.appr.map(NORM), openLvl = this.state.openLvl;
+    const levels = (lvls.length ? lvls : [null]).map((n, li) => {
+      const ids = n ? n.ids : [], open = openLvl === li;
+      const used = new Set(lvls.flatMap((x, j) => j === li ? [] : x.ids.filter(i => i !== 'assign')));
+      const setIds = next => { const arr = [...lvls]; if (!n) arr.push({ kind: 'multi', ids: next, rule: 'any' }); else if (!next.length) arr.splice(li, 1); else arr[li] = { ...n, ids: next }; patch({ appr: arr }); };
+      const toggle = id => setIds(ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
+      return {
+        n: li + 1, canRemove: !!n, open, caret: open ? '▲' : '▼', line: open ? 'rgb(150 136 120)' : 'rgb(229 222 211)',
+        onRemove: () => { patch({ appr: lvls.filter((_, j) => j !== li) }); this.setState({ openLvl: null }); },
+        onToggle: e => { if (e) e.stopPropagation(); this.setState(s => ({ openLvl: s.openLvl === li ? null : li })); },
+        empty: !ids.length, emptyText: !n ? 'No approval · choose approvers' : 'Choose approvers',
+        sel: ids.map(id => ({ label: LBL(id), icon: ICO(id), av: AVC[id] || 'rgb(255 255 255)', onRemove: e => { e.stopPropagation(); toggle(id); } })),
+        opts: ['Rachel', 'Daniel', 'Mei', 'pic', 'assign'].map(id => { const on = ids.includes(id), off = !on && used.has(id); return { label: LBL(id), icon: ICO(id), av: AVC[id] || 'rgb(246 244 240)',
+          hint: off ? 'Already approves at another level' : id === 'pic' ? 'Client approves through the tracking link' : id === 'assign' ? 'MM picks the approver per project' : ROLE[id],
+          tick: on ? '✓' : '', boxBg: on ? INK : '#fff', boxLine: on ? INK : 'rgb(200 192 182)', cursor: off ? 'not-allowed' : 'pointer', op: off ? 0.45 : 1, onClick: () => !off && toggle(id) }; }),
+        multi: ids.length > 1,
+        rules: [['any', 'Any one of them'], ['all', 'Everyone']].map(([k, label]) => { const on = ((n && n.rule) || 'any') === k; return { label, bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400, onClick: () => { const arr = [...lvls]; arr[li] = { ...n, rule: k }; patch({ appr: arr }); } }; }),
+      };
+    });
+    const nextName = names[at + 1];
+    return {
+      n: at + 1, name: st.name, isTabs: !isAcc, isAcc, tabs, sec,
+      onRemove: p.onRemove, moveUp: () => at > 0 && p.onMove && p.onMove(at, at - 1), moveDown: () => at < names.length - 1 && p.onMove && p.onMove(at, at + 1),
+      upOp: at > 0 ? 1 : 0.35, downOp: at < names.length - 1 ? 1 : 0.35,
+      onName: e => patch({ name: e.target.value }),
+      addingGroup: this.state.addingGroup, notAddingGroup: !this.state.addingGroup, groupDraft: this.state.groupDraft,
+      startGroup: () => this.setState({ addingGroup: true, groupDraft: '' }),
+      onGroupDraft: e => this.setState({ groupDraft: e.target.value }),
+      onGroupKey: e => { if (e.key === 'Enter') this.commitGroup(); else if (e.key === 'Escape') this.setState({ addingGroup: false }); },
+      onGroupBlur: () => this.commitGroup(),
+      groups: Object.entries(G).map(([k, g]) => ({ label: g[0], dot: g[3] || g[2], ...chip(st.dept === k), onClick: () => patch({ dept: k }) })),
+      sla: st.sla, span: `day ${start + 1}–${start + st.sla}`,
+      slaUp: () => patch({ sla: Math.min(30, st.sla + 1) }), slaDown: () => patch({ sla: Math.max(1, st.sla - 1) }),
+      splitTrack: st.split && !locked ? INK : 'rgb(214 206 196)', splitKnob: st.split && !locked ? 18 : 2, splitCursor: locked ? 'not-allowed' : 'pointer', splitOp: locked ? 0.5 : 1,
+      splitHint: locked ? 'Off while “MM assigns every stage” is on' : 'The doer can open subtasks for other people; checked internally only', splitHintFg: locked ? 'rgb(138 92 10)' : 'rgb(117 100 86)',
+      toggleSplit: () => !locked && patch({ split: !st.split }),
+      whoCards: [
+        { k: 'assign', icon: '👤', title: 'MM assigns', text: 'Rachel picks the person when she plans each project.' },
+        { k: 'prev', icon: '🔓', title: 'Handoff from the previous stage', text: at === 0 ? 'The person on the stage before picks who does this one.' : `When Stage ${at} · ${names[at - 1] || ''} is done, that person picks who does this one from a shortlist.`,
+          why: at === 0 ? 'Not available on the first stage' : locked ? 'Off while “MM assigns every stage” is on' : '' },
+      ].map(c => { const on = mode === c.k, off = c.k === 'prev' && prevOff; return { ...c, hasWhy: !!c.why, border: on ? INK : 'rgb(236 231 224)', bg: on ? 'rgb(250 248 244)' : '#fff', radio: on ? `5px solid ${INK}` : '1.5px solid rgb(200 192 182)', cursor: off ? 'not-allowed' : 'pointer', op: off ? 0.55 : 1,
+        onClick: () => { if (off) return; patch({ who: c.k === 'prev' ? { mode: 'prev', cands } : { mode: 'assign', cands } }); } }; }),
+      isPrev, candHint: cands.length ? `${cands.length} picked` : 'pick at least one', candFg: cands.length ? 'rgb(117 100 86)' : 'rgb(176 40 34)',
+      cands: ['Siti', 'Aina', 'Hafiz', 'Ali', 'Ah Kit', 'Jason', 'Wei Lun'].map(n => { const on = cands.includes(n); return { name: n, init: n[0], av: AVC[n], load: `${LOAD[n]} active`, ...chip(on), onClick: () => patch({ who: { mode: 'prev', cands: on ? cands.filter(x => x !== n) : [...cands, n] } }) }; }),
+      levels, canAddLevel: st.appr.length > 0 && st.appr.length < 3, nextLevel: st.appr.length + 1,
+      addLevel: e => { if (e) e.stopPropagation(); patch({ appr: [...lvls, { kind: 'multi', ids: [], rule: 'any' }] }); this.setState({ openLvl: lvls.length }); },
+      stop: e => e.stopPropagation(), closeMenus: () => this.state.openLvl !== null && this.setState({ openLvl: null }),
+      hasAppr: st.appr.length > 0,
+      onApprove: nextName ? `${st.appr.length ? 'Approved' : 'Submitted'} → Stage ${at + 2} · ${nextName}` : `${st.appr.length ? 'Approved' : 'Submitted'} → task done`,
+      backOpts: [{ k: 'prev', label: 'Stay on this stage' }, ...names.slice(0, at).map((x, j) => ({ k: j, label: `${j + 1}. ${x}` }))].map(o => ({ label: o.label, ...chip(st.back === o.k), onClick: () => patch({ back: o.k }) })),
+      openCanvas: () => p.onOpenCanvas && p.onOpenCanvas(),
+      picText: st.picText, onPicText: e => patch({ picText: e.target.value }),
+      fields: st.form.map(([name, type], j) => ({ name, type: type === 'File' ? 'File / link' : type, glyph: GLYPH[type] || 'Aa', onRemove: () => patch({ form: st.form.filter((_, k) => k !== j) }) })),
+      fieldDraft: this.state.fieldDraft, onFieldDraft: e => this.setState({ fieldDraft: e.target.value }),
+      fieldType: this.state.fieldType, onFieldType: e => this.setState({ fieldType: e.target.value }), fieldTypes: FIELD_TYPES,
+      onFieldKey: e => { if (e.key === 'Enter' && this.state.fieldDraft.trim()) { patch({ form: [...st.form, [this.state.fieldDraft.trim(), this.state.fieldType]] }); this.setState({ fieldDraft: '' }); } },
+    };
+  }
+}
+</script>
+</body>
+</html>

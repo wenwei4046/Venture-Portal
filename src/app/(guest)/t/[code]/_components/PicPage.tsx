@@ -8,6 +8,9 @@ import {
   bothState, dateWords, kindWords, nameOk, picAnswered, picBanner, picStatus, picTimeline, reasonOk, receiptTime, type PicField, type PicPage as Page,
 } from '@/lib/marketing/pic'
 import type { Tone } from '@/lib/marketing/task'
+import { picFlowView, picSimple } from '@/lib/marketing/pic-flow'
+import TaskFlowPic from '@/components/mkt/task/TaskFlowPic'
+import PicAnswer from './PicAnswer'
 import PicWork from './PicWork'
 import s from './pic.module.css'
 
@@ -66,6 +69,18 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
         <main className={s.main}>
           <div className={s.closed}><div className={s.closedTitle}>This link is closed</div></div>
         </main>
+      </div>
+    )
+  }
+
+  // A task's own link, one piece of work and no minutes of theirs (Workflow Builder 2a — the PIC link view): the simpler
+  // page — its stage's words, Approve / Request changes while it waits for them, the steps, what they may see.
+  if (picSimple(page)) {
+    const w = page.work[0]
+    return (
+      <div className={`mkt-pic ${s.root}`}>
+        <TaskFlowPic view={picFlowView(page, w)} title={page.title} sub={`Houzs Marketing · tracking link for ${page.sub}`}
+          answer={w.stage ? <PicAnswer key={`${w.id}:${w.stage.ver}`} code={code} work={w.id} stage={w.stage.name} ver={w.stage.ver} onPage={p => setPage(p)} /> : null} />
       </div>
     )
   }

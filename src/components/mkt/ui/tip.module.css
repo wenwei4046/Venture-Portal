@@ -1,0 +1,16 @@
+/* The helper line on hover / keyboard focus (Tip.tsx): the prototype's toast — ink, light words — with a popover's
+   shadow. The wrapper takes no box, so the option it wraps keeps its own layout. */
+.wrap { display: contents; }
+
+.tip {
+  position: fixed; top: 0; left: 0; z-index: 1000;
+  max-width: 260px; box-sizing: border-box; padding: 7px 10px;
+  border-radius: 8px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-on-ink));
+  box-shadow: var(--mk-shadow-pop);
+  font-size: 12px; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal; text-wrap: pretty;
+  pointer-events: none; animation: tipIn .12s ease-out;
+}
+
+@keyframes tipIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) { .tip { animation: none; } }

@@ -472,6 +472,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Marketing's Workflow Builder (mig 20261023235500): the templates read, saved, published and cloned — all by
   // Marketing · Manage.
   'mkt_workflows', 'mkt_workflow_save', 'mkt_workflow_publish', 'mkt_workflow_clone',
+  // The Workflow Builder 2a (mig 20261113200000): a template renamed from the picker; categories made (with a Standard
+  // template), renamed, given an icon and deleted (never one with a published template); a group added — Marketing · Manage.
+  'mkt_workflow_rename', 'mkt_wf_category_add', 'mkt_wf_category_rename', 'mkt_wf_category_icon', 'mkt_wf_category_delete',
+  'mkt_group_add',
   // Marketing's Minutes Builder (mig 20261023235800): the minutes templates read, saved and published — all by
   // Marketing · Manage.
   'mkt_minutes_templates', 'mkt_minutes_save', 'mkt_minutes_publish',
@@ -559,6 +563,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_product_run_day', 'mkt_product_runs_due', 'mkt_product_pause',
   // An Ads report's period due (mig 20261026002000): told by the hourly sweep — the service role's alone.
   'mkt_ads_due',
+  // The Workflow Builder 2a's running task (mig 20261113210000): ⇄ a stage reassigned by Marketing · Manage; the doer's own
+  // table columns by Marketing · Edit (the doer now); a late stage told by the hourly sweep — the service role's alone.
+  'mkt_stage_reassign', 'mkt_task_column', 'mkt_overdue_sweep',
   // A choice's shared option lists (mig 20261025191000): read by Marketing · View, an option added by Marketing · Edit,
   // taken off by Marketing · Manage.
   'mkt_option_lists', 'mkt_option_add', 'mkt_option_remove',

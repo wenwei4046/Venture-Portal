@@ -1,12 +1,20 @@
 // A deliverable's Assignment Plan (②b-2a — `Assignment Plan.dc.html`; the user's answer 10: each deliverable its own
 // START day): who does each stage (the manager assigns, or 🔓 the stage before picks from its candidates), who approves
-// it (up to three levels: a manager, the PIC on the link), its working days, whether it splits into subtasks — and the
+// it (up to three levels, each one or more people — a manager, a Director, the PIC on the link — and whether any one of
+// them or everyone must approve: the Workflow Builder 2a's levels), its working days, whether it splits into subtasks — and the
 // day it starts. What the page draws (each stage's dates, the summary, who is on it), what stops Save, which changes
 // need a reason once it has opened, and what mkt_deliverable_plan takes. Pure.
 
 import { addDays, longDay, shortDay, weekdayOf, type MktHoliday, type MktPerson, type MktStageStatus } from './board'
 import { MAX_APPROVALS, MAX_SLA, stageDates } from './tasks'
-import type { MktTaskPage, PlanAppr } from './task'
+import { ASSIGN_ID, PIC_ID, type ApprLevel } from './flow'
+import type { MktTaskPage } from './task'
+
+/** An approval level on the plan: its people (staff ids, 'pic' — the PIC on the link — or 'assign', still to pick), any or
+ * all, and — the PIC on it, the project with two PICs — whether both PICs approve (`picAll`, mkt_level_norm). */
+export interface PlanLevel extends ApprLevel {
+  picAll?: boolean
+}
 
 export interface PlanStage {
   idx: number
@@ -18,7 +26,7 @@ export interface PlanStage {
   /** null: picked by the stage before (🔓 — a 'prev' stage), or nobody chosen yet. */
   owner: string | null
   extra: string
-  appr: PlanAppr[]
+  appr: PlanLevel[]
   sla: number
   split: boolean
   status: MktStageStatus
@@ -43,7 +51,8 @@ export function planFromTask(page: MktTaskPage): PlanDraft {
       cands: s.cands,
       owner: s.owner,
       extra: s.extra ?? '',
-      appr: s.levels,
+      // The levels whole (any / all, several on one) — never trimmed to one person; Both PICs read from the plan's shape.
+      appr: s.levels.map(l => (l.ids.includes(PIC_ID) && s.plan.some(a => a.kind === 'pic' && a.all) ? { ...l, ids: [...l.ids], picAll: true } : { ...l, ids: [...l.ids] })),
       sla: s.sla,
       split: s.split && !p.locked,
       status: s.status,
@@ -90,8 +99,8 @@ export function planSummary(d: PlanDraft, holidays: readonly MktHoliday[]): Plan
   const names = d.start && last ? holidays.filter(h => h.day >= d.start && h.day <= last).map(h => h.name) : []
   return {
     days: d.stages.reduce((n, s) => n + s.sla, 0),
-    pic: d.stages.reduce((n, s) => n + s.appr.filter(a => a.kind === 'pic').length, 0),
-    internal: d.stages.reduce((n, s) => n + s.appr.filter(a => a.kind !== 'pic').length, 0),
+    pic: d.stages.reduce((n, s) => n + s.appr.filter(l => l.ids.includes(PIC_ID)).length, 0),
+    internal: d.stages.reduce((n, s) => n + s.appr.filter(l => l.ids.some(id => id !== PIC_ID)).length, 0),
     starts: d.start ? longDay(d.start) : '—',
     finishes: last ? longDay(last) : '—',
     skipped: names.length ? [...new Set(names)].join(', ') : 'none in this range',
@@ -103,10 +112,10 @@ export function planCrew(d: PlanDraft, team: readonly MktPerson[], pic: string |
   const ids: string[] = []
   for (const s of d.stages) {
     if (s.owner && !ids.includes(s.owner)) ids.push(s.owner)
-    for (const a of s.appr) if (a.kind === 'person' && !ids.includes(a.staff)) ids.push(a.staff)
+    for (const l of s.appr) for (const id of l.ids) if (id !== PIC_ID && id !== ASSIGN_ID && !ids.includes(id)) ids.push(id)
   }
   const crew = ids.map(id => ({ id, name: team.find(p => p.id === id)?.first || 'someone', pic: false }))
-  return d.stages.some(s => s.appr.some(a => a.kind === 'pic')) ? [...crew, { id: 'pic', name: `${pic || 'PIC'} (PIC)`, pic: true }] : crew
+  return d.stages.some(s => s.appr.some(l => l.ids.includes(PIC_ID))) ? [...crew, { id: 'pic', name: `${pic || 'PIC'} (PIC)`, pic: true }] : crew
 }
 
 /** A stage with nobody on it (a 🔓 stage is the stage before's to pick — not unassigned). */
@@ -134,7 +143,12 @@ export function planProblems(saved: PlanDraft, d: PlanDraft, open: boolean, toda
   const n = d.stages.filter(unassigned).length
   if (n) out.push(`${n} stage${n === 1 ? '' : 's'} unassigned`)
   for (const s of d.stages) {
-    if (s.appr.some(a => a.kind === 'assign')) out.push(`Stage ${s.idx + 1} (${s.name}): pick who approves it`)
+    // As mkt_levels_check: a level with nobody — or one still "picked at assignment" — needs its people; a person on one
+    // level only; the PIC once.
+    if (s.appr.some(l => !l.ids.length || l.ids.includes(ASSIGN_ID))) out.push(`Stage ${s.idx + 1} (${s.name}): pick who approves it`)
+    const ids = s.appr.flatMap(l => l.ids).filter(id => id !== ASSIGN_ID)
+    if (ids.filter(id => id === PIC_ID).length > 1) out.push(`Stage ${s.idx + 1} (${s.name}): the PIC twice`)
+    else if (new Set(ids).size < ids.length) out.push(`Stage ${s.idx + 1} (${s.name}): the same approver twice`)
     if (s.appr.length > MAX_APPROVALS) out.push(`Stage ${s.idx + 1} (${s.name}): at most ${MAX_APPROVALS} approvals`)
     if (s.sla < 1 || s.sla > MAX_SLA) out.push(`Stage ${s.idx + 1} (${s.name}): 1 to ${MAX_SLA} working days`)
   }
@@ -152,11 +166,11 @@ export function planChanged(saved: PlanDraft, d: PlanDraft, planning: boolean): 
 
 const payloadStages = (d: PlanDraft) => d.stages.map(s => ({
   owner: s.owner, extra: s.extra.trim() || null,
-  appr: s.appr.filter((a): a is Exclude<PlanAppr, { kind: 'assign' }> => a.kind !== 'assign'),
+  appr: s.appr.map(l => ({ ids: [...l.ids], rule: l.rule, ...(l.picAll && l.ids.includes(PIC_ID) ? { picAll: true } : {}) })),
   sla: s.sla, split: s.split,
 }))
 
-/** What mkt_deliverable_plan takes. */
+/** What mkt_deliverable_plan takes: each stage's levels as {ids, rule, picAll?} (mkt_levels_check). */
 export function planPayload(d: PlanDraft, reasons: Readonly<Record<number, string>>, needed: readonly number[]) {
   const why: Record<string, string> = {}
   for (const i of needed) if ((reasons[i] ?? '').trim()) why[String(i)] = reasons[i].trim()

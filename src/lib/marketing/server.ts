@@ -21,7 +21,7 @@ import { lobbyFromRow, petStatsFromRow, spaceFromRow, visitFromRow, type LobbyPe
 import { subFeedFromRow, type SubFeedEvent } from './subsidiary'
 import { minutesPicksFromRow, type MinutesPick } from './task-minutes'
 import { taskFromRow, type MktTaskPage } from './task'
-import { workflowsFromRow, type WfTemplate } from './workflows'
+import { workflowBookFromRow, type WfBook } from './workflows'
 
 // Marketing's reads on the page's own session (the DEFINER functions of mig 20261023214100 ask Marketing · View
 // themselves). A refusal throws — the page's error boundary answers it.
@@ -44,12 +44,12 @@ export async function readNotices(limit = 30): Promise<MktNotice[]> {
   return mktNoticesFromRow(data)
 }
 
-/** The Workflow Builder's templates with their drafts (mig 20261023235500) — Marketing · Manage. */
-export async function readWorkflows(): Promise<WfTemplate[]> {
+/** The Workflow Builder's categories, groups and templates with their drafts (migs 20261023235500, 20261113200000) — Marketing · Manage. */
+export async function readWorkflows(): Promise<WfBook> {
   const db = await client()
   const { data, error } = await db.rpc('mkt_workflows')
   if (error) throw new Error(error.message)
-  return workflowsFromRow(data)
+  return workflowBookFromRow(data)
 }
 
 /** The Minutes Builder's templates with their drafts and folders (mig 20261023235800, v2 20261112180000) — Marketing · Manage. */

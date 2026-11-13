@@ -5,7 +5,7 @@
 
 import { officeTime } from '@/lib/office-time'
 import {
-  approverNow, daysBetween, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, sourceFromRow, stageFromRow, subFromRow,
+  approverNow, waitsNow, daysBetween, holidaysFromRow, longDay, personFromRow, projectFromRow, rowsOf, shortDay, sourceFromRow, stageFromRow, subFromRow,
   postedFromRow, subtaskFromRow, type MktDelivery, type MktHoliday, type MktPerson, type MktPosted, type MktProject, type MktProjectStatus, type MktSource,
   type MktStage, type MktStageStatus, type MktSub, type MktSubtask, type MktSubtaskStatus,
 } from './board'
@@ -16,6 +16,9 @@ import { ruleFromRow, ruleText, periodText, type RecurRule } from './recur'
 import { formFromRow, missingWork, TASK_TYPES, workFromRow, type FormField, type StageWork, type TaskType } from './tasks'
 import { minutesFromRow, type MinutesDoc, type PicReply } from './project'
 import { minutesState, picWho } from './task-minutes'
+import {
+  finishFromRow, levelsText, overdueFromRow, PIC_ID, type FinishCfg, type FlowAt, type FlowStage, type OverdueCfg,
+} from './flow'
 
 /** An approval level as a deliverable's template has it (②b-2a): a person, the PIC on the link, or one the manager picks
  * at assignment. */
@@ -30,8 +33,15 @@ export interface TaskStage extends MktStage {
   cands: string[]
   /** The words beside its person ("+ talent"). */
   extra: string | null
-  /** Its approval levels, one picked at assignment included. */
-  levels: PlanAppr[]
+  /** Its approval levels in the plan's one-person shape (each level's first), one picked at assignment included — the
+   * Assignment Plan's. The levels themselves (any / all, several on one) are `levels` (MktStage). */
+  plan: PlanAppr[]
+  /** Its stable key in its template (a stage of a version since the Workflow Builder 2a), else null. */
+  sid: string | null
+  /** When its overdue rule last told its people (mig 20261113210000). */
+  lateToldAt: string | null
+  /** What the PIC reads of it on the link (≤ 120), null for none. */
+  picText: string | null
   /** The PICs' approvals of this version at this level (mig 20261025035000). */
   picOk: PicOk | null
   form: FormField[]
@@ -110,6 +120,68 @@ export interface TaskProject extends MktProject {
   picMinutes: TaskPicMinutes | null
   /** Its stages ask the PIC on the link and its minutes do not (②a-5): the PICs and their links; a run's, its series'. */
   picLink: TaskPicLink | null
+  /** ⏰ When a stage is late — its template version's, copied when the work started (mig 20261113210000); null: none. */
+  overdue: OverdueCfg | null
+  /** 🏁 When the task is done — its template version's; null: none (a quick task). */
+  finish: FinishCfg | null
+  /** The doer's own table columns on this task: a table field's id (else its label) → its columns. */
+  extraCols: Record<string, TaskCol[]>
+  /** The workflow it runs on: its category, the template's name, the version. */
+  wf: { category: string; tname: string; version: number } | null
+  /** The canvas's sections (titles and emoji), each naming the stage (sid) that fills it in, null = any. */
+  sections: { id: string; emoji: string; title: string; stage: string | null }[]
+}
+
+/** A column a table takes on the task page (+ Add column) — the template's column types. */
+export const TASK_COL_TYPES = ['Text', 'Number', 'Checkbox', 'Date', 'Person'] as const
+export type TaskColType = (typeof TASK_COL_TYPES)[number]
+/** A column the doer added on this task only: who added it (only they take it off), at which stage. */
+export interface TaskCol {
+  id: string
+  name: string
+  type: TaskColType
+  by: string | null
+  stage: number | null
+}
+
+export function extraColsFromRow(v: unknown): Record<string, TaskCol[]> {
+  if (!isObj(v)) return {}
+  return Object.fromEntries(Object.entries(v).map(([k, list]): [string, TaskCol[]] => [k, (Array.isArray(list) ? list : []).filter(isObj).flatMap((c): TaskCol[] => {
+    const type = TASK_COL_TYPES.find(t => t === c.type) ?? 'Text'
+    return str(c.id) ? [{ id: str(c.id), name: str(c.name), type, by: strOrNull(c.by), stage: typeof c.stage === 'number' ? c.stage : null }] : []
+  })]).filter(([, list]) => list.length > 0))
+}
+
+/** The task's own columns of one table field (keyed by its id, else its label). */
+export const extraColsOf = (p: Pick<TaskProject, 'extraCols'>, f: Pick<FormField, 'label'> & { id?: string }) =>
+  p.extraCols[f.id ?? f.label] ?? p.extraCols[f.label] ?? []
+
+/** A level in the plan's one-person shape: legacy {kind}, or a 2a level by its first id. */
+function planAppr(a: Record<string, unknown>): PlanAppr[] {
+  if (a.kind === 'pic') return [a.all === true ? { kind: 'pic', all: true } : { kind: 'pic' }]
+  if (a.kind === 'assign') return [{ kind: 'assign' }]
+  if (a.kind === 'person' && typeof a.staff === 'string') return [{ kind: 'person', staff: a.staff }]
+  if (Array.isArray(a.ids)) {
+    const id = a.ids.find((x): x is string => typeof x === 'string' && x.length > 0)
+    if (!id) return []
+    return id === PIC_ID ? [a.picAll === true ? { kind: 'pic', all: true } : { kind: 'pic' }] : id === 'assign' ? [{ kind: 'assign' }] : [{ kind: 'person', staff: id }]
+  }
+  return []
+}
+
+/** The running task in the shared rules' terms (flow.ts) — what the task page's strip, banner and focus reckon from:
+ * each stage's doer, levels, due day, done; where it stands now (the stage, the level, who approved it). */
+export function flowOf(page: Pick<MktTaskPage, 'project' | 'stages'>): { stages: FlowStage[]; at: FlowAt } {
+  const p = page.project
+  const done = p.status === 'done'
+  const stages: FlowStage[] = page.stages.map(s => ({ doer: s.owner, levels: s.levels, dueOn: s.dueOn, done: done || s.status === 'done' }))
+  const last = Math.max(0, page.stages.length - 1)
+  const at = Math.min(Math.max(0, p.cur), last)
+  const cur = page.stages[at]
+  return {
+    stages,
+    at: { cur: at, level: !done && cur?.status === 'review' ? cur.apprIdx : -1, ok: cur?.status === 'review' ? cur.apprOk : {}, done },
+  }
 }
 
 /** A task's links for the stages the PIC approves (②a-5, mig 20261025235000 — the user's answer 52): its PICs, their
@@ -173,6 +245,8 @@ export function picMinutesFromRow(v: unknown): TaskPicMinutes | null {
 export interface MktTaskPage {
   today: string
   me: string | null
+  /** Who looks: their staff id (null off the roster), whether they manage (Marketing · Manage — ⇄ Reassign, Nudge). */
+  viewer: { staff: string | null; manages: boolean }
   team: MktPerson[]
   sub: MktSub | null
   project: TaskProject
@@ -228,9 +302,10 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       mode: s.mode === 'assign' || s.mode === 'prev' ? s.mode : 'person',
       cands: Array.isArray(s.cands) ? s.cands.filter((c): c is string => typeof c === 'string') : [],
       extra: typeof s.extra === 'string' && s.extra ? s.extra : null,
-      levels: (Array.isArray(s.appr) ? s.appr : []).filter(isObj).flatMap((a): PlanAppr[] =>
-        a.kind === 'pic' ? [a.all === true ? { kind: 'pic', all: true } : { kind: 'pic' }] : a.kind === 'assign' ? [{ kind: 'assign' }]
-          : a.kind === 'person' && typeof a.staff === 'string' ? [{ kind: 'person', staff: a.staff }] : []),
+      plan: (Array.isArray(s.appr) ? s.appr : []).filter(isObj).flatMap(planAppr),
+      sid: typeof spec.sid === 'string' && spec.sid ? spec.sid : null,
+      lateToldAt: strOrNull(s.lateToldAt),
+      picText: strOrNull(s.picText) ?? (typeof spec.picText === 'string' && spec.picText ? spec.picText : null),
       picOk: picOkFromRow(s.picOk),
       form: formFromRow(spec.form),
       back: typeof spec.back === 'number' ? spec.back : null,
@@ -267,7 +342,13 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       source: sourceFromRow(p.source),
       picMinutes: picMinutesFromRow(p.picMinutes),
       picLink: picLinkFromRow(p.picLink),
+      overdue: isObj(p.overdue) ? overdueFromRow(p.overdue) : null,
+      finish: isObj(p.finish) ? finishFromRow(p.finish, str(isObj(p.wf) ? p.wf.category : '') || 'task') : null,
+      extraCols: extraColsFromRow(p.extraCols),
+      wf: isObj(p.wf) ? { category: str(p.wf.category), tname: str(p.wf.tname), version: Number(p.wf.version) || 0 } : null,
+      sections: rowsOf(p.sections).map(x => ({ id: str(x.id), emoji: str(x.emoji), title: str(x.title), stage: typeof x.stage === 'string' && x.stage ? x.stage : null })),
     },
+    viewer: { staff: strOrNull(v.me), manages: v.manages === true },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
     events: rowsOf(v.events).map(eventFromRow),
@@ -354,8 +435,9 @@ export function nameOf(team: readonly MktPerson[], id: string | null | undefined
 
 /** "👤 Rachel → 👤 Daniel" · "🔗 PIC" · "🔗 Both PICs" · "— no approval". */
 export function approvalText(team: readonly MktPerson[], s: MktStage): string {
-  if (!s.appr.length) return '— no approval'
-  return s.appr.map(a => (a.kind === 'pic' ? (a.all ? '🔗 Both PICs' : '🔗 PIC') : `👤 ${nameOf(team, a.staff)}`)).join(' → ')
+  if (!s.levels.length) return '— no approval'
+  return levelsText(s.levels, id => (id === PIC_ID ? (s.appr.some(a => a.kind === 'pic' && a.all) ? '🔗 Both PICs' : '🔗 PIC')
+    : id === 'assign' ? '👤 Picked at assignment' : `👤 ${nameOf(team, id)}`))
 }
 
 /** Who a PIC level waits for, by the project's own PICs (the user's answer 29): "Kelvin (PIC)"; either of two —
@@ -374,7 +456,7 @@ export function picApprover(p: { pic: string | null; pic2: string | null }, sub:
 export function picWaiting(page: Pick<MktTaskPage, 'project' | 'stages'>): { name: string; ver: number } | null {
   const cur = page.stages[page.project.cur]
   if (!cur || cur.status !== 'review' || page.project.status !== 'active') return null
-  return approverNow(cur)?.kind === 'pic' ? { name: cur.name, ver: cur.ver } : null
+  return waitsNow(cur).includes(PIC_ID) ? { name: cur.name, ver: cur.ver } : null
 }
 
 /** What the WhatsApp to a PIC says (②a-5): the stage ready for their approval — else, the task to follow on the link. */
@@ -395,9 +477,10 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const appr = cur ? approverNow(cur) : null
   const approver = appr ? (appr.kind === 'pic' ? picApprover(p, page.sub, appr.all === true, cur?.picOk ?? null) : nameOf(team, appr.staff)) : '—'
   const amOwner = open && !!me && cur.owner === me
-  const working = amOwner && (cur.status === 'accepted' || cur.status === 'changes')
-  const amApprover = open && cur.status === 'review' && appr?.kind === 'person' && !!me && appr.staff === me
-  const missing = working ? missingWork(cur.form, cur.work) : []
+  // No Accept (Workflow Builder 2a): a stage is its doer's to work as soon as it opens — an old `todo` too.
+  const working = amOwner && (cur.status === 'todo' || cur.status === 'accepted' || cur.status === 'changes')
+  const amApprover = open && !!me && waitsNow(cur).includes(me)
+  const missing = working ? missingWork(cur.form, cur.work, cur.sid) : []
   const subsOut = working ? page.subtasks.filter(t => t.stage === cur.idx && t.status !== 'approved').length : 0
   // Waiting for the PIC to approve its minutes (②a-4): nobody's turn yet — the work starts with the approval.
   const pm = p.picMinutes
@@ -407,13 +490,9 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
   const actions: TaskView['actions'] = []
   let note = ''
   let noteRed = false
-  if (amOwner && cur.status === 'todo' && can.edit) {
-    actions.push({ key: 'accept', label: 'Accept', disabled: false })
-    note = 'New · just assigned to you'
-  }
   if (working && can.edit) {
     const held = missing.length > 0 || subsOut > 0
-    actions.push(cur.appr.length ? { key: 'submit', label: 'Submit for approval', disabled: held } : { key: 'complete', label: 'Complete stage', disabled: held })
+    actions.push(cur.levels.length ? { key: 'submit', label: 'Submit for approval', disabled: held } : { key: 'complete', label: 'Complete stage', disabled: held })
     note = missing.length ? `Fill in ${missing.join(', ')}` : subsOut ? subsOutText(subsOut) : 'Ready'
     noteRed = held
   }
@@ -451,8 +530,7 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     tone = 'draft'
     status = `Opens ${longDay(p.startsOn as string)}`
   } else if (cur) {
-    if (cur.status === 'todo') status = `Waiting for ${owner} to Accept`
-    if (cur.status === 'accepted') status = `In progress · ${owner}`
+    if (cur.status === 'todo' || cur.status === 'accepted') status = `In progress · ${owner}`
     if (cur.status === 'review') status = `Waiting for ${approver}`
     if (cur.status === 'changes') {
       tone = 'red'
@@ -469,7 +547,7 @@ export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
     banner = { tone: 'waiting', text: `Edited after approval — needs PIC re-approval · ${waits.edited} changed` }
   } else if (open && cur.status === 'changes' && cur.changes) {
     banner = { tone: 'red', text: `Changes requested by ${cur.changes.by}${cur.changes.from ? ` on ${cur.changes.from}` : ''}: "${cur.changes.reason}"` }
-  } else if (amOwner && cur.status === 'todo') {
+  } else if (working && cur.status !== 'changes' && !cur.work.notes && !Object.keys(cur.work.vals).length) {
     banner = { tone: 'waiting', text: `You're up: ${cur.name}${cur.dueOn ? ` · due ${longDay(cur.dueOn)}` : ''}` }
   } else if (amApprover) {
     banner = { tone: 'waiting', text: `${owner} submitted ${cur.name} v${cur.ver} for your approval` }

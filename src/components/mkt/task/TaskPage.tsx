@@ -4,11 +4,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { acceptMktStage, decideMktStage, putMktFree, saveMktStageFiles, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
+import { decideMktStage, nudgeMkt, putMktFree, saveMktStageFiles, saveMktWork, setMktSeries, submitMktStage } from '@/lib/marketing/actions'
 import {
-  nameOf, newFromHref, opensFrom, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone,
+  nameOf, newFromHref, opensFrom, picWaits, TASK_COL_TYPES, seriesView, subsOutText, taskView, trailLines, type FreeBlock, type FreeType, type MktTaskPage, type TaskViewer, type Tone,
 } from '@/lib/marketing/task'
-import { missingWork, type FormField, type PickPerson, type StageFile, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
+import { flowFromPage, rowsToCells, rowsToValue } from '@/lib/marketing/task-flow-page'
+import { addMktTaskColumn, reassignMktStage, removeMktTaskColumn, saveMktTable } from '@/lib/marketing/task-actions'
+import type { FlowField, FlowRow, FlowValue } from '@/lib/marketing/task-flow-view'
+import { fileRoute } from '@/lib/storage/browser'
+import { fieldKey, missingWork, type FormField, type PickPerson, type StageFile, type StageWork, type WorkLink } from '@/lib/marketing/tasks'
 import { LIB_MAX_BYTES, STAGE_MAX_FILES, stagePath, type TaskFile } from '@/lib/marketing/library'
 import { sameAnswer, type OptionLists } from '@/lib/marketing/options'
 import type { AdsPage } from '@/lib/marketing/ads'
@@ -22,6 +26,7 @@ import TaskLibrary from './TaskLibrary'
 import TaskMinutes from './TaskMinutes'
 import TaskPicLink from './TaskPicLink'
 import TaskPosts from './TaskPosts'
+import TaskFlow from './TaskFlow'
 import TaskSubtasks from './TaskSubtasks'
 import s from './task.module.css'
 
@@ -35,8 +40,13 @@ const TONE: Record<Tone, string> = { red: s.red, waiting: s.waiting, done: s.don
 const INPUT_TYPES = new Set(['Text', 'Number', 'Date', 'Person'])
 const blockId = () => (Math.random().toString(36).slice(2) + '00000000').slice(0, 10)
 const isLink = (v: string) => /^https?:\/\/\S+$/i.test(v.trim())
+/** A flow field's id back to its stage and label (task-flow-page's fieldId). */
+const splitFieldId = (id: string): [number, string] => {
+  const k = id.indexOf(':')
+  return [Number(id.slice(0, k)), id.slice(k + 1)]
+}
 
-export default function TaskPage({ initial, can, files = [], splitPeople = [], lists: initialLists = {}, ads = null }: {
+export default function TaskPage({ initial, can, files = [], splitPeople = [], lists: initialLists = {}, ads = null, loads }: {
   initial: MktTaskPage
   can: TaskViewer
   files?: TaskFile[]
@@ -46,6 +56,8 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
   lists?: OptionLists
   /** Its Ads report (2026-10-25) — a quick task's or a series' (never a run's). */
   ads?: AdsPage | null
+  /** Each person's open tasks now — read for a manager, for the reassign modal's "{n} active". */
+  loads?: Record<string, number>
 }) {
   const router = useRouter()
   const [page, setPage] = useState(initial)
@@ -101,21 +113,20 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
     else router.refresh()
   }
 
-  const accept = () =>
-    start(async () => {
-      const r = await acceptMktStage(p.id)
-      if (!r.ok) return say(r.reason)
-      fresh(r.page)
-      say('Accepted — it’s yours')
-    })
+  // The last approval passed (or the last stage, with none, was submitted): the celebration plays.
+  const [celebrate, setCelebrate] = useState<number | null>(null)
+  const cheer = (next: MktTaskPage | null) => {
+    if (next?.project.status === 'done' && page.project.status !== 'done') setCelebrate(Date.now())
+  }
 
-  const submit = () =>
+  const submit = (pick: string | null = null) =>
     start(async () => {
       if (!mine) return
       const next = page.stages[mine.idx + 1]
       const approver = mine.appr[0]
-      const r = await submitMktStage(p.id)
+      const r = await submitMktStage(p.id, pick)
       if (!r.ok) return say(r.reason)
+      cheer(r.page)
       fresh(r.page)
       if (approver) say(`Submitted · sent to ${approver.kind === 'pic' ? 'the PIC' : nameOf(page.team, approver.staff)}`)
       else say(next ? `Done · ${next.name} opens for ${nameOf(page.team, next.owner)}` : 'Task complete 🎉')
@@ -128,6 +139,7 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
       if (!r.ok) return say(r.reason)
       setModal(false)
       setReason('')
+      cheer(r.page)
       fresh(r.page)
       if (!approve) return say('Sent back')
       const nextLevel = cur?.appr[cur.apprIdx + 1]
@@ -259,106 +271,272 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
   const cur = page.stages[p.cur]
   const sendsBackTo = cur && cur.back != null && cur.back < cur.idx ? page.stages[cur.back] : null
 
+  // ── The new top (Workflow Builder 2a — Task Flow.dc.html): the header, the banner, the strip, the focused stage. ──
+  // A task whose stages run (or ran): not a series' pattern, not one still waiting for the PIC's minutes or its plan.
+  const flowOn = !view.isSeries && !picWaits(p.picMinutes) && page.stages.length > 0 && (p.status === 'active' || p.status === 'done')
+  // The viewer's own stage as typed here, over the page's.
+  const shown: MktTaskPage = mine && work ? { ...page, stages: page.stages.map(x => (x.idx === mine.idx ? { ...x, work } : x)) } : page
+  const flow = flowOn ? flowFromPage(shown, { loads }) : null
+  // The clock: the page's day until the browser's own (so the server and the browser draw the same first), every 30 s.
+  const [now, setNow] = useState(() => new Date(`${page.today || '2026-01-01'}T12:00:00+08:00`))
+  useEffect(() => {
+    setNow(new Date())
+    const t = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(t)
+  }, [])
+  const formOf = (f: FlowField): FormField | undefined => (f.stage === null ? undefined : page.stages[f.stage]?.form.find(x => x.label === f.label))
+  const onFlowValue = (f: FlowField, v: FlowValue, commit: boolean) => {
+    const ff = formOf(f)
+    if (!ff || !mine || f.stage !== mine.idx) return
+    setWork(cw => (cw ? { ...cw, vals: { ...cw.vals, [ff.label]: v } } : cw))
+    if (commit) saveVal(ff, v)
+  }
+  /** A table's rows: kept here as typed, saved whole once a change is done (a cell left, a row added or taken off). */
+  const onFlowRows = (f: FlowField, rows: FlowRow[], commit: boolean) => {
+    const ff = formOf(f)
+    if (!ff || !mine || f.stage !== mine.idx) return
+    const json = rowsToValue(f, rows)
+    setWork(cw => (cw ? { ...cw, vals: { ...cw.vals, [ff.label]: json } } : cw))
+    if (!commit) return
+    void saveMktTable(p.id, ff.label, rowsToCells(f, rows)).then(r => {
+      if (!r.ok) return say(r.reason)
+      if (saved.current) saved.current = { ...saved.current, vals: { ...saved.current.vals, [ff.label]: json } }
+    })
+  }
+  /** A write of the new top (⇄ Reassign, a column added or taken off): the task as it now stands, or the reason. */
+  const taskWrite = (send: () => Promise<{ ok: true; page: MktTaskPage | null } | { ok: false; reason: string }>, done: string) =>
+    start(async () => {
+      const r = await send()
+      if (!r.ok) return say(r.reason)
+      fresh(r.page)
+      say(done)
+    })
+  const nudge = () =>
+    start(async () => {
+      const r = await nudgeMkt(p.id)
+      if (!r.ok) return say(r.reason)
+      say(r.already ? `${r.who} was nudged within the hour` : `Nudged ${r.who}`)
+    })
+  /** A file's uploads and a choice's options, drawn by the page's own parts. */
+  const renderField = (f: FlowField, editable: boolean) => {
+    const ff = formOf(f)
+    if (!ff || f.stage === null) return null
+    const live = editable && mine?.idx === f.stage && !!work
+    const ww = live && work ? work : page.stages[f.stage].work
+    const v = ww.vals[ff.label]
+    if (ff.type === 'Select' || ff.type === 'Multi-select') {
+      return (
+        <ChoiceField field={ff} value={v} lists={lists} live={live} busy={pending} say={say}
+          onAnswer={next => live && answerChoice(ff, next)}
+          onList={(name, opts) => setLists(l => ({ ...l, [name]: opts }))} />
+      )
+    }
+    if (ff.type === 'File') {
+      return (
+        <div className={s.fileField}>
+          <StageFiles files={ww.files.filter(x => x.field === ff.label)} live={live} busy={pending} label={ff.label}
+            onPick={list => sendFiles(ff.label, list)} onRemove={dropFile} />
+          {!live && typeof v === 'string' && isLink(v) ? (
+            <a className={s.fileChip} href={v} target="_blank" rel="noreferrer">📎 <span>{v}</span></a>
+          ) : live ? (
+            <input className={s.fInput} type="url" value={typeof v === 'string' ? v : ''} disabled={pending} placeholder="or a link — https://…" aria-label={ff.label}
+              onChange={e => setWork(cw => (cw ? { ...cw, vals: { ...cw.vals, [ff.label]: e.target.value } } : cw))}
+              onBlur={e => saveVal(ff, e.target.value.trim())} />
+          ) : !ww.files.some(x => x.field === ff.label) ? <span className={s.noFiles}>Filled at {page.stages[f.stage].name}</span> : null}
+        </div>
+      )
+    }
+    return null
+  }
+  const crumbs = (
+    <>
+      <Link href="/marketing">← My Space</Link>
+      <span>/</span>
+      {page.sub ? <Link href={`/marketing/projects?sub=${encodeURIComponent(page.sub.code)}`}>{page.sub.name}</Link> : null}
+      {page.sub ? <span>/</span> : null}
+      {p.parentProject ? (
+        <>
+          <Link href={`/marketing/projects/${encodeURIComponent(p.parentProject.trackId)}`}>📦 {p.parentProject.title}</Link>
+          <span>/</span>
+        </>
+      ) : null}
+      <span>{p.title}</span>
+      {/* A project opened from this one (④-4c — answer 23): Marketing · Create's. */}
+      {can.create && opensFrom(p) ? <><span>·</span><Link href={newFromHref(p.trackId)}>+ Open a project from here</Link></> : null}
+    </>
+  )
+  const headExtra = (
+    <>
+      {p.source ? (
+        <Link href={`/marketing/projects/${encodeURIComponent(p.source.trackId)}`} className={s.from} title={p.source.title}>
+          ↳ Opened from <span className={s.fromTrack}>{p.source.trackId}</span>
+        </Link>
+      ) : null}
+      {can.manage && p.kind === 'deliverable' && p.status === 'active' ? (
+        <Link href={`/marketing/projects/${encodeURIComponent(p.trackId)}?plan=1`} className={s.from}>Assignment plan</Link>
+      ) : null}
+      {sending ? <span className={s.note} role="status">{sending}</span> : null}
+      {mine && view.subsOut ? <span className={`${s.note} ${s.noteRed}`}>{subsOutText(view.subsOut)}</span> : null}
+    </>
+  )
+  const requirementsBody = page.minutes ? (
+    <TaskMinutes page={page} doc={page.minutes} can={can} source={view.requirements.source} onPage={fresh} say={say} />
+  ) : (
+    <div className={s.req}>
+      <div className={s.reqSource}>{view.requirements.source}</div>
+      <div className={s.reqText}>{view.requirements.text}</div>
+    </div>
+  )
+
   return (
     <div>
-      <div className={s.top}>
-        <div className={s.crumbs}>
-          <Link href="/marketing/projects" className={s.crumbLink}>← Projects</Link>
-          <span>/</span>
-          {page.sub ? <Link href={`/marketing/projects?sub=${encodeURIComponent(page.sub.code)}`} className={s.crumbLink}>{page.sub.name}</Link> : null}
-          <span>/</span>
-          {p.parentProject ? (
-            <>
-              <Link href={`/marketing/projects/${encodeURIComponent(p.parentProject.trackId)}`} className={s.crumbLink}>📦 {p.parentProject.title}</Link>
-              <span>/</span>
-            </>
-          ) : null}
-          <span className={s.crumbText}>{p.title}</span>
-          <span className={s.grow} />
-          {/* A project opened from this one (④-4c — answer 23): Marketing · Create's; never from a series' pattern. */}
-          {can.create && opensFrom(p) ? <Link href={newFromHref(p.trackId)} className={s.crumbLink}>+ Open a project from here</Link> : null}
-          <span className={s.ver}>{view.version}</span>
-        </div>
-        <div className={s.headRow}>
-          <div className={s.headLeft}>
-            <div className={s.idRow}>
-              <span className={s.track}>{p.trackId}</span>
-              <span className={`${s.pill} ${TONE[view.tone]}`}><span className={s.pillDot} aria-hidden="true" />{view.status}</span>
-              {p.source ? (
-                <Link href={`/marketing/projects/${encodeURIComponent(p.source.trackId)}`} className={s.from} title={p.source.title}>
-                  ↳ Opened from <span className={s.fromTrack}>{p.source.trackId}</span>
+      {flow ? (
+        <>
+          <TaskFlow
+            task={flow}
+            me={page.me}
+            isManager={can.manage}
+            now={now}
+            busy={pending}
+            say={say}
+            crumbs={crumbs}
+            headExtra={headExtra}
+            requirements={{
+              peek: page.minutes ? `Meeting minutes · ${page.minutes.template.name}` : (p.brief || 'No extra details.').replace(/s+/g, ' '),
+              body: requirementsBody,
+              open: !!page.minutes && page.minutes.status !== 'completed',
+            }}
+            renderField={renderField}
+            fileFilled={id => {
+              const [i, label] = splitFieldId(id)
+              const w = i === mine?.idx && work ? work : page.stages[i]?.work
+              return !!w?.files.some(x => x.field === label)
+            }}
+            celebrate={celebrate}
+            gif={flow.finish.gifPath ? fileRoute('marketing', flow.finish.gifPath) : null}
+            onValue={onFlowValue}
+            onRows={onFlowRows}
+            onAddCol={(f, name, type) => {
+              const ff = formOf(f)
+              const t = TASK_COL_TYPES.find(x => x === type)
+              if (ff && t) taskWrite(() => addMktTaskColumn(p.id, fieldKey(ff), name, t), `Column “${name}” added · only on this task`)
+            }}
+            onDropCol={(f, col) => {
+              const ff = formOf(f)
+              if (ff) taskWrite(() => removeMktTaskColumn(p.id, fieldKey(ff), col), 'Column taken off')
+            }}
+            onReassign={can.manage ? (i, staff, why) => taskWrite(() => reassignMktStage(p.id, i, staff, why || null), `${page.stages[i]?.name ?? 'Stage'} → ${nameOf(page.team, staff)} · told`) : undefined}
+            onSubmit={pick => submit(pick)}
+            onApprove={() => decide(true)}
+            onChanges={() => setModal(true)}
+            onNudge={can.manage ? nudge : undefined}
+          />
+          <div className={s.top}>
+            <TaskSubtasks part="list" page={page} can={can} people={splitPeople} onPage={fresh} say={say} />
+          </div>
+        </>
+      ) : (
+        <>
+        <div className={s.top}>
+          <div className={s.crumbs}>
+            <Link href="/marketing/projects" className={s.crumbLink}>← Projects</Link>
+            <span>/</span>
+            {page.sub ? <Link href={`/marketing/projects?sub=${encodeURIComponent(page.sub.code)}`} className={s.crumbLink}>{page.sub.name}</Link> : null}
+            <span>/</span>
+            {p.parentProject ? (
+              <>
+                <Link href={`/marketing/projects/${encodeURIComponent(p.parentProject.trackId)}`} className={s.crumbLink}>📦 {p.parentProject.title}</Link>
+                <span>/</span>
+              </>
+            ) : null}
+            <span className={s.crumbText}>{p.title}</span>
+            <span className={s.grow} />
+            {/* A project opened from this one (④-4c — answer 23): Marketing · Create's; never from a series' pattern. */}
+            {can.create && opensFrom(p) ? <Link href={newFromHref(p.trackId)} className={s.crumbLink}>+ Open a project from here</Link> : null}
+            <span className={s.ver}>{view.version}</span>
+          </div>
+          <div className={s.headRow}>
+            <div className={s.headLeft}>
+              <div className={s.idRow}>
+                <span className={s.track}>{p.trackId}</span>
+                <span className={`${s.pill} ${TONE[view.tone]}`}><span className={s.pillDot} aria-hidden="true" />{view.status}</span>
+                {p.source ? (
+                  <Link href={`/marketing/projects/${encodeURIComponent(p.source.trackId)}`} className={s.from} title={p.source.title}>
+                    ↳ Opened from <span className={s.fromTrack}>{p.source.trackId}</span>
+                  </Link>
+                ) : null}
+              </div>
+              <div className={s.title}>{p.title}</div>
+            </div>
+            <div className={s.headRight}>
+              {/* A deliverable's Assignment Plan, the manager's (②b-2a). */}
+              {can.manage && p.kind === 'deliverable' && (p.status === 'planning' || p.status === 'active') ? (
+                <Link href={`/marketing/projects/${encodeURIComponent(p.trackId)}?plan=1`} className={`${s.btn}${p.status === 'planning' ? ` ${s.btnPrimary}` : ''}`}>
+                  {p.status === 'planning' ? 'Plan it →' : 'Assignment plan'}
                 </Link>
               ) : null}
+              {view.actions.length ? (
+                <div className={s.actions}>
+                  {view.actions.map(a => {
+                    const ready = a.key === 'submit' || a.key === 'complete' ? !holdNote : !a.disabled
+                    return (
+                      <button
+                        key={a.key}
+                        type="button"
+                        disabled={pending || !ready}
+                        className={`${s.btn}${a.key === 'changes' ? ` ${s.btnDanger}` : ` ${s.btnPrimary}`}`}
+                        onClick={() => (a.key === 'changes' ? setModal(true) : a.key === 'approve' ? decide(true) : submit())}
+                      >
+                        {a.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+              {sending ? <span className={s.note} role="status">{sending}</span> : null}
+              {mine ? (
+                <span className={`${s.note}${holdNote ? ` ${s.noteRed}` : ''}`}>{holdNote || 'Ready'}</span>
+              ) : view.note ? (
+                <span className={`${s.note}${view.noteRed ? ` ${s.noteRed}` : ''}`}>{view.note}</span>
+              ) : null}
             </div>
-            <div className={s.title}>{p.title}</div>
           </div>
-          <div className={s.headRight}>
-            {/* A deliverable's Assignment Plan, the manager's (②b-2a). */}
-            {can.manage && p.kind === 'deliverable' && (p.status === 'planning' || p.status === 'active') ? (
-              <Link href={`/marketing/projects/${encodeURIComponent(p.trackId)}?plan=1`} className={`${s.btn}${p.status === 'planning' ? ` ${s.btnPrimary}` : ''}`}>
-                {p.status === 'planning' ? 'Plan it →' : 'Assignment plan'}
-              </Link>
-            ) : null}
-            {view.actions.length ? (
-              <div className={s.actions}>
-                {view.actions.map(a => {
-                  const ready = a.key === 'submit' || a.key === 'complete' ? !holdNote : !a.disabled
-                  return (
-                    <button
-                      key={a.key}
-                      type="button"
-                      disabled={pending || !ready}
-                      className={`${s.btn}${a.key === 'changes' ? ` ${s.btnDanger}` : ` ${s.btnPrimary}`}`}
-                      onClick={() => (a.key === 'accept' ? accept() : a.key === 'changes' ? setModal(true) : a.key === 'approve' ? decide(true) : submit())}
-                    >
-                      {a.label}
-                    </button>
-                  )
-                })}
+          <div className={s.meta}>
+            {view.meta.map(m => (
+              <div key={m.k}>
+                <div className={s.metaK}>{m.k}</div>
+                <div className={s.metaV}>{m.v}</div>
               </div>
-            ) : null}
-            {sending ? <span className={s.note} role="status">{sending}</span> : null}
-            {mine ? (
-              <span className={`${s.note}${holdNote ? ` ${s.noteRed}` : ''}`}>{holdNote || 'Ready'}</span>
-            ) : view.note ? (
-              <span className={`${s.note}${view.noteRed ? ` ${s.noteRed}` : ''}`}>{view.note}</span>
-            ) : null}
+            ))}
           </div>
-        </div>
-        <div className={s.meta}>
-          {view.meta.map(m => (
-            <div key={m.k}>
-              <div className={s.metaK}>{m.k}</div>
-              <div className={s.metaV}>{m.v}</div>
-            </div>
-          ))}
-        </div>
-        <div className={s.rail}>
-          {view.rail.map((r, i) => (
-            <div key={r.idx} className={s.railStage}>
-              <div className={s.railTop}>
-                <div className={`${s.railMark}${r.state === 'done' ? ` ${s.railDone}` : r.state === 'current' ? ` ${s.railCur}` : ''}`}>{r.mark}</div>
-                {i < view.rail.length - 1 ? <div className={`${s.railLine}${r.state === 'done' ? ` ${s.railLineDone}` : ''}`} /> : null}
+          <div className={s.rail}>
+            {view.rail.map((r, i) => (
+              <div key={r.idx} className={s.railStage}>
+                <div className={s.railTop}>
+                  <div className={`${s.railMark}${r.state === 'done' ? ` ${s.railDone}` : r.state === 'current' ? ` ${s.railCur}` : ''}`}>{r.mark}</div>
+                  {i < view.rail.length - 1 ? <div className={`${s.railLine}${r.state === 'done' ? ` ${s.railLineDone}` : ''}`} /> : null}
+                </div>
+                <div className={s.railText}>
+                  <div className={`${s.railName}${r.state === 'current' ? ` ${s.railNameCur}` : ''}`}>{r.name}</div>
+                  <div className={s.railWho}>{r.who}</div>
+                  <div className={s.railAppr}>{r.appr} · due {r.due}</div>
+                </div>
               </div>
-              <div className={s.railText}>
-                <div className={`${s.railName}${r.state === 'current' ? ` ${s.railNameCur}` : ''}`}>{r.name}</div>
-                <div className={s.railWho}>{r.who}</div>
-                <div className={s.railAppr}>{r.appr} · due {r.due}</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <TaskSubtasks part="list" page={page} can={can} people={splitPeople} onPage={fresh} say={say} />
         </div>
-        <TaskSubtasks part="list" page={page} can={can} people={splitPeople} onPage={fresh} say={say} />
-      </div>
-
-      {view.banner ? <div className={`${s.banner} ${TONE[view.banner.tone]}`}>{view.banner.text}</div> : null}
+  
+        {view.banner ? <div className={`${s.banner} ${TONE[view.banner.tone]}`}>{view.banner.text}</div> : null}
+        </>
+      )}
 
       <div className={s.body}>
         <div className={s.main}>
           {/* 🔗 Its stages the PIC approves on their link, its minutes not theirs (②a-5): the link to send them. */}
           {p.picLink ? <TaskPicLink page={page} pl={p.picLink} say={say} /> : null}
           {/* Written with meeting minutes (②a-3): the minutes are its requirements — signed, and written on by its owner. */}
-          {page.minutes ? (
+          {flow ? null : page.minutes ? (
             <TaskMinutes page={page} doc={page.minutes} can={can} source={view.requirements.source} onPage={fresh} say={say} />
           ) : (
             <div>
@@ -418,7 +596,7 @@ export default function TaskPage({ initial, can, files = [], splitPeople = [], l
             </div>
           ) : null}
 
-          {view.work.map(w => {
+          {!flow && view.work.map(w => {
             const live = w.editable && mine?.idx === w.idx && work
             const ww = live ? work : w.work
             return (

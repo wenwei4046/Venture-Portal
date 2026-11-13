@@ -59,7 +59,7 @@ describe('a deliverable’s Assignment Plan', () => {
     // Tomorrow is offered to start: Tue 27 Oct; Design's two days → Thu 29.
     expect((screen.getByLabelText('Starts') as HTMLInputElement).value).toBe('2026-10-27')
     expect(within(card('Design')).getByText('27 Oct → 29 Oct')).toBeTruthy()
-    expect(screen.getByText('Skips weekends and Selangor’s public holidays: none in this range')).toBeTruthy()
+    expect(screen.getByText('Working days Monday to Friday · public holidays in it: none in this range')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Save plan' })).toHaveProperty('disabled', true)
     expect(screen.getByText('2 stages unassigned')).toBeTruthy()
   })
@@ -77,9 +77,9 @@ describe('a deliverable’s Assignment Plan', () => {
     fireEvent.click(within(card('Publish')).getByRole('button', { name: /Choose someone/ }))
     fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /Mei/ }))
     fireEvent.click(within(card('Publish')).getByRole('button', { name: '👤 Pick who approves' }))
-    fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /SIA/ }))
+    fireEvent.click(within(card('Publish')).getByRole('option', { name: /SIA/ }))
     fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '2026-11-02' } })
-    expect(screen.getByText('Skips weekends and Selangor’s public holidays: Selangor day')).toBeTruthy()
+    expect(screen.getByText('Working days Monday to Friday · public holidays in it: Selangor day')).toBeTruthy()
     expect(screen.getByText('Notifies 3 people')).toBeTruthy()
     const save = screen.getByRole('button', { name: 'Save plan' })
     expect(save).toHaveProperty('disabled', false)
@@ -91,9 +91,9 @@ describe('a deliverable’s Assignment Plan', () => {
     expect(actions.planMktDeliverable.mock.calls[0]).toEqual(['d1', {
       start: '2026-11-02',
       stages: [
-        { owner: ALI, extra: null, appr: [{ kind: 'pic' }], sla: 2, split: false },
-        { owner: null, extra: null, appr: [{ kind: 'person', staff: JOSIAH }], sla: 1, split: false },
-        { owner: MEI, extra: null, appr: [{ kind: 'person', staff: JOSIAH }], sla: 1, split: true },
+        { owner: ALI, extra: null, appr: [{ ids: ['pic'], rule: 'any' }], sla: 2, split: false },
+        { owner: null, extra: null, appr: [{ ids: [JOSIAH], rule: 'any' }], sla: 1, split: false },
+        { owner: MEI, extra: null, appr: [{ ids: [JOSIAH], rule: 'any' }], sla: 1, split: true },
       ],
     }])
     expect(await screen.findByText('3 people on the plan told · Ali has it to Accept on Mon 2 Nov')).toBeTruthy()
@@ -114,13 +114,13 @@ describe('a deliverable’s Assignment Plan', () => {
     fireEvent.click(within(card('Publish')).getByRole('button', { name: /Choose someone/ }))
     fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /Mei/ }))
     fireEvent.click(within(card('Publish')).getByRole('button', { name: '👤 Pick who approves' }))
-    fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /SIA/ }))
+    fireEvent.click(within(card('Publish')).getByRole('option', { name: /SIA/ }))
     actions.planMktDeliverable.mockResolvedValue({ ok: true, reassigned: 0, page: null })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save plan' }))
     })
     await waitFor(() => expect(actions.planMktDeliverable).toHaveBeenCalledTimes(1))
-    expect(actions.planMktDeliverable.mock.calls[0][1].stages[0].appr).toEqual([{ kind: 'pic', all: true }])
+    expect(actions.planMktDeliverable.mock.calls[0][1].stages[0].appr).toEqual([{ ids: ['pic'], rule: 'any', picAll: true }])
   })
 
   it('one PIC: no either / both to pick', () => {
@@ -168,5 +168,41 @@ describe('a deliverable’s Assignment Plan', () => {
     await waitFor(() => expect(actions.planMktDeliverable).toHaveBeenCalledTimes(1))
     expect(actions.planMktDeliverable.mock.calls[0][1]).toMatchObject({ start: '2026-10-26', reasons: { 1: 'Mei is on MC until Friday' } })
     expect(await screen.findByText('Plan updated · 1 change of hands logged · new people told')).toBeTruthy()
+  })
+
+  // 2026-11-13 — the Workflow Builder 2a's levels: several on one, any one or everyone; a level not touched is sent whole.
+  it('a level of several: shown whole, Any one | Everyone, a person on one level only — and untouched levels kept', async () => {
+    const pg = page({}, [
+      stage(0, { name: 'Design', sla: 2, appr: [{ ids: [JOSIAH, 'pic'], rule: 'all' }] }),
+      stage(1, { name: 'Caption', dept: 'VIDEOGRAPHER', mode: 'prev', cands: [ALI, MEI], appr: [] }),
+      stage(2, { name: 'Publish', dept: 'VIDEOGRAPHER', appr: [{ ids: ['assign'], rule: 'any' }], split: true }),
+    ])
+    render(<AssignmentPlan initial={pg} people={people} approvers={approvers} />)
+    const design = card('Design')
+    const l1 = within(design).getByLabelText('Level 1')
+    expect(l1.textContent).toContain('SIA×&🔗PIC · Kelvin')
+    expect(within(design).getByRole('radio', { name: 'Everyone' }).getAttribute('aria-checked')).toBe('true')
+    // Publish: its "picked at assignment" resolved (SIA on another stage is no matter — one level a stage).
+    fireEvent.click(within(card('Publish')).getByRole('button', { name: '👤 Pick who approves' }))
+    const sia = within(card('Publish')).getByRole('option', { name: /SIA/ })
+    expect(sia.getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(sia)
+    // A second level on Design: SIA is on level 1 — not offered.
+    fireEvent.click(within(design).getByRole('button', { name: '+ Level' }))
+    expect(within(design).getByRole('option', { name: /SIA/ }).getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(within(design).getByRole('radio', { name: 'Any one' }))
+    fireEvent.click(within(design).getByRole('button', { name: /Choose someone/ }))
+    fireEvent.click(within(design).getByRole('menuitem', { name: /Ali/ }))
+    fireEvent.click(within(card('Publish')).getByRole('button', { name: /Choose someone/ }))
+    fireEvent.click(within(card('Publish')).getByRole('menuitem', { name: /Mei/ }))
+    fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '2026-11-02' } })
+    actions.planMktDeliverable.mockResolvedValue({ ok: true, reassigned: 0, page: null })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save plan' }))
+    })
+    await waitFor(() => expect(actions.planMktDeliverable).toHaveBeenCalledTimes(1))
+    expect(actions.planMktDeliverable.mock.calls[0][1].stages.map((x: { appr: unknown }) => x.appr)).toEqual([
+      [{ ids: [JOSIAH, 'pic'], rule: 'any' }], [], [{ ids: [JOSIAH], rule: 'any' }],
+    ])
   })
 })

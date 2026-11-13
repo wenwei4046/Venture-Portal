@@ -84,6 +84,9 @@ export interface PicWorkField {
   name: string
   type: string
   value: string | null
+  /** A table they may see (Workflow Builder 2a — mkt_pic_table): its 👁 columns (never a Person column) and rows, a text a
+   * cell; null for any other field. */
+  table?: { cols: string[]; rows: string[][] } | null
 }
 
 export interface PicWork {
@@ -94,6 +97,12 @@ export interface PicWork {
   dueOn: string | null
   stages: number
   done: number
+  /** Its stages' names in order (Workflow Builder 2a) — the PIC's step bar. */
+  stageNames: string[]
+  /** 📋 Requirements as the task gives them — null when hidden from the PIC. */
+  brief: string | null
+  /** Done: what the PIC reads, the celebration, and until when the link takes their feedback (null: it closes). */
+  finish: { picText: string | null; celebration: string | null; feedbackUntil: string | null } | null
   stage: {
     idx: number
     name: string
@@ -203,6 +212,9 @@ function workFromRow(w: Record<string, unknown>): PicWork {
     dueOn: strOrNull(w.dueOn),
     stages: n(w.stages),
     done: n(w.done),
+    stageNames: (Array.isArray(w.stageNames) ? w.stageNames : []).map(x => str(x)),
+    brief: strOrNull(w.brief),
+    finish: isObj(w.finish) ? { picText: strOrNull(w.finish.picText), celebration: strOrNull(w.finish.celebration), feedbackUntil: strOrNull(w.finish.feedbackUntil) } : null,
     stage: s ? {
       idx: n(s.idx),
       name: str(s.name),
@@ -213,7 +225,12 @@ function workFromRow(w: Record<string, unknown>): PicWork {
       both: s.both === true,
       ok: picOkFromRow(s.ok),
       note: strOrNull(s.note),
-      fields: (Array.isArray(s.fields) ? s.fields : []).filter(isObj).map(f => ({ name: str(f.name), type: str(f.type), value: workValue(str(f.type), f.value) })),
+      fields: (Array.isArray(s.fields) ? s.fields : []).filter(isObj).map(f => ({
+        name: str(f.name), type: str(f.type), value: str(f.type) === 'Table' ? null : workValue(str(f.type), f.value),
+        table: str(f.type) === 'Table' && isObj(f.value)
+          ? { cols: (Array.isArray(f.value.cols) ? f.value.cols : []).map(x => str(x)), rows: (Array.isArray(f.value.rows) ? f.value.rows : []).filter(Array.isArray).map(r => (r as unknown[]).map(x => str(x))) }
+          : null,
+      })),
       links: (Array.isArray(s.links) ? s.links : []).filter(isObj).filter(l => /^https:\/\//i.test(str(l.url))).map(l => ({ url: str(l.url), label: str(l.label) })),
       files: (Array.isArray(s.files) ? s.files : []).filter(isObj).filter(f => /^[0-9a-f-]{36}$/i.test(str(f.key)))
         .map(f => ({ key: str(f.key), name: str(f.name) || 'File', size: Math.max(0, n(f.size)), mime: str(f.mime), field: strOrNull(f.field) })),

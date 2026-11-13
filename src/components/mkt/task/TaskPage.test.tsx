@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { taskFromRow, type MktTaskPage } from '@/lib/marketing/task'
 
 // 2026-10-23 — the task page (`New Task Page.dc.html`, PR ②a) for the people who work it: the stage's owner fills its
@@ -18,6 +18,9 @@ const actions = vi.hoisted(() => ({
   addMktOption: vi.fn(),
 }))
 vi.mock('@/lib/marketing/actions', () => actions)
+// The task page's own writes since the Workflow Builder 2a (⇄ Reassign, a table's columns and rows).
+const taskActions = vi.hoisted(() => ({ reassignMktStage: vi.fn(), addMktTaskColumn: vi.fn(), removeMktTaskColumn: vi.fn(), saveMktTable: vi.fn() }))
+vi.mock('@/lib/marketing/task-actions', () => taskActions)
 const bucket = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ storage: { from: () => bucket } }) }))
 vi.mock('@/lib/storage/browser', () => ({ fileRoute: (b: string, p: string) => `/files/${b}/${p}` }))
@@ -79,7 +82,7 @@ describe('a stage’s own files (②b-2e)', () => {
     expect(actions.saveMktStageFiles).toHaveBeenCalledWith('p1', [{ path, name: 'art.png', field: 'Final artwork' }])
     expect(await screen.findByText('📎 art.png')).toBeTruthy()
     expect(screen.getByText('2 KB · Uploaded by Siti · 25 Oct')).toBeTruthy()
-    expect(screen.getByText('Fill in Logo checked')).toBeTruthy()
+    expect(screen.getByText('Fill 1 required field below, then submit.')).toBeTruthy()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Remove art.png' }))
     })
@@ -127,7 +130,7 @@ describe('a choice on the stage’s work (③d-2)', () => {
     fireEvent.click(chip('Showroom'))
     fireEvent.click(chip('LRT'))
     await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { Location: null } }))
-    expect(screen.getByText('Fill in Location')).toBeTruthy()
+    expect(screen.getByText('Fill 1 required field below, then submit.')).toBeTruthy()
   })
 
   it('+ Add an option… puts a missing one on the list and picks it; one there in other letters is picked as spelt; a refusal is said', async () => {
@@ -184,9 +187,11 @@ describe('a choice on the stage’s work (③d-2)', () => {
 describe('the task page, for the people who work it', () => {
   it('the owner fills the fields in — each saved alone — and hands the stage on once they are', async () => {
     render(<TaskPage initial={page(SITI, {})} can={ALL} />)
-    const submit = screen.getByRole('button', { name: 'Submit for approval' })
-    expect(submit).toHaveProperty('disabled', true)
-    expect(screen.getByText('Fill in Final artwork, Logo checked')).toBeTruthy()
+    // Workflow Builder 2a: Submit is always offered; missing fields are listed in a toast and outlined in red.
+    expect(screen.getByText('Fill 2 required fields below, then submit.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Redesign' }))
+    expect(screen.getByRole('status').textContent).toBe('Fill 2 required fields first: Final artwork, Logo checked')
+    expect(actions.submitMktStage).not.toHaveBeenCalled()
 
     const link = screen.getByPlaceholderText('or a link — https://…')
     fireEvent.change(link, { target: { value: 'https://drive.google.com/a' } })
@@ -195,7 +200,7 @@ describe('the task page, for the people who work it', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Logo checked' }))
     await waitFor(() => expect(actions.saveMktWork).toHaveBeenLastCalledWith('p1', { vals: { 'Logo checked': true } }))
-    expect(screen.getByText('Ready')).toBeTruthy()
+    expect(screen.getByText('Everything required is filled. When you submit, Rachel is notified to approve.')).toBeTruthy()
 
     // Blurring again with nothing changed sends nothing.
     fireEvent.blur(link)
@@ -203,17 +208,18 @@ describe('the task page, for the people who work it', () => {
 
     actions.submitMktStage.mockResolvedValue({ ok: true, page: page(SITI, { status: 'review', ver: 1, work: { vals: { 'Final artwork': 'https://drive.google.com/a', 'Logo checked': true } } }) })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Submit Redesign' }))
     })
-    await waitFor(() => expect(actions.submitMktStage).toHaveBeenCalledWith('p1'))
+    await waitFor(() => expect(actions.submitMktStage).toHaveBeenCalledWith('p1', null))
     expect(await screen.findByText('Submitted · sent to Rachel')).toBeTruthy()
-    expect(screen.getAllByText('Waiting for Rachel').length).toBe(2) // the status and the note
-    expect(screen.queryByRole('button', { name: 'Submit for approval' })).toBeNull()
+    expect(screen.getByText('Rachel (approving)')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Submit Redesign' })).toBeNull()
   })
 
   it('the approver sends it back with a reason — to the stage the builder named', async () => {
     render(<TaskPage initial={page(RACHEL, { status: 'review', ver: 1 })} can={ALL} />)
-    expect(screen.getByText('Siti submitted Redesign v1 for your approval')).toBeTruthy()
+    expect(screen.getByText('Your approval · Redesign')).toBeTruthy()
+    expect(screen.getByText('Siti submitted it. Approve to move it on, or send it back.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Request changes' }))
     expect(screen.getByText('Redesign v1 · back to First draft (Rachel)')).toBeTruthy()
     const send = screen.getByRole('button', { name: 'Send back' })
@@ -240,7 +246,8 @@ describe('the task page, for the people who work it', () => {
   it('somebody else sees where it stands and does nothing', () => {
     render(<TaskPage initial={page('s-other', {})} can={{ edit: true, approve: false, manage: false }} />)
     expect(screen.queryByRole('button', { name: /Accept|Submit|Approve|Complete/ })).toBeNull()
-    expect(screen.getByText('Now with Siti')).toBeTruthy()
+    expect(screen.getByText('You’re not on this task')).toBeTruthy()
+    expect(screen.getByText(/^It’s now at Redesign with Siti/)).toBeTruthy()
     expect(screen.queryByText('+ Checklist')).toBeNull()
   })
 
@@ -297,5 +304,37 @@ describe('opened from another project', () => {
     render(<TaskPage initial={page(SITI, {})} can={ALL} />)
     expect(screen.queryByRole('link', { name: /Opened from/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '+ Open a project from here' })).toBeNull()
+  })
+})
+
+// 2026-11-13 — the Workflow Builder 2a top on the real page: the manager reassigns, the doer's table is saved whole and
+// takes a column of this task's own.
+describe('the new top’s writes', () => {
+  const TABLE = { spec: { form: [{ label: 'Specs', type: 'Table', cols: [{ name: 'Size', type: 'Text', req: true }] }] }, work: {} }
+  it('⇄ Reassign current: the person picked, the task as it now stands', async () => {
+    taskActions.reassignMktStage.mockResolvedValue({ ok: true, page: page(SITI, { owner: RACHEL }) })
+    render(<TaskPage initial={page(RACHEL, {})} can={ALL} />)
+    fireEvent.click(screen.getByRole('button', { name: '⇄ Reassign current' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Reassign Stage 2 · Redesign' })).getByText('Rachel'))
+    })
+    expect(taskActions.reassignMktStage).toHaveBeenCalledWith('p1', 1, RACHEL, null)
+    expect(await screen.findByText('Redesign → Rachel · told')).toBeTruthy()
+  })
+  it('a table: + Add row saved whole; + Add column on this task only', async () => {
+    taskActions.saveMktTable.mockResolvedValue({ ok: true, page: null })
+    taskActions.addMktTaskColumn.mockResolvedValue({ ok: true, page: page(SITI, TABLE) })
+    render(<TaskPage initial={page(SITI, TABLE)} can={ALL} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Add row' }))
+    await waitFor(() => expect(taskActions.saveMktTable).toHaveBeenCalledWith('p1', 'Specs', [['']]))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Size row 1' }), { target: { value: 'A4' } })
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Size row 1' }))
+    await waitFor(() => expect(taskActions.saveMktTable).toHaveBeenLastCalledWith('p1', 'Specs', [['A4']]))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add column' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Column name' }), { target: { value: 'Paper' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    expect(taskActions.addMktTaskColumn).toHaveBeenCalledWith('p1', 'Specs', 'Paper', 'Text')
   })
 })

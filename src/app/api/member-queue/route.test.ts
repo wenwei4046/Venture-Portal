@@ -10,6 +10,7 @@ const answers = vi.hoisted(() => ({
   purge: { data: null as null, error: null as { code: string } | null },
   runs: { data: 2 as number | null, error: null as { code: string } | null },
   adsDue: { data: 1 as number | null, error: null as { code: string } | null },
+  overdue: { data: 2 as number | null, error: null as { code: string } | null },
 }))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({
@@ -21,6 +22,7 @@ vi.mock('@/lib/supabase/admin', () => ({
       if (name === 'mkt_lib_purge') return answers.purge
       if (name === 'mkt_product_runs_due') return answers.runs
       if (name === 'mkt_ads_due') return answers.adsDue
+      if (name === 'mkt_overdue_sweep') return answers.overdue
       return { data: 0, error: null }
     },
   }),
@@ -43,6 +45,7 @@ beforeEach(() => {
   answers.purge = { data: null, error: null }
   answers.runs = { data: 2, error: null }
   answers.adsDue = { data: 1, error: null }
+  answers.overdue = { data: 2, error: null }
   process.env.CRON_SECRET = SECRET
 })
 afterEach(() => {
@@ -113,5 +116,19 @@ describe('the hourly sweep', () => {
   it('answers nobody without the cron secret — nothing is written', async () => {
     expect((await sweep('Bearer wrong-secret-wrong-secret-wrong-secret')).status).toBe(401)
     expect(calls).toEqual([])
+  })
+
+  // The Workflow Builder 2a (mig 20261113210000): a stage late by its template's rule is told before the pushes go.
+  it("tells Marketing's overdue stages before the pushes go; a failure is logged by its code and stops nothing", async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    expect((await sweep()).status).toBe(200)
+    expect(calls.indexOf('mkt_overdue_sweep')).toBeGreaterThan(-1)
+    expect(calls.indexOf('mkt_overdue_sweep')).toBeLessThan(calls.indexOf('flushPush'))
+    expect(info).toHaveBeenCalledWith('Marketing overdue stages told', 2)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    answers.overdue = { data: null, error: { code: '42883' } }
+    expect((await sweep()).status).toBe(200)
+    expect(error).toHaveBeenCalledWith('Marketing overdue stages failed', '42883')
+    expect(calls).toContain('mkt_lib_purge')
   })
 })

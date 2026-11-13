@@ -53,10 +53,10 @@ describe('a task’s page', () => {
     expect(taskFromRow(null)).toBeNull()
   })
 
-  it('the owner of the stage now: Accept', () => {
+  it('the owner of the stage now: theirs to work at once — no Accept (Workflow Builder 2a)', () => {
     const page = taskFromRow(row([stage(0, { status: 'done' }), stage(1, { status: 'todo' }), stage(2, {})]))!
     const v = taskView(page, STAFF)
-    expect([v.status, v.actions.map(a => a.key), v.note, v.banner]).toEqual(['Waiting for Siti to Accept', ['accept'], 'New · just assigned to you',
+    expect([v.status, v.actions.map(a => a.key), v.note, v.banner]).toEqual(['In progress · Siti', ['complete'], 'Fill in a note, a file or a link',
       { tone: 'waiting', text: 'You\'re up: Redesign · due Tue 27 Oct' }])
     expect(v.meta.map(m => m.v)).toEqual(['Carres', 'Rachel', 'Siti', '⚡ Quick task · Social Media', 'Due Wed 28 Oct'])
     expect(v.rail.map(r => [r.mark, r.state, r.appr])).toEqual([['✓', 'done', '— no approval'], ['S', 'current', '— no approval'], ['3', 'next', '— no approval']])
@@ -169,7 +169,7 @@ describe('a PIC level, with one or two PICs (②b-2d-2b, the user’s answer 29)
       project: { id: 'd1', trackId: 'MKT-CAR-2610-001-D01', kind: 'deliverable', sub: 'sub', title: 'Poster', status: 'active', cur: 0, pic: 'Kelvin', pic2: 'Hana' },
       stages: [{ project: 'd1', idx: 0, name: 'Design', status: 'review', ver: 2, apprIdx: 0, appr: [{ kind: 'pic', all: true }], picOk: { '1': { name: 'Kelvin Tan', at: null } } }],
       events: [], holidays: [] })
-    expect([page?.project.pic2, page?.stages[0].levels, page?.stages[0].picOk]).toEqual(['Hana', [{ kind: 'pic', all: true }], { '1': { name: 'Kelvin Tan', at: null } }])
+    expect([page?.project.pic2, page?.stages[0].plan, page?.stages[0].picOk]).toEqual(['Hana', [{ kind: 'pic', all: true }], { '1': { name: 'Kelvin Tan', at: null } }])
     expect(approvalText([], page!.stages[0])).toBe('🔗 Both PICs')
   })
 })

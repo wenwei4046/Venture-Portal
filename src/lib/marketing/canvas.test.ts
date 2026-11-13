@@ -1,177 +1,103 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canvasFromRow, canvasPayload, canvasProblems, canvasRemap, EMPTY_CANVAS, fieldExtras, fieldFlags, newCanvasSection, picView, stageMap,
-  staffView, withType, type WfCanvas,
+  canvasForStages, canvasFromRow, canvasPayload, canvasProblems, duplicateStageSections, ensureStageSections, fieldFlags, newCanvasSection,
+  picView, renameStageSection, stageFillCount, stageNameOf, staffView, withType, type CanvasField, type WfCanvas,
 } from './canvas'
-import type { FormField } from './tasks'
-import { newWfStage, wfStageFromRow, type WfStage } from './workflows'
 
-// 2026-10-23 — the Canvas Template Editor (`Canvas Template Editor.dc.html`, ③ of the handoff): the task page's layout
-// kept with a workflow template — what the builder reads, sends, follows when the stages change, refuses on publishing
-// (as mkt_canvas_check / mkt_workflow_check do: tests/member-sql/validate-marketing-canvas.mjs) and previews.
+// A template's canvas (Workflow Builder 2a, 2026-11-13): the only place fields are defined — every field and table
+// column names the stage that fills it in by the stage's key, so stages renamed or moved keep their fields. The
+// database's side: tests/member-sql/validate-marketing-wf-builder-v2.mjs.
 
-const stage = (over: Partial<WfStage> = {}): WfStage => ({ ...newWfStage(undefined), ...over })
-const STAGES = [
-  stage({ key: 'a', name: 'Script', form: [{ label: 'Topic', type: 'Text' }, { label: 'Read the brief', type: 'Note' }] }),
-  stage({ key: 'b', name: 'Shoot', sec: { emoji: '🎬', locked: true, req: false, pic: false },
-    form: [{ label: 'Shoot date', type: 'Date', cal: { kind: 'shoot', pic: false } }, { label: 'Shots', type: 'Table', cols: [{ name: 'Shot', type: 'Text' }] }] }),
-  stage({ key: 'c', name: 'Edit', form: [{ label: 'Final video', type: 'File', pic: false }] }),
-]
-const ROW = {
-  req: { pic: false },
+const STAGES = [{ sid: 'sscript', name: 'Script' }, { sid: 'sedit00', name: 'Edit' }, { sid: 'sfinal0', name: 'Final' }]
+const field = (p: Partial<CanvasField> = {}): CanvasField => ({ id: 'f1', label: 'Body', type: 'Text', stage: 'sscript', req: true, pic: true, ...p })
+const CANVAS: WfCanvas = {
+  req: { pic: true },
   sections: [
-    { emoji: '💬', title: 'Caption', stage: 0, locked: true, req: true, pic: true, fields: [
-      { label: 'Caption', type: 'Text', stage: 0, req: true, pic: true },
-      { label: 'Posting date', type: 'Date', stage: 0, req: true, pic: true, cal: { kind: 'post', pic: true } },
-      { label: 'Platform', type: 'Select', stage: 2, req: false, pic: false, opts: ['Instagram', 'TikTok'] },
-      { label: 'Budget', type: 'Number', stage: 0 },
+    { id: 'xs', emoji: '🎯', title: 'Script', stage: 'sscript', locked: false, req: true, pic: true, fields: [
+      field(),
+      field({ id: 'ft', label: 'Shots', type: 'Table', req: false, cols: [
+        { id: 'k1', name: 'Shot', type: 'Text', stage: 'sscript', req: true, pic: true },
+        { id: 'k2', name: 'Edit notes (internal)', type: 'Text', stage: 'sedit00', req: false, pic: false },
+      ], rows: [['Opening', '']] }),
     ] },
-    { title: 'Internal notes', stage: null, fields: [{ label: 'Notes', type: 'Text', stage: 2 }] },
+    { id: 'xn', emoji: '📝', title: 'Notes', stage: null, locked: false, req: false, pic: false, fields: [field({ id: 'fn', label: 'Notes', stage: 'sfinal0', pic: false })] },
   ],
 }
 
-describe('what the builder reads', () => {
-  it('the canvas as the database keeps it; a kind of answer the canvas does not offer is left out', () => {
-    const c = canvasFromRow(ROW)
-    expect(c.req).toEqual({ pic: false })
-    expect(c.sections.map(s => [s.emoji, s.title, s.stage, s.locked, s.req, s.pic])).toEqual([['💬', 'Caption', 0, true, true, true], ['📝', 'Internal notes', null, false, false, false]])
-    expect(c.sections[0].fields.map(f => f.label)).toEqual(['Caption', 'Posting date', 'Platform'])
-    expect(c.sections[0].fields[1].cal).toEqual({ kind: 'post', pic: true })
-    expect(c.sections[0].fields[2].opts).toEqual(['Instagram', 'TikTok'])
-  })
-
-  it('nothing kept yet: the empty canvas, the Requirements shown to the PIC', () => {
-    expect(canvasFromRow(null)).toEqual(EMPTY_CANVAS)
-    expect(canvasFromRow({ sections: 'x' })).toEqual(EMPTY_CANVAS)
-  })
-
-  it('a stage’s section and its fields’ settings', () => {
-    const s = wfStageFromRow({ name: 'Shoot', dept: 'content', sla: 1, sec: { emoji: '🎬', locked: true, req: false, pic: false },
-      form: [{ label: 'Day', type: 'Date', req: false, pic: true, cal: { kind: 'ads_live', label: 'Ads go-live', pic: true } }, { label: 'Where', type: 'Select', opts: ['LRT'] }] })
-    expect(s.sec).toEqual({ emoji: '🎬', locked: true, req: false, pic: false })
-    expect(s.form[0]).toEqual({ label: 'Day', type: 'Date', req: false, pic: true, cal: { kind: 'ads_live', pic: true } })
-    expect(s.form[1].opts).toEqual(['LRT'])
-    expect(wfStageFromRow({ name: 'Old', dept: 'design', sla: 1 }).sec).toEqual({ emoji: '🎯', locked: false, req: true, pic: true })
-  })
-})
-
-describe('what the builder sends', () => {
-  it('a field’s settings, explicit: required and shown unless set, a note never required, a mark only on a date, options only on a choice', () => {
-    expect(fieldExtras({ label: 'T', type: 'Text' })).toEqual({ req: true, pic: true })
-    expect(fieldExtras({ label: 'N', type: 'Note', req: true })).toEqual({ req: false, pic: true })
-    expect(fieldExtras({ label: 'D', type: 'Date', cal: { kind: 'report', pic: true } })).toEqual({ req: true, pic: true, cal: { kind: 'report', pic: true } })
-    expect(fieldExtras({ label: 'S', type: 'Select' })).toEqual({ req: true, pic: true, opts: [] })
-    expect(fieldExtras({ label: 'X', type: 'Text', cal: { kind: 'ads_end', pic: false }, opts: ['a'] })).toEqual({ req: true, pic: true })
-  })
-
-  it('the canvas without the page’s keys', () => {
-    const p = canvasPayload(canvasFromRow(ROW)) as { req: unknown; sections: { fields: Record<string, unknown>[] }[] }
-    expect(p.req).toEqual({ pic: false })
-    expect(p.sections[0].fields[2]).toEqual({ label: 'Platform', type: 'Select', stage: 2, req: false, pic: false, opts: ['Instagram', 'TikTok'] })
-    expect(JSON.stringify(p)).not.toContain('"key"')
-  })
-
-  it('a new kind of answer: options for a choice, a calendar mark only on a date', () => {
-    const d: FormField = { label: 'Day', type: 'Date', cal: { kind: 'ads_live', pic: false } }
-    expect(withType(d, 'Select')).toEqual({ label: 'Day', type: 'Select', opts: [] })
-    expect(withType({ label: 'P', type: 'Select', opts: ['a'] }, 'Text')).toEqual({ label: 'P', type: 'Text' })
-    // A shared list (③d-2) is a choice's only: kept between the two, gone with another kind.
-    expect(withType({ label: 'L', type: 'Select', opts: [], list: 'Locations' }, 'Multi-select')).toEqual({ label: 'L', type: 'Multi-select', opts: [], list: 'Locations' })
-    expect(withType({ label: 'L', type: 'Select', opts: [], list: 'Locations' }, 'Text')).toEqual({ label: 'L', type: 'Text' })
-  })
-
-  // ③d-2 — the user's answer 9: a choice naming a shared list.
-  it('a choice naming a shared list: read, sent, published with no options of its own', () => {
-    const c = canvasFromRow({ sections: [{ title: 'Shoot', stage: 0, fields: [
-      { label: 'Location', type: 'Multi-select', stage: 0, opts: [], list: 'Locations' }, { label: 'Note', type: 'Text', stage: 0, list: 'Locations' }] }] })
-    expect(c.sections[0].fields.map(f => [f.label, f.list ?? null])).toEqual([['Location', 'Locations'], ['Note', null]])
-    expect(fieldExtras({ label: 'L', type: 'Select', opts: ['Own'], list: 'Locations' })).toEqual({ req: true, pic: true, opts: ['Own'], list: 'Locations' })
-    expect(fieldExtras({ label: 'L', type: 'Select', list: undefined })).toEqual({ req: true, pic: true, opts: [] })
-    expect(canvasProblems([{ form: [] }], c)).toEqual([])
-    const none = canvasFromRow({ sections: [{ title: 'Shoot', stage: 0, fields: [{ label: 'Location', type: 'Select', stage: 0, opts: [] }] }] })
-    expect(canvasProblems([{ form: [] }], none)).toContain('A choice has no options')
-  })
-
-  it('a new section (the handoff’s): New section, 📝, a Notes field filled in at the last stage', () => {
-    const s = newCanvasSection(3)
-    expect([s.title, s.emoji, s.stage, s.locked, s.req, s.pic]).toEqual(['New section', '📝', null, false, false, false])
-    expect(s.fields.map(f => [f.label, f.type, f.stage, f.req, f.pic])).toEqual([['Notes', 'Text', 2, false, false]])
-    expect(newCanvasSection(0).fields[0].stage).toBeNull()
-  })
-
-  it('a field’s marks on the canvas', () => {
-    expect(fieldFlags({ label: 'D', type: 'Date', cal: { kind: 'meeting', pic: false } })).toBe('⭐ 👁 📅')
-    expect(fieldFlags({ label: 'T', type: 'Text', req: false, pic: false })).toBe('🔒')
-    expect(fieldFlags({ label: 'N', type: 'Note' }, false)).toBe('')
+describe('the canvas as the database keeps it', () => {
+  it('reads and writes the same shape — ids, stages by key, a table’s columns with their own stage', () => {
+    const back = canvasFromRow(canvasPayload(CANVAS))
+    expect(back).toEqual(CANVAS)
+    expect(canvasFromRow({ sections: [{ fields: [{ label: 'x', type: 'Video' }, { label: 'n', type: 'Note', req: true }] }] }).sections[0].fields)
+      .toEqual([expect.objectContaining({ label: 'n', type: 'Note', req: false })])
   })
 })
 
 describe('the stages change, the canvas follows', () => {
-  const c = canvasFromRow(ROW)
-  it('a stage moved: the sections and fields go with it', () => {
-    const moved = [STAGES[2], STAGES[0], STAGES[1]]
-    const next = canvasRemap(c, stageMap(STAGES, moved))
-    expect(next.sections[0].stage).toBe(1)
-    expect(next.sections[0].fields.map(f => f.stage)).toEqual([1, 1, 0])
-    expect(next.sections[1].fields[0].stage).toBe(0)
+  it('a stage with no section gets one after the stage before’s', () => {
+    const c = ensureStageSections(CANVAS, [...STAGES.slice(0, 2), { sid: 'snew000', name: 'Thumbnail' }, STAGES[2]])
+    expect(c.sections.map(s => [s.title, s.stage])).toEqual([['Script', 'sscript'], ['Edit', 'sedit00'], ['Thumbnail', 'snew000'], ['Final', 'sfinal0'], ['Notes', null]])
+    expect(ensureStageSections(c, STAGES)).toBe(c)
   })
+  it('a stage taken out leaves its fields and columns to nobody; renamed, its section follows', () => {
+    const c = canvasForStages(CANVAS, [STAGES[0], STAGES[2]])
+    expect(c.sections[0].fields[1].cols?.map(x => x.stage)).toEqual(['sscript', null])
+    expect(canvasForStages(c, [STAGES[0], STAGES[2]])).toBe(c)
+    expect(renameStageSection(CANVAS, 'sscript', 'Script', 'Scripting').sections[0].title).toBe('Scripting')
+    expect(renameStageSection(CANVAS, 'sscript', 'Other', 'X')).toBe(CANVAS)
+  })
+  it('a stage copied: its section and fields copied for the copy', () => {
+    const c = duplicateStageSections(CANVAS, 'sscript', 'scopy00', 'Script copy')
+    expect(c.sections.map(s => [s.title, s.stage])).toEqual([['Script', 'sscript'], ['Script copy', 'scopy00'], ['Notes', null]])
+    expect(c.sections[1].fields.map(f => f.stage)).toEqual(['scopy00', 'scopy00'])
+    expect(c.sections[1].fields[1].cols?.map(x => x.stage)).toEqual(['scopy00', 'sedit00'])
+    expect(c.sections[1].fields[0].id).not.toBe('f1')
+  })
+  it('counts what a stage fills in, and names a stage by its key', () => {
+    expect([stageFillCount(CANVAS, 'sscript'), stageFillCount(CANVAS, 'sedit00'), stageFillCount(CANVAS, 'sfinal0')]).toEqual([2, 1, 1])
+    expect([stageNameOf(STAGES, 'sedit00'), stageNameOf(STAGES, null), stageNameOf(STAGES, 'sgone00')]).toEqual(['Edit', '—', 'Removed stage'])
+  })
+})
 
-  it('a stage taken out: what was its belongs to none until picked again', () => {
-    const next = canvasRemap(c, stageMap(STAGES, [STAGES[0], STAGES[1]]))
-    expect(next.sections[0].fields.map(f => f.stage)).toEqual([0, 0, null])
-    expect(next.sections[1].fields[0].stage).toBeNull()
+describe('fields', () => {
+  it('a new kind: a table gets a column, a choice its options, a note is never required', () => {
+    expect(withType(field(), 'Table').cols).toHaveLength(1)
+    expect(withType(field(), 'Select').opts).toEqual([])
+    expect(withType(field(), 'Note').req).toBe(false)
+    expect(withType(withType(field(), 'Table'), 'Text').cols).toBeUndefined()
+  })
+  it('the marks: ⭐ 👁 / 🔒 📅', () => {
+    expect(fieldFlags(field())).toBe('⭐ 👁')
+    expect(fieldFlags(field({ req: false, pic: false, type: 'Date', cal: { kind: 'post', pic: false } }))).toBe('🔒 📅')
+  })
+  it('a new section: a Notes field at the last stage', () => {
+    expect(newCanvasSection('sfinal0').fields.map(f => [f.label, f.stage])).toEqual([['Notes', 'sfinal0']])
   })
 })
 
 describe('what publishing refuses', () => {
-  const ok = canvasFromRow(ROW)
-  it('a canvas in order may be published', () => {
-    expect(canvasProblems(STAGES, ok)).toEqual([])
-    expect(canvasProblems(STAGES, EMPTY_CANVAS)).toEqual([])
-  })
-
-  it('every section named, a field once in its section and named, each with its stage', () => {
-    const c = (patch: (x: WfCanvas) => void) => {
-      const x = structuredClone(ok)
-      patch(x)
-      return canvasProblems(STAGES, x)
-    }
-    expect(c(x => { x.sections[0].title = ' ' })).toEqual(['A section has no name'])
-    expect(c(x => { x.sections[0].fields[1].label = 'Caption' })).toEqual(['Each field in a section needs its own name'])
-    expect(c(x => { x.sections[0].fields[0].label = '' })).toEqual(['Each field in a section needs its own name'])
-    expect(c(x => { x.sections[1].fields[0].stage = null })).toEqual(['A field has no stage to fill it in'])
-    expect(c(x => { x.sections[1].fields[0].stage = 7 })).toEqual(['A field has no stage to fill it in'])
-  })
-
-  it('every choice with options, each once — a stage’s own too', () => {
-    const noOpts = structuredClone(ok)
-    noOpts.sections[0].fields[2].opts = [' ']
-    expect(canvasProblems(STAGES, noOpts)).toEqual(['A choice has no options'])
-    const stages = [...STAGES.slice(0, 2), stage({ key: 'c', name: 'Edit', form: [{ label: 'Where', type: 'Multi-select', opts: ['LRT', 'lrt '] }] })]
-    expect(canvasProblems(stages, ok)).toEqual(['An option is there twice'])
+  it('a field or column of a stage gone, a nameless one, a choice without options', () => {
+    expect(canvasProblems(STAGES, CANVAS)).toEqual([])
+    const bad: WfCanvas = { req: { pic: true }, sections: [{ ...CANVAS.sections[0], title: '', fields: [
+      field({ stage: 'sgone00' }), field({ id: 'f2', label: '', type: 'Select', opts: [] }),
+      field({ id: 'f3', label: 'T', type: 'Table', cols: [{ id: 'k', name: '', type: 'Text', stage: null, req: false, pic: false }] }),
+    ] }] }
+    expect(canvasProblems(STAGES, bad)).toEqual([
+      'A section has no name', 'Each field in a section needs its own name', 'A field has no stage to fill it in', 'A table column has no name',
+      'A table column has no stage to fill it in', 'A choice has no options',
+    ])
   })
 })
 
 describe('the preview', () => {
-  const c = canvasFromRow(ROW)
-  it('as the staff see it at a stage: every section, those not theirs faded', () => {
-    const v = staffView(STAGES, c, 2)
-    expect(v.map(s => [s.title, s.mine])).toEqual([
-      ['Requirements', true], ['Script', false], ['Shoot', false], ['Edit', true], ['Caption', true], ['Internal notes', true],
-    ])
-    expect(v[2].badges).toEqual(['🔒', '🎯 Shoot'])
-    expect(v[2].cols).toEqual(['Shot'])
-    expect(v[4].badges).toEqual(['🔒', '⭐', '🎯 Script', '👁'])
+  it('staff: the sections a stage fills nothing in faded, its own columns marked', () => {
+    const v = staffView(STAGES, CANVAS, 'sedit00')
+    expect(v.map(s => [s.title, s.mine, s.kind])).toEqual([['Requirements', true, 'req'], ['Script', true, 'table'], ['Notes', false, 'fields']])
+    expect(v[1].cols).toEqual([{ name: 'Shot', mine: false }, { name: 'Edit notes', mine: true }])
   })
-
-  it('as the PIC sees it on the link: only what is shown, the dates on their calendar, what is left out', () => {
-    const v = picView(STAGES, c)
-    expect(v.sections.map(s => [s.title, s.fields])).toEqual([
-      ['Script', ['Topic', 'Read the brief']],
-      ['Edit', []],
-      ['Caption', ['Caption', 'Posting date']],
-    ])
-    expect(v.calendar).toEqual([{ label: 'Post day', kind: 'post', from: 'Posting date' }])
-    expect(v.hidden).toBe('Hidden: Requirements, Shoot, Internal notes, 2 internal fields.')
+  it('the PIC: only 👁 sections and columns, and what is hidden', () => {
+    const p = picView(CANVAS)
+    expect(p.sections.map(s => [s.title, s.cols])).toEqual([['Requirements', null], ['Script', ['Shot']]])
+    expect(p.hidden).toBe('Hidden: Notes, 1 internal column.')
   })
 })

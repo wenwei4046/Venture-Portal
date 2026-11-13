@@ -1,322 +1,290 @@
 'use client'
 
-import { useState } from 'react'
-import { groupLabel, isManagerTitle, rosterGroups, sameGroup } from '@/lib/marketing/groups'
-import { WF_MAX_APPROVALS, WF_MAX_SLA, type WfAppr, type WfStage } from '@/lib/marketing/workflows'
-import FieldsEditor from '../builder/FieldsEditor'
-import { personBg, type BuilderPerson } from '../builder/people'
-import b from '../builder/builder.module.css'
+import { useRef, useState, type CSSProperties } from 'react'
+import type { ApprLevel } from '@/lib/marketing/flow'
+import {
+  apprSummary, groupNameOf, mayApprove, onApprove, whoSummary, WF_MAX_APPROVALS, WF_MAX_SLA,
+  type WfGroup, type WfPerson, type WfStage,
+} from '@/lib/marketing/workflows'
+import { personBg } from '../builder/people'
+import Tip from '../ui/Tip'
+import ApprovalLevel from './ApprovalLevel'
+import RadioCard from './RadioCard'
+import Stepper from './Stepper'
+import ToggleRow from './ToggleRow'
+import w from './workflows.module.css'
 
-// A workflow template's stage, its settings (`Workflow Builder.dc.html`, not quick): its name and group (a People title —
-// the user, 2026-10-24: each title is a group), who does it (the
-// manager picks at assignment, or 🔓 the stage before picks from the candidates set here), who approves it (up to
-// three levels: a manager, the PIC through the link, a person picked at assignment), how long, what the PIC sees on the
-// link, whether it splits into subtasks, where changes go back to, the fields it fills in.
+// The Stage Settings panel (`Stage Settings.dc.html`, layout="accordion"): the number, the name, ◀ ▶ to move it and
+// Remove; then four sections, one open at a time, each with a one-line summary — Basics (name, group chips with
+// "+ New group", how long as "day a–b", subtasks), Who does it (👤 MM assigns or 🔓 a handoff from the stage before,
+// with its shortlist and each person's load), Approval (Doer submits → up to three levels → what follows; where
+// changes go back to) and PIC & form (what the PIC reads; the fields are the Canvas template's — a link card).
 
-const initial = (first: string) => first.charAt(0).toUpperCase() || '?'
+export type Section = 'basics' | 'who' | 'appr' | 'pic' | ''
 
 export default function TemplateSettings({
   stage,
   at,
   stages,
   locked,
+  section,
+  startDay,
+  groups,
   people,
-  approvers,
+  fills,
   nameOf,
-  onChange,
+  onSection,
+  onPatch,
   onRemove,
+  onMove,
+  onOpenCanvas,
+  onAddGroup,
 }: {
   stage: WfStage
   at: number
-  stages: readonly WfStage[]
+  /** Every stage as drafted (names, approval of the others). */
+  stages: WfStage[]
   locked: boolean
-  /** Who a 🔓 stage may pick from: Marketing's people. */
-  people: BuilderPerson[]
-  /** Who may approve: Marketing's managers. */
-  approvers: BuilderPerson[]
-  nameOf: (staff: string) => string
-  onChange: (patch: Partial<WfStage>) => void
-  onRemove: () => void
+  section: Section
+  /** Working days before this stage (its "day a–b"). */
+  startDay: number
+  groups: WfGroup[]
+  /** Marketing's roster with each one's load. */
+  people: WfPerson[]
+  /** How many fields and columns the canvas has this stage fill in. */
+  fills: number
+  nameOf: (id: string) => string
+  onSection: (s: Section) => void
+  onPatch: (patch: Partial<WfStage>) => void
+  onRemove: (() => void) | null
+  onMove: (to: number) => void
+  onOpenCanvas: () => void
+  /** "+ New group": answers the new group's key, or null when it was refused. */
+  onAddGroup: (name: string) => Promise<string | null>
 }) {
-  const [dd, setDd] = useState<string | null>(null)
-  const toggle = (k: string) => setDd(cur => (cur === k ? null : k))
-  const close = () => setDd(null)
+  const [openLvl, setOpenLvl] = useState<number | null>(null)
+  const [addingGroup, setAddingGroup] = useState(false)
+  const [groupDraft, setGroupDraft] = useState('')
+  const addingRef = useRef(false)
 
-  // What the stage runs as — locked: picked at assignment, no subtasks (the stage keeps what was set for unlocking).
-  const prevOff = at === 0 || locked
   const mode = locked ? 'assign' : stage.who.mode
-  const split = stage.split && !locked
   const cands = stage.who.cands
-  // The stage's own group first (the handoff's "Assign to · Design first"); a manager only when picked already.
-  const workers = people
-    .filter(p => !isManagerTitle(p.group) || cands.includes(p.id))
-    .sort((x, y) => Number(sameGroup(y.group, stage.dept)) - Number(sameGroup(x.group, stage.dept)))
-  // The groups to pick from: the roster's titles — and the stage's own, should nobody hold it now.
-  const groups = rosterGroups([...people, ...approvers].map(p => ({ title: p.group })))
-  if (stage.dept && !groups.some(g => sameGroup(g, stage.dept))) groups.push(stage.dept)
+  const isPrev = mode === 'prev'
+  const prevOff = at === 0 || locked
+  const approvers = people.filter(p => mayApprove(p.title))
+  const workers = people.filter(p => !mayApprove(p.title) || cands.includes(p.id))
+  const levels: (ApprLevel | null)[] = stage.appr.length ? stage.appr : [null]
 
-  const setLevel = (li: number, a: WfAppr | null) => {
-    close()
-    if (a === null) return onChange({ appr: [] })
-    const next = [...stage.appr]
-    next[li] = a
-    onChange({ appr: next })
+  const commitGroup = async () => {
+    if (!addingRef.current) return
+    addingRef.current = false
+    const name = groupDraft.trim()
+    setAddingGroup(false)
+    setGroupDraft('')
+    if (!name) return
+    const key = await onAddGroup(name)
+    if (key) onPatch({ dept: key })
   }
-  const same = (x: WfAppr, y: WfAppr) => x.kind === y.kind && (x.kind !== 'person' || (y.kind === 'person' && x.staff === y.staff))
-  const levelLabel = (a: WfAppr | null) =>
-    !a ? { icon: '—', label: 'No approval', person: null }
-      : a.kind === 'pic' ? { icon: '🔗', label: 'PIC via link', person: null }
-      : a.kind === 'assign' ? { icon: '👤', label: 'Pick at assignment', person: null }
-      : { icon: '', label: nameOf(a.staff), person: people.find(p => p.id === a.staff) ?? approvers.find(p => p.id === a.staff) ?? null }
-  const addLevel = () => {
-    const pic = stage.appr.some(a => a.kind === 'pic')
-    onChange({ appr: [...stage.appr, pic ? { kind: 'assign' } : { kind: 'pic' }] })
+  const setLevel = (li: number, next: ApprLevel) => {
+    const arr = [...stage.appr]
+    if (li >= arr.length) arr.push(next)
+    else if (!next.ids.length && arr.length > 1) arr.splice(li, 1)
+    else if (!next.ids.length) arr.splice(li, 1)
+    else arr[li] = next
+    onPatch({ appr: arr })
   }
+  const acc = (k: Exclude<Section, ''>, label: string, summary: string, red = false, last = false) => (
+    <button type="button" aria-expanded={section === k} className={`${w.acc}${last ? ` ${w.accLast}` : ''}`} onClick={() => onSection(section === k ? '' : k)}>
+      <span className={w.accLabel}>{label}</span>
+      <span className={`${w.accSum}${red ? ` ${w.accSumRed}` : ''}`}>{summary}</span>
+      <span className={w.caret}>{section === k ? '▲' : '▼'}</span>
+    </button>
+  )
 
   return (
-    <div className={b.wbSettings} onClick={() => dd && close()}>
-      <div className={b.wbSetHead}>
-        <span className={b.wbSetLabel}>Stage {at + 1} settings</span>
-        <button type="button" className={b.wbRemove} onClick={onRemove}>Remove stage</button>
+    <div className={w.ss} onClick={() => openLvl !== null && setOpenLvl(null)}>
+      <div className={w.ssHead}>
+        <span className={w.ssNum}>{at + 1}</span>
+        <span className={w.ssName}>{stage.name || 'Untitled stage'}</span>
+        <button type="button" className={w.ssMove} title="Move earlier" aria-label="Move earlier" disabled={at === 0} onClick={() => onMove(at - 1)}>◀</button>
+        <button type="button" className={w.ssMove} title="Move later" aria-label="Move later" disabled={at >= stages.length - 1} onClick={() => onMove(at + 1)}>▶</button>
+        <button type="button" className={w.ssRemove} disabled={!onRemove} title={onRemove ? undefined : 'Keep at least one stage'} onClick={() => onRemove?.()}>Remove</button>
       </div>
 
-      <label className={b.field}>
-        <span className={b.wbQ}>What&apos;s this stage called?</span>
-        <input className={b.input} value={stage.name} maxLength={80} onChange={e => onChange({ name: e.target.value })} />
-      </label>
-
-      <div className={b.field}>
-        <span className={b.wbQ}>Which group?</span>
-        <div className={b.wbTeams} role="radiogroup" aria-label="Which group?">
-          {groups.map(g => {
-            const on = sameGroup(stage.dept, g)
-            return (
-              <button key={g} type="button" role="radio" aria-checked={on} className={`${b.wbBackOpt}${on ? ` ${b.wbBackOn}` : ''}`}
-                onClick={() => onChange({ dept: on ? '' : g })}>
-                {groupLabel(g)}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className={b.field}>
-        <span className={b.wbQ}>Who does it?</span>
-        <div className={b.wbDD}>
-          <button
-            type="button"
-            className={`${b.wbDDBtn}${dd === 'who' ? ` ${b.wbDDBtnOn}` : ''}`}
-            onClick={e => {
-              e.stopPropagation()
-              toggle('who')
-            }}
-            aria-expanded={dd === 'who'}
-          >
-            <span className={b.wbDDIcon}>{mode === 'prev' ? '🔓' : '👤'}</span>
-            <span className={b.wbDDText}><span className={b.wbDDLabel}>{mode === 'prev' ? 'Previous stage picks' : 'Pick at assignment'}</span></span>
-            <span className={b.wbCaret}>▼</span>
-          </button>
-          {dd === 'who' ? (
-            <div className={b.wbMenu} onClick={e => e.stopPropagation()}>
-              <button type="button" className={`${b.wbOpt}${mode === 'assign' ? ` ${b.wbOptOn}` : ''}`} onClick={() => { onChange({ who: { mode: 'assign', cands } }); close() }}>
-                <span className={b.wbTick}>{mode === 'assign' ? '✓' : ''}</span>
-                <span className={b.wbOptText}><span className={b.wbOptLabel}>Pick at assignment</span></span>
-              </button>
-              <button
-                type="button"
-                className={`${b.wbOpt}${mode === 'prev' ? ` ${b.wbOptOn}` : ''}${prevOff ? ` ${b.wbOptOff}` : ''}`}
-                aria-disabled={prevOff}
-                title={at === 0 ? 'Not on the first stage' : locked ? 'Off — whole workflow is locked' : undefined}
-                onClick={() => {
-                  if (prevOff) return
-                  onChange({ who: { mode: 'prev', cands } })
-                  close()
-                }}
-              >
-                <span className={b.wbTick}>{mode === 'prev' ? '✓' : ''}</span>
-                <span className={b.wbOptText}><span className={b.wbOptLabel}>🔓 Previous stage picks</span></span>
-              </button>
+      <div className={w.ssBody}>
+        {acc('basics', 'Basics', `${groupNameOf(groups, stage.dept)} · ${stage.sla}d${stage.split && !locked ? ' · subtasks' : ''}`)}
+        {section === 'basics' ? (
+          <div className={w.accBody}>
+            <label className={w.part}>
+              <span className={w.q}>Stage name</span>
+              <input className={w.input} value={stage.name} maxLength={80} onChange={e => onPatch({ name: e.target.value })} />
+            </label>
+            <div className={w.part}>
+              <span className={w.q}>Group</span>
+              <div className={w.chips} role="radiogroup" aria-label="Group">
+                {groups.map(g => {
+                  const on = stage.dept === g.key
+                  return (
+                    <button key={g.key} type="button" role="radio" aria-checked={on} className={`${w.chip}${on ? ` ${w.chipOn}` : ''}`}
+                      style={{ '--g-h': g.hue } as CSSProperties} onClick={() => onPatch({ dept: g.key })}>
+                      <span className={w.gDot} />{g.name}
+                    </button>
+                  )
+                })}
+                {addingGroup ? (
+                  <input
+                    className={w.groupInput}
+                    autoFocus
+                    value={groupDraft}
+                    maxLength={40}
+                    placeholder="Group name, Enter"
+                    aria-label="New group"
+                    onChange={e => setGroupDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') void commitGroup()
+                      else if (e.key === 'Escape') {
+                        addingRef.current = false
+                        setAddingGroup(false)
+                      }
+                    }}
+                    onBlur={() => void commitGroup()}
+                  />
+                ) : (
+                  <button type="button" className={w.newGroup} onClick={() => { addingRef.current = true; setAddingGroup(true); setGroupDraft('') }}>+ New group</button>
+                )}
+              </div>
             </div>
-          ) : null}
-        </div>
-        {mode === 'prev' ? (
-          <div className={b.field} style={{ marginTop: 4, gap: 5 }}>
-            <span className={b.wbCandHead}>
-              Who can they pick from?{' '}
-              <span className={cands.length ? b.wbCandCount : b.wbCandNone}>{cands.length ? `${cands.length} candidate${cands.length === 1 ? '' : 's'}` : 'Pick at least one'}</span>
-            </span>
-            <div className={b.wbDD}>
-              <button
-                type="button"
-                className={`${b.wbDDBtn}${dd === 'cands' ? ` ${b.wbDDBtnOn}` : ''}`}
-                onClick={e => {
-                  e.stopPropagation()
-                  toggle('cands')
-                }}
-                aria-expanded={dd === 'cands'}
-              >
-                {cands.length ? (
-                  <span className={b.wbAvs}>
-                    {cands.slice(0, 5).map(c => {
-                      const p = people.find(x => x.id === c)
-                      return <span key={c} className={b.wbAv} style={{ background: personBg(p) }}>{initial(nameOf(c))}</span>
-                    })}
-                  </span>
-                ) : null}
-                <span className={b.wbDDText} style={{ paddingLeft: cands.length ? 8 : 0 }}>
-                  <span className={b.wbDDLabel}>{cands.length ? cands.map(nameOf).join(' / ') : 'Choose candidates…'}</span>
-                </span>
-                <span className={b.wbCaret}>▼</span>
-              </button>
-              {dd === 'cands' ? (
-                <div className={b.wbMenu} onClick={e => e.stopPropagation()}>
+            <div className={w.part}>
+              <span className={w.q}>How long?</span>
+              <div className={w.stepRow}>
+                <Stepper wide label="Working days" value={stage.sla} min={1} max={WF_MAX_SLA} onChange={sla => onPatch({ sla })} />
+                <span className={w.small}>working days · day {startDay + 1}–{startDay + stage.sla}</span>
+              </div>
+            </div>
+            <ToggleRow
+              top
+              on={stage.split}
+              disabled={locked}
+              title="Can be split into subtasks"
+              sub={locked ? 'Off while “MM assigns every stage” is on' : 'The doer can open subtasks for other people; checked internally only'}
+              subWait={locked}
+              onChange={split => onPatch({ split })}
+            />
+          </div>
+        ) : null}
+
+        {acc('who', 'Who does it', whoSummary(stage, at, locked, nameOf), isPrev && !cands.length)}
+        {section === 'who' ? (
+          <div className={`${w.accBody} ${w.accBodyWho}`} role="radiogroup" aria-label="Who does it">
+            <RadioCard big on={mode === 'assign'} title="👤 MM assigns" text="MM picks the person when planning each project."
+              onPick={() => onPatch({ who: { mode: 'assign', cands } })} />
+            <RadioCard
+              big
+              on={isPrev}
+              off={prevOff}
+              title="🔓 Handoff from the previous stage"
+              text={at === 0 ? 'The person on the stage before picks who does this one.' : `When Stage ${at} · ${stages[at - 1]?.name || ''} is done, that person picks who does this one from a shortlist.`}
+              why={at === 0 ? 'Not available on the first stage' : locked ? 'Off while “MM assigns every stage” is on' : undefined}
+              onPick={() => onPatch({ who: { mode: 'prev', cands } })}
+            />
+            {isPrev ? (
+              <div className={w.shortlist}>
+                <div className={w.shortHead}>
+                  Shortlist <span className={`${w.shortHint}${cands.length ? '' : ` ${w.shortHintRed}`}`}>· {cands.length ? `${cands.length} picked` : 'pick at least one'}</span>
+                </div>
+                <div className={w.chips}>
                   {workers.map(p => {
                     const on = cands.includes(p.id)
                     return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className={b.wbOpt}
-                        aria-pressed={on}
-                        onClick={() => onChange({ who: { mode: 'prev', cands: on ? cands.filter(x => x !== p.id) : [...cands, p.id] } })}
-                      >
-                        <span className={`${b.wbCheck}${on ? ` ${b.wbCheckOn}` : ''}`}>{on ? '✓' : ''}</span>
-                        <span className={b.wbAv} style={{ background: personBg(p) }}>{initial(p.first)}</span>
-                        <span className={b.wbOptText}><span className={b.wbOptLabel}>{p.first}</span></span>
-                        <span className={b.wbOptHint}>{p.hint}</span>
+                      <button key={p.id} type="button" aria-pressed={on} className={`${w.person}${on ? ` ${w.personOn}` : ''}`}
+                        onClick={() => onPatch({ who: { mode: 'prev', cands: on ? cands.filter(x => x !== p.id) : [...cands, p.id] } })}>
+                        <span className={w.personAv} style={{ background: personBg({ group: p.title }) }}>{p.first.charAt(0).toUpperCase()}</span>
+                        {p.first}
+                        <span className={w.personLoad}>{p.load} active</span>
                       </button>
                     )
                   })}
                   {cands.filter(c => !people.some(p => p.id === c)).map(c => (
-                    <button key={c} type="button" className={b.wbOpt} aria-pressed onClick={() => onChange({ who: { mode: 'prev', cands: cands.filter(x => x !== c) } })}>
-                      <span className={`${b.wbCheck} ${b.wbCheckOn}`}>✓</span>
-                      <span className={b.wbOptText}><span className={b.wbOptLabel}>{nameOf(c)}</span></span>
+                    <button key={c} type="button" aria-pressed className={`${w.person} ${w.personOn}`} title="No longer on Marketing's team"
+                      onClick={() => onPatch({ who: { mode: 'prev', cands: cands.filter(x => x !== c) } })}>
+                      <span className={w.personAv}>?</span>{nameOf(c)}
                     </button>
                   ))}
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
-      </div>
 
-      <div className={b.field} style={{ gap: 8 }}>
-        <span className={b.wbQ}>Who approves it?</span>
-        {(stage.appr.length ? stage.appr : [null]).map((a, li) => {
-          const key = `appr${li}`
-          const cur = levelLabel(a)
-          const opts: { a: WfAppr | null; icon: string; label: string; person: BuilderPerson | null }[] = [
-            ...(li === 0 ? [{ a: null, icon: '—', label: 'No approval', person: null }] : []),
-            ...approvers.map(p => ({ a: { kind: 'person', staff: p.id } as WfAppr, icon: '', label: p.first, person: p })),
-            { a: { kind: 'pic' }, icon: '🔗', label: 'PIC via link', person: null },
-            { a: { kind: 'assign' }, icon: '👤', label: 'Pick at assignment', person: null },
-          ]
-          // A person or the PIC once a stage; another level may be picked at assignment again.
-          const taken = (o: WfAppr | null) => !!o && o.kind !== 'assign' && stage.appr.some((x, j) => j !== li && same(x, o))
-          return (
-            <div key={li} className={b.wbLevel}>
-              <div className={b.wbLevelHead}>
-                <span className={b.wbLevelN}>Level {li + 1}</span>
-                <span className={b.wbLevelLock}>🔒 always locked</span>
-                {li > 0 ? (
-                  <button type="button" className={b.wbLevelRemove} onClick={() => onChange({ appr: stage.appr.filter((_, j) => j !== li) })}>Remove</button>
-                ) : null}
-              </div>
-              <div className={b.wbDD}>
-                <button
-                  type="button"
-                  className={`${b.wbDDBtn}${dd === key ? ` ${b.wbDDBtnOn}` : ''}`}
-                  onClick={e => {
-                    e.stopPropagation()
-                    toggle(key)
-                  }}
-                  aria-expanded={dd === key}
-                >
-                  {cur.person || (a?.kind === 'person') ? (
-                    <span className={b.wbAv} style={{ background: personBg(cur.person ?? undefined) }}>{initial(cur.label)}</span>
-                  ) : (
-                    <span className={b.wbDDIcon}>{cur.icon}</span>
-                  )}
-                  <span className={b.wbDDText}><span className={b.wbDDLabel}>{cur.label}</span></span>
-                  <span className={b.wbCaret}>▼</span>
-                </button>
-                {dd === key ? (
-                  <div className={b.wbMenu} onClick={e => e.stopPropagation()}>
-                    {opts.filter(o => !taken(o.a)).map(o => {
-                      const on = o.a === null ? !a : !!a && same(a, o.a)
-                      return (
-                        <button key={o.a ? `${o.a.kind}${o.a.kind === 'person' ? o.a.staff : ''}` : 'none'} type="button" className={`${b.wbOpt}${on ? ` ${b.wbOptOn}` : ''}`} onClick={() => setLevel(li, o.a)}>
-                          {o.person ? (
-                            <span className={b.wbAv} style={{ background: personBg(o.person) }}>{initial(o.person.first)}</span>
-                          ) : (
-                            <span className={b.wbDDIcon}>{o.icon}</span>
-                          )}
-                          <span className={b.wbOptText}><span className={b.wbOptLabel}>{o.label}</span></span>
-                          {o.person ? <span className={b.wbOptHint}>{o.person.hint}</span> : null}
-                          <span className={b.wbTick}>{on ? '✓' : ''}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </div>
+        {acc('appr', 'Approval', apprSummary(stage.appr, nameOf))}
+        {section === 'appr' ? (
+          <div className={w.chain}>
+            <div className={w.chainRow}>
+              <span className={w.rail}><span className={w.ring} /></span>
+              <span className={w.chainText}>Doer submits <strong>{stage.name || 'Untitled stage'}</strong></span>
             </div>
-          )
-        })}
-        {stage.appr.length > 0 && stage.appr.length < WF_MAX_APPROVALS ? (
-          <button type="button" className={b.wbAddLevel} onClick={addLevel}>+ Add another approval level</button>
-        ) : null}
-      </div>
-
-      <div className={b.field}>
-        <span className={b.wbQ}>How long?</span>
-        <div className={b.wbSla}>
-          <div className={b.wbStepper}>
-            <button type="button" className={b.wbStepBtn} onClick={() => onChange({ sla: Math.max(1, stage.sla - 1) })} aria-label="One day less">−</button>
-            <span className={b.wbStepN}>{stage.sla}</span>
-            <button type="button" className={b.wbStepBtn} onClick={() => onChange({ sla: Math.min(WF_MAX_SLA, stage.sla + 1) })} aria-label="One day more">+</button>
+            {levels.map((l, li) => (
+              <ApprovalLevel
+                key={li}
+                n={li + 1}
+                level={l}
+                open={openLvl === li}
+                approvers={approvers}
+                usedElsewhere={new Set(stage.appr.flatMap((x, j) => (j === li ? [] : x.ids)))}
+                nameOf={nameOf}
+                onToggle={() => setOpenLvl(o => (o === li ? null : li))}
+                onChange={next => setLevel(li, next)}
+                onRemove={l ? () => { onPatch({ appr: stage.appr.filter((_, j) => j !== li) }); setOpenLvl(null) } : null}
+              />
+            ))}
+            {stage.appr.length > 0 && stage.appr.length < WF_MAX_APPROVALS ? (
+              <div className={w.chainRow}>
+                <span className={w.rail}><span className={w.railTall} /></span>
+                <button type="button" className={w.addLevel} onClick={e => {
+                  e.stopPropagation()
+                  onPatch({ appr: [...stage.appr, { ids: [], rule: 'any' }] })
+                  setOpenLvl(stage.appr.length)
+                }}>+ Add level {stage.appr.length + 1}</button>
+              </div>
+            ) : null}
+            <div className={w.chainRow}>
+              <span className={w.okDot}>✓</span>
+              <span className={w.okText}>{onApprove(stages, at)}</span>
+            </div>
+            {stage.appr.length ? (
+              <div className={w.back}>
+                <span className={w.backTitle}>↩ If changes are requested, go back to</span>
+                <div className={w.chips} role="radiogroup" aria-label="If changes are requested, go back to">
+                  {[{ k: null as number | null, label: 'Stay on this stage' }, ...stages.slice(0, at).map((x, j) => ({ k: j as number | null, label: `${j + 1}. ${x.name || 'Untitled stage'}` }))].map(o => (
+                    <button key={o.k ?? 'stay'} type="button" role="radio" aria-checked={stage.back === o.k}
+                      className={`${w.chip} ${w.chipSm}${stage.back === o.k ? ` ${w.chipOn}` : ''}`} onClick={() => onPatch({ back: o.k })}>{o.label}</button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
-          <span className={b.unit}>working days</span>
-        </div>
-      </div>
+        ) : null}
 
-      <label className={b.field}>
-        <span className={b.wbQ}>What does PIC see on the link?</span>
-        <input
-          className={b.input}
-          value={stage.picText}
-          maxLength={120}
-          placeholder="Department words only — no names, no prices"
-          onChange={e => onChange({ picText: e.target.value })}
-        />
-      </label>
-
-      <div className={b.wbSwitchRow}>
-        <span className={b.wbQ}>Can this stage be split into subtasks?</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={split}
-          aria-label="Can this stage be split into subtasks?"
-          className={`${b.wbSwitch}${split ? ` ${b.wbSwitchOn}` : ''}`}
-          disabled={locked}
-          title={locked ? 'Off — whole workflow is locked' : undefined}
-          onClick={() => onChange({ split: !stage.split })}
-        />
-      </div>
-
-      <div className={b.field}>
-        <span className={b.wbQ}>If changes are requested, go back to which stage?</span>
-        <div className={b.wbBack}>
-          {[{ k: null as number | null, label: 'Stay on this stage' }, ...stages.slice(0, at).map((x, j) => ({ k: j as number | null, label: `${j + 1}. ${x.name || 'Untitled stage'}` }))].map(o => (
-            <button key={o.k ?? 'stay'} type="button" className={`${b.wbBackOpt}${stage.back === o.k ? ` ${b.wbBackOn}` : ''}`} onClick={() => onChange({ back: o.k })}>{o.label}</button>
-          ))}
-        </div>
-      </div>
-
-      <div className={b.field}>
-        <span className={b.wbQ}>What does this stage fill in?</span>
-        <FieldsEditor form={stage.form} onChange={form => onChange({ form })} presetRows stageName={stage.name} />
+        {acc('pic', 'PIC & form', stage.picText ? `“${stage.picText}”` : 'Fields are set in Canvas', false, true)}
+        {section === 'pic' ? (
+          <div className={w.accBody}>
+            <label className={w.part}>
+              <span className={w.q}>What does PIC see on the link?</span>
+              <input className={w.input} value={stage.picText} maxLength={120} placeholder="Department words only — no names, no prices"
+                onChange={e => onPatch({ picText: e.target.value })} />
+            </label>
+            <Tip text={`Set in the Canvas template: pick “${stage.name || 'Untitled stage'}” under 🎯 Which stage fills this in?`}>
+              <button type="button" className={w.canvasLink} onClick={onOpenCanvas}>
+                <span className={w.canvasLinkIcon}>🎯</span>
+                <span className={w.canvasLinkText}>
+                  <span className={w.q}>What this stage fills in</span>
+                  <span className={w.canvasLinkSub}>{fills} in the Canvas now</span>
+                </span>
+                <span className={w.canvasLinkGo}>Open Canvas →</span>
+              </button>
+            </Tip>
+          </div>
+        ) : null}
       </div>
     </div>
   )

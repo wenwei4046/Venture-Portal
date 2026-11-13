@@ -3,7 +3,8 @@
 // make, what a stage still needs before it is handed on, and the stages as mkt_task_create takes them. The dates and
 // the needs are reckoned exactly as the database reckons them (mkt_stage_dates, mkt_stage_missing). Pure.
 
-import { addDays, approverNow, longDay, runsStages, weekdayOf, type MktBoard, type MktGroup, type MktPerson } from './board'
+import { approverNow, longDay, runsStages, waitsNow, type MktBoard, type MktGroup, type MktPerson } from './board'
+import { flowDates, PIC_ID } from './flow'
 import { groupOf, isManagerTitle, type MktTone } from './groups'
 
 export const FIELD_TYPES = ['Text', 'Number', 'Select', 'Multi-select', 'Date', 'Person', 'File', 'Checkbox', 'Table', 'Note'] as const
@@ -25,10 +26,12 @@ export const TASK_TYPES: readonly { key: TaskType; label: string }[] = [
 ]
 
 export interface FormField {
+  /** Its id in the canvas (Workflow Builder 2a) — a quick task's fields have none. */
+  id?: string
   label: string
   type: FieldType
-  /** A table's columns. */
-  cols?: { name: string; type: ColType }[]
+  /** A table's columns — a canvas's (Workflow Builder 2a) each with its id, the stage (sid) that fills it in, ⭐, 👁. */
+  cols?: FormCol[]
   /** A workflow table's preset rows, a cell per column: one filled in is fixed for the team, a blank one is theirs. */
   rows?: string[][]
   /** A workflow template's canvas (lib/marketing/canvas.ts): required before its stage submits (unset = yes, a note never). */
@@ -41,9 +44,27 @@ export interface FormField {
   opts?: string[]
   /** …or a shared list's, by its name (③d-2 — the user's answer 9: *Locations*): the field's own options are then unused. */
   list?: string
-  /** A deliverable's field from one of its canvas's own sections (②b-2a): that section's title. */
+  /** A deliverable's field from its canvas's sections: the section's id (since the Workflow Builder 2a, mig
+   * 20261113210000 — a deliverable started before it: the section's title). */
   section?: string
+  /** …that section's title (since 2a). */
+  sectionTitle?: string
 }
+
+/** A table's column. */
+export interface FormCol {
+  name: string
+  type: ColType
+  id?: string
+  /** The stage (sid) that fills it in; unset = the table's own stage. */
+  stage?: string | null
+  /** Filled on every row before its stage submits (only a canvas's columns carry it). */
+  req?: boolean
+  pic?: boolean
+}
+
+/** A field's id in its canvas (Workflow Builder 2a), when it has one. */
+export const fieldKey = (f: FormField) => f.id ?? f.label
 
 /** The kinds of date a field may put on the calendar (2026-10-24 — the user's answer 16: "要，固定种类"; 15: a post is a
  * deliverable with a Post day) — each its name there, its glyph and its colour. */
@@ -135,30 +156,24 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 
 /** Each stage's first and last day: the first starts on `base`, each is due its SLA in working days after the one
  * before (the first, after `base`); a later stage starts the working day after the one before is due. Working days
- * are Monday to Friday less the holidays given. */
-export function stageDates(base: string, slas: readonly number[], holidays: ReadonlySet<string>): { idx: number; startsOn: string; dueOn: string }[] {
-  const work = (d: string) => weekdayOf(d) < 5 && !holidays.has(d)
-  const out: { idx: number; startsOn: string; dueOn: string }[] = []
-  let day = base
-  slas.forEach((sla, idx) => {
-    let start = base
-    if (idx > 0) {
-      start = addDays(day, 1)
-      while (!work(start)) start = addDays(start, 1)
-    }
-    for (let left = Math.max(1, Math.trunc(sla) || 1); left > 0; ) {
-      day = addDays(day, 1)
-      if (work(day)) left -= 1
-    }
-    out.push({ idx, startsOn: start, dueOn: day })
-  })
-  return out
+ * are Monday to Friday — no holidays since the Workflow Builder 2a (the user, 2026-11-13: "只算周一到周五"; flow.ts ›
+ * flowDates = mkt_stage_dates). `_holidays` is no longer read; kept so every caller stays as it is. */
+export function stageDates(base: string, slas: readonly number[], _holidays?: ReadonlySet<string>): { idx: number; startsOn: string; dueOn: string }[] {
+  return flowDates(base, slas)
 }
 
 /** What a stage still needs before it is handed on: each field not filled in (a box not ticked) — a note and a table
  * are not asked for; a File field is filled by a link or a file of its own; a stage with no field, a note, a file or a
  * link (as mkt_stage_missing). Empty = ready. */
-export function missingWork(form: readonly FormField[], work: StageWork): string[] {
+export function missingWork(form: readonly FormField[], work: StageWork, sid: string | null = null): string[] {
+  // A table its canvas marks (Workflow Builder 2a — it carries `req`): a row when required; a column marked required
+  // and filled in at this stage (or any) filled on every row. A quick task's tables are asked nothing, as before.
+  const tables = form.filter(f => f.type === 'Table' && typeof f.req === 'boolean')
+  const tableOut = tables.filter(f => {
+    const rows = tableRows(work.vals[f.label])
+    if (f.req === true && rows.length === 0) return true
+    return (f.cols ?? []).some((c, j) => c.req === true && (!c.stage || c.stage === (sid ?? '')) && rows.some(r => !String(r[j] ?? '').trim()))
+  }).map(f => f.label)
   const inputs = form.filter(f => f.type !== 'Note' && f.type !== 'Table')
   const out = inputs
     .filter(f => {
@@ -169,8 +184,20 @@ export function missingWork(form: readonly FormField[], work: StageWork): string
       return v === undefined || v === false || (typeof v === 'string' && !v.trim()) || (Array.isArray(v) && v.length === 0)
     })
     .map(f => f.label)
-  if (inputs.length === 0 && !work.notes.trim() && work.links.length === 0 && work.files.length === 0) out.push('a note, a file or a link')
+  out.push(...tableOut)
+  if (inputs.length + tables.length === 0 && !work.notes.trim() && work.links.length === 0 && work.files.length === 0) out.push('a note, a file or a link')
   return out
+}
+
+/** A table's rows as a stage keeps them (mkt_stage_save, mig 20261113210000: {rows}; the page may hold them as the JSON
+ * of its rows): each a list of cells by column. */
+export function tableRows(v: unknown): string[][] {
+  let x: unknown = v
+  if (typeof x === 'string' && x.trim().startsWith('[')) {
+    try { x = JSON.parse(x) } catch { x = [] }
+  }
+  if (isObj(x)) x = x.rows
+  return Array.isArray(x) ? x.filter(Array.isArray).map(r => r.map(c => (typeof c === 'string' ? c : c === true ? 'true' : ''))) : []
 }
 
 export const EMPTY_WORK: StageWork = { notes: '', links: [], vals: {}, files: [] }
@@ -183,13 +210,20 @@ export function formFromRow(v: unknown): FormField[] {
     const label = typeof f.label === 'string' ? f.label : ''
     if (!type || !label) return []
     const cols = Array.isArray(f.cols)
-      ? f.cols.filter(isObj).map(c => ({ name: String(c.name ?? ''), type: COL_TYPES.find(t => t === c.type) ?? 'Text' }))
+      ? f.cols.filter(isObj).map((c): FormCol => ({
+          name: String(c.name ?? ''), type: COL_TYPES.find(t => t === c.type) ?? 'Text',
+          ...(typeof c.id === 'string' && c.id ? { id: c.id } : {}),
+          ...(typeof c.stage === 'string' ? { stage: c.stage } : c.stage === null ? { stage: null } : {}),
+          ...(typeof c.req === 'boolean' ? { req: c.req } : {}),
+          ...(typeof c.pic === 'boolean' ? { pic: c.pic } : {}),
+        }))
       : undefined
     const rows = Array.isArray(f.rows)
       ? f.rows.filter(Array.isArray).map(r => (cols ?? []).map((_, i) => (typeof r[i] === 'string' ? r[i] : '')))
       : []
     // A workflow template's canvas settings, when it has them (a quick task's fields have none).
     const extras: Partial<FormField> = {}
+    if (typeof f.id === 'string' && f.id) extras.id = f.id
     if (typeof f.req === 'boolean') extras.req = f.req
     if (typeof f.pic === 'boolean') extras.pic = f.pic
     if (type === 'Date') {
@@ -199,6 +233,7 @@ export function formFromRow(v: unknown): FormField[] {
     if ((type === 'Select' || type === 'Multi-select') && Array.isArray(f.opts)) extras.opts = f.opts.filter((o): o is string => typeof o === 'string')
     if ((type === 'Select' || type === 'Multi-select') && typeof f.list === 'string' && f.list) extras.list = f.list
     if (typeof f.section === 'string' && f.section) extras.section = f.section
+    if (typeof f.sectionTitle === 'string' && f.sectionTitle) extras.sectionTitle = f.sectionTitle
     return [{ label, type, ...(type === 'Table' ? { cols: cols ?? [], ...(rows.length ? { rows } : {}) } : {}), ...extras }]
   })
 }
@@ -214,6 +249,8 @@ export function workFromRow(v: unknown): StageWork {
     if (typeof x === 'string' || typeof x === 'boolean') vals[k] = x
     // A Multi-select's picks (③d-2).
     else if (Array.isArray(x)) vals[k] = x.filter((o): o is string => typeof o === 'string')
+    // A table's rows (mig 20261113210000 — {rows}): kept as the JSON of its rows, as the task page holds a table.
+    else if (isObj(x) && Array.isArray(x.rows)) vals[k] = JSON.stringify(tableRows(x))
   }
   const files: StageFile[] = Array.isArray(v.files)
     ? v.files.filter(isObj).filter(f => typeof f.path === 'string' && f.path).map(f => ({
@@ -339,9 +376,10 @@ export function builderPeople(board: MktBoard): { people: PickPerson[]; approver
   const curOf = new Map(board.projects.map(p => [p.id, p.cur]))
   for (const s of board.stages) {
     if (!open.has(s.project) || curOf.get(s.project) !== s.idx) continue
-    const a = approverNow(s)
-    const who = a ? (a.kind === 'person' ? a.staff : null) : s.status === 'todo' || s.status === 'accepted' || s.status === 'changes' ? s.owner : null
-    if (who) load.set(who, (load.get(who) ?? 0) + 1)
+    // Whose plate it is on now: the doer working it, or everybody its level still waits for.
+    const who = s.status === 'review' ? waitsNow(s).filter(x => x !== PIC_ID && x !== 'assign')
+      : s.status === 'todo' || s.status === 'accepted' || s.status === 'changes' ? (s.owner ? [s.owner] : []) : []
+    for (const w of who) load.set(w, (load.get(w) ?? 0) + 1)
   }
   const rank = (p: MktPerson) => (p.id === board.me ? 0 : isManagerTitle(p.title) ? 2 : 1)
   const people = [...board.team]

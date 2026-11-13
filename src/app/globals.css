@@ -7908,6 +7908,29 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-shadow-rail: 0 1px 2px rgb(51 36 27 / .06), 0 0 0 1px rgb(236 231 224);
   --mk-shadow-menu: 0 14px 36px rgb(51 36 27 / .16); --mk-shadow-col: 0 14px 36px rgb(51 36 27 / .12);
   --mk-shadow-sheet: 0 8px 28px rgb(51 36 27 / .06); --mk-shadow-seg-2: 0 1px 2px rgb(0 0 0 / .08);
+  /* The task page's top, My turn and the ▶ Preview (2026-11-13, `docs/design_handoff_workflow_builder/` › Task Flow):
+     a level passed, an avatar's dashed ring, an empty cell, the modal's scrim, the focused stage's shadow, and the
+     celebrations' skies, sparks and confetti. */
+  --mk-tf-gate-ok: 240 248 242; --mk-tf-av-line: 200 190 178; --mk-tf-empty: 190 180 170;
+  --mk-tf-scrim: rgb(40 30 22 / .32); --mk-tf-sel-shadow: 0 6px 16px rgb(51 36 27 / .12);
+  --mk-tf-cur-shadow: 0 6px 18px rgb(51 36 27 / .10);
+  --mk-celeb-night: rgb(28 22 40 / .9); --mk-celeb-movie: rgb(24 18 14 / .92); --mk-celeb-light: rgb(255 252 246 / .94);
+  --mk-celeb-sub-dark: 230 220 210; --mk-celeb-gif-shadow: 0 18px 48px rgb(51 36 27 / .25);
+  --mk-celeb-c1: #EC9B55; --mk-celeb-c2: oklch(0.78 0.15 350); --mk-celeb-c3: oklch(0.82 0.14 95);
+  --mk-celeb-c4: oklch(0.75 0.13 235); --mk-celeb-c5: oklch(0.78 0.14 150); --mk-celeb-c6: rgb(90 62 43);
+  --mk-celeb-bubble-line: oklch(0.80 0.12 85); --mk-celeb-bubble: oklch(0.95 0.06 90 / .5);
+  --mk-celeb-beam: radial-gradient(ellipse at top, rgb(255 236 200 / .35), transparent 70%);
+  /* The Workflow Builder 2a and its Canvas template (2026-11-13, `docs/design_handoff_workflow_builder/` › Workflow
+     Builder v2 #2a, Canvas Template Editor): the armed Delete pill, the right-click menu's, a selected card's and an
+     approval dropdown's shadows, the foot's veil; the canvas's preview pane, its segmented track, a preset cell, a
+     column being edited, a blank cell's dashes and focus, the PIC link's lines and soft fills, the icon picker's shadow. */
+  --mk-wb-del: 190 50 40;
+  --mk-wb-shadow-ctx: 0 14px 34px rgb(51 36 27 / .18); --mk-wb-shadow-card: 0 8px 20px rgb(51 36 27 / .12);
+  --mk-wb-shadow-lvl: 0 12px 28px rgb(51 36 27 / .16); --mk-wb-foot: rgb(255 255 255 / .97);
+  --mk-cv-pane: 250 249 247; --mk-cv-track: 240 238 234; --mk-cv-fixed: 248 246 242; --mk-cv-open: 250 244 236;
+  --mk-cv-blank: 214 190 160; --mk-cv-blank-key: 196 170 140; --mk-cv-blank-focus: 150 120 90; --mk-cv-stripe: 253 252 250;
+  --mk-cv-pk-line: 226 223 217; --mk-cv-pk-line-2: 236 234 230; --mk-cv-pk-soft: 248 247 245; --mk-cv-pk-text: 98 92 86;
+  --mk-cv-col-off: 243 241 237; --mk-cv-col-off-ink: 130 120 110; --mk-cv-shadow-icons: 0 12px 30px rgb(51 36 27 / .16);
   background: rgb(var(--mk-app));
 }
 /* The PIC's link, /t/<code> (⑤-1, `PIC Link.dc.html`): the client-facing page in the handoff's own cooler palette,

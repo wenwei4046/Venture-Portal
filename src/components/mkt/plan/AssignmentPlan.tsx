@@ -8,15 +8,16 @@ import {
   datesLabel, firstStart, planChanged, planCrew, planDates, planFromTask, planOpen, planPayload, planProblems, planSummary,
   reasonsNeeded, REASON_MAX, REASON_MIN, stageEditable, unassigned, type PlanDraft, type PlanStage,
 } from '@/lib/marketing/plan'
-import type { MktTaskPage, PlanAppr } from '@/lib/marketing/task'
+import type { MktTaskPage } from '@/lib/marketing/task'
 import { picNames } from '@/lib/marketing/clients'
 import type { PickPerson } from '@/lib/marketing/tasks'
 import { personBg } from '../builder/people'
+import PlanLevels from './PlanLevels'
 import s from './plan.module.css'
 
 // A deliverable's Assignment Plan (`Assignment Plan.dc.html`; ②b-2a — the user's answer 10): each stage's person (the
 // manager assigns, or 🔓 the stage before picks from its candidates), its approvals (a manager, or the PIC on the
-// link — always locked, never passed on), its working days and dates, whether it splits into subtasks; the day it
+// link, one or more on a level, any one or everyone — always locked, never passed on — PlanLevels), its working days and dates, whether it splits into subtasks; the day it
 // starts; the summary — days, PIC approvals, start and finish, the holidays skipped, who is on it — and Save. Once the
 // deliverable has opened, a stage done is locked, a change of hands asks why, and the stage open now is the new
 // person's to Accept again (the database says the same: mkt_deliverable_plan).
@@ -25,7 +26,7 @@ const TONE_TAG: Record<string, string> = {
   content: s.tag_content, social: s.tag_social, design: s.tag_design, ads: s.tag_ads, brand: s.tag_brand, manager: s.tag_manager, none: s.tag_none,
 }
 
-type Menu = { i: number; k: 'a' | 'p' } | null
+type Menu = { i: number; k: 'a' } | null
 
 export default function AssignmentPlan({ initial, people, approvers }: { initial: MktTaskPage; people: PickPerson[]; approvers: PickPerson[] }) {
   const [page, setPage] = useState(initial)
@@ -169,14 +170,6 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
               ? `Changed from ${nameOf(was?.owner)}: “${reason}”${current ? ` · ${nameOf(st.owner)} must Accept again` : ''}`
               : picked ? `${i > 0 ? nameOf(draft.stages[i - 1].owner) || 'The stage before' : 'The stage before'} chooses when they finish` : ''
             const state = done ? { label: 'Done', cls: s.chipDone } : current ? { label: was?.status === 'review' ? 'Waiting for its approval' : 'In progress', cls: s.chipWait } : null
-            const apprOpts: { a: PlanAppr; icon: string; label: string }[] = [
-              ...approvers.filter(x => !st.appr.some(a => a.kind === 'person' && a.staff === x.id)).map(x => ({ a: { kind: 'person', staff: x.id } as PlanAppr, icon: '👤', label: x.first })),
-              ...(st.appr.some(a => a.kind === 'pic') ? [] : [{ a: { kind: 'pic' } as PlanAppr, icon: '🔗', label: `PIC (${pic || 'the PIC'}) via link` }]),
-            ]
-            const setLevel = (k: number | null, a: PlanAppr) => {
-              const at = k ?? st.appr.findIndex(x => x.kind === 'assign')
-              upd(i, { appr: at >= 0 ? st.appr.map((x, j) => (j === at ? a : x)) : [...st.appr, a] })
-            }
             return (
               <div key={st.idx} className={s.stageRow}>
                 <div className={s.rail}>
@@ -239,52 +232,8 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
 
                     <div className={s.col}>
                       <span className={s.label}>Approver</span>
-                      <div className={s.apprs}>
-                        {!st.appr.length ? <span className={s.noAppr}>— No approval</span> : null}
-                        {st.appr.map((a, k) => (
-                          <span key={`${a.kind}${a.kind === 'person' ? a.staff : ''}${k}`} className={s.apprWrap}>
-                            {k > 0 ? <span className={s.arrow}>→</span> : null}
-                            {a.kind === 'assign' ? (
-                              <button type="button" className={`${s.appr} ${s.apprPick}`} disabled={!ed.people}
-                                onClick={e => { e.stopPropagation(); setMenu({ i, k: 'p' }) }}>👤 Pick who approves</button>
-                            ) : (
-                              <span className={s.appr} title="Approvers are always locked">
-                                <span>{a.kind === 'pic' ? '🔗' : '👤'}</span>
-                                {(() => {
-                                  const who = a.kind === 'pic' ? `${two && a.all ? 'Both PICs' : 'PIC'} · ${pic || 'the PIC'}` : nameOf(a.staff)
-                                  return <span className={s.apprName} title={who}>{who}</span>
-                                })()}
-                                {/* Two PICs: either one's approval, or both (set per approval — the user's answer 29). */}
-                                {a.kind === 'pic' && two ? (
-                                  <button type="button" className={`${s.apprToggle}${a.all ? ` ${s.apprToggleOn}` : ''}`} aria-pressed={!!a.all}
-                                    aria-label={a.all ? 'Both PICs approve — make it either' : 'Either PIC approves — make it both'} disabled={!ed.people}
-                                    onClick={() => upd(i, { appr: st.appr.map((x, j) => (j === k && x.kind === 'pic' ? (x.all ? { kind: 'pic' } : { kind: 'pic', all: true }) : x)) })}>
-                                    {a.all ? 'Both' : 'Either'}
-                                  </button>
-                                ) : null}
-                                <span className={s.lockSmall} aria-hidden="true">🔒</span>
-                                {ed.people ? (
-                                  <button type="button" className={s.apprX} aria-label={`Remove ${a.kind === 'pic' ? 'the PIC' : nameOf(a.staff)}`}
-                                    onClick={() => upd(i, { appr: st.appr.filter((_, j) => j !== k) })}>×</button>
-                                ) : null}
-                              </span>
-                            )}
-                          </span>
-                        ))}
-                        {ed.people && st.appr.length < 3 && !st.appr.some(a => a.kind === 'assign') ? (
-                          <button type="button" className={s.addLevel} onClick={e => { e.stopPropagation(); setMenu(m => (m?.i === i && m.k === 'p' ? null : { i, k: 'p' })) }}>+ Level</button>
-                        ) : null}
-                      </div>
-                      {menu?.i === i && menu.k === 'p' ? (
-                        <div className={`${s.menu} ${s.menuNarrow}`} role="menu" onClick={e => e.stopPropagation()}>
-                          {apprOpts.map(o => (
-                            <button key={o.label} type="button" role="menuitem" className={s.opt} onClick={() => setLevel(null, o.a)}>
-                              <span>{o.icon}</span>{o.label}
-                            </button>
-                          ))}
-                          <div className={s.menuWhy}>Approvers are always 🔒 and can&rsquo;t be passed on.</div>
-                        </div>
-                      ) : null}
+                      <PlanLevels levels={st.appr} editable={ed.people} approvers={approvers} nameOf={id => nameOf(id)} pic={pic} two={two}
+                        onChange={appr => upd(i, { appr })} />
                     </div>
 
                     <div className={s.col}>
@@ -331,7 +280,7 @@ export default function AssignmentPlan({ initial, people, approvers }: { initial
               <span className={s.muted}>Est. finish</span><span className={`${s.factMono} ${s.factStrong}`}>{summary.finishes}</span>
               <span className={s.muted}>Internal approvals</span><span className={s.factMono}>{summary.internal}</span>
             </div>
-            <div className={s.skips}>Skips weekends and Selangor&rsquo;s public holidays: {summary.skipped}</div>
+            <div className={s.skips}>Working days Monday to Friday &middot; public holidays in it: {summary.skipped}</div>
             <div className={s.crewBox}>
               <div className={s.label}>On this plan</div>
               <div className={s.crew}>
