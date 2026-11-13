@@ -115,8 +115,17 @@ Build the data's before anybody is narrowed on a Revenue page.
 Shipped: the items, the run, Comm Cal's month and bill page
 (`.claude/rules/revenue/comm-cal.md` › 2990s' OWN KPI ITEMS), the Revenue
 app's KPI readings (`revenue-app.md` › 2990s' OWN KPI ITEMS COUNT IN THE APP),
-and Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
-KPI ITEMS ARE EDITED ON RULES). Still owed:
+Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
+KPI ITEMS ARE EDITED ON RULES), and an item's cost a unit — what comes off the
+bill (`comm-cal.md` › A BRAND'S KPI ITEM HAS A COST). Still owed:
+- **A brand item's cost is one figure — a corner is not read** (2026-11-13).
+  The owner's list prices a corner sofa's upgrade double (fabric RM 125 / 250,
+  latex RM 500 / 1,000). The cost on Rules is one figure a unit; a corner's
+  dearer price comes off only where the ERP's special order says it (the
+  dearer of the two is taken). A second figure needs a rule for which sofa is
+  a corner — the bills of that day could not give one (every sofa was charged
+  RM 250 / RM 500; the one with a CNR piece named no upgrade). Ask the owner
+  before building it.
 - **One figure for two ladders — LIVE since 2026-11-13** (the owner switched
   Fair's own KPI on that evening; threshold 10 units). My team's *KPI hit / KPI
   pending* and the Championship's threshold bonus compare a person's EVERY KPI
@@ -139,8 +148,8 @@ KPI ITEMS ARE EDITED ON RULES). Still owed:
 - **The KPI footnotes speak of Fair's items only.** Insight › KPI items and
   the Arena's KPI board end *…including eligible giveaway items*
   (`KpiPage.tsx`, `arena-model.ts`). True of the sub-department's own items; a
-  brand's own count only where the bill charges for them. Reword once a month
-  can hold both.
+  brand's own count wherever the sofa names them, charged or not. Reword once
+  a month can hold both.
 
 ## Owed — Revenue Director (2026-09-11)
 

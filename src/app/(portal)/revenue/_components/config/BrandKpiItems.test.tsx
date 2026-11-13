@@ -89,11 +89,15 @@ afterEach(cleanup)
 
 describe("Rules › KPI items — a brand's own items", () => {
   describe('for whoever may not manage the rules', () => {
-    it('lists them — the name over the special, a unit a sofa set, the bonus, the tiers — with nothing to type or press', () => {
-      renderBlock({}, false)
+    it('lists them — the name over the special, a unit a sofa set, the cost, the bonus, the tiers — with nothing to type or press', () => {
+      // The latex seat costs RM 500 a unit; the fabric has no cost: what the bill charged comes off.
+      renderBlock({ brandKpiItems: [FABRIC, { ...LATEX, cost_amount: '500.00' }] }, false)
+      expect(within(table()).getAllByRole('columnheader').map(h => h.textContent)).toEqual([
+        'Item', 'Counted', 'Cost a unit · RM', 'Bonus a unit · RM', "By the month's units",
+      ])
       expect(bodyRows().map(r => within(r).getAllByRole('cell').map(c => c.textContent))).toEqual([
-        ['Upgrade fabricSofa Full Fabric', 'Once per sofa set', '50.00', '—'],
-        ['Upgrade latex seatLatex Seat', 'Once per sofa set', '50.00', '5+ · 70.00  ·  10+ · 100.00'],
+        ['Upgrade fabricSofa Full Fabric', 'Once per sofa set', 'As billed', '50.00', '—'],
+        ['Upgrade latex seatLatex Seat', 'Once per sofa set', '500.00', '50.00', '5+ · 70.00  ·  10+ · 100.00'],
       ])
       expect(screen.getByText('2 ITEMS · ALWAYS PAID')).toBeInTheDocument()
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
@@ -113,8 +117,12 @@ describe("Rules › KPI items — a brand's own items", () => {
     })
   })
 
-  it('opens each bonus and each tier to edit, with nothing to save yet', () => {
+  it('opens each cost, each bonus and each tier to edit, with nothing to save yet', () => {
     renderBlock()
+    // No cost yet: an empty box that says what that means.
+    expect(box('Upgrade fabric cost a unit')).toHaveValue('')
+    expect(box('Upgrade fabric cost a unit')).toHaveAttribute('placeholder', 'As billed')
+    expect(box('Upgrade latex seat cost a unit')).toHaveValue('')
     expect(box('Upgrade fabric bonus a unit')).toHaveValue('50')
     expect(box('Upgrade latex seat bonus a unit')).toHaveValue('50')
     expect(box('Upgrade latex seat tier 1 from units')).toHaveValue('5')
@@ -158,6 +166,59 @@ describe("Rules › KPI items — a brand's own items", () => {
     expect(box('Upgrade fabric bonus a unit')).toHaveValue('60')
     expect(saveButton()).toBeDisabled()
     expect(screen.queryByText(/not saved/)).not.toBeInTheDocument()
+  })
+
+  // 2026-11-13 — the user: "i need a place at kpi item rules set there fill in cost, so that it can dedecut the cost
+  // out and change to kpi amount only".
+  it('a cost typed is saved alone — the bonus and the tiers nobody touched left out', async () => {
+    renderBlock()
+    type('Upgrade latex seat cost a unit', '500')
+    expect(screen.getByText('1 change not saved')).toBeInTheDocument()
+    // Emptied again, or typed 0, on an item with no cost: nothing to save.
+    type('Upgrade latex seat cost a unit', '')
+    expect(saveButton()).toBeDisabled()
+    type('Upgrade latex seat cost a unit', '0')
+    expect(saveButton()).toBeDisabled()
+    type('Upgrade latex seat cost a unit', ' 500 ')
+    type('Upgrade fabric cost a unit', '250')
+    expect(saveButton()).toHaveTextContent('Save 2 changes')
+    fireEvent.click(saveButton())
+    await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, {
+      adds: [],
+      changes: [
+        { id: FABRIC_ID, cost: '250', label: 'Upgrade fabric' },
+        { id: LATEX_ID, cost: '500', label: 'Upgrade latex seat' },
+      ],
+      removes: [],
+    }))
+  })
+
+  it('shows the cost an item has, saves a new one, and sends an emptied one as none', async () => {
+    renderBlock({ brandKpiItems: [FABRIC, { ...LATEX, cost_amount: 500 }] })
+    expect(box('Upgrade latex seat cost a unit')).toHaveValue('500')
+    // Typed back to what it is: nothing to save.
+    type('Upgrade latex seat cost a unit', '500.00')
+    expect(saveButton()).toBeDisabled()
+    type('Upgrade latex seat cost a unit', '')
+    expect(saveButton()).toHaveTextContent('Save 1 change')
+    fireEvent.click(saveButton())
+    await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, {
+      adds: [], changes: [{ id: LATEX_ID, cost: null, label: 'Upgrade latex seat' }], removes: [],
+    }))
+  })
+
+  it('says what is wrong with a cost before anything is sent', () => {
+    renderBlock()
+    type('Upgrade latex seat cost a unit', 'five hundred')
+    fireEvent.click(saveButton())
+    expect(screen.getByRole('alert')).toHaveTextContent('Upgrade latex seat: cost: "five hundred" is not an amount (up to two decimals)')
+    type('Upgrade latex seat cost a unit', '-5')
+    fireEvent.click(saveButton())
+    expect(screen.getByRole('alert')).toHaveTextContent('Upgrade latex seat: a cost cannot be negative')
+    type('Upgrade latex seat cost a unit', '1000000.01')
+    fireEvent.click(saveButton())
+    expect(screen.getByRole('alert')).toHaveTextContent('Upgrade latex seat: a cost is at most RM 1,000,000 a unit')
+    expect(saveKpiItems).not.toHaveBeenCalled()
   })
 
   it('a tier added to an item is saved as its tiers, the bonus nobody touched left out', async () => {
@@ -227,18 +288,21 @@ describe("Rules › KPI items — a brand's own items", () => {
     await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, { adds: [], changes: [], removes: [LATEX_ID] }))
   })
 
-  it("adds a special of the brand's pool under a name of its own, with its bonus and a tier", async () => {
+  it("adds a special of the brand's pool under a name of its own, with its cost, its bonus and a tier", async () => {
     renderBlock()
     fireEvent.change(picker(), { target: { value: 'Nylon Fabric' } })
     type('2990s new item name', 'Upgrade nylon')
+    type('2990s new item cost a unit', '125')
     type('2990s new item bonus a unit', '30')
     click('Add 2990s item')
     const added = bodyRows()[2]
     expect(within(added).getAllByRole('cell')[0]).toHaveTextContent('Upgrade nylonNewNylon Fabric')
+    expect(box('Upgrade nylon cost a unit')).toHaveValue('125')
     expect(box('Upgrade nylon bonus a unit')).toHaveValue('30')
     // The picker is ready for the next one: the special picked is gone from it, the boxes are empty.
     expect(offered()).toEqual(['Neylon Fabric', 'Separate Backrest Packing'])
     expect(box('2990s new item name')).toHaveValue('')
+    expect(box('2990s new item cost a unit')).toHaveValue('')
     expect(box('2990s new item bonus a unit')).toHaveValue('')
     click('Add a tier to Upgrade nylon')
     type('Upgrade nylon tier 1 from units', '5')
@@ -248,7 +312,23 @@ describe("Rules › KPI items — a brand's own items", () => {
     await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, {
       adds: [{
         source: 'option', optionPool: 'sofa_specials', optionValue: 'Nylon Fabric', amount: '30', brandId: BRAND_ID,
-        name: 'Upgrade nylon', tiers: [{ minQty: '5', amount: '45' }], label: 'Upgrade nylon',
+        name: 'Upgrade nylon', tiers: [{ minQty: '5', amount: '45' }], label: 'Upgrade nylon', cost: '125',
+      }],
+      changes: [],
+      removes: [],
+    }))
+  })
+
+  it('an item added with no cost names none', async () => {
+    renderBlock()
+    type('2990s new item bonus a unit', '30')
+    click('Add 2990s item')
+    expect(box('Neylon Fabric cost a unit')).toHaveValue('')
+    fireEvent.click(saveButton())
+    await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, {
+      adds: [{
+        source: 'option', optionPool: 'sofa_specials', optionValue: 'Neylon Fabric', amount: '30', brandId: BRAND_ID,
+        name: null, tiers: [], label: 'Neylon Fabric',
       }],
       changes: [],
       removes: [],

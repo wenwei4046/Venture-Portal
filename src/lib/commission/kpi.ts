@@ -68,8 +68,8 @@
  *     main   2,990 × 4% = 119.60
  *     KPI    RM 50                    → RM 169.60   (RM 189.60 with no cost)
  *
- * The twin of the SQL in migrations 20260927050000, 20261030010000 and
- * 20261112200000 (`comm_kpi_hits`); the run, the month page, the member app
+ * The twin of the SQL in migrations 20260927050000, 20261030010000,
+ * 20261112200000, 20261114030000 and 20261114040000 (`comm_kpi_hits`); the run, the month page, the member app
  * and the calculator must find the same items. The calculator's cart names no
  * fabric, so a quote finds no fabric series.
  */
