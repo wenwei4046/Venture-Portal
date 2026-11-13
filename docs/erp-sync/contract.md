@@ -846,9 +846,13 @@ booths changed forgets its kept My honours (`member_honour_months`).
 `member_erp_brand_weeks(sub, staff?)` is the first layer: for each portal
 person, the booth the ERP lists them at for each fair weekend — the weekend
 named by the Friday of the Monday–Sunday week the fair opens in, the Arena's
-weeks. Listed at two booths that weekend → the one they wrote the most bills
-at (the second layer's own measure), then the earlier, then the lower project
-id. A booth is read at the portal's fair for it: the one the order feed pinned
+weeks, and (since 2026-11-13, mig `20261114060000`) every later week in which
+the booth is open on a Friday, Saturday or Sunday: a standing booth of two
+months is a brand week on each of its nine weekends, a fair ending on a Monday
+still one. Listed at two booths that weekend → the one they wrote the most
+bills at (the second layer's own measure; of a booth open several weekends,
+the bills sold in that weekend's own week), then the earlier, then the lower
+project id. A booth is read at the portal's fair for it: the one the order feed pinned
 the project to (`comm_venue_events.erp_project_ids`), else the same place on
 overlapping days under the booth's own organiser (`erp_sync_fair`'s rule, since
 2026-11-13); it writes no fair of its own.

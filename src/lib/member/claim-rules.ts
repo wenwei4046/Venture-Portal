@@ -315,17 +315,59 @@ export function foodOpenTo(rates: Pick<ClaimRates, "food"> | null | undefined, s
   return !!mine && food.titles.some(t => t.trim().toLowerCase() === mine);
 }
 
+/** The Monday of the Monday–Sunday week a day is in — the Arena's weeks. */
+const mondayOf = (day: string) => shiftDay(day, -((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7));
+
+/**
+ * The weekends a fair is a brand week on, each by its Friday, in order (2026-11-13 — asked whether every weekend a
+ * standing booth is open counts, the user: "yes"): the weekend it opens in, and every later Monday–Sunday week in
+ * which it is open on a Friday, Saturday or Sunday. A fair that ends on a Monday (6–9 Nov) is one weekend; 2990s'
+ * standing booth, 29 Oct – 31 Dec, is nine. `member_erp_brand_weeks` lists the same (a year of them at most).
+ */
+export function fairWeekends(fair: { start: string; end: string }): string[] {
+  const first = mondayOf(fair.start);
+  const out = [shiftDay(first, 4)];
+  for (let monday = shiftDay(first, 7), n = 0; monday <= fair.end && n < 52; monday = shiftDay(monday, 7), n++) {
+    if (fair.start <= shiftDay(monday, 6) && fair.end >= shiftDay(monday, 4)) out.push(shiftDay(monday, 4));
+  }
+  return out;
+}
+
 /**
  * The days of a brand week's fair, `YYYY-MM-DD`, first to last — its own days, else its weekend's, Friday
  * to Sunday (the brand week is named by its Friday; `member_claim_food_detail` takes the same).
+ *
+ * A fair open over several weekends gives each weekend the days of its own week (2026-11-13: "跟着他的那个 fair
+ * date，fair date 是多长，它就是多长" — every day of the fair is somebody's to tick, once): from its week's Monday —
+ * the fair's first day for the weekend it opens in — to the day before its next weekend's week, the fair's last day
+ * for its last weekend. A fair of one weekend is whole, a Monday it ends on included.
  */
 export function fairDays(fair: { start: string | null; end: string | null }, weekend: string): string[] {
   const known = !!fair.start && !!fair.end && fair.start <= fair.end;
-  const first = known ? fair.start! : weekend;
-  const last = known ? fair.end! : shiftDay(weekend, 2);
+  let first = known ? fair.start! : weekend;
+  let last = known ? fair.end! : shiftDay(weekend, 2);
+  if (known) {
+    const weekends = fairWeekends({ start: first, end: last });
+    const at = weekends.indexOf(weekend);
+    if (weekends.length > 1 && at >= 0) {
+      if (at > 0) first = shiftDay(weekend, -4);
+      if (at < weekends.length - 1) last = shiftDay(weekends[at + 1], -5);
+    }
+  }
   const out: string[] = [];
   for (let day = first; day <= last && out.length < 31; day = shiftDay(day, 1)) out.push(day);
   return out;
+}
+
+/**
+ * A weekend's own first and last day at a fair open over several weekends — what My brand weeks and the food claim
+ * say of it instead of the fair's first to last; null for a fair of one weekend, whose own days say it.
+ */
+export function weekendSpan(fair: { start: string | null; end: string | null }, weekend: string): { first: string; last: string } | null {
+  if (!fair.start || !fair.end || fair.start > fair.end) return null;
+  if (fairWeekends({ start: fair.start, end: fair.end }).length < 2) return null;
+  const days = fairDays(fair, weekend);
+  return days.length ? { first: days[0], last: days[days.length - 1] } : null;
 }
 
 /** A day of the fair as the form offers it: free to claim, in another food claim of theirs, or still to come. */

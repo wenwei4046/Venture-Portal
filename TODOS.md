@@ -95,13 +95,18 @@ right today only because Vercel runs in UTC with a US locale):
 Shipped: two organisers at one place on the same days are two fairs
 (`.claude/rules/revenue/comm-cal.md` › TWO ORGANISERS AT ONE PLACE ARE TWO
 FAIRS). Still owed:
-- **A standing booth is one fair and one brand week.** 2990s' booth at Penang
-  Waterfront (29 Oct – 31 Dec) is one fair: its sellers' brand week is the week
-  it opens in (30 Oct) and no later weekend's, its Arena result waits for
-  31 December, and the Arena's week of 30 Oct stays open until 7 Jan 2027
-  (`member_arena_week_closes_on` takes the latest end of the fairs opening in
-  the week). The user's answer (2026-11-13): every weekend the booth is open
-  counts, and a claim follows the fair's own dates. Next to build.
+- **A standing booth has one Arena board, once it closes.** 2990s' booth at
+  Penang Waterfront (29 Oct – 31 Dec) is a brand week every weekend it is open
+  (`revenue-app.md` › A BOOTH IS A BRAND WEEK EVERY WEEKEND IT IS OPEN), but a
+  Fair result is a booth at a COMPLETED fair: nothing until 31 December, then
+  one board for two months. Ranking it weekend by weekend means events per
+  (fair, booth, weekend) in `member_arena_booth_history_for_staff`, each bill
+  in its sale day's weekend — and its two or three sellers a medal every week.
+  Asked 2026-11-14; not built.
+- **HR's Brand weeks foot lists a standing booth's unmatched names in its
+  first month only.** `member_admin_brand_weeks.unlisted` reads the booths
+  OPENING in the month's weekends; *Dexon*, listed at the 2990s booth and
+  matched to nobody, is said on October's grid and not on November's.
 - **The guess does not read the bill's brand.** A bill the ERP names no fair on
   is guessed by place and day (`venue_event_for_order`): two fairs open on the
   day → the shorter. A 2990s bill written during another organiser's fair at

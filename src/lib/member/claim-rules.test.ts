@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, foodAmount, foodClaimMonths, foodDayState,
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, fairWeekends, foodAmount, foodClaimMonths, foodDayState,
   foodMonthOpensOn, foodMonthOver, foodOpenTo, inFoodMonth, isOutstation, monthOfDay, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, shiftMonth,
   stayProblem, stayWindow, tapStayDay,
   type ClaimRates, type StayPick, transportOpenTo, transportPartProblem, transportPartsFor } from "./claim-rules";
@@ -269,6 +269,50 @@ describe("the food claim", () => {
     expect(fairDays({ start: null, end: null }, "2026-10-16")).toEqual(["2026-10-16", "2026-10-17", "2026-10-18"]);
     // Ends before it starts: read as its weekend.
     expect(fairDays({ start: "2026-10-11", end: "2026-10-09" }, "2026-10-09")).toEqual(["2026-10-09", "2026-10-10", "2026-10-11"]);
+  });
+
+  // 2026-11-13 — every weekend a standing booth is open is a brand week (the user: "yes"), and a claim follows the
+  // fair's dates ("fair date 是多长，它就是多长"): 2990s' booth at Penang Waterfront, Thursday 29 Oct to Thursday 31 Dec.
+  it("gives each weekend of a fair open over several the days of its own week", () => {
+    const booth = { start: "2026-10-29", end: "2026-12-31" };
+    const range = (from: string, n: number) => Array.from({ length: n }, (_, i) => shiftDay(from, i));
+    expect(fairWeekends(booth)).toEqual(["2026-10-30", "2026-11-06", "2026-11-13", "2026-11-20", "2026-11-27", "2026-12-04", "2026-12-11", "2026-12-18", "2026-12-25"]);
+    // The weekend it opens in: its first day to that week's Sunday.
+    expect(fairDays(booth, "2026-10-30")).toEqual(["2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
+    // A weekend between: its Monday to its Sunday.
+    expect(fairDays(booth, "2026-11-06")).toEqual(range("2026-11-02", 7));
+    // The last: its Monday to the fair's last day — the four days after it open no weekend of their own.
+    expect(fairDays(booth, "2026-12-25")).toEqual(range("2026-12-21", 11));
+    // Every day of the fair is one weekend's, once.
+    const all = fairWeekends(booth).flatMap(w => fairDays(booth, w));
+    expect([all.length, new Set(all).size, all[0], all[all.length - 1]]).toEqual([64, 64, "2026-10-29", "2026-12-31"]);
+    // A weekend that is none of the fair's reads the fair as before: whole, 31 days at most.
+    expect(fairDays(booth, "2027-01-08")).toEqual(range("2026-10-29", 31));
+  });
+
+  it("keeps a fair of one weekend whole — a Monday it ends on, days before its weekend", () => {
+    expect(fairWeekends({ start: "2026-11-06", end: "2026-11-09" })).toEqual(["2026-11-06"]);
+    expect(fairDays({ start: "2026-11-06", end: "2026-11-09" }, "2026-11-06")).toEqual(["2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09"]);
+    // Open Monday to Thursday: the weekend it opens in, though it is open on none of its days.
+    expect(fairWeekends({ start: "2026-10-05", end: "2026-10-08" })).toEqual(["2026-10-09"]);
+    expect(fairDays({ start: "2026-10-05", end: "2026-10-08" }, "2026-10-09")).toEqual(["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"]);
+    // Twelve days over two weekends: Wednesday to Sunday, then Monday to Sunday.
+    const starling = { start: "2026-12-16", end: "2026-12-27" };
+    expect(fairWeekends(starling)).toEqual(["2026-12-18", "2026-12-25"]);
+    expect(fairDays(starling, "2026-12-18")).toEqual(["2026-12-16", "2026-12-17", "2026-12-18", "2026-12-19", "2026-12-20"]);
+    expect(fairDays(starling, "2026-12-25")).toEqual(["2026-12-21", "2026-12-22", "2026-12-23", "2026-12-24", "2026-12-25", "2026-12-26", "2026-12-27"]);
+  });
+
+  it("puts a standing booth's weekend on the month each of its days is in", () => {
+    const weekend = (key: string) => ({ key, worked: true, start: "2026-10-29", end: "2026-12-31" });
+    // Monday 30 Nov is the weekend of 4 Dec's — on November's claim for that day, on December's for the rest.
+    expect(fairDaysIn(weekend("2026-12-04"), "2026-12-04", "2026-11")).toEqual(["2026-11-30"]);
+    expect([inFoodMonth(weekend("2026-12-04"), "2026-11"), inFoodMonth(weekend("2026-12-04"), "2026-12")]).toEqual([true, true]);
+    // The weekend of 27 Nov is 23–29 Nov: no day of December, though the booth runs to its end.
+    expect(inFoodMonth(weekend("2026-11-27"), "2026-12")).toBe(false);
+    // The weekend it opens in is on November's for its 1 Nov, as a fair across two months always was.
+    expect(fairDaysIn(weekend("2026-10-30"), "2026-10-30", "2026-11")).toEqual(["2026-11-01"]);
+    expect(foodClaimMonths([weekend("2026-10-30"), weekend("2026-11-06"), weekend("2026-11-13")], "2026-11-14")).toEqual(["2026-11", "2026-10"]);
   });
 
   it("holds back a day already claimed, and a day still to come", () => {

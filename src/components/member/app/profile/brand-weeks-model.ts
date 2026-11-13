@@ -1,5 +1,6 @@
 import { ARENA_WEEK_BRANDS, arenaMonthFridays, arenaWeekFriday, arenaWeekendLabel, type MemberArenaSnapshot } from "@/lib/member/arena";
 import type { ArenaBrandWeek } from "@/lib/member/arena-history";
+import { weekendSpan } from "@/lib/member/claim-rules";
 import { dayRange, monthName } from "../format";
 import { brandWeekTone } from "./profile-model";
 
@@ -89,9 +90,12 @@ export function brandWeeksVM(snap: MemberArenaSnapshot, today: string, staffId?:
         return { ...base, when: arenaWeekendLabel(friday), source: "none", brand: null, brandName: null, venue: null, organizer: null,
           empty: friday === thisFriday ? "Not assigned yet" : "No fair" };
       }
+      // A booth open over several weekends (2026-11-13 — every weekend it is open is a brand week): this weekend's
+      // own days, not the booth's first to last on every one of them.
+      const span = weekendSpan(found, friday);
       return {
         ...base,
-        when: found.start && found.end ? dayRange(found.start, found.end) : arenaWeekendLabel(friday),
+        when: span ? dayRange(span.first, span.last) : found.start && found.end ? dayRange(found.start, found.end) : arenaWeekendLabel(friday),
         source: found.source, brand: found.brand, brandName: nameOf(found.brand) ?? "No brand",
         venue: found.venue, organizer: found.organizer, empty: null,
       };

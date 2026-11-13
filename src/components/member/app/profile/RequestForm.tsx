@@ -12,7 +12,7 @@ import StayCalendar from "./StayCalendar";
 import Reveal from "./Reveal";
 import {
   airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, foodAmount, foodClaimMonths, foodDayState,
-  foodMonthOpensOn, foodMonthOver, inFoodMonth, monthOfDay, nightsBetween, regionClaimProblem, stayProblem, stayWindow, transportPartProblem,
+  foodMonthOpensOn, foodMonthOver, inFoodMonth, monthOfDay, nightsBetween, regionClaimProblem, stayProblem, stayWindow, transportPartProblem, weekendSpan,
 } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
@@ -176,6 +176,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const daysOf = (w: ClaimWeek) => (!w.worked ? []
     : (dayPick[pickKey(w)] ?? (foodMonth === revisingMonth ? [] : openDaysOf(w)))
       .filter(d => fairDaysIn(w, w.key, foodMonth).includes(d) && foodDayState(d, today, takenDays) === "open").sort());
+  // A fair open over several weekends (2026-11-13): each weekend says its own days, not the fair's first to last.
+  const foodDates = (w: ClaimWeek) => {
+    const span = w.worked ? weekendSpan(w, w.key) : null;
+    return span ? dayRange(span.first, span.last) : w.dates;
+  };
   const foodWeeks = monthWeeks.map(w => ({ week: w, days: daysOf(w) }));
   const foodDays = foodWeeks.flatMap(x => x.days).sort();
   const foodTotal = foodAmount(perDay, foodDays.length);
@@ -544,14 +549,14 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                         <button className={s.foodWeekHead} onClick={() => toggleWeek(w.key)} aria-expanded={open} disabled={!w.worked}>
                           <span className={`${s.weekBadge} ${s.weekBadgeMonth}`} style={{ background: w.color }}><span className={s.weekMonth}>{w.month}</span>{w.n}</span>
                           <span className={s.weekText}>
-                            <span className={s.weekTitle}>{w.brandWeek} · {w.dates}</span>
+                            <span className={s.weekTitle}>{w.brandWeek} · {foodDates(w)}</span>
                             <span className={s.weekWhere}>{w.worked ? [w.venue, w.org].filter(Boolean).join(" · ") || "Your booth that weekend" : "No booth that weekend"}</span>
                           </span>
                           {w.worked && <span className={s.foodWeekCount}>{days.length ? `${days.length} day${days.length === 1 ? "" : "s"}` : "None"}</span>}
                           {w.worked && <span className={`${s.wlCaret} ${open ? s.wlCaretOpen : ""}`}><Svg d={ICON.chevronDown} size={16} sw={2} stroke="var(--rv-sub)" /></span>}
                         </button>
                         {open && (
-                          <Reveal className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${w.dates}`}>
+                          <Reveal className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${foodDates(w)}`}>
                             {fairDays(w, w.key).map(day => {
                               const state = foodDayState(day, today, takenDays);
                               // A day of the other month is claimed with that month's food (2026-11-01): shown, faded.
