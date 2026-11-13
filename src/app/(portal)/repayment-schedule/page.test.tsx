@@ -96,6 +96,12 @@ const page = async () => render(<FinViewProvider value>{await RepaymentScheduleP
 const card = (name: string) => screen.getByRole('group', { name })
 const tab = (name: RegExp) => screen.getByRole('button', { name })
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section') as HTMLElement
+// 2026-11-13: We collect / We pay live under By company, folded — a side at a time.
+const fold = (title: string) => Array.from(document.querySelectorAll('details.fin-fold')).find((d) => d.querySelector('summary')?.textContent?.startsWith(title)) as HTMLElement
+const side = (name: RegExp, foldTitle = 'Instalments') => {
+  fireEvent.click(tab(/^By company/))
+  fireEvent.click(within(fold(foldTitle)).getByRole('button', { name }))
+}
 const rowsOf = (sec: HTMLElement, name: string) => within(sec).getAllByText(name).map((el) => el.closest('tr') as HTMLElement)
 
 beforeEach(() => {
@@ -142,15 +148,14 @@ describe('the Repayment Schedule’s cards', () => {
 describe('Due to collect', () => {
   it('keeps the four old tables and the toggle, folded under it, in English', async () => {
     await page()
-    fireEvent.click(tab(/^We collect/))
-    const fold = document.querySelector('details.fin-fold') as HTMLDetailsElement
-    expect(fold.open).toBe(false)
-    expect(fold.querySelector('summary')).toHaveTextContent('Full plans')
-    expect(Array.from(fold.querySelectorAll('.sect-head h2')).map((h) => h.textContent)).toEqual([
+    side(/^We collect/, 'Full plans')
+    const plans = fold('Full plans') as HTMLDetailsElement
+    expect(plans.open).toBe(false)
+    expect(Array.from(plans.querySelectorAll('.sect-head h2')).map((h) => h.textContent)).toEqual([
       'Minimum interest — to collect', 'To collect — scheduled loans', 'To collect — compounding', 'To collect — no fixed term',
     ])
-    expect(within(fold).getByRole('button', { name: 'Outstanding only' })).toBeInTheDocument()
-    expect(within(fold).getAllByText('paid in Oct 2026', { selector: '.chip' })).toHaveLength(2)
+    expect(within(plans).getByRole('button', { name: 'Outstanding only' })).toBeInTheDocument()
+    expect(within(plans).getAllByText('paid in Oct 2026', { selector: '.chip' })).toHaveLength(2)
     expect(document.body.textContent).not.toMatch(/[一-鿿]/)
   })
 })
@@ -168,22 +173,24 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
     })
   const heads = (sec: HTMLElement) => Array.from(sec.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim())
 
-  it('reads the list tab’s cards off the list: to collect, received, still owed, overdue', async () => {
+  it('By company’s cards follow Actual / By right', async () => {
     await page()
-    fireEvent.click(tab(/^We collect/))
-    expect(card('To collect · Oct')).toBeInTheDocument()
-    expect(card('Received so far')).toHaveAttribute('data-tone', 'ledger')
-    expect(card('Still owed')).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: /^Overdue · \d+$/ })).toBeInTheDocument()
+    fireEvent.click(tab(/^By company/))
+    // Actual (the default): what came in this month — HC 11,200 and HD 5,000.
+    expect(card('Received · Oct')).toHaveTextContent('RM 16,200.00')
+    expect(card('Paid · Oct')).toBeInTheDocument()
+    expect(card('Interest profit · Oct')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Done so far' })).toBeNull()
-    const side = screen.getByRole('region', { name: 'Repayment Schedule' })
-    expect((side.querySelector('.stat-cards-grid') as HTMLElement).style.getPropertyValue('--stat-cols')).toBe('4')
+    fireEvent.click(screen.getByRole('button', { name: 'By right' }))
+    expect(card('To collect · Oct')).toBeInTheDocument()
+    expect(card('Settled so far · Oct')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Received · Oct' })).toBeNull()
   })
 
   it('is one row an instalment, sorted by its day, with its status and the day it was paid', async () => {
     paidUp()
     await page()
-    fireEvent.click(tab(/^We collect/))
+    side(/^We collect/)
     const due = section('Due to collect')
     expect(heads(due)).toEqual(['Due', 'Company', '#', 'To collect', 'Received', 'Still owed', 'Status', 'Received on', ''])
     expect(due.querySelector('tfoot')).toHaveTextContent('Total')
@@ -222,7 +229,7 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
   it('filters by status from the chips over it', async () => {
     paidUp()
     await page()
-    fireEvent.click(tab(/^We collect/))
+    side(/^We collect/)
     const due = section('Due to collect')
     fireEvent.click(within(due).getByRole('button', { name: /^Paid · 1$/ }))
     expect(within(due).getAllByRole('row').filter((r) => r.closest('tbody'))).toHaveLength(1)
@@ -237,13 +244,15 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
   it('lists the earlier instalments still owed, overdue, in the office’s month', async () => {
     paidUp()
     await page()
-    fireEvent.click(tab(/^We collect/))
+    side(/^We collect/)
     const due = section('Due to collect')
     const hk = rowsOf(due, 'HK')
     expect(hk.length).toBeGreaterThan(1)
     expect(within(hk[0]).getByText(/^(Overdue|Part paid)/)).toBeInTheDocument()
     expect(hk[hk.length - 1]).toHaveTextContent('9 Oct')
-    expect(screen.getByRole('group', { name: /^Overdue · [1-9][0-9]*$/ })).toHaveAttribute('data-tone', 'danger')
+    // By company counts them as HK's earlier unpaid.
+    const hkCo = screen.getAllByText('HK').map((el) => el.closest('tr')).find((tr) => tr?.hasAttribute('aria-expanded')) as HTMLElement
+    expect(hkCo.querySelectorAll('td')[5].textContent).toMatch(/^[1-9][\d,]*\.\d\d$/)
   })
 
   it('prints the rows on show from a right-click on the header', async () => {
@@ -252,7 +261,7 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(win as unknown as Window)
     paidUp()
     await page()
-    fireEvent.click(tab(/^We collect/))
+    side(/^We collect/)
     const due = section('Due to collect')
     fireEvent.click(within(due).getByRole('button', { name: /^Paid · 1$/ }))
     fireEvent.contextMenu(due.querySelector('thead tr') as HTMLElement)
@@ -269,7 +278,7 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
 
   it('We pay: Record payment on what is owed, a repayment PV in flight instead', async () => {
     await page()
-    fireEvent.click(tab(/^We pay/))
+    side(/^We pay/)
     const due = section('Due to pay')
     expect(heads(due)).toContain('Paid on')
     const [tan] = rowsOf(due, 'Tan S.H.')
