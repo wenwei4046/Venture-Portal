@@ -2,23 +2,35 @@
 
 import { useState } from 'react'
 import { coreOf, dmy, lastSent, quoteTotals, rm, QUOTE_HINT, type Quote, type QuoteBook, type QuoteStatus } from '@/lib/marketing/quotes'
+import { longPress } from '../workflows/longPress'
 import { StatusPill } from './QuoteEditor'
+import pb from './products.module.css'
 import qs from './quotes.module.css'
 
 // The quotations (`Product Builder.dc.html` › 📄 Quotations): the client filter (each client with its count, × to
 // clear), the status seg (its counts follow the client), + New quotation; a row each — its number and the version last
-// sent, the client's dot, its products, its total, its status (its hint as the tooltip) and its date.
+// sent, the client's dot, its products, its total, its status (its hint as the tooltip) and its date. Right-click (or
+// a long press) a row: Open, Delete — a draft only, asked first (2026-11-14 — the user: "只有 Draft 能删").
 
 type Filter = 'all' | QuoteStatus
 const FILTERS: [Filter, string][] = [['all', 'All'], ['draft', 'Draft'], ['sent', 'Sent'], ['accepted', 'Accepted']]
 
-export default function QuoteList({ book, busy, onOpen, onNew }: {
+export default function QuoteList({ book, busy, onOpen, onNew, onDelete }: {
   book: QuoteBook
   busy: boolean
   onOpen: (id: string) => void
   onNew: () => void
+  onDelete?: (q: Quote) => void
 }) {
   const [client, setClient] = useState('')
+  const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [ask, setAsk] = useState(false)
+  const menuAt = (id: string, x: number, y: number) => {
+    setAsk(false)
+    setCtx({ id, x: Math.min(x, window.innerWidth - 240), y: Math.min(y, window.innerHeight - 200) })
+  }
+  const close = () => { setCtx(null); setAsk(false) }
+  const ctxQ = ctx ? book.quotes.find(q => q.id === ctx.id) ?? null : null
   const [filter, setFilter] = useState<Filter>('all')
   const nameOf = (q: Quote) => (q.other ? q.client.trim() : book.clients.find(c => c.id === q.sub)?.name ?? '')
   const keyOf = (q: Quote) => (q.other ? `other:${q.client.trim().toLowerCase()}` : q.sub ?? '')
@@ -63,7 +75,8 @@ export default function QuoteList({ book, busy, onOpen, onNew }: {
             const dot = q.other ? 'rgb(var(--mk-dash))' : book.clients.find(c => c.id === q.sub)?.dot || 'rgb(var(--mk-dash))'
             const hint = q.status === 'accepted' ? `${QUOTE_HINT.accepted} · ${q.tasks ? 'tasks assigned' : 'tasks not assigned yet'}` : QUOTE_HINT[q.status]
             return (
-              <div key={q.id} className={qs.qRow} role="button" tabIndex={0} onClick={() => onOpen(q.id)} onKeyDown={e => { if (e.key === 'Enter') onOpen(q.id) }}>
+              <div key={q.id} className={qs.qRow} role="button" tabIndex={0} onClick={() => onOpen(q.id)} onKeyDown={e => { if (e.key === 'Enter') onOpen(q.id) }}
+                onContextMenu={e => { e.preventDefault(); menuAt(q.id, e.clientX, e.clientY) }} {...longPress((x, y) => menuAt(q.id, x, y))}>
                 <span className={qs.qNo}><span className={qs.qNoN}>{q.no}</span><span className={qs.qNoV}>{sent ? `v${sent.rev}` : ''}</span></span>
                 <span className={qs.qClient}><span className={qs.dot7} style={{ background: dot }} /><span>{name || '—'}</span></span>
                 <span className={qs.qProducts}>{q.lines.map(l => l.name).join(', ') || 'No products yet'}</span>
@@ -76,6 +89,32 @@ export default function QuoteList({ book, busy, onOpen, onNew }: {
           {!rows.length ? <div className={qs.empty}>{book.quotes.length ? 'None here' : 'No quotations yet'}</div> : null}
         </div>
       </div>
+      {ctxQ && ctx ? (
+        <>
+          <div className={pb.ctxScrim} onClick={close} onContextMenu={e => { e.preventDefault(); close() }} />
+          <div className={pb.ctx} style={{ left: ctx.x, top: ctx.y }} role="menu" aria-label={ctxQ.no}>
+            <div className={pb.ctxName}>{ctxQ.no}</div>
+            <button type="button" role="menuitem" className={pb.ctxRow} onClick={() => { close(); onOpen(ctxQ.id) }}>Open</button>
+            <div className={pb.ctxLine} />
+            {ctxQ.status !== 'draft' || !onDelete ? (
+              <button type="button" role="menuitem" className={`${pb.ctxRow} ${pb.ctxOff}`} disabled
+                title="A quotation sent or accepted stays — the client has seen it">
+                <span className={pb.grow}>Delete</span><span className={pb.ctxHint}>Drafts only</span>
+              </button>
+            ) : ask ? (
+              <div className={pb.ctxAsk}>
+                <span className={pb.ctxAskText}>Delete {ctxQ.no}? This cannot be undone.</span>
+                <span className={pb.ctxAskBtns}>
+                  <button type="button" className={pb.ctxDanger} disabled={busy} onClick={() => { close(); onDelete(ctxQ) }}>Delete</button>
+                  <button type="button" className={pb.ctxKeep} onClick={() => setAsk(false)}>Keep</button>
+                </span>
+              </div>
+            ) : (
+              <button type="button" role="menuitem" className={`${pb.ctxRow} ${pb.ctxDel}`} onClick={() => setAsk(true)}>Delete</button>
+            )}
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }
