@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { duplicateMktQuote, readMktQuoteBook, saveMktItem, saveMktQuote } from '@/lib/marketing/quote-actions'
+import { deleteMktQuote, duplicateMktQuote, readMktQuoteBook, saveMktItem, saveMktQuote } from '@/lib/marketing/quote-actions'
 import { factsPayload, mergeFacts, norm, withFacts, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
 import type { Product, ProductBook } from '@/lib/marketing/products'
 import { coreOf, packageLine, quoteTotals, rm, type Quote, type QuoteBook } from '@/lib/marketing/quotes'
@@ -185,6 +185,21 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
     flash(`Duplicated ${q.no}`)
   }
 
+  /** A draft deleted (2026-11-14 — "只有 Draft 能删"): off the list, back to the list when it was open. */
+  const deleteQuote = async (q: Quote, rev: number) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = await deleteMktQuote(q.id, rev)
+      if (!r.ok) return flash(r.reason)
+      setQbook(b => ({ ...b, quotes: b.quotes.filter(x => x.id !== q.id) }))
+      setQuoteId(cur => (cur === q.id ? null : cur))
+      flash(`Deleted ${q.no}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const clientName = (q: Quote) => (q.other ? q.client.trim() : qbook.clients.find(c => c.id === q.sub)?.name ?? '')
   const taskCount = (q: Quote) => q.lines.reduce((n, l) => n + (l.kind === 'item' ? 1 : l.items.filter(it => it.qty > 0).length), 0)
 
@@ -271,12 +286,14 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
             onOpenProduct={id => { setQuoteId(null); setProductId(id); setTab('products'); scrollTop() }}
             onBack={() => { setQuoteId(null); scrollTop() }}
             onDuplicate={q => void duplicateQuote(q)}
+            onDelete={(q, rev) => void deleteQuote(q, rev)}
             onAccepted={accepted}
             onAssign={() => setAssignFor(openQuote.id)}
             flash={flash}
           />
         ) : (
-          <QuoteList book={qbook} busy={busy} onOpen={id => { setQuoteId(id); scrollTop() }} onNew={() => void newQuote(null)} />
+          <QuoteList book={qbook} busy={busy} onOpen={id => { setQuoteId(id); scrollTop() }} onNew={() => void newQuote(null)}
+            onDelete={q => void deleteQuote(q, q.rev)} />
         )
       ) : null}
 

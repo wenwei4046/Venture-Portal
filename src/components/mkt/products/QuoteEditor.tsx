@@ -7,6 +7,7 @@ import {
   addDays, coreOf, dmy, extrasWords, itemLine, lastSent, lineCalc, numOf, packageLine, quoteTotals, rm, sameCore, withExtras,
   type PackageLine, type Quote, type QuoteBook, type QuoteCore, type QuoteLine,
 } from '@/lib/marketing/quotes'
+import DeleteDraft from '../builder/DeleteDraft'
 import MoneyInput from './MoneyInput'
 import QuoteDoc from './QuoteDoc'
 import { pickDate } from './pick-date'
@@ -28,13 +29,15 @@ function patchOf(saved: Quote, now: Quote): Record<string, unknown> | null {
   return Object.keys(p).length ? p : null
 }
 
-export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, onDuplicate, onAccepted, onAssign, flash, people, unpublished = [], onOpenProduct }: {
+export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, onDuplicate, onDelete, onAccepted, onAssign, flash, people, unpublished = [], onOpenProduct }: {
   quote: Quote
   setQuote: (q: Quote) => void
   book: QuoteBook
   setItems: (fn: (items: CatalogItem[]) => CatalogItem[]) => void
   onBack: () => void
   onDuplicate: (q: Quote) => void
+  /** A draft deleted (2026-11-14 — only a draft): its id and the count it was last saved on. */
+  onDelete?: (q: Quote, rev: number) => void
   onAccepted: (q: Quote) => void
   onAssign: () => void
   flash: (words: string) => void
@@ -209,6 +212,9 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
           <span className={`${qs.revChip}${dirty ? ` ${qs.revChipDirty}` : ''}`}>v{sent.rev} sent {dmy(sent.at)}{dirty ? ' · edited since' : ''}</span>
         ) : null}
         <span className={qs.grow} />
+        {q.status === 'draft' && onDelete ? (
+          <DeleteDraft what="quotation" busy={false} onDelete={() => void flush().then(ok => ok && onDelete(q, revRef.current))} />
+        ) : null}
         <button type="button" className={qs.ghost} onClick={() => void flush().then(ok => ok && onDuplicate(q))}>⧉ Duplicate</button>
       </div>
 

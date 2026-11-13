@@ -487,6 +487,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // assigned), a product duplicated or its status set from the list — all Marketing · Manage; the bell's quotation states.
   'mkt_quote_book', 'mkt_item_save', 'mkt_item_delete', 'mkt_catalogue_rename', 'mkt_quote_save', 'mkt_quote_send', 'mkt_quote_accept',
   'mkt_quote_assign', 'mkt_quote_duplicate', 'mkt_quote_states', 'mkt_product_duplicate', 'mkt_product_set_status',
+  // A draft quotation deleted (mig 20261114010000) — Marketing · Manage.
+  'mkt_quote_delete',
   'mkt_item_column_save', 'mkt_item_column_delete', 'mkt_item_columns_order',
   // Marketing's product projects (mig 20261024002000): the products on sale and a project started by Marketing · Manage;
   // its page read by View; its intake minutes written and sent, started before approval, resent by Manage; signed by an

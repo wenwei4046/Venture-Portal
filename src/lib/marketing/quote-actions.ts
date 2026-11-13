@@ -139,6 +139,17 @@ export async function assignMktQuote(id: string, rows: AssignRow[]): Promise<Don
   return { ok: true, quote: quoteFromRow(data) }
 }
 
+/** A draft quotation deleted (the user, 2026-11-14: "只有 Draft 能删"), on the count the page last saw. */
+export async function deleteMktQuote(id: string, rev: number): Promise<Done> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That quotation is not there any more.' }
+  if (!Number.isInteger(rev)) return { ok: false, reason: 'Reload the page and try again.' }
+  const { error } = await (await client()).rpc('mkt_quote_delete', { p_id: id, p_rev: rev })
+  if (error) return { ok: false, reason: words(error, 'The quotation could not be deleted. Please try again.') }
+  revalidatePath(PAGE)
+  return { ok: true }
+}
+
 /** A new draft from a quotation — its history empty. */
 export async function duplicateMktQuote(id: string): Promise<Done<{ quote: Quote }>> {
   await requireActionOn('/marketing/products', 'marketing', 'manage')

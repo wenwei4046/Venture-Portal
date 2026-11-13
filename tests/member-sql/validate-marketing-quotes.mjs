@@ -254,6 +254,8 @@ await db.exec(`ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO authenticated, service_role;`)
 await db.exec(mig)
 await db.exec(mig) // twice: nothing changes, nothing breaks
+// A draft quotation deleted (2026-11-14).
+await db.exec(await sql('20261114010000_marketing_quote_delete.sql'))
 
 const TODAY = await peek1(`SELECT ((now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::text`)
 const j = async (sql, params = []) => one(sql, params)
@@ -436,5 +438,18 @@ check((await j(`SELECT public.mkt_quote_book()`)).columns.map(c => c.name), ['Si
 await q(`SELECT public.mkt_item_column_delete($1)`, [size.id])
 check([await peek1(`SELECT extra FROM public.mkt_items WHERE id = $1`, [reel.id]), (await j(`SELECT public.mkt_quote_book()`)).columns.length], [{}, 1],
   'a column taken off, its values with it')
+
+// ── A draft deleted (mig 20261114010000 — the user: "只有 Draft 能删") ──────────────────────────────────────────────
+check([await may('anon', 'mkt_quote_delete(uuid, integer)'), await may('authenticated', 'mkt_quote_delete(uuid, integer)')], [false, true],
+  'mkt_quote_delete: signed in, asking its own action')
+const gone = await j(`SELECT public.mkt_quote_save(NULL, NULL, '{"contact":"x"}')`)
+await as(U.mei, STAFF)
+await refuses(`SELECT public.mkt_quote_delete($1, $2)`, [gone.id, gone.rev], /Quotations are the manager's/, 'the staff delete none')
+await as(U.josiah, MANAGER)
+await refuses(`SELECT public.mkt_quote_delete($1, $2)`, [gone.id, gone.rev - 1], /changed this quotation since you opened it/, 'never over a newer save')
+await refuses(`SELECT public.mkt_quote_delete($1, $2)`, [q3.id, q3.rev], /Only a draft is deleted/, 'an accepted one stays')
+check((await j(`SELECT public.mkt_quote_delete($1, $2)`, [gone.id, gone.rev])).no, gone.no, 'a draft deleted')
+check(await peek1(`SELECT count(*)::integer FROM public.mkt_quotes WHERE id = $1`, [gone.id]), 0, '…gone')
+await refuses(`SELECT public.mkt_quote_delete($1, 1)`, [gone.id], /not there any more/, 'twice: not there')
 
 console.log(`validate-marketing-quotes: ${checks} checks passed`)
