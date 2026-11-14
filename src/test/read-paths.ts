@@ -212,7 +212,7 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
   revenue_move_order: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_reassignments', 'sales_order_shares', 'sales_orders', 'users'],
   // comm_brands (20261112200000): comm_kpi_hits asks which bills are a brand's on its own scheme — their KPI items are their brand's own.
-  revenue_month_orders: ['catalogue_gwp_items', 'comm_brands', 'comm_cost_ratio_brands', 'comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
+  revenue_month_orders: ['catalogue_gwp_items', 'comm_brand_cost_ratios', 'comm_brands', 'comm_cost_ratio_brands', 'comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_pay_lines_closed: [],
   revenue_possible_double_claims: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_restore_double_claim: ['comm_double_claim_dismissals'],

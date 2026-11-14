@@ -39,7 +39,7 @@ describe('validateCostSetting', () => {
           { erpId: 'p-2', ratio: '' },
         ],
       }),
-    ).toEqual({ divisor: 0.7, ratios: [{ erp_product_id: 'p-1', ratio: 0.6 }], removes: ['p-2'], brands: [] })
+    ).toEqual({ divisor: 0.7, ratios: [{ erp_product_id: 'p-1', ratio: 0.6 }], removes: ['p-2'], brands: [], brandRatios: [] })
   })
 
   // 2026-11-07: a rider SKU's ratio for a brand — set, or blank to take it off.
@@ -62,7 +62,47 @@ describe('validateCostSetting', () => {
         { erp_product_id: 'trion-k', brand_code: 'ERGOTEX', ratio: 0.5 },
         { erp_product_id: 'trion-k', brand_code: 'AKEMI', ratio: null },
       ],
+      brandRatios: [],
     })
+  })
+
+  // 2026-11-14: a brand's own ratio — set, or blank to take it off (the main ratio typed sends every brand that had one, blank).
+  it("carries the brands' own ratios: a ratio set, a blank one taken off, beside the main ratio", () => {
+    expect(
+      validateCostSetting({
+        divisor: '0.65',
+        ratios: [],
+        brandRatios: [
+          { brand: 'ERGOTEX', ratio: '0.6', label: 'Ergotex' },
+          { brand: 'DUNLOP', ratio: '' },
+        ],
+      }),
+    ).toEqual({
+      divisor: 0.65,
+      ratios: [],
+      removes: [],
+      brands: [],
+      brandRatios: [
+        { brand_code: 'ERGOTEX', ratio: 0.6 },
+        { brand_code: 'DUNLOP', ratio: null },
+      ],
+    })
+    // A brand's ratio alone is something to save.
+    expect(validateCostSetting({ ratios: [], brandRatios: [{ brand: 'AKEMI', ratio: '0.66' }] }).brandRatios)
+      .toEqual([{ brand_code: 'AKEMI', ratio: 0.66 }])
+  })
+
+  it("refuses a brand's ratio named twice, a brand that is no code, and a ratio that is none", () => {
+    expect(() => validateCostSetting({ ratios: [], brandRatios: [
+      { brand: 'ERGOTEX', ratio: '0.6', label: 'Ergotex' },
+      { brand: 'ERGOTEX', ratio: '0.5', label: 'Ergotex' },
+    ] })).toThrow('Ergotex appears twice')
+    expect(() => validateCostSetting({ ratios: [], brandRatios: [{ brand: '', ratio: '0.6' }] })).toThrow('A row names no brand')
+    expect(() => validateCostSetting({ ratios: [], brandRatios: [{ brand: 'AK;DROP', ratio: '0.6' }] })).toThrow('A row names no brand')
+    expect(() => validateCostSetting({ ratios: [], brandRatios: [{ brand: 'ERGOTEX', ratio: '10.5', label: 'Ergotex' }] }))
+      .toThrow('Ergotex: a ratio must be above 0 and at most 10')
+    expect(() => validateCostSetting({ ratios: [], brandRatios: [{ brand: 'ERGOTEX', ratio: '0.66666' }] })).toThrow(/four decimals/)
+    expect(() => validateCostSetting({ ratios: [], brandRatios: [] })).toThrow('Nothing to save')
   })
 
   it('refuses a brand named twice for a SKU, a brand that is no code, and a ratio that is none', () => {

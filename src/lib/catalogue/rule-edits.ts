@@ -54,6 +54,13 @@ export interface CostSettingEdit {
    * takes it off: that brand follows the SKU's own ratio, else the default.
    */
   brands?: ReadonlyArray<{ erpId: string; brand: string; ratio: string | null; label?: string }>
+  /**
+   * The sub-department's ratio for a brand (2026-11-14) — only the ones
+   * changed. Blank takes it off: that brand divides by the sub-department's.
+   * The page sends every brand that had one, blank, when the main ratio
+   * changes (the user: "如果说我调主要的一个的话，这样它就是 override 全部").
+   */
+  brandRatios?: ReadonlyArray<{ brand: string; ratio: string | null; label?: string }>
 }
 
 export interface CostSettingPlan {
@@ -63,6 +70,8 @@ export interface CostSettingPlan {
   removes: string[]
   /** Null ratio = taken off. */
   brands: Array<{ erp_product_id: string; brand_code: string; ratio: number | null }>
+  /** A brand's own ratio (2026-11-14); null = taken off, the brand divides by the sub-department's again. */
+  brandRatios: Array<{ brand_code: string; ratio: number | null }>
 }
 
 const BRAND_CODE = /^[A-Za-z0-9 _&.'-]{1,40}$/
@@ -100,8 +109,21 @@ export function validateCostSetting(edit: CostSettingEdit): CostSettingPlan {
     seenBrand.add(key)
     brands.push({ erp_product_id: row.erpId, brand_code: row.brand, ratio: parseRatio(row.ratio, name) })
   }
-  if (divisor === null && ratios.length === 0 && removes.length === 0 && brands.length === 0) throw new EditError('Nothing to save')
-  return { divisor, ratios, removes, brands }
+  const brandRatioRows = edit.brandRatios ?? []
+  if (brandRatioRows.length > 100) throw new EditError('Save at most 100 brands at a time')
+  const seenBrandRatio = new Set<string>()
+  const brandRatios: CostSettingPlan['brandRatios'] = []
+  for (const row of brandRatioRows) {
+    if (!row || typeof row.brand !== 'string' || !BRAND_CODE.test(row.brand)) throw new EditError('A row names no brand')
+    const name = row.label?.trim() || row.brand
+    if (seenBrandRatio.has(row.brand)) throw new EditError(`${name} appears twice`)
+    seenBrandRatio.add(row.brand)
+    brandRatios.push({ brand_code: row.brand, ratio: parseRatio(row.ratio, name) })
+  }
+  if (divisor === null && ratios.length === 0 && removes.length === 0 && brands.length === 0 && brandRatios.length === 0) {
+    throw new EditError('Nothing to save')
+  }
+  return { divisor, ratios, removes, brands, brandRatios }
 }
 
 /** Revenue Team cost: what a margin is judged against. Never rounded here. */

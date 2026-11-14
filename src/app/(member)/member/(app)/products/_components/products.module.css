@@ -292,6 +292,11 @@
 .figExampleValue { font-size: 15px; font-weight: 650; }
 .figExampleResult { font-size: 15px; font-weight: 700; color: var(--rv-accent); }
 .figExampleOp { font-size: 15px; color: var(--rv-sub); }
+/* Costing Setting › the ratio by brand (2026-11-14): a chip a brand, a box each while editing. A brand with no ratio
+   of its own reads the main ratio, its figure in the sub ink. */
+.figBrands { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 2px; }
+.figBrandsLabel { font-size: 12px; font-weight: 650; letter-spacing: .1em; color: var(--rv-sub); }
+.brandRatio[data-follows] b { color: var(--rv-sub); font-weight: 650; }
 
 /* ── Costing Setting › KIV bed frames (2026-10-31): the four sizes, a card each ── */
 .kivGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }

@@ -901,8 +901,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   // (2026-11-12), whatever the switch above says.
   const own = ownSchemesOf(input, schemeKpiIndex)
   const kpiIndexOf = own.kpiIndexFor
-  // Every line's cost ÷ its own SKU's ratio, else the sub-department's.
-  const costBasis = costBasisOf(scheme.costDivisor, scheme.costRatios, scheme.costRatiosByBrand)
+  // Every line's cost ÷ its SKU's ratio for the bill's brand, else its own, else the brand's, else the sub-department's.
+  const costBasis = costBasisOf(scheme.costDivisor, scheme.costRatios, scheme.costRatiosByBrand, scheme.brandDivisors)
   const groupIndex = indexItemGroups(scheme.itemGroups)
   const ranks = [...input.ranks].sort((a, b) => a.sortOrder - b.sortOrder)
   const rankByKey = new Map(ranks.map(r => [r.rankKey, r]))

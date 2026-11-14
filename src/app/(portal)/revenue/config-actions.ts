@@ -344,6 +344,22 @@ async function cloneSchemeChildren(
       'Could not clone the cost ratios by brand',
     )
   }
+
+  // A brand's own ratio (Costing Setting, 2026-11-14), once the new scheme has its brands: each names one by its code.
+  const { data: brandRatios } = await supabase
+    .from('comm_brand_cost_ratios')
+    .select('brand_code, ratio')
+    .eq('scheme_id', fromSchemeId)
+  if (brandRatios?.length) {
+    check(
+      (
+        await supabase.from('comm_brand_cost_ratios').insert(
+          (brandRatios as unknown as Array<Record<string, unknown>>).map(r => ({ ...r, scheme_id: toSchemeId })),
+        )
+      ).error,
+      "Could not clone the brands' cost ratios",
+    )
+  }
 }
 
 // ─── Scheme switches ────────────────────────────────────────────────────────

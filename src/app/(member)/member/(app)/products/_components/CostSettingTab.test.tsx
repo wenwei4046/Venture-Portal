@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CostRatioBrandRow, CostRatioRow, KivCostRow, PickSku, SchemeBrand } from '../load'
+import type { BrandDivisorRow, CostRatioBrandRow, CostRatioRow, KivCostRow, PickSku, SchemeBrand } from '../load'
 
 const { saveCostSetting, saveKivCosts, refresh, push } = vi.hoisted(() => ({ saveCostSetting: vi.fn(), saveKivCosts: vi.fn(), refresh: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }), usePathname: () => '/member/products', useSearchParams: () => new URLSearchParams() }))
@@ -415,5 +415,94 @@ describe('Costing Setting › KIV bed frames', () => {
     click('Cancel changes')
     expect(kivCard('K')).toHaveTextContent('KING1,000.00')
     expect(screen.queryByRole('textbox', { name: 'King KIV cost' })).toBeNull()
+  })
+})
+
+// ── The sub-department's ratio by brand (2026-11-14): "我要这个 ratio 这边，它是可以能够被 separate by brand 去填的 … 它其实是有
+// 4 个，如果说我调主要的一个的话，这样它就是 override 全部" ──
+function renderBrandRatios(brandDivisors: BrandDivisorRow[] = [], byBrand: CostRatioBrandRow[] = []) {
+  return render(<CostSettingTab sub={subs[0]} subs={subs} schemeId={SCHEME} divisor={0.7} ratios={[ultK]} skus={riderSkus}
+    byBrand={byBrand} brands={BRANDS} brandDivisors={brandDivisors} kivCosts={KIV} />)
+}
+const brandRow = () => screen.getByRole('group', { name: 'Fair cost ratio by brand' })
+const brandBoxes = () => within(brandRow()).getAllByRole('textbox') as HTMLInputElement[]
+
+describe("Costing Setting › the sub-department's ratio by brand", () => {
+  it('shows every brand at its ratio — its own, else the main one', () => {
+    renderBrandRatios([{ brand: 'ERGOTEX', ratio: 0.6 }])
+    expect(brandRow()).toHaveTextContent('BY BRANDAkemi 0.70Dunlopillo 0.70Ergotex 0.60Zanotti 0.70')
+    // Only Ergotex has one of its own; the others read the main ratio.
+    expect([...brandRow().querySelectorAll('[data-follows]')].map(chip => chip.textContent))
+      .toEqual(['Akemi 0.70', 'Dunlopillo 0.70', 'Zanotti 0.70'])
+    // A KIV frame rides on a bill of any brand: its team cost spans the ratios (1,000 ÷ 0.7 … ÷ 0.6).
+    expect(kivCard('K')).toHaveTextContent('Team cost 1,428.57 – 1,666.67')
+    expect(screen.getByText(/every other SKU divides by 0\.70 or its brand’s/)).toBeInTheDocument()
+  })
+
+  it('has no row for a sub-department without brands', () => {
+    renderTab()
+    expect(screen.queryByRole('group', { name: 'Fair cost ratio by brand' })).toBeNull()
+  })
+
+  it("saves a brand's ratio alone; a brand left blank reads the main ratio", async () => {
+    renderBrandRatios()
+    click('Edit ratios')
+    expect(brandBoxes().map(box => [box.getAttribute('aria-label'), box.value, box.getAttribute('placeholder')])).toEqual([
+      ['Akemi cost ratio', '', '0.70'], ['Dunlopillo cost ratio', '', '0.70'],
+      ['Ergotex cost ratio', '', '0.70'], ['Zanotti cost ratio', '', '0.70'],
+    ])
+    type('Ergotex cost ratio', '0.6')
+    click('Save 1 change')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      ratios: [],
+      brandRatios: [{ brand: 'ERGOTEX', ratio: '0.6', label: 'Ergotex' }],
+    }))
+  })
+
+  it('the main ratio typed sends every brand back to it — "override 全部" — and a brand typed after keeps its own', async () => {
+    renderBrandRatios([{ brand: 'ERGOTEX', ratio: 0.6 }, { brand: 'DUNLOP', ratio: 0.65 }])
+    click('Edit ratios')
+    expect(brandBoxes().map(box => box.value)).toEqual(['', '0.65', '0.60', ''])
+    type('Fair cost ratio', '0.68')
+    expect(brandBoxes().map(box => [box.value, box.getAttribute('placeholder')])).toEqual([
+      ['', '0.68'], ['', '0.68'], ['', '0.68'], ['', '0.68'],
+    ])
+    type('Zanotti cost ratio', '0.5')
+    // The main ratio, Dunlopillo's and Ergotex's taken off, Zanotti's set.
+    click('Save 4 changes')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      divisor: '0.68',
+      ratios: [],
+      brandRatios: [
+        { brand: 'DUNLOP', ratio: '', label: 'Dunlopillo' },
+        { brand: 'ERGOTEX', ratio: '', label: 'Ergotex' },
+        { brand: 'ZANOTTI', ratio: '0.5', label: 'Zanotti' },
+      ],
+    }))
+  })
+
+  it("a blank box takes a brand's ratio off; Cancel puts every box back", async () => {
+    renderBrandRatios([{ brand: 'ERGOTEX', ratio: 0.6 }])
+    click('Edit ratios')
+    type('Ergotex cost ratio', '0.55')
+    click('Cancel changes')
+    expect(brandRow()).toHaveTextContent('Ergotex 0.60')
+    click('Edit ratios')
+    type('Ergotex cost ratio', '')
+    click('Save 1 change')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      ratios: [],
+      brandRatios: [{ brand: 'ERGOTEX', ratio: '', label: 'Ergotex' }],
+    }))
+  })
+
+  it("a rider split by brand reads a brand's ratio where it has none for that brand", () => {
+    // TRION listed for Dunlopillo alone (0.6); Ergotex 0.6 and Zanotti 0.5 of their own.
+    renderBrandRatios([{ brand: 'ERGOTEX', ratio: 0.6 }, { brand: 'ZANOTTI', ratio: 0.5 }], [trionBy('DUNLOP', 0.6)])
+    // Akemi 830 ÷ 0.7 … Zanotti 830 ÷ 0.5.
+    expect(cells(rowOf('TRION (A)-(K)'))[6]).toBe('1,185.71 – 1,660.00')
+    click('Edit ratios')
+    const group = screen.getByRole('group', { name: 'TRION (A)-(K) by brand' })
+    expect(within(group).getAllByRole('textbox').map(box => box.getAttribute('placeholder'))).toEqual(['0.70', '0.70', '0.60', '0.50'])
   })
 })

@@ -14,6 +14,7 @@ import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
 import { billsWithBrandKpi, readSpecialMoney } from './special-money'
 import type {
+  BrandCostRatioRow,
   BrandRow,
   CostRatioBrandRow,
   GwpRow,
@@ -178,7 +179,7 @@ export async function loadCommissionInput(
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, cutover,
-    costRatios, costRatiosByBrand, gwp, heads, directorRows, directorPayRows, standingCloses, appliedRuns, brands] = await Promise.all([
+    costRatios, costRatiosByBrand, brandCostRatios, gwp, heads, directorRows, directorPayRows, standingCloses, appliedRuns, brands] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -249,6 +250,10 @@ export async function loadCommissionInput(
     readRows<CostRatioBrandRow>('the cost ratios by brand', (from, to) =>
       supabase.from('comm_cost_ratio_brands').select('product_code, brand_code, ratio')
         .eq('scheme_id', scheme.id).order('erp_product_id').order('brand_code').range(from, to)),
+    // A brand's own ratio, for a line whose SKU has none (Costing Setting, 2026-11-14).
+    readRows<BrandCostRatioRow>('the brands’ cost ratios', (from, to) =>
+      supabase.from('comm_brand_cost_ratios').select('brand_code, ratio')
+        .eq('scheme_id', scheme.id).order('brand_code').range(from, to)),
     // Product List › GWP (2026-11-08): what a purchase earns free, its cost out of the margin.
     readRows<GwpRow>('the gifts with purchase', (from, to) =>
       supabase.from('catalogue_gwp').select('id, catalogue_gwp_items (role, product_code, qty)')
@@ -418,7 +423,7 @@ export async function loadCommissionInput(
   const sourceRows = {
     periodMonth: period, scheme, ranks, itemGroups, kpiItems, kpiThresholds,
     marginBands, hierarchy, orders: orderRows,
-    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios, costRatiosByBrand, gwp, fabrics,
+    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios, costRatiosByBrand, brandCostRatios, gwp, fabrics,
     departmentHeadIds: heads.map(head => head.id),
     directors,
     monthCommissionableValue: monthValue,

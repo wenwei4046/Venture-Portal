@@ -293,7 +293,7 @@ export function calculateQuote(
     return invalid("The margin rules for this department are not configured.");
   // A SKU may carry its own ratio, and a rider one for the brand the cart
   // answers to (Product List › Costing Setting; 2026-11-07).
-  const basis = costBasisOf(divisor, rules.costRatios ?? [], rules.costRatiosByBrand ?? []);
+  const basis = costBasisOf(divisor, rules.costRatios ?? [], rules.costRatiosByBrand ?? [], rules.brandDivisors ?? []);
   const price = cents(input.price),
     delivery = cents(input.delivery || "0");
   if (price === null || price <= 0)
