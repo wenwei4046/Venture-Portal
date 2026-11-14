@@ -309,3 +309,32 @@ describe('a half-comm bill', () => {
     expect(closeOf(plain, 'agent').summary.bills.find(b => b.id === 'one')).not.toHaveProperty('halfComm')
   })
 })
+
+// ─── No commission (2026-11-14) ─────────────────────────────────────────────
+
+describe('a no-commission bill', () => {
+  const none = input({ orders: [sale('one', 1_000, { noCommission: true })] })
+  const plain = input({ orders: [sale('one')] })
+
+  it('closes at the figure the page shows: nothing paid, the whole sale', () => {
+    const melvin = board(none).people.find(p => p.staffId === 'agent')!
+    expect(salespersonFigures(melvin)).toMatchObject({ orders: 1, salesValue: 1_000, commissionable: 1_000 })
+    expect(melvin.personalTotal).toBe(0)
+    expect(melvin.personalRows.find(r => r.orderId === 'one')).toMatchObject({ noComm: true, productCommission: 0 })
+    expect(melvin.reconciliationDifference).toBe(0)
+    expect(closeOf(none, 'agent').total).toBe(melvin.totalCommission)
+  })
+
+  it('pays the upline no override on it, row and total alike', () => {
+    const leader = board(none).people.find(p => p.staffId === 'leader')
+    expect(leader?.overrideTotal ?? 0).toBe(0)
+    expect(leader?.overridingRows.reduce((a, r) => a + r.overrideAmount, 0) ?? 0).toBe(0)
+    expect(leader?.reconciliationDifference ?? 0).toBe(0)
+  })
+
+  it('is kept as such by the close, through JSON', () => {
+    const bills = closeOf(none, 'agent').summary.bills
+    expect(bills.find(b => b.id === 'one')).toMatchObject({ id: 'one', noComm: true })
+    expect(closeOf(plain, 'agent').summary.bills.find(b => b.id === 'one')).not.toHaveProperty('noComm')
+  })
+})
