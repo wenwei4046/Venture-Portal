@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  signIn: vi.fn(), signOut: vi.fn(), profile: vi.fn(), redirect: vi.fn(), clearView: vi.fn(),
+  signIn: vi.fn(), signOut: vi.fn(), reset: vi.fn(), profile: vi.fn(), redirect: vi.fn(), clearView: vi.fn(),
 }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
-    auth: { signInWithPassword: mocks.signIn, signOut: mocks.signOut },
+    auth: { signInWithPassword: mocks.signIn, signOut: mocks.signOut, resetPasswordForEmail: mocks.reset },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mocks.profile }) }) }),
   }),
 }))
@@ -100,5 +100,39 @@ describe('canonical sign-in routing', () => {
     expect(mocks.profile).not.toHaveBeenCalled()
     expect(mocks.redirect).not.toHaveBeenCalled()
     expect(mocks.clearView).not.toHaveBeenCalled()
+  })
+})
+
+describe('Forgot password — the reset link (2026-11-14)', () => {
+  async function ask(email: string) {
+    const screen = await LoginPage({ searchParams: Promise.resolve({}) })
+    const form = new FormData()
+    form.set('email', email)
+    return screen.props.resetAction(form)
+  }
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mocks.reset.mockResolvedValue({ data: {}, error: null })
+  })
+
+  it('asks Supabase to email the login, and answers the same whether it has one or not', async () => {
+    await expect(ask('  Someone@Gmail.com ')).resolves.toEqual({ error: '', sent: expect.stringContaining('If someone@gmail.com has an account') })
+    expect(mocks.reset).toHaveBeenCalledWith('someone@gmail.com')
+    expect(mocks.signIn).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing for an address that is not one', async () => {
+    await expect(ask('principal')).resolves.toEqual({ error: expect.any(String) })
+    expect(mocks.reset).not.toHaveBeenCalled()
+  })
+
+  it('words a rate limit, and anything else as try again', async () => {
+    mocks.reset.mockResolvedValue({ data: null, error: { code: 'over_email_send_rate_limit', status: 429 } })
+    await expect(ask('a@b.com')).resolves.toEqual({ error: expect.stringContaining('Wait a minute') })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.reset.mockResolvedValue({ data: null, error: { code: 'unexpected_failure', status: 500 } })
+    await expect(ask('a@b.com')).resolves.toEqual({ error: 'The email could not be sent. Please try again shortly.' })
+    expect(log).toHaveBeenCalled()
+    log.mockRestore()
   })
 })

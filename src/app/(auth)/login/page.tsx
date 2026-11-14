@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_PERSON_MARK } from "@/lib/view-as";
 import MemberLoginScreen from "@/components/member/MemberLoginScreen";
+import type { ResetLinkState } from "@/components/member/ForgotPasswordForm";
+import { resetEmailProblem, resetSendRefusal, resetSentNote } from "@/lib/password-reset";
 
 export const metadata = { title: "Sign In · HOUZS Venture" };
 
@@ -54,5 +56,25 @@ export default async function LoginPage({
     redirect(back ?? (profile.role === "revenue_member" ? "/member" : "/dashboard"));
   }
 
-  return <MemberLoginScreen action={signIn} initialError={error} />;
+  /**
+   * Forgot password (2026-11-14): Supabase emails the login a link to /reset-password
+   * (supabase/templates/recovery.html). The anon client, no service role: an address with no
+   * login gets the same answer and no email, so the box tells nobody who works here.
+   */
+  async function sendResetLink(form: FormData): Promise<ResetLinkState> {
+    "use server";
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
+    const problem = resetEmailProblem(email);
+    if (problem) return { error: problem };
+    const supabase = await createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      const said = resetSendRefusal(error.code);
+      if (!said) console.error("[password] reset link refused", JSON.stringify({ code: error.code ?? null, status: error.status ?? null }));
+      return { error: said ?? "The email could not be sent. Please try again shortly." };
+    }
+    return { error: "", sent: resetSentNote(email) };
+  }
+
+  return <MemberLoginScreen action={signIn} initialError={error} resetAction={sendResetLink} />;
 }

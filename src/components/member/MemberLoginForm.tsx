@@ -35,10 +35,13 @@ export default function MemberLoginForm({
   action,
   initialError = "",
   preview = false,
+  onForgot,
 }: {
   action: (form: FormData) => Promise<LoginState | void>;
   initialError?: string;
   preview?: boolean;
+  /** Forgot password (2026-11-14): switches to the reset-link form with what was typed; without it, the old note. */
+  onForgot?: (email: string) => void;
 }) {
   const id = useId();
   const emailId = `${id}-email`;
@@ -111,9 +114,9 @@ export default function MemberLoginForm({
           <button
             className={s.helpToggle}
             type="button"
-            aria-expanded={showHelp}
-            aria-controls={helpId}
-            onClick={() => setShowHelp((shown) => !shown)}
+            aria-expanded={onForgot ? undefined : showHelp}
+            aria-controls={onForgot ? undefined : helpId}
+            onClick={() => (onForgot ? onForgot(email.trim()) : setShowHelp((shown) => !shown))}
           >
             Forgot password?
           </button>

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { COMPANY_NAME } from './company'
 import { welcomeLink } from './invite'
-import { EMAILS_PER_HOUR, INVITE, SENDER, SITE_URL, wanted } from '../../scripts/push-auth-email.mjs'
+import { EMAILS_PER_HOUR, INVITE, RECOVERY, SENDER, SITE_URL, recoveryTemplate, wanted } from '../../scripts/push-auth-email.mjs'
 
 // The invite email (2026-10-16, the user: "在 email 那边收到它显示的是 148B，我要它显示是我们的
 // email。 and icon. email hello@houzsventure.com"). Supabase sends it; its body is
@@ -67,13 +67,15 @@ describe('the invite email', () => {
 })
 
 describe('what scripts/push-auth-email.mjs sends', () => {
+  const RECOVERY_FIELDS = { mailer_subjects_recovery: RECOVERY.subject, mailer_templates_recovery_content: recoveryTemplate() }
+
   it('is what a local Supabase sends too', () => {
     const local = readFileSync(join(ROOT, 'supabase/config.toml'), 'utf8').match(/\[auth\.email\.template\.invite\]\s*\nsubject = "([^"]*)"\s*\ncontent_path = "\.\/([^"]*)"/)
     expect(local?.slice(1)).toEqual([INVITE.subject, INVITE.file])
   })
 
   it('without the app password, the address, the subject and the body only — never half an SMTP', () => {
-    expect(wanted()).toEqual({ site_url: SITE_URL, mailer_subjects_invite: INVITE.subject, mailer_templates_invite_content: html })
+    expect(wanted()).toEqual({ site_url: SITE_URL, mailer_subjects_invite: INVITE.subject, mailer_templates_invite_content: html, ...RECOVERY_FIELDS })
     expect(wanted({ smtpPass: '   ' })).toEqual(wanted())
   })
 
@@ -82,6 +84,7 @@ describe('what scripts/push-auth-email.mjs sends', () => {
       site_url: SITE_URL,
       mailer_subjects_invite: INVITE.subject,
       mailer_templates_invite_content: html,
+      ...RECOVERY_FIELDS,
       smtp_host: 'smtp.gmail.com',
       smtp_port: '465',
       smtp_user: 'hello@houzsventure.com',

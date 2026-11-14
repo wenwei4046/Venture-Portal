@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import MemberLoginForm from "./MemberLoginForm";
+import ForgotPasswordForm, { type ResetLinkState } from "./ForgotPasswordForm";
 import { forgetReads } from "./app/read-memory";
 import { forgetMedia } from "./crm/shared/media-cache";
 import LoginInstallCard from "@/components/pwa/LoginInstallCard";
@@ -23,6 +24,8 @@ type LoginScreenProps = {
    * password): its own heading, line and form in place of the sign-in's.
    */
   panel?: { title: string; intro: string; body: ReactNode };
+  /** Forgot password (2026-11-14): emails the login a reset link. Without it *Forgot password?* shows the old note. */
+  resetAction?: (form: FormData) => Promise<ResetLinkState>;
 };
 
 /** Selected Warm Editorial design for member sign-in and sample previews. */
@@ -31,8 +34,20 @@ export default function MemberLoginScreen({
   initialError,
   preview = false,
   previewHref,
-  panel,
+  panel: givenPanel,
+  resetAction,
 }: LoginScreenProps) {
+  // Forgot password swaps the sign-in for the reset-link form, carrying the email typed so far.
+  const [forgot, setForgot] = useState<{ email: string } | null>(null);
+  const panel =
+    givenPanel ??
+    (forgot && resetAction
+      ? {
+          title: "Reset your password.",
+          intro: "We will email you a link to choose a new one.",
+          body: <ForgotPasswordForm action={resetAction} initialEmail={forgot.email} onBack={() => setForgot(null)} />,
+        }
+      : undefined);
   // Every sign-out ends here: the Revenue app's figures kept on this phone go with the session (2026-10-08),
   // so a phone handed to somebody else shows nobody's.
   useEffect(() => {
@@ -103,7 +118,12 @@ export default function MemberLoginScreen({
               panel.body
             ) : (
               <>
-                <MemberLoginForm action={action} initialError={initialError} preview={preview} />
+                <MemberLoginForm
+                  action={action}
+                  initialError={initialError}
+                  preview={preview}
+                  onForgot={resetAction && !preview ? (email) => setForgot({ email }) : undefined}
+                />
                 {previewHref && (
                   <a className={s.previewLink} href={previewHref}>
                     {preview ? "Preview workspace" : "Explore the demo"}

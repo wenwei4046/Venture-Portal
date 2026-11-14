@@ -49,10 +49,16 @@ export const EMAILS_PER_HOUR = 30
 /** The invite: its subject and its body, a Go template (`{{ .SiteURL }}`, `{{ .TokenHash }}`, `{{ .Data.name }}`). */
 export const INVITE = { subject: 'Your HOUZS Venture account', file: 'supabase/templates/invite.html' }
 
+/**
+ * The reset-password email (2026-11-14): the sign-in's *Forgot password?* sends it; its link opens
+ * our /reset-password (`{{ .SiteURL }}`, `{{ .TokenHash }}`, `{{ .Email }}`).
+ */
+export const RECOVERY = { subject: 'Reset your HOUZS Venture password', file: 'supabase/templates/recovery.html' }
+
 /** With LF line ends, whichever checkout it is sent from (Windows' writes CRLF). */
-export function inviteTemplate() {
-  return readFileSync(join(ROOT, INVITE.file), 'utf8').replace(/\r\n/g, '\n')
-}
+const template = (file) => readFileSync(join(ROOT, file), 'utf8').replace(/\r\n/g, '\n')
+export const inviteTemplate = () => template(INVITE.file)
+export const recoveryTemplate = () => template(RECOVERY.file)
 
 /**
  * The fields to send. The sender goes only with its password, and then whole:
@@ -65,6 +71,8 @@ export function wanted({ smtpPass = '' } = {}) {
     site_url: SITE_URL,
     mailer_subjects_invite: INVITE.subject,
     mailer_templates_invite_content: inviteTemplate(),
+    mailer_subjects_recovery: RECOVERY.subject,
+    mailer_templates_recovery_content: recoveryTemplate(),
   }
   const pass = smtpPass.replace(/\s+/g, '')
   if (!pass) return fields
