@@ -16,8 +16,10 @@ export type MessengerWindow = "open" | "human_agent" | "shut";
  * is refused by Meta, so the window shuts at 24 h and the chat is a cold lead (the owner, 2026-10-13: Kyky Loke could
  * not be answered but was not in Cold leads). Set to true once Meta approves; the 24 h – 7 days HUMAN_AGENT window
  * then opens again everywhere (the screens and the send ask this one function).
+ * APPROVED 2026-11-14 (Meta's App Review, submitted 10:19 the same day; the owner: "我的AI Agent 通过了 … 是human agent").
+ * Only a person's reply may carry the tag: Lead View's automatic sends (templates, AI Agent) keep to 24 h (`automatic`).
  */
-export const HUMAN_AGENT_APPROVED = false;
+export const HUMAN_AGENT_APPROVED = true;
 
 export function messengerWindow(lastCustomerAt: string | null | undefined, now: Date = new Date(), humanAgent = HUMAN_AGENT_APPROVED): MessengerWindow {
   const t = lastCustomerAt ? new Date(lastCustomerAt).getTime() : NaN;
