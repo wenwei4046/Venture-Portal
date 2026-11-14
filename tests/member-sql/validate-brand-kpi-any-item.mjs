@@ -198,7 +198,8 @@ try {
     -- The fabric lists: a code may be on both, in another series on each; 2990s' EZ fabrics have no series.
     INSERT INTO erp_fabrics(erp_company_id, erp_id, fabric_code, series) VALUES
       (1, 'f1', 'AV-01', 'AVANI'), (1, 'f2', 'X1-01', 'AVANI'),
-      (2, 'g1', 'EZ-007', NULL), (2, 'g2', 'BROWNIE-02', 'HOMELY'), (2, 'g3', 'HG1313-02', 'BELONG'), (2, 'g4', 'X1-01', 'HOMELY');
+      (2, 'g1', 'EZ-007', NULL), (2, 'g2', 'BROWNIE-02', 'HOMELY'), (2, 'g3', 'HG1313-02', 'BELONG'), (2, 'g4', 'X1-01', 'HOMELY'),
+      (2, 'g5', 'Velvet Interlace - Bronze', NULL);
     INSERT INTO sales_import_batches VALUES ('${BATCH}', '${FAIR}', '${NOV}', 'committed');
 
     -- The sub-department's own items, in force since August: a sofa special, a SKU and a sofa fabric series.
@@ -430,7 +431,9 @@ try {
     brandOpt('models', 'boaat'), brandOpt('compartments', 'cnr'), brandOpt('compartments', '1a'),
     brandOpt('sofa_fabric_series', 'ez'), brandOpt('bedframe_fabric_series', 'homely'),
     brandOpt('bedframe_specials', 'hb straight', { label: 'Headboard straight' }),
-  ]), 7, "seven of a brand's items, one of every kind")
+    // A family read off a code with spaces round its '-': no space kept on its name.
+    brandOpt('sofa_fabric_series', ' velvet  interlace '),
+  ]), 8, "eight of a brand's items, of every kind")
   check(await stored(), [
     { source: 'option', pool: 'bedframe_fabric_series', value: 'HOMELY', name: 'HOMELY · Bed frame fabric', amount: 50, cost_amount: null, corner_cost_amount: null, from: today },
     { source: 'option', pool: 'bedframe_specials', value: 'HB Straight', name: 'Headboard straight', amount: 50, cost_amount: null, corner_cost_amount: null, from: today },
@@ -438,6 +441,10 @@ try {
     { source: 'option', pool: 'compartments', value: 'CNR', name: null, amount: 50, cost_amount: null, corner_cost_amount: null, from: today },
     { source: 'option', pool: 'models', value: 'Boaat', name: null, amount: 50, cost_amount: null, corner_cost_amount: null, from: today },
     { source: 'option', pool: 'sofa_fabric_series', value: 'EZ', name: 'EZ · Sofa fabric', amount: 50, cost_amount: null, corner_cost_amount: null, from: today },
+    {
+      source: 'option', pool: 'sofa_fabric_series', value: 'Velvet Interlace', name: 'Velvet Interlace · Sofa fabric', amount: 50,
+      cost_amount: null, corner_cost_amount: null, from: today,
+    },
     { source: 'sku', pool: null, value: 'SQUARE PILLOW-M', name: 'SOFA SQUARE PILLOW-M (16"X16")', amount: 10, cost_amount: null, corner_cost_amount: null, from: today },
   ], "each in the master's own spelling — a model its live SKUs', a compartment as the costing reads a piece (1A(P)(LHF) "
     + 'is 1A), a series its list\'s or its code\'s family — named as asked, else as the master names it; no cost')

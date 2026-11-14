@@ -66,7 +66,7 @@ SET LOCAL lock_timeout = '8s';
 CREATE TEMP TABLE brand_kpi_any_fns (proc text PRIMARY KEY, written_from text NOT NULL, makes text NOT NULL) ON COMMIT DROP;
 INSERT INTO brand_kpi_any_fns VALUES
   ('public.comm_kpi_hits(uuid, uuid[], date)',                    'b7710762d784f1e7707a137a7c43c92b', '13619cdb8dde3e75fc2ffe7ad0900b95'),
-  ('public.catalogue_save_kpi_items(uuid, jsonb, jsonb, uuid[])', '4c676def8a63d5d41008619e2bdc0d41', '76b22a80dc3bbf3873c9293e714906c1'),
+  ('public.catalogue_save_kpi_items(uuid, jsonb, jsonb, uuid[])', '4c676def8a63d5d41008619e2bdc0d41', '60457794cf68a6245c5f1063f08bb1c8'),
   ('public.member_kpi_for_staff(uuid, uuid, date)',               'a20392fb1acc51891dee50e72d01de07', '9cfa4355677da71c7ca86d21ef3e83cb');
 
 -- Each is production's body, or this migration's own once it has run — else nothing is touched.
@@ -598,7 +598,7 @@ BEGIN
             -- (20261114230000) A brand's: its own company's list, a fabric with no series in its code's family.
             SELECT x.series INTO v_value
               FROM (SELECT CASE WHEN r.brand_id IS NULL THEN BTRIM(f.series)
-                                ELSE COALESCE(NULLIF(BTRIM(f.series), ''), SPLIT_PART(BTRIM(f.fabric_code), '-', 1)) END AS series,
+                                ELSE COALESCE(NULLIF(BTRIM(f.series), ''), BTRIM(SPLIT_PART(BTRIM(f.fabric_code), '-', 1))) END AS series,
                            f.removed_at
                       FROM erp_fabrics f
                      WHERE f.erp_company_id = v_company) x

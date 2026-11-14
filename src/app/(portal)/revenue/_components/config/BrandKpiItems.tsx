@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatMoneyBare } from '@/lib/utils'
 import { valueKey } from '@/lib/catalogue/keys'
-import { kpiItemKind, type KpiItemPool } from '@/lib/commission/kpi'
+import { fabricSeriesLabel, kpiItemKind, type KpiItemPool } from '@/lib/commission/kpi'
 import { MAX_KPI_TIERS, validateKpiItems } from '@/lib/catalogue/rule-edits'
 import {
   bonusDiffers,
@@ -255,7 +255,8 @@ function BrandKpiBlock({ brand, scheme, items, catalogue, goneSkus, canManage }:
     })
   }
 
-  // What the picker offers for the source chosen, from the brand's own catalogue.
+  // What the picker offers for the source chosen, from the brand's own catalogue. A pick is named, until a name is
+  // typed, as the database will list it: a SKU by its description, a fabric series with its kind, the rest by itself.
   const q = query.trim().toLowerCase()
   const has = (...texts: Array<string | null | undefined>) => !q || texts.some(t => (t ?? '').toLowerCase().includes(q))
   const isTaken = (pick: { source: 'sku' | 'option'; pool: string | null; value: string }) => taken.has(brandKpiKey(pick))
@@ -276,7 +277,7 @@ function BrandKpiBlock({ brand, scheme, items, catalogue, goneSkus, canManage }:
           code: m.model,
           desc: [m.category, plural(m.skus, 'SKU'), m.sample].filter(Boolean).join(' · '),
           listed: isTaken({ source: 'option', pool: 'models', value: m.model }),
-          add: () => add(pickBrandItem({ source: 'option', pool: 'models', value: m.model, label: m.sample }, pickAmount.trim())),
+          add: () => add(pickBrandItem({ source: 'option', pool: 'models', value: m.model }, pickAmount.trim())),
         }))
       : source === 'compartments'
         ? catalogue.compartments.filter(c => has(c.compartment)).map(c => ({
@@ -292,7 +293,7 @@ function BrandKpiBlock({ brand, scheme, items, catalogue, goneSkus, canManage }:
               code: s.series,
               desc: fabricCount(s.fabrics),
               listed: isTaken({ source: 'option', pool: source, value: s.series }),
-              add: () => add(pickBrandItem({ source: 'option', pool: source, value: s.series }, pickAmount.trim())),
+              add: () => add(pickBrandItem({ source: 'option', pool: source, value: s.series, label: fabricSeriesLabel(source, s.series) }, pickAmount.trim())),
             }))
           : catalogue.specials
               .filter(o => o.pool === source && !o.removed && has(o.value, o.label))
@@ -302,7 +303,7 @@ function BrandKpiBlock({ brand, scheme, items, catalogue, goneSkus, canManage }:
                 code: o.value,
                 desc: o.label !== o.value ? o.label : '',
                 listed: isTaken({ source: 'option', pool: o.pool, value: o.value }),
-                add: () => add(pickBrandItem({ source: 'option', pool: o.pool, value: o.value, label: o.label }, pickAmount.trim())),
+                add: () => add(pickBrandItem({ source: 'option', pool: o.pool, value: o.value }, pickAmount.trim())),
               }))
   const message = source === 'sku'
     ? !q

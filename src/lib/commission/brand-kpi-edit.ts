@@ -48,7 +48,10 @@ export interface BrandKpiAdded {
   /** A SKU's code, or the option's value. */
   value: string
   erpId: string | null
-  /** What the item is called where it comes from (a SKU's description, a model's SKU) — shown, never sent. */
+  /**
+   * What the item is listed as while no name is typed — as the database will name it: a SKU by its description, a
+   * fabric series with its kind (*EZ · Sofa fabric*); null = its value. Shown, and named in a refusal; never stored.
+   */
   label: string | null
   /** A name of its own, as typed; blank = its own. */
   name: string
