@@ -11,7 +11,8 @@ import { officeToday } from '@/lib/office-time'
 import { loadHalfComms, loadMonthOrders, loadNoComms } from './month-orders'
 import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
-import { namesFabricSeries, readFabricSeries } from './fabric-series'
+import { brandCompaniesWith, namesFabricSeries, readBrandSkuModels, readFabricSeries } from './fabric-series'
+import { isFabricSeriesPool } from '@/lib/commission/kpi'
 import { billsWithBrandKpi, readSpecialMoney } from './special-money'
 import type {
   BrandRow,
@@ -68,10 +69,11 @@ async function readByKeys<T>(
 
 /**
  * A KPI item is a SKU, a Maintenance special (2026-09-27) or a fabric series (2026-10-29) — the sub-department's
- * own, or (brand_id, unit_tiers, cost_amount, corner_cost_amount) a brand's own on its own commission scheme
- * (2026-11-12; its cost 2026-11-13, its corner cost 2026-11-14).
+ * own, or (brand_id, unit_tiers) a brand's own on its own commission scheme (2026-11-12) — since 2026-11-14 of every
+ * kind, a model and a compartment too; what it takes off is what the bill charged for it (its cost and corner cost,
+ * 2026-11-13 / 14, are no longer read).
  */
-const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers, cost_amount, corner_cost_amount'
+const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers'
 
 function periodEnd(period: string): string {
   if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(period)) {
@@ -281,7 +283,7 @@ export async function loadCommissionInput(
     // The scheme's brands (2026-11-11): one that follows its own scheme — 2990s —
     // is paid at its own rate per rank and stands outside every margin.
     readRows<BrandRow>('the brands', (from, to) =>
-      supabase.from('comm_brands').select('id, code, own_scheme, is_active')
+      supabase.from('comm_brands').select('id, code, own_scheme, is_active, erp_company_id')
         .eq('scheme_id', scheme.id).order('id').range(from, to)),
   ])
 
@@ -317,8 +319,12 @@ export async function loadCommissionInput(
     const bill = upsaleBillId(row, upsaleDocBills)
     return bill ? [bill] : []
   }))]
-  // A KPI item that is a fabric series (2026-10-29) finds a line's fabric on the ERP's fabric list.
-  const needsFabrics = namesFabricSeries([...kpiItems, ...currentKpiItems])
+  // A KPI item that is a fabric series (2026-10-29) finds a line's fabric on the ERP's fabric list — a brand's own on
+  // its own company's (2026-11-14); a brand's own model item, a line's SKU's base model on its own SKU master.
+  const allKpiItems = [...kpiItems, ...currentKpiItems]
+  const needsFabrics = namesFabricSeries(allKpiItems)
+  const fabricCompanies = brandCompaniesWith(brands, allKpiItems, isFabricSeriesPool)
+  const modelCompanies = brandCompaniesWith(brands, allKpiItems, pool => pool === 'models')
   // A drop or an upsell on a bill of a brand with its own scheme is paid — or
   // taken back — at the rate that bill was paid at (2026-11-11): the brand of
   // the bill each one changed, read only while a brand has its own scheme.
@@ -326,7 +332,7 @@ export async function loadCommissionInput(
   // A brand's own KPI items (2026-11-12) are found where its bill's special order charges for them: read for the
   // bills of a brand that has such items, and for no other.
   const brandKpiBills = billsWithBrandKpi(orderRows, brands, [...kpiItems, ...currentKpiItems])
-  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney, noComms] = await Promise.all([
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney, noComms, brandSkuModels] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -341,7 +347,7 @@ export async function loadCommissionInput(
     readByKeys<OrderShareRow>('the shares of the bills drops and upsells changed', upsaleBillIds,
       (chunk, from, to) => supabase.from('sales_order_shares').select('order_id, staff_id, share_pct')
         .in('order_id', chunk).order('order_id').order('staff_id').range(from, to)),
-    needsFabrics ? readFabricSeries(supabase) : Promise.resolve([]),
+    needsFabrics ? readFabricSeries(supabase, fabricCompanies) : Promise.resolve([]),
     // Half comm (2026-11-10): the bills paid half their commission.
     loadHalfComms(supabase, orderIds),
     ownBrands.size > 0
@@ -352,6 +358,8 @@ export async function loadCommissionInput(
     readSpecialMoney(supabase, brandKpiBills),
     // No commission (2026-11-14): the bills that count and pay nobody.
     loadNoComms(supabase, orderIds),
+    // A brand's own model items (2026-11-14): its SKU master's base models.
+    readBrandSkuModels(supabase, modelCompanies),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
   const ownBrandCodes = new Set(ownBrands.values())
@@ -431,6 +439,7 @@ export async function loadCommissionInput(
     feedFloor,
     brands,
     specialMoney,
+    brandSkuModels,
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,
