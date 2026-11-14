@@ -25,6 +25,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ adI
   const lead = seen.data ? null : await db.from("crm_contacts").select("id").eq("ad_source_id", adId).limit(1).maybeSingle();
   if (!seen.data && !lead?.data) return deny(404, "Not found.");
   const token = process.env.META_SYSTEM_USER_TOKEN;
-  const url = (token && (await metaAdPermalink(adId, token))) || `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${adId}`;
+  // Meta's own post for the ad; else the post a customer of this ad came with (crm_contacts.ad_source_url — /posts/ or a
+  // reel, which Facebook opens; 2026-11-14); else Ads Manager with the ad picked.
+  const kept = async () => {
+    const r = await db.from("crm_contacts").select("ad_source_url").eq("ad_source_id", adId).not("ad_source_url", "is", null)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const u = (r.data as { ad_source_url?: string } | null)?.ad_source_url;
+    return typeof u === "string" && /^https:\/\/(www\.|m\.)?facebook\.com\//.test(u) && !/facebook\.com\/\d+_\d+/.test(u) ? u : null;
+  };
+  const url = (token && (await metaAdPermalink(adId, token))) || (await kept()) || `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${adId}`;
   return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "private, no-store" } });
 }

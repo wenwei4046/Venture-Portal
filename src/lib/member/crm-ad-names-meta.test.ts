@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, crmPages, metaAdInsights, metaAdDaily, metaAdThumbs, metaAdBudget } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, crmPages, metaAdInsights, metaAdDaily, metaAdThumbs, metaAdBudget, metaAdPermalink } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -241,5 +241,20 @@ describe("an ad's daily budget (2026-10-27: \"让系统读取每支广告的日�
   it('keeps a lifetime budget, and gives nothing for an ad it cannot read', async () => {
     expect(await metaAdBudget(id, 't', answer({ adset: { id: '9', lifetime_budget: '150000' } }))).toEqual({ daily: null, lifetime: 1500, key: 'adset:9', level: 'adset' })
     expect(await metaAdBudget(id, 't', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
+  })
+})
+
+// Insight / Ads Performance's ↗ (2026-11-14 — the owner: "所有广告点进去的链接是看不到的"): an ad's post is unpublished, so
+// Facebook opens it at /<page>/posts/<post> and answers "This isn't available" at /<page>_<post>.
+describe('where an ad can be seen', () => {
+  const answer = (creative: object) => vi.fn(async () => new Response(JSON.stringify({ creative }), { status: 200 })) as unknown as typeof fetch
+  it('opens the post at /<page>/posts/<post>, never /<page>_<post>', async () => {
+    const url = await metaAdPermalink('52625304217664', 't', answer({ effective_object_story_id: '102351059576534_1022808454194916' }))
+    expect(url).toBe('https://www.facebook.com/102351059576534/posts/1022808454194916')
+  })
+  it('an Instagram post as Meta gives it; nothing it cannot read', async () => {
+    expect(await metaAdPermalink('52625304217664', 't', answer({ instagram_permalink_url: 'https://www.instagram.com/p/abc/' }))).toBe('https://www.instagram.com/p/abc/')
+    expect(await metaAdPermalink('52625304217664', 't', answer({ effective_object_story_id: 'nope' }))).toBeNull()
+    expect(await metaAdPermalink('x', 't', answer({}))).toBeNull()
   })
 })
