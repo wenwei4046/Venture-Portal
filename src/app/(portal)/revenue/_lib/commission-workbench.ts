@@ -13,6 +13,7 @@ import { loadPayBoard } from './pay-preview'
 import { loadBillMoves, loadCarriedCloses, loadFeedFloor, loadUpsaleFacts, type UpsaleFact } from './row-origins'
 import type { BillMoved } from '@/lib/commission/bill-move'
 import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
+import type { NoCommMark } from '@/lib/commission/bill-no-comm'
 
 /** Read-only inputs: opening the workbench never creates a run or changes payroll. */
 export async function loadCommissionWorkbench(
@@ -21,7 +22,7 @@ export async function loadCommissionWorkbench(
   /** The All bills page reads commission only; the salary preview is the month page's. */
   { pay: withPay = true }: { pay?: boolean } = {},
 ) {
-  const [{ input, currentHierarchy, currentRules, unmatchedOrderNos, halfComms }, calendar] = await Promise.all([
+  const [{ input, currentHierarchy, currentRules, unmatchedOrderNos, halfComms, noComms }, calendar] = await Promise.all([
     // The month's bills ride along for the directors' incentive: the page
     // read them already, so the threshold is judged on the card's figure.
     loadCommissionInput(period, subDepartmentId, db, { replayRunId: runId, includeCurrentRules: true, monthOrders }),
@@ -119,6 +120,8 @@ export async function loadCommissionWorkbench(
     moves: moves as Record<string, BillMoved>,
     /** Half comm (2026-11-10): who halved which bill, and why, keyed by bill. */
     halfComms: Object.fromEntries(halfComms ?? []) as Record<string, HalfCommMark>,
+    /** No commission (2026-11-14): who took which bill's commission off, and why, keyed by bill. */
+    noComms: Object.fromEntries(noComms ?? []) as Record<string, NoCommMark>,
     people: people.map(p => ({ staffId: p.id, name: p.employee_name, employeeCode: p.employee_code })),
     payRows: pay.rows, payUnavailable: pay.unavailable,
     /** Why the month's pay lines cannot change, or null while they can. */
@@ -134,7 +137,7 @@ type Loaded = Awaited<ReturnType<typeof loadCommissionWorkbench>>
  * other-month rows' facts (2026-10-12): absent, a row says only what its own
  * fields can — an upsell is an upsell, a carried bill the month it came from.
  */
-export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' | 'carriedCloses' | 'moves' | 'halfComms' | 'orders' | 'unassignedOldBillNos'>
+export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' | 'carriedCloses' | 'moves' | 'halfComms' | 'noComms' | 'orders' | 'unassignedOldBillNos'>
   & {
     payLinesClosed?: string | null
     unassignedOldBillNos?: readonly string[]
@@ -142,6 +145,7 @@ export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' 
     carriedCloses?: readonly CloseBills[]
     moves?: Readonly<Record<string, BillMoved>>
     halfComms?: Readonly<Record<string, HalfCommMark>>
+    noComms?: Readonly<Record<string, NoCommMark>>
     orders: (Omit<Loaded['orders'][number], 'saleMonth' | 'oldBill' | 'customer' | 'brandCode'>
       & { saleMonth?: string | null; oldBill?: OldBill | null; customer?: string | null; brandCode?: string | null })[]
   }

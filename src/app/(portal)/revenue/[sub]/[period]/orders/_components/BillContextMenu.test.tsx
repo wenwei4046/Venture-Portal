@@ -10,13 +10,14 @@ const mocks = vi.hoisted(() => ({
   unshareOrder: vi.fn(),
   moveOrder: vi.fn(),
   setHalfComm: vi.fn(),
+  setNoComm: vi.fn(),
   refresh: vi.fn(),
   push: vi.fn(),
 }))
 vi.mock('../../../../run-actions', () => ({
   excludeOrder: mocks.excludeOrder, includeOrder: mocks.includeOrder,
   shareOrder: mocks.shareOrder, unshareOrder: mocks.unshareOrder, moveOrder: mocks.moveOrder,
-  setHalfComm: mocks.setHalfComm,
+  setHalfComm: mocks.setHalfComm, setNoComm: mocks.setNoComm,
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }) }))
 
@@ -61,21 +62,24 @@ describe('BillContextMenu', () => {
     const confirm = screen.getByRole('dialog', { name: "Don't count HC-SO-013493" })
     expect(within(confirm).getByText(/as if the ERP had cancelled it/)).toBeInTheDocument()
     fireEvent.change(within(confirm).getByLabelText(/Why/), { target: { value: 'duplicate of HC-SO-013251' } })
-    fireEvent.click(within(confirm).getByRole('button', { name: "Don't count this bill" }))
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Not counted' }))
 
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(mocks.excludeOrder).toHaveBeenCalledWith('order-1', 'duplicate of HC-SO-013251')
+    expect(mocks.setNoComm).not.toHaveBeenCalled()
     expect(mocks.refresh).toHaveBeenCalled()
     expect(onDone.mock.calls[0][0]).toMatchObject({ orderId: 'order-1', orderNo: 'HC-SO-013493', excluded: true })
+    expect(onDone.mock.calls[0][0]).not.toHaveProperty('noComm')
   })
 
-  it('confirms from the keyboard with Enter in the reason', async () => {
+  it('asks which kind — Enter in the reason picks neither', () => {
     const { root, onDone } = menu({ kind: 'exclude' })
     fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
     const confirm = screen.getByRole('dialog', { name: "Don't count HC-SO-013493" })
     fireEvent.keyDown(within(confirm).getByLabelText(/Why/), { key: 'Enter' })
-    await waitFor(() => expect(onDone).toHaveBeenCalled())
-    expect(mocks.excludeOrder).toHaveBeenCalledWith('order-1', '')
+    expect(onDone).not.toHaveBeenCalled()
+    expect(mocks.excludeOrder).not.toHaveBeenCalled()
+    expect(mocks.setNoComm).not.toHaveBeenCalled()
   })
 
   it('backs out of the confirmation without writing anything', () => {
@@ -91,7 +95,7 @@ describe('BillContextMenu', () => {
     mocks.excludeOrder.mockRejectedValue(new Error('The run for September 2026 has paid. Reopen it before changing which of its bills count.'))
     const { root, onDone } = menu({ kind: 'exclude' })
     fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: "Don't count this bill" }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Not counted' }))
     expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(/has paid/)
     expect(onDone).not.toHaveBeenCalled()
   })
@@ -491,5 +495,83 @@ describe('BillContextMenu — Half comm (2026-11-10)', () => {
   it('has no row where none is offered', () => {
     const { root } = menu({ kind: 'exclude' })
     expect(within(root).queryByRole('menuitem', { name: /Half comm|Full comm/ })).toBeNull()
+  })
+})
+
+// 2026-11-14 — the user: "Down count（HR 那边）我觉得要分为两种：1. 一种是指完全不出 commission，但他还是有算在 revenue，还有
+// 算在 margin 等等 2. 另外一种是不算 commission，同时也不算进 revenue、不算进 margin，跟他完全没有关系".
+describe('BillContextMenu — Don’t count’s two kinds (2026-11-14)', () => {
+  it('offers No commission beside Not counted, each said in the panel', () => {
+    const { root } = menu({ kind: 'exclude' })
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
+    const panel = screen.getByRole('dialog', { name: "Don't count HC-SO-013493" })
+    expect(within(panel).getByText(/still counts in September 2026's sales and margin/)).toBeInTheDocument()
+    expect(within(panel).getByText(/no commission, no override, no KPI/)).toBeInTheDocument()
+    expect(within(panel).getByText(/leaves September 2026's sales, margin and commission/)).toBeInTheDocument()
+    expect(within(panel).getAllByRole('button').map(b => b.textContent)).toEqual(['Cancel', 'No commission', 'Not counted'])
+  })
+
+  it('No commission writes the list with the why typed, and says so as a Don’t count of its kind', async () => {
+    mocks.setNoComm.mockResolvedValue({ ok: true, result: { orderNo: 'HC-SO-013493', changed: true, halfCommOff: false } })
+    const { root, onDone } = menu({ kind: 'exclude' })
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
+    const panel = screen.getByRole('dialog', { name: "Don't count HC-SO-013493" })
+    fireEvent.change(within(panel).getByLabelText(/Why/), { target: { value: 'keyed for ANTHONY' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'No commission' }))
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(mocks.setNoComm).toHaveBeenCalledWith('order-1', true, 'keyed for ANTHONY')
+    expect(mocks.excludeOrder).not.toHaveBeenCalled()
+    expect(mocks.refresh).toHaveBeenCalled()
+    expect(onDone.mock.calls[0][0]).toMatchObject({ orderId: 'order-1', excluded: true, noComm: true, result: { changed: true } })
+  })
+
+  it('says a half comm comes off, and passes on that it did', async () => {
+    mocks.setNoComm.mockResolvedValue({ ok: true, result: { orderNo: 'HC-SO-013493', changed: true, halfCommOff: true } })
+    const { root, onDone } = menu({ kind: 'exclude' }, { halfComm: { action: { kind: 'full' }, detail: null } })
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
+    const panel = screen.getByRole('dialog', { name: "Don't count HC-SO-013493" })
+    expect(within(panel).getByText(/Its half comm comes off/)).toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('button', { name: 'No commission' }))
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(onDone.mock.calls[0][0]).toMatchObject({ noComm: true, halfCommOff: true })
+  })
+
+  it('keeps a refusal in the panel', async () => {
+    mocks.setNoComm.mockResolvedValue({ ok: false, reason: 'SHAWN’s November 2026 is closed.' })
+    const { root, onDone } = menu({ kind: 'exclude' })
+    fireEvent.click(within(root).getByRole('menuitem', { name: /Don't count this bill/ }))
+    const panel = screen.getByRole('dialog', { name: "Don't count HC-SO-013493" })
+    fireEvent.click(within(panel).getByRole('button', { name: 'No commission' }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('closed')
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('counts a bill that pays nobody again in one click, saying who took its commission off', async () => {
+    mocks.setNoComm.mockResolvedValue({ ok: true, result: { orderNo: 'HC-SO-013493', changed: true } })
+    const onDone = vi.fn()
+    render(
+      <BillContextMenu
+        bill={{
+          orderId: 'order-1', orderNo: 'HC-SO-013493', href: '/b', who: 'SHAWN', action: { kind: 'noComm' },
+          exclusionDetail: 'No commission by HR on 14 Nov 2026 — keyed for ANTHONY',
+        }}
+        anchor={{ left: 200, top: 150, bottom: 150 }} monthLabel="November 2026" onClose={vi.fn()} onDone={onDone} />,
+    )
+    const root = screen.getByRole('menu', { name: 'Actions for HC-SO-013493' })
+    expect(within(root).queryByRole('menuitem', { name: /Don't count this bill/ })).toBeNull()
+    const row = within(root).getByRole('menuitem', { name: 'Count this bill again' })
+    expect(row).toHaveAttribute('title', 'No commission by HR on 14 Nov 2026 — keyed for ANTHONY')
+    fireEvent.click(row)
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(mocks.setNoComm).toHaveBeenCalledWith('order-1', false, null)
+    expect(mocks.includeOrder).not.toHaveBeenCalled()
+    expect(onDone.mock.calls[0][0]).toMatchObject({ excluded: false, noComm: true })
+  })
+
+  it('is shut once the month has paid, still offering to count it again', () => {
+    const { root } = menu({ kind: 'locked', excludedByHand: false, noComm: true, reason: 'The run for September 2026 has paid' })
+    const row = within(root).getByRole('menuitem', { name: 'Count this bill again' })
+    expect(row).toBeDisabled()
   })
 })

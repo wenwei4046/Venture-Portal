@@ -70,29 +70,44 @@ export function describeExclusion(ex: HandExclusion): string {
   return `Taken out ${who}on ${formatDate(myt)}${ex.note ? ` — ${ex.note}` : ''}`
 }
 
-/** What a bill's right-click menu may do about whether it counts. */
+/**
+ * What a bill's right-click menu may do about whether it counts. *Don't count
+ * this bill…* is two kinds since 2026-11-14 (the user: "Down count（HR 那边）我
+ * 觉得要分为两种"): **No commission** — it counts in sales and margin and pays
+ * nobody (`bill-no-comm.ts`) — and **Not counted**, out of everything (this
+ * file's exclusion). *Count this bill again* undoes either.
+ */
 export type BillCountAction =
-  /** A live bill: it can be taken out. */
+  /** A live bill that pays: it can be taken out, either way. */
   | { kind: 'exclude' }
   /** Out by hand: it can be counted again. `stillOut` when something else keeps it out anyway. */
   | { kind: 'include'; stillOut: string | null }
-  /** The month's run has paid: neither way until it is reopened. */
-  | { kind: 'locked'; excludedByHand: boolean; reason: string }
+  /** Counts and pays nobody by hand (2026-11-14): counting it again pays it again. */
+  | { kind: 'noComm' }
+  /** The month's run has paid: neither way until it is reopened. `noComm` while it pays nobody by hand. */
+  | { kind: 'locked'; excludedByHand: boolean; noComm?: boolean; reason: string }
   /** Out for a reason this menu cannot undo — the ERP's, or a salesperson who is not ours. */
   | { kind: 'unavailable'; reason: string }
 
 export function billCountAction(
-  o: BillStanding & { excludedByHand: boolean },
+  o: BillStanding & { excludedByHand: boolean; noComm?: boolean },
   { runLocked, monthLabel }: { runLocked: boolean; monthLabel: string },
 ): BillCountAction {
   if (runLocked) {
     return {
       kind: 'locked',
       excludedByHand: o.excludedByHand,
+      ...(o.noComm && !o.excludedByHand ? { noComm: true } : {}),
       reason: `The run for ${monthLabel} has paid — reopen it before changing which bills count`,
     }
   }
   if (o.excludedByHand) return { kind: 'include', stillOut: outWithoutTheHand(o) }
   if (o.cancelled) return { kind: 'unavailable', reason: exclusionReason(o) ?? 'Excluded' }
+  if (o.noComm) return { kind: 'noComm' }
   return { kind: 'exclude' }
+}
+
+/** The menu's word for the count row while it is shut: what it would do once the month is open again. */
+export function lockedCountLabel(action: Extract<BillCountAction, { kind: 'locked' }>): string {
+  return action.excludedByHand || action.noComm ? 'Count this bill again' : "Don't count this bill"
 }
