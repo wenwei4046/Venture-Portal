@@ -888,6 +888,30 @@ export async function loadCostRatioBrands(schemeId: string): Promise<CostRatioBr
   })
 }
 
+/** A brand's own ratio in the sub-department (Costing Setting, 2026-11-14). */
+export interface BrandDivisorRow {
+  /** `comm_brands.code`. */
+  brand: string
+  ratio: number
+}
+
+/** The sub-department's ratio for each brand that has one of its own; a brand left out divides by the main ratio. */
+export async function loadBrandDivisors(schemeId: string): Promise<BrandDivisorRow[]> {
+  const sb = await untyped()
+  const rows = await all((f, t) =>
+    sb
+      .from('comm_brand_cost_ratios')
+      .select('brand_code, ratio')
+      .eq('scheme_id', schemeId)
+      .order('brand_code')
+      .range(f, t),
+  )
+  return rows.flatMap(r => {
+    const ratio = num(r.ratio)
+    return ratio !== null && ratio > 0 ? [{ brand: String(r.brand_code), ratio }] : []
+  })
+}
+
 /** A brand whose ladder the sub-department pays on: what a SKU's ratio by brand is set for. */
 export interface SchemeBrand {
   code: string

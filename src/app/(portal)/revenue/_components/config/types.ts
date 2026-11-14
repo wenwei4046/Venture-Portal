@@ -7,7 +7,7 @@
  * bank_recon_*.
  */
 
-import type { KpiOptionPool } from '@/lib/commission/kpi'
+import type { KpiItemPool } from '@/lib/commission/kpi'
 
 export interface SubDeptRow {
   id: string
@@ -123,7 +123,8 @@ export interface KpiItemRow {
   id: string
   /**
    * 'sku' = a code on a line; 'option' = a bed frame's or sofa's special
-   * (2026-09-27) or fabric series (2026-10-29), by `option_pool`.
+   * (2026-09-27) or fabric series (2026-10-29), by `option_pool` — and a brand's
+   * own, a model or a compartment (2026-11-14).
    */
   source: 'sku' | 'option'
   product_code: string | null
@@ -131,7 +132,7 @@ export interface KpiItemRow {
   product_name: string | null
   /** The SKU Master row a SKU item was picked from. */
   erp_product_id: string | null
-  option_pool: KpiOptionPool | null
+  option_pool: KpiItemPool | null
   option_value: string | null
   kpi_amount: number
   effective_from: string
@@ -140,10 +141,6 @@ export interface KpiItemRow {
   brand_id?: string | null
   /** A brand's own item alone: `[{min_qty, amount}]` — from min_qty units in a month every unit pays amount. */
   unit_tiers?: unknown
-  /** A brand's own item alone (2026-11-13): RM a unit taken off the bill; null = what the bill's special order charges. */
-  cost_amount?: number | string | null
-  /** A brand's own item alone (2026-11-14): RM a unit taken off the bill of a sofa with a corner; null = its cost. */
-  corner_cost_amount?: number | string | null
 }
 
 /** A special of the Bedframe or Sofa Maintenance pool — what Rules › KPI items picks from. */
@@ -156,17 +153,37 @@ export interface KpiSpecialRow {
   removed: boolean
 }
 
+/** A base model of a brand's own SKU master (2026-11-14, `erp_products.base_model`) — a brand's own KPI item may be one. */
+export interface BrandKpiModelRow {
+  /** Its live SKUs' spelling. */
+  model: string
+  /** The SKUs' category (SOFA, MATTRESS …). */
+  category: string | null
+  /** Its SKUs the ERP still lists. */
+  skus: number
+  /** One SKU's description — what names the model to a person (5157's: SOFA PAAU …). */
+  sample: string | null
+}
+
+/** A sofa compartment of a brand's own SKU master (2026-11-14): a piece's module, as the costing reads a piece (CNR). */
+export interface BrandKpiCompartmentRow {
+  compartment: string
+  /** The sofa models with such a piece. */
+  models: number
+}
+
 /**
- * A sofa special of another ERP company's Maintenance pool — what a brand on its own commission scheme (2990s,
- * company 2) picks its own KPI items from (2026-11-12).
+ * What a brand on its own commission scheme (2990s, company 2) picks its own KPI items from (2026-11-12; every kind
+ * since 2026-11-14): its own ERP company's SKU master, Maintenance pools and fabric list. Its SKUs are searched for.
  */
-export interface BrandKpiSpecialRow {
-  /** The ERP company whose pool it is (`comm_brands.erp_company_id`). */
+export interface BrandKpiCatalogue {
+  /** The ERP company (`comm_brands.erp_company_id`). */
   companyId: number
-  value: string
-  label: string
-  sort_order: number
-  removed: boolean
+  specials: KpiSpecialRow[]
+  /** A fabric with no series in its code's family (`brandFabricSeriesOf`). */
+  fabricSeries: KpiFabricSeriesRow[]
+  models: BrandKpiModelRow[]
+  compartments: BrandKpiCompartmentRow[]
 }
 
 /** A fabric series on the ERP's fabric list — what Rules › KPI items picks a bed frame's or a sofa's from (2026-10-29). */
@@ -347,8 +364,8 @@ export interface CommissionSettingsData {
    * listed under the sub-department's own, never among them. Absent in older fixtures = none.
    */
   brandKpiItems?: KpiItemRow[]
-  /** The sofa specials of those brands' own ERP companies — what one of their items may be. Absent = none read. */
-  brandKpiSpecials?: BrandKpiSpecialRow[]
+  /** What those brands pick their own items from, by ERP company (2026-11-14). Absent = none read. */
+  brandKpiCatalogues?: BrandKpiCatalogue[]
   kpiThresholds: KpiThresholdRow[]
   /** The Bedframe and Sofa specials pools, for the KPI items picker. */
   kpiSpecials: KpiSpecialRow[]

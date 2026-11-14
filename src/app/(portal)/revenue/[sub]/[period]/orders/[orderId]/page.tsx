@@ -19,8 +19,8 @@ import {
   type LineClass,
   type SalesLine,
 } from '@/lib/commission/engine'
-import { EMPTY_FABRIC_SERIES, indexBrandKpiItems, indexFabricSeries, kpiCodeKey, kpiItemLabel, lineKpiFactsOf } from '@/lib/commission/kpi'
-import { ownSchemeBrandsOf, specialMoneyByLine, toCostRatiosByBrand, toGwpRules, toKpiItems, type CostRatioBrandRow, type CostRatioRow, type GwpRow, type KpiItemRow } from '@/lib/commission/run-payload'
+import { indexBrandKpiItems, isFabricSeriesPool, kpiCodeKey, kpiItemLabel } from '@/lib/commission/kpi'
+import { kpiLineReaders, ownSchemeBrandsOf, specialMoneyByLine, toBrandDivisors, toCostRatiosByBrand, toGwpRules, toKpiItems, type BrandCostRatioRow, type BrandRow, type CostRatioBrandRow, type CostRatioRow, type GwpRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { gwpFreeParts } from '@/lib/catalogue/gwp'
 import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
@@ -35,7 +35,7 @@ import { isOwnSchemeBill, OWN_SCHEME_LABEL, ownSchemeCodes } from '@/lib/commiss
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadNoComms, loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 import { loadBillMoves } from '../../../../_lib/row-origins'
-import { namesFabricSeries, readFabricSeries } from '../../../../_lib/fabric-series'
+import { brandCompaniesWith, namesFabricSeries, readBrandSkuModels, readFabricSeries } from '../../../../_lib/fabric-series'
 import { readSpecialMoney } from '../../../../_lib/special-money'
 import { movedPhrase } from '@/lib/commission/bill-move'
 import { loadAdjustmentAnswers, loadBillChanges } from '../../../../_lib/erp-changes'
@@ -223,7 +223,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }, noComms] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }, { data: brandDivisorData }, noComms] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -239,7 +239,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       subDept.schemeId
         ? supabase
             .from('comm_kpi_items')
-            .select('source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers, cost_amount, corner_cost_amount')
+            .select('source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers')
             .eq('scheme_id', subDept.schemeId)
             .lte('effective_from', asAt)
             .or(`effective_to.is.null,effective_to.gte.${asAt}`)
@@ -302,14 +302,18 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       supabase.from('catalogue_gwp').select('id, catalogue_gwp_items (role, product_code, qty)'),
       // The brands on their own scheme (2990s, 2026-11-11): a bill of one stands in no margin.
       subDept.schemeId
-        ? supabase.from('comm_brands').select('id, code').eq('scheme_id', subDept.schemeId).eq('own_scheme', true).eq('is_active', true)
+        ? supabase.from('comm_brands').select('id, code, erp_company_id').eq('scheme_id', subDept.schemeId).eq('own_scheme', true).eq('is_active', true)
+        : Promise.resolve({ data: null }),
+      // A brand's own ratio, for a line whose SKU has none (Costing Setting, 2026-11-14).
+      subDept.schemeId
+        ? supabase.from('comm_brand_cost_ratios').select('brand_code, ratio').eq('scheme_id', subDept.schemeId)
         : Promise.resolve({ data: null }),
       // No commission (2026-11-14): a bill that counts and pays nobody — who said so, when and why.
       order.cancelled ? Promise.resolve(null) : loadNoComms(supabase, [orderId]),
     ])
   // A bill of a brand that follows its own scheme: paid at that brand's rate for the rank, in no margin, and found
   // none of the sub-department's KPI items — its brand's own instead — as the run reads it (`ownSchemesOf`).
-  const ownBrandRows = (ownBrandData ?? []) as Array<{ id: string; code: string }>
+  const ownBrandRows = (ownBrandData ?? []) as Array<{ id: string; code: string; erp_company_id: number | string | null }>
   const ownScheme = isOwnSchemeBill(
     order.brand_code,
     ownSchemeCodes(ownBrandRows.map(b => ({ code: b.code, ownScheme: true }))),
@@ -352,11 +356,22 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const kpiIndex = ownScheme
     ? indexBrandKpiItems(kpiItems).get(kpiCodeKey(order.brand_code)) ?? EMPTY_KPI_INDEX
     : scheme?.enable_kpi ? indexKpiItems(kpiItems) : EMPTY_KPI_INDEX
-  // A fabric series item finds a line's fabric on the ERP's fabric list, as the run does (2026-10-29).
-  const fabrics = !ownScheme && kpiIndex.size > 0 && namesFabricSeries(kpiRows)
-    ? indexFabricSeries(await readFabricSeries(supabase))
-    : EMPTY_FABRIC_SERIES
-  // A brand's own item is found where the bill's special order charges for it, and takes that off its sales.
+  // A fabric series item finds a line's fabric on the ERP's fabric list, as the run does (2026-10-29) — a brand's own on
+  // its own company's list, and a brand's own model item a line's SKU's base model on its own SKU master (2026-11-14).
+  const brandRows: BrandRow[] = ownBrandRows.map(b => ({ ...b, own_scheme: true }))
+  const ownKpiRows = ownScheme ? kpiRows.filter(k => !!k.brand_id) : kpiRows
+  const fabricCompanies = ownScheme ? brandCompaniesWith(brandRows, ownKpiRows, isFabricSeriesPool) : []
+  const modelCompanies = ownScheme ? brandCompaniesWith(brandRows, ownKpiRows, pool => pool === 'models') : []
+  const [fabricRows, skuModels] = kpiIndex.size > 0
+    ? await Promise.all([
+      (ownScheme ? fabricCompanies.length > 0 : namesFabricSeries(kpiRows))
+        ? readFabricSeries(supabase, fabricCompanies) : Promise.resolve([]),
+      readBrandSkuModels(supabase, modelCompanies),
+    ])
+    : [[], []]
+  const readers = kpiLineReaders(brandRows, fabricRows, skuModels)
+  const company = ownScheme ? readers.companyOf(order.brand_code) : null
+  // A brand's own item is found where the bill names it, and takes off what the bill charged for it.
   const specialMoney = ownScheme && kpiIndex.size > 0
     ? specialMoneyByLine(await readSpecialMoney(supabase, [orderId]))
     : new Map<string, Record<string, number>>()
@@ -367,6 +382,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     scheme?.revenue_cost_divisor === null || scheme?.revenue_cost_divisor === undefined ? 1 : Number(scheme.revenue_cost_divisor),
     ((ratioData ?? []) as CostRatioRow[]).map(r => ({ productCode: r.product_code, ratio: Number(r.ratio) })),
     toCostRatiosByBrand((brandRatioData ?? []) as CostRatioBrandRow[]),
+    toBrandDivisors((brandDivisorData ?? []) as BrandCostRatioRow[]),
   )
 
   // The part of each line a purchase earned free (Product List › GWP, 2026-11-08), on the whole bill, as the run reads it.
@@ -386,8 +402,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     brandCode: l.brand_code ?? undefined,
     costAmount: l.cost_amount === null ? undefined : Number(l.cost_amount),
     optionCharge: Number(l.option_charge_amount ?? 0) || undefined,
-    ...lineKpiFactsOf(l.item_group, l.description2, l.raw?.variants, fabrics),
+    ...readers.factsOf({ item_group: l.item_group, description2: l.description2, variants: l.raw?.variants }, company),
     ...(specialMoney.has(l.id) ? { specialMoney: specialMoney.get(l.id)! } : {}),
+    ...(readers.modelOf(company, l.product_code) ? { model: readers.modelOf(company, l.product_code)! } : {}),
     ...(gwpParts.has(l.id) ? { gwpFree: gwpParts.get(l.id)! } : {}),
   }))
   const classed = lines.map((l, i) => ({ line: l, cls: classifyLine(salesLines[i], groupIndex) }))
@@ -758,17 +775,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                           title={split.uncovered
                             ? "Not paid: the bill's sales do not cover its KPI items"
                             : hit.item.brandCode
-                              // Named on the sofa (2026-11-13: the price is sometimes written in the remark) — a unit
-                              // whatever its special order charges: its cost on Rules comes off the bill — its corner
-                              // cost on a sofa with a corner (2026-11-14) — what the bill charged when it has none,
-                              // nothing when neither says.
-                              ? `${hit.offBy === 'corner'
-                                ? "The sofa has a corner: its corner cost on Rules › KPI items is off the bill's commissionable sales; its bonus is paid instead"
-                                : hit.offBy === 'cost'
-                                  ? "Its cost on Rules › KPI items is off the bill's commissionable sales; its bonus is paid instead"
-                                  : hit.amount === 0
-                                    ? "Its special order charges nothing for it and it has no cost on Rules, so nothing comes off the bill's commissionable sales; its bonus is paid"
-                                    : "It has no cost on Rules, so what the bill charged for it is off its commissionable sales; its bonus is paid instead"}${hit.item.unitTiers?.length ? ", at the tier the month's units reach" : ''}`
+                              // A brand's own item (2026-11-14): what the bill charged for it comes off — nothing where
+                              // it charged nothing, a fabric series, or a special on a piece that came off whole.
+                              ? `${hit.amount === 0
+                                ? "Nothing of the bill's commissionable sales comes off for it; its bonus is paid"
+                                : "What the bill charged for it is off its commissionable sales; its bonus is paid instead"}${hit.item.unitTiers?.length ? ", at the tier the month's units reach" : ''}`
                               : "Paid flat as KPI, off the bill's commissionable sales"}
                         >
                           <span className="dot" />
