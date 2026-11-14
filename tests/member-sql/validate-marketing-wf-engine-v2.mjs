@@ -359,13 +359,19 @@ check([r.cols.length, (await peek1(`SELECT work -> 'vals' -> 'Shots' -> 'rows' F
 check((await projOf(TB.id)).extra_cols.Shots.length, 7, 'kept on the project')
 
 // ── The overdue sweep ───────────────────────────────────────────────────────────────────────────────────────
+// The sweeps below are run AT fixed days (11, 13, 14 and 20 Nov 2026), and the sweep passes a task that starts after
+// the day it is run at. A task made here starts on the day the test runs — so each of the two is put back to
+// 1 Nov, or from 14 Nov 2026 on the sweep would find nothing to tell (CI's SQL job, red since that day).
+// "Late 1 day" is asked on the 11th: the sweep rounds the days past 18:00 of the due day UP, so on the 12th at 9:30
+// (1.6 days) the stage is 2 days late and its people are told — while the task started on the 13th, the day this
+// was written, that check passed only because the task had not started yet.
 const OD = await create('Late one', [st('Design', S.ali), st('Post', S.mei)])
 await asSystem()
-await db.exec(`UPDATE public.mkt_projects SET overdue = '{"days":2,"notify":["doer","mm","next"],"action":"reassign","repeat":false}' WHERE id = '${OD.id}'`)
+await db.exec(`UPDATE public.mkt_projects SET starts_on = '2026-11-01', overdue = '{"days":2,"notify":["doer","mm","next"],"action":"reassign","repeat":false}' WHERE id = '${OD.id}'`)
 await db.exec(`UPDATE public.mkt_stages SET due_on = '2026-11-10', entered_at = '2026-11-01' WHERE project_id = '${OD.id}' AND idx = 0`)
 await db.exec('DELETE FROM public.app_notifications')
 const sweep = at => as(null, [], 'service_role').then(() => one(`SELECT public.mkt_overdue_sweep($1::timestamptz)`, [at]))
-check(await sweep('2026-11-12T09:30:00+08:00'), 0, 'late 1 day (past 18:00 on the 10th): not yet 2')
+check(await sweep('2026-11-11T09:30:00+08:00'), 0, 'late 1 day (past 18:00 on the 10th): not yet 2')
 check(await sweep('2026-11-13T08:30:00+08:00'), 0, 'late 3 days but before 9:00: nobody woken')
 check(await sweep('2026-11-13T09:30:00+08:00'), 1, 'late 3 days ≥ 2, from 9:00: told')
 check([(await notices(U.ali)).map(n => n.title), (await notices(U.josiah)).map(n => n.title), (await notices(U.mei)).map(n => n.title)],
@@ -378,6 +384,7 @@ check(await sweep('2026-11-13T15:00:00+08:00'), 0, 'repeat: not twice a day')
 check(await sweep('2026-11-14T10:00:00+08:00'), 1, 'repeat: again the next day')
 const NOD = await create('No rule', [st('Design', S.ali)])
 await asSystem()
+await db.exec(`UPDATE public.mkt_projects SET starts_on = '2026-11-01' WHERE id = '${NOD.id}'`)
 await db.exec(`UPDATE public.mkt_stages SET due_on = '2026-11-01' WHERE project_id = '${NOD.id}'`)
 await db.exec('DELETE FROM public.app_notifications')
 await sweep('2026-11-20T10:00:00+08:00')
