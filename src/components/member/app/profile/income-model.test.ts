@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { IncomeBill, IncomeMonth, MemberIncome } from "@/lib/member/income";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
-import { incomeOrdersVM, incomeVM, OLD_BILL_NOTE } from "./income-model";
+import { incomeOrdersVM, incomeVM, NO_COMMISSION, NO_COMMISSION_NOTE, OLD_BILL_NOTE } from "./income-model";
 
 const bill = (over: Partial<IncomeBill> = {}): IncomeBill => ({
   orderId: "o1", no: "SO-1", status: "eligible", upsale: false, commissionable: 10000, orderTotal: 10500, personal: 500,
@@ -187,6 +187,24 @@ describe("an old bill topped up in My income", () => {
     const row = vm.mine.rows.find(r => r.no === "ZNT4813")!;
     expect(row.meta).toBe("Mdm Lee · Akemi");
     expect(vm.sheets[row.id].meta).toBe("Mdm Lee · SUNWAY");
+  });
+});
+
+// 2026-11-14 — HR's Don't count › No commission: "完全不出 commission，但他还是有算在 revenue，还有算在 margin 等等".
+describe("a bill HR set to pay no commission, in My income", () => {
+  const none = bill({ orderId: "nc", no: "HC-SO-2611-044", noCommission: true, personal: 0, pay: 0, marginPct: 11.8, brand: "ZANOTTI" });
+
+  it("lists it at RM 0, saying why — and that it still counts in sales and margin", () => {
+    const vm = incomeOrdersVM(data(month({ bills: [bill(), none] })), null, [], false);
+    const row = vm.mine.rows.find(r => r.no === "HC-SO-2611-044")!;
+    expect(row).toMatchObject({ pay: "RM 0.00", sub: NO_COMMISSION, held: false });
+    expect(vm.sheets[row.id]).toMatchObject({ tag: `${NO_COMMISSION} · 11.8% margin`, tone: "neutral", comm: "RM 0.00", note: NO_COMMISSION_NOTE });
+    expect(NO_COMMISSION_NOTE).toMatch(/still counts in your sales and your margin/);
+  });
+
+  it("says No commission alone while it has no margin yet", () => {
+    const vm = incomeOrdersVM(data(month({ bills: [{ ...none, marginPct: null }] })), null, [], false);
+    expect(vm.sheets[vm.mine.rows[0].id].tag).toBe(NO_COMMISSION);
   });
 });
 

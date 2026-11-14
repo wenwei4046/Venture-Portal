@@ -207,12 +207,15 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
   revenue_full_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_orders'],
   revenue_half_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_orders', 'users'],
+  // No commission (2026-11-14): the list, and the half comm it takes off.
+  revenue_comm_again_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_no_comm', 'sales_orders'],
+  revenue_no_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_order_no_comm', 'sales_orders', 'users'],
   revenue_fair_calendar: ['comm_organisers', 'comm_venue_events', 'comm_venues', 'sales_import_batches', 'sales_orders'],
   revenue_fair_calendar_moves: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
   revenue_move_order: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_reassignments', 'sales_order_shares', 'sales_orders', 'users'],
   // comm_brands (20261112200000): comm_kpi_hits asks which bills are a brand's on its own scheme — their KPI items are their brand's own.
-  revenue_month_orders: ['catalogue_gwp_items', 'comm_brands', 'comm_cost_ratio_brands', 'comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
+  revenue_month_orders: ['catalogue_gwp_items', 'comm_brand_cost_ratios', 'comm_brands', 'comm_cost_ratio_brands', 'comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_pay_lines_closed: [],
   revenue_possible_double_claims: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_restore_double_claim: ['comm_double_claim_dismissals'],
@@ -578,6 +581,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
   'member_share_order_context', 'member_share_order_send', 'member_share_order_answer', 'member_share_order_cancel',
   'member_share_requests', 'revenue_share_requests', 'revenue_share_request_decide',
+  // Not my order (mig 20261114210000): a bill's sheet, a request sent and withdrawn by the salesperson on the bill (the send
+  // also asks Profile · Requests · Create); one's own list (View as: the Principal's member context); Comm Cal's Requests
+  // read by Revenue · View / Edit, decided by Revenue · Edit on the month page's tab.
+  'member_not_mine_context', 'member_not_mine_send', 'member_not_mine_cancel', 'member_not_mine_requests',
+  'revenue_not_mine_requests', 'revenue_not_mine_decide',
   // Whose sale (mig 20261031030000): Comm Cal's held bills read by Revenue · View / Edit, answered by Revenue · Edit;
   // a bill the ERP gave to somebody else answered the same way (mig 20261031040000).
   'revenue_seller_checks', 'revenue_answer_seller_check', 'revenue_answer_seller_move',

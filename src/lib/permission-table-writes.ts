@@ -263,6 +263,8 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   // Half comm (2026-11-10, mig 20261110160000).
   sales_order_half_comm: each(REVENUE_WORK),
   sales_order_lines: each(REVENUE_WORK),
+  // No commission (2026-11-14, mig 20261114200000).
+  sales_order_no_comm: each(REVENUE_WORK),
   sales_order_reassignments: each(REVENUE_WORK),
   sales_order_shares: each(REVENUE_WORK),
   sales_orders: each(REVENUE_WORK),
@@ -284,6 +286,7 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   // The Product List's Costing Setting writes the scheme's divisor and the
   // per-SKU ratios.
   comm_cost_ratio_brands: each([...REVENUE_RULES, 'product_list.edit']),
+  comm_brand_cost_ratios: each([...REVENUE_RULES, 'product_list.edit']),
   comm_cost_ratios: each([...REVENUE_RULES, 'product_list.edit']),
   comm_schemes: each([...REVENUE_RULES, 'product_list.edit']),
 

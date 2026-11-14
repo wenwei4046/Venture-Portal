@@ -9,6 +9,7 @@ import { loadOrderShares, loadShareTeam } from './_lib/month-orders'
 import { holdersOf, type BillShareAnswer, type BillShareResult, type ShareHolder } from '@/lib/commission/bill-share'
 import type { BillMoveAnswer } from '@/lib/commission/bill-move'
 import type { BillHalfCommAnswer, BillHalfCommResult } from '@/lib/commission/bill-half-comm'
+import type { BillNoCommAnswer, BillNoCommResult } from '@/lib/commission/bill-no-comm'
 
 /**
  * What a commission month's people change by hand: shares, moves, bills that
@@ -350,6 +351,42 @@ export async function setHalfComm(orderId: string, half: boolean, note?: string 
     throw new Error(error.message)
   }
   const result = data as BillHalfCommResult
+  if (result.changed) revalidatePath('/revenue', 'layout')
+  return { ok: true, result }
+}
+
+// ─── No commission (2026-11-14) ─────────────────────────────────────────────
+
+/** The no-commission list's own refusals (a paid month, a bill that does not count), as words. */
+const NO_COMM_REFUSALS = new Set(['23RUN', '23EXC'])
+
+/**
+ * *Don't count this bill…* › No commission, or *Count this bill again* on such
+ * a bill (2026-11-14 — the user: "完全不出 commission，但他还是有算在 revenue，
+ * 还有算在 margin 等等"; asked who else goes unpaid, "整张单谁都不拿钱"): nobody is
+ * paid on the bill — no commission, no override, no KPI — while it counts in
+ * sales, margin and the KPI count. The rule is the database's
+ * (`revenue_no_comm_order` / `revenue_comm_again_order`, mig 20261114200000);
+ * this also refuses, as Don't count does, a bill somebody paid on it has closed.
+ *
+ * Answers with what it did, or with why not (`BillNoCommAnswer`) — never a
+ * thrown refusal, which production shows as "Minified React error #441".
+ */
+export async function setNoComm(orderId: string, noComm: boolean, note?: string | null): Promise<BillNoCommAnswer> {
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
+  if (typeof orderId !== 'string' || !orderId) return { ok: false, reason: 'Which bill?' }
+  const why = typeof note === 'string' ? note.trim().slice(0, 500) : ''
+  const supabase = await client()
+  const closed = await billsClosedReason(supabase, [orderId])
+  if (closed) return { ok: false, reason: closed }
+  const { data, error } = noComm
+    ? await supabase.rpc('revenue_no_comm_order', { p_order_id: orderId, p_note: why || null })
+    : await supabase.rpc('revenue_comm_again_order', { p_order_id: orderId })
+  if (error) {
+    if (NO_COMM_REFUSALS.has(error.code ?? '')) return { ok: false, reason: error.message }
+    throw new Error(error.message)
+  }
+  const result = data as BillNoCommResult
   if (result.changed) revalidatePath('/revenue', 'layout')
   return { ok: true, result }
 }

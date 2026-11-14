@@ -60,6 +60,11 @@ export interface IncomeBill {
    */
   commissionOnly?: true;
   /**
+   * No commission (2026-11-14, HR's *Don't count this bill…* › No commission): it counts in the member's sales and
+   * margin and pays nobody — no commission, no KPI, no override to their leader.
+   */
+  noCommission?: true;
+  /**
    * A bill of a brand that follows its own commission scheme (2990s, 2026-11-12): paid the rank's rate for the brand,
    * in no margin — it has none to read and waits for no cost. Live months only (the engine's row); a closed month
    * reads it off the order book.
@@ -167,6 +172,7 @@ function bill(row: CommissionOrderRow): IncomeBill {
     sharePct: row.share && part ? part.pct : null,
     brand: row.brands[0] ?? null,
     ...(row.commissionOnly ? { commissionOnly: true as const } : {}),
+    ...(row.noComm ? { noCommission: true as const } : {}),
     ...(row.ownBrand ? { ownScheme: true as const } : {}),
   };
 }
@@ -244,6 +250,7 @@ export function closedIncome(close: {
       commissionable: o?.basis ?? 0, orderTotal: 0, personal: o?.personal ?? 0, kpi: o?.kpi ?? 0, kpiQty: o?.kpiQty ?? 0,
       pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0)), marginPct: null, sharePct: null, brand: null,
       ...(b.commissionOnly ? { commissionOnly: true as const } : {}),
+      ...(b.noComm ? { noCommission: true as const } : {}),
     };
   });
   const overrides: IncomeOverride[] = lines.filter(l => l.component === "override").map(l => {

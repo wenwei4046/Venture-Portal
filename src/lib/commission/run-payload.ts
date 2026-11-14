@@ -175,6 +175,20 @@ export interface CostRatioBrandRow {
   ratio: Num
 }
 
+/** A brand's cost ratio in the sub-department (`comm_brand_cost_ratios`, Costing Setting, 2026-11-14). */
+export interface BrandCostRatioRow {
+  brand_code: string
+  ratio: Num
+}
+
+/** The rows as the engine reads them: a positive ratio and a brand, else left out (that brand takes the default). */
+export function toBrandDivisors(rows: readonly BrandCostRatioRow[] | undefined): { brand: string; ratio: number }[] {
+  return (rows ?? []).flatMap(r => {
+    const ratio = numOrNull(r.ratio)
+    return ratio !== null && ratio > 0 && (r.brand_code ?? '').trim() ? [{ brand: r.brand_code, ratio }] : []
+  })
+}
+
 /** The rows as the engine reads them: a positive ratio, a code and a brand, else left out (that brand takes the next ratio). */
 export function toCostRatiosByBrand(rows: readonly CostRatioBrandRow[] | undefined): { productCode: string; brand: string; ratio: number }[] {
   return (rows ?? []).flatMap(r => {
@@ -279,6 +293,8 @@ export interface SalesOrderRow {
   source?: string | null
   /** Half comm (2026-11-10, `sales_order_half_comm`): set by the loader, never a column. */
   half_comm?: boolean
+  /** No commission (2026-11-14, `sales_order_no_comm`): set by the loader, never a column. */
+  no_comm?: boolean
   sales_order_lines: SalesLineRow[] | null
 }
 
@@ -316,6 +332,8 @@ export interface RunSourceRows {
   costRatios?: CostRatioRow[]
   /** `comm_cost_ratio_brands` of this scheme (2026-11-07). Absent = no SKU has a ratio by brand. */
   costRatiosByBrand?: CostRatioBrandRow[]
+  /** `comm_brand_cost_ratios` of this scheme (2026-11-14). Absent = no brand has a ratio of its own. */
+  brandCostRatios?: BrandCostRatioRow[]
   /** Product List › GWP (2026-11-08): every gift with purchase. Absent = none. */
   gwp?: GwpRow[]
   /**
@@ -570,6 +588,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         ? { commissionOnly: true } : {}),
       // Half comm (2026-11-10): the bill's own commission and override base halved.
       ...(o.half_comm ? { halfComm: true } : {}),
+      // No commission (2026-11-14): nobody is paid on the bill; it counts in sales, margin and the KPI count.
+      ...(o.no_comm ? { noCommission: true } : {}),
       manualMarginPct: numOrNull(o.manual_margin_pct),
       brandCode: o.brand_code?.trim() || null,
       lines: (o.sales_order_lines ?? []).map(l => ({
@@ -623,6 +643,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         return ratio !== null && ratio > 0 ? [{ productCode: r.product_code, ratio }] : []
       }),
       ...(rows.costRatiosByBrand?.length ? { costRatiosByBrand: toCostRatiosByBrand(rows.costRatiosByBrand) } : {}),
+      ...(rows.brandCostRatios?.length ? { brandDivisors: toBrandDivisors(rows.brandCostRatios) } : {}),
     },
     ranks,
     orders,

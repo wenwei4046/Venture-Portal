@@ -77,6 +77,12 @@ export interface CommissionOrderRow {
    * of the override are halved; its sales and KPI are whole. Absent: paid in full.
    */
   halfComm?: boolean
+  /**
+   * No commission (2026-11-14, `SalesOrder.noCommission`): nobody is paid on it —
+   * no commission, no override, no KPI, none of the month's incentive — while it
+   * counts in sales, margin and the KPI count. Absent: it pays.
+   */
+  noComm?: boolean
   /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
   /**
@@ -302,7 +308,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const paidKpi = ownSchemesOf(input, input.scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX)
   const ownBrandOf = paidKpi.brandOf
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
-  const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios, input.scheme.costRatiosByBrand)
+  const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios, input.scheme.costRatiosByBrand, input.scheme.brandDivisors)
   const nameOf = (staffId: string) => personMeta.get(staffId)?.name ?? staffId
   const rankOf = (staffId: string) => input.ranks.find(rank =>
     rank.rankKey === (statements.get(staffId)?.effectiveRankKey ?? hierarchy.get(staffId)?.baseRankKey))
@@ -362,8 +368,10 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     ladderBases.set(key, sum(sourceLines.filter(line => line.component === 'kpi_item' && !line.brandCode).map(line => line.amount)))
     const kpiRevenue = split.kpiAmount
     // Half comm (2026-11-10): the bill's part of the override base is halved, as the engine's is — its KPI is not.
-    const half = order.halfComm ? HALF_COMM : 1
-    overrideBases.set(key, eligible && !commissionOnly ? round2(round2(productRevenue * multiplier * half) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
+    // No commission (2026-11-14): none of it — the bill pays nobody, its KPI included.
+    const noComm = !!order.noCommission
+    const half = noComm ? 0 : order.halfComm ? HALF_COMM : 1
+    overrideBases.set(key, eligible && !commissionOnly && !noComm ? round2(round2(productRevenue * multiplier * half) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
     return {
       key, orderId: order.id, originalOrderId: order.id, orderNo: order.orderNo,
       refNo: meta?.refNo ?? null, paperNo: meta?.paperNo ?? null,
@@ -375,7 +383,8 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       // brand riding on it does not make it that brand's too (2026-09-27).
       brands: order.brandCode ? [order.brandCode] : [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
-      upsale: !!order.upsale, commissionOnly, ...(order.halfComm ? { halfComm: true } : {}), orderTotal: order.orderTotal,
+      upsale: !!order.upsale, commissionOnly, ...(order.halfComm && !noComm ? { halfComm: true } : {}),
+      ...(noComm ? { noComm: true } : {}), orderTotal: order.orderTotal,
       commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
       productRevenue, marginRevenue: ownBrand ? 0 : base.revenue,
@@ -390,7 +399,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       productCommission: component('product_revenue'),
       kpiQty: sourceLines.filter(line => line.component === 'kpi_item').reduce((qty, line) => qty + (line.qty ?? 0), 0),
       kpiBase: component('kpi_item'), kpiBonus: 0,
-      kpiThresholdPct: eligible && !commissionOnly ? statement?.kpiThresholdPct ?? 0 : 0,
+      kpiThresholdPct: eligible && !commissionOnly && !noComm ? statement?.kpiThresholdPct ?? 0 : 0,
       marginIncentive: 0, marginAllocationBasis: null,
       penaltyMultiplier: multiplier,
       penaltyWithheld: eligible ? sum(result.penalised.filter(row => row.staffId === order.staffId && row.orderId === order.id).map(row => row.withheld)) : 0,
@@ -408,11 +417,17 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     // An old bill topped up is in no margin (2026-11-07): none of the month's incentive rides on it. Nor is a bill of
     // a brand with its own scheme (2026-11-11).
     const inMargin = (row: CommissionOrderRow) => row.status === 'eligible' && !row.commissionOnly && !row.ownBrand
-    const margins = allocateCommissionAmount(statement?.marginIncentive ?? 0, rows.map(row => inMargin(row) ? Math.max(0, row.marginRevenue) : 0))
+    // A no-commission bill (2026-11-14) counts in the month's margin and pays nobody: none of the incentive is shown
+    // on it — unless the month's margin bills are all such bills, when the incentive still has to sit somewhere.
+    const marginWeight = (row: CommissionOrderRow, withNoComm: boolean) =>
+      inMargin(row) && (withNoComm || !row.noComm) ? Math.max(0, row.marginRevenue) : 0
+    const paying = rows.map(row => marginWeight(row, false))
+    const marginWeights = paying.some(weight => weight > 0) ? paying : rows.map(row => marginWeight(row, true))
+    const margins = allocateCommissionAmount(statement?.marginIncentive ?? 0, marginWeights)
     rows.forEach((row, index) => {
       row.kpiBonus = bonuses[index]
       row.marginIncentive = margins[index]
-      row.marginAllocationBasis = statement?.marginIncentive && inMargin(row) && row.marginRevenue > 0 ? 'eligible_goods_revenue' : null
+      row.marginAllocationBasis = statement?.marginIncentive && marginWeights[index] > 0 ? 'eligible_goods_revenue' : null
       row.totalCommission = sum([row.productCommission, row.kpiBase, row.kpiBonus, row.marginIncentive])
     })
 

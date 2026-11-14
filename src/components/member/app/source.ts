@@ -23,6 +23,8 @@ import { fetchItRequest, noteItRequest, openItFile, signItFiles, submitItRequest
 import type { ItRequest } from "@/lib/it-requests/model";
 import { answerShareRequest, cancelShareRequest, fetchShareContext, sendShareRequest, type fetchShareRequests } from "@/app/(member)/member/share-actions";
 import type { ShareContext, ShareRequest, ShareSendInput } from "@/lib/member/share-requests";
+import { cancelNotMineRequest, fetchNotMineContext, sendNotMineRequest, type fetchNotMineRequests } from "@/app/(member)/member/not-mine-actions";
+import type { NotMineContext, NotMineRequest } from "@/lib/member/not-mine-requests";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
 import type { Notices } from "@/lib/push/notices";
@@ -89,6 +91,7 @@ export const ask = {
   itMine: (): MemberRead => ({ kind: "itMine" }),
   itDesk: (): MemberRead => ({ kind: "itDesk" }),
   shareRequests: (context?: MemberReadContext): MemberRead => ({ kind: "shareRequests", context }),
+  notMineRequests: (context?: MemberReadContext): MemberRead => ({ kind: "notMineRequests", context }),
 };
 
 /**
@@ -205,6 +208,16 @@ export interface RevenueSource {
   /** The salesperson withdraws their request before HR decides. */
   shareCancel?(id: string): Promise<Outcome<ShareRequest>>;
   /**
+   * Not my order (2026-11-14): the requests one sent (View as: the viewed member's) — read fresh, never kept on the phone.
+   */
+  notMineRequests?(context?: MemberReadContext): Promise<Outcome<NotMineRequest[]>>;
+  /** A bill's Not my order sheet: why it cannot be sent now, or the request open on it. */
+  notMineContext?(orderId: string, context?: MemberReadContext): Promise<Outcome<NotMineContext>>;
+  /** Send one, with the reason. */
+  notMineSend?(orderId: string, reason: string): Promise<Outcome<NotMineRequest>>;
+  /** Withdraw one HR has not decided. */
+  notMineCancel?(id: string): Promise<Outcome<NotMineRequest>>;
+  /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
    */
@@ -320,6 +333,11 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     shareSend: input => sendShareRequest(input),
     shareAnswer: (id, accept, note) => answerShareRequest(id, accept, note),
     shareCancel: id => cancelShareRequest(id),
+    // Not my order (2026-11-14): read fresh, never kept, as a share request.
+    notMineRequests: context => read<Answer<typeof fetchNotMineRequests>>(ask.notMineRequests(context)),
+    notMineContext: (orderId, context) => fetchNotMineContext(orderId, context),
+    notMineSend: (orderId, reason) => sendNotMineRequest(orderId, reason),
+    notMineCancel: id => cancelNotMineRequest(id),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       keep: (request: MemberRead, value: unknown) => memory.put(readKey(request), value),

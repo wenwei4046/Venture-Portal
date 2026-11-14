@@ -65,6 +65,8 @@ export const ICON = {
   /* Share order (2026-10-21) — not in the prototype: a bill's ⋯, and a person added beside its salesperson */
   more: "M5 12h.01M12 12h.01M19 12h.01",
   share: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6",
+  /* Not my order (2026-11-14) — not in the prototype: the bill's ⋯ beside Share order, a person taken off */
+  notMine: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 11h-6",
   /* the notification icons (`IC`) */
   nOk: "M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
   nMemo: "M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4",

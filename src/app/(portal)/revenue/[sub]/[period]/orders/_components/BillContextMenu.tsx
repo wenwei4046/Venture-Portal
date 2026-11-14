@@ -3,8 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { excludeOrder, includeOrder, moveOrder, setHalfComm, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
-import type { BillCountAction } from '@/lib/commission/bill-exclusion'
+import { excludeOrder, includeOrder, moveOrder, setHalfComm, setNoComm, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
+import { lockedCountLabel, type BillCountAction } from '@/lib/commission/bill-exclusion'
 import type { BillHalfCommAction, BillHalfCommResult } from '@/lib/commission/bill-half-comm'
 import { pickableBrands, type BillBrandAction, type BrandOption } from '@/lib/commission/bill-brand'
 import { moveProblem, type BillMoveAction, type BillMoveResult } from '@/lib/commission/bill-move'
@@ -24,15 +24,22 @@ export interface BillMenuBill {
   /** Whose bill, for the heading. */
   who: string | null
   action: BillCountAction
-  /** "Taken out by Principal on 27 Sep 2026 — duplicate", while it is out by hand. */
+  /**
+   * "Taken out by Principal on 27 Sep 2026 — duplicate", while it is out by hand; "No commission by HR on
+   * 14 Nov 2026 — keyed for ANTHONY", while it pays nobody by hand (2026-11-14).
+   */
   exclusionDetail: string | null
 }
 
 export interface BillMenuOutcome {
   orderId: string
   orderNo: string
-  /** True: it no longer counts. False: the hand let go of it. */
+  /** True: it no longer counts (or, with `noComm`, pays nobody). False: the hand let go of it. */
   excluded: boolean
+  /** No commission (2026-11-14): the kind that counts in sales and margin and pays nobody. */
+  noComm?: boolean
+  /** No commission took a half comm off the bill. */
+  halfCommOff?: boolean
   result: BillCountResult
 }
 
@@ -541,6 +548,39 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     })
   }
 
+  // ── No commission (2026-11-14) ───────────────────────────────────────────
+  // *Don't count this bill…*'s first kind: it counts in sales and margin and
+  // nobody is paid on it ("整张单谁都不拿钱"); *Count this bill again* pays it again.
+  const halved = halfAction?.kind === 'full' || (halfAction?.kind === 'locked' && halfAction.halved)
+
+  function runNoComm(noComm: boolean) {
+    if (writing.current) return
+    writing.current = true
+    setError(null)
+    startTransition(async () => {
+      try {
+        const answer = await setNoComm(bill.orderId, noComm, noComm ? note : null)
+        // A refusal comes back as words (a closed month, a paid run): it stays in the panel.
+        if (!answer.ok) {
+          setError(answer.reason)
+          return
+        }
+        router.refresh()
+        writing.current = false
+        onDone({
+          orderId: bill.orderId, orderNo: bill.orderNo, excluded: noComm, noComm: true,
+          ...(answer.result.halfCommOff ? { halfCommOff: true } : {}),
+          result: { orderNo: answer.result.orderNo, changed: answer.result.changed },
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'That did not save'
+        if (!message.includes('NEXT_REDIRECT')) setError(message)
+      } finally {
+        writing.current = false
+      }
+    })
+  }
+
   function open(href: string, newTab: boolean) {
     if (writing.current) return
     if (newTab) window.open(href, '_blank', 'noopener')
@@ -554,7 +594,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
         return (
           <button ref={countButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
             aria-expanded={!!confirm} aria-controls={confirm ? confirmId : undefined} disabled={pending}
-            title={`Takes it out of ${monthLabel}'s commission`} onClick={openConfirm}>
+            title={`No commission on it, or out of ${monthLabel} altogether`} onClick={openConfirm}>
             Don&apos;t count this bill…
           </button>
         )
@@ -565,10 +605,17 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
             Count this bill again
           </button>
         )
+      case 'noComm':
+        return (
+          <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => runNoComm(false)}
+            title={bill.exclusionDetail ?? undefined}>
+            Count this bill again
+          </button>
+        )
       case 'locked':
         return (
           <button type="button" role="menuitem" tabIndex={-1} disabled title={action.reason}>
-            {action.excludedByHand ? 'Count this bill again' : "Don't count this bill"}
+            {lockedCountLabel(action)}
           </button>
         )
       case 'unavailable':
@@ -696,25 +743,32 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
         <MenuPanel id={confirmId} label={`Don't count ${bill.orderNo}`} anchor={confirm.anchor} submenu dialog focus
           onStackedChange={setConfirmStacked} onBack={backFromConfirm} onClose={close}>
           <div className={styles.menuHeading}>Don&apos;t count {bill.orderNo}?</div>
+          {/* Two kinds (2026-11-14 — the user: "Down count（HR 那边）我觉得要分为两种"). */}
           <p className={styles.confirmCopy}>
-            It leaves <strong>{monthLabel}</strong>&apos;s commission — no commission on it, no group sales or
-            override, no KPI — as if the ERP had cancelled it, and it stays out whatever the ERP
-            sends next until somebody counts it again.
+            <strong>No commission</strong> — it still counts in {monthLabel}&apos;s sales and margin, and nobody is
+            paid on it: no commission, no override, no KPI.{halved ? ' Its half comm comes off.' : ''}
+          </p>
+          <p className={styles.confirmCopy}>
+            <strong>Not counted</strong> — it leaves {monthLabel}&apos;s sales, margin and commission, as if the ERP
+            had cancelled it.
+          </p>
+          <p className={styles.confirmCopy}>
+            Either stays whatever the ERP sends next, until somebody counts it again.
           </p>
           <label className={styles.dateField} htmlFor={noteId}>
             Why (optional)
             <input id={noteId} type="text" value={note} maxLength={500} disabled={pending}
-              placeholder="e.g. duplicate of HC-SO-013251"
+              placeholder="e.g. keyed for ANTHONY"
               onChange={event => { setNote(event.target.value); setError(null) }}
-              onKeyDown={event => {
-                if (event.key !== 'Enter') return
-                event.preventDefault()
-                run(true)
-              }} />
+              // Two answers: Enter picks neither.
+              onKeyDown={event => { if (event.key === 'Enter') event.preventDefault() }} />
           </label>
           <button type="button" disabled={pending} onClick={backFromConfirm}>Cancel</button>
+          <button type="button" disabled={pending} onClick={() => runNoComm(true)}>
+            No commission
+          </button>
           <button type="button" className={styles.danger} disabled={pending} onClick={() => run(true)}>
-            Don&apos;t count this bill
+            Not counted
           </button>
           {pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
           {error ? <p role="alert" className={styles.error}>{error}</p> : null}

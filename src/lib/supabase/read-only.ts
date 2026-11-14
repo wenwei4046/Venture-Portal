@@ -128,6 +128,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_bill_import_preview',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
+  // Not my order (mig 20261114210000): a bill's sheet, one's own requests, Comm Cal's Requests — all STABLE.
+  'member_not_mine_context', 'member_not_mine_requests', 'revenue_not_mine_requests',
   // Whose sale (mig 20261031030000): Comm Cal's held bills — STABLE.
   'revenue_seller_checks',
   // Comm Cal › Tally (mig 20261112190000): every bill with its deposit day and the month a close released it — STABLE.

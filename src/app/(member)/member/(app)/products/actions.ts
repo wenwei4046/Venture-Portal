@@ -304,9 +304,13 @@ export async function saveCostSetting(schemeId: string, edit: CostSettingEdit): 
     p_ratios: plan.ratios,
     p_removes: plan.removes,
   }
+  // Three writers by what is sent (PostgREST picks one by its arguments' names): the brands' own ratios
+  // (2026-11-14) go through the 6-argument Save, which calls the 5-argument one — a SKU's ratios by brand — first.
   const { data, error } = await sb.rpc(
     'catalogue_save_cost_setting',
-    plan.brands.length > 0 ? { ...args, p_brands: plan.brands } : args,
+    plan.brandRatios.length > 0
+      ? { ...args, p_brands: plan.brands, p_brand_ratios: plan.brandRatios }
+      : plan.brands.length > 0 ? { ...args, p_brands: plan.brands } : args,
   )
   if (error) ruleFail('the costing setting', error)
   refresh()

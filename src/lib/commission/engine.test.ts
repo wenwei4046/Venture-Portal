@@ -941,6 +941,71 @@ describe("a rider SKU's ratio by brand — 2026-11-07", () => {
   })
 })
 
+describe("a brand's own ratio — 2026-11-14", () => {
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+  // Fair at 0.7; Ergotex 0.6 and Dunlopillo 0.65 of their own, Akemi and Zanotti none. M2 has a ratio of its own (0.8);
+  // TRION a ratio for Dunlopillo (0.55).
+  const basis = costBasisOf(0.7, [{ productCode: 'M2', ratio: 0.8 }], [{ productCode: 'TRION (K)', brand: 'DUNLOP', ratio: 0.55 }], [
+    { brand: ' ergotex ', ratio: 0.6 },
+    { brand: 'DUNLOP', ratio: 0.65 },
+    { brand: 'AKEMI', ratio: 0 },
+  ])
+
+  it("divides a SKU with no ratio of its own by the brand's, else the default", () => {
+    expect(costDivisorFor('M1', basis, 'ERGOTEX')).toBe(0.6)
+    expect(costDivisorFor('M1', basis, 'dunlop')).toBe(0.65)
+    // A brand with none — or a ratio that is no ratio — divides by the sub-department's.
+    expect(costDivisorFor('M1', basis, 'ZANOTTI')).toBe(0.7)
+    expect(costDivisorFor('M1', basis, 'AKEMI')).toBe(0.7)
+    // No brand: the sub-department's.
+    expect(costDivisorFor('M1', basis, null)).toBe(0.7)
+    expect(costDivisorFor('M1', basis)).toBe(0.7)
+  })
+
+  it("a SKU's own ratio, and its ratio for the brand, stay ahead of the brand's", () => {
+    expect(costDivisorFor('M2', basis, 'ERGOTEX')).toBe(0.8)
+    expect(costDivisorFor('TRION (K)', basis, 'DUNLOP')).toBe(0.55)
+    // The frame has none for Ergotex and none of its own: Ergotex's.
+    expect(costDivisorFor('TRION (K)', basis, 'ERGOTEX')).toBe(0.6)
+  })
+
+  it("costs a bill's lines at its brand's ratio", () => {
+    const lines = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 3_000, 600],
+      ['MATTRESS', 'M2', 1, 1_000, 200],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 330],
+    ]).lines
+    // Ergotex: 600 ÷ 0.6 + 200 ÷ 0.8 + 330 ÷ 0.6 = 1,000 + 250 + 550.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'ERGOTEX').cost).toBe(1_800)
+    // Dunlopillo: 600 ÷ 0.65 + 250 + 330 ÷ 0.55 = 923.08 + 250 + 600.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'DUNLOP').cost).toBe(1_773.08)
+    // Zanotti has none: 600 ÷ 0.7 + 250 + 330 ÷ 0.7.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'ZANOTTI').cost).toBe(1_578.57)
+  })
+
+  it('a bill with no brand of its own answers to the brand its goods sell the most of', () => {
+    const lines = order('2', 'rs', [
+      ['MATTRESS', 'M1', 1, 3_000, 600, 'ERGOTEX'],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 330],
+    ]).lines
+    const base = marginBase(lines, indexKpiItems([]), groupIndex, basis)
+    expect(base.brandCode).toBe('ERGOTEX')
+    expect(base.cost).toBe(1_550) // 600 ÷ 0.6 + 330 ÷ 0.6
+  })
+
+  it('carries them into the run: one mattress, two brands, two margins', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 1_000, 300]], { brandCode: 'ERGOTEX' }),
+        order('2', 'ta', [['MATTRESS', 'M1', 1, 1_000, 300]], { brandCode: 'AKEMI' }),
+      ],
+      scheme: { ...SCHEME, costDivisor: 0.7, brandDivisors: [{ brand: 'ERGOTEX', ratio: 0.6 }] },
+    })
+    expect(find(r.statements, 'rs').marginPct).toBeCloseTo(0.5, 10) // 1 − 300 ÷ 0.6 ÷ 1,000
+    expect(find(r.statements, 'ta').marginPct).toBeCloseTo(0.5714, 4) // 1 − 300 ÷ 0.7 ÷ 1,000
+  })
+})
+
 // ─── Hierarchy override ─────────────────────────────────────────────────────
 
 describe('hierarchy override — differential roll-up', () => {
@@ -2122,6 +2187,113 @@ describe('half comm halves what a bill pays, never its sales (2026-11-10)', () =
     const r = run({ hierarchy: SIX, orders: [bill('1', 5_000), halfComm(bill('2', 5_000))] })
     expect(find(r.statements, 'rs').productCommission).toBe(450) // 300 + 150
     expect(find(r.statements, 'rs').productRevenue).toBe(10_000)
+  })
+})
+
+// 2026-11-14 (Comm Cal › a bill's menu › Don't count this bill… › No commission — the user: "Down count（HR 那边）我觉得
+// 要分为两种：1. 一种是指完全不出 commission，但他还是有算在 revenue，还有算在 margin 等等"; asked who else goes unpaid,
+// with the RM example these tests use — RM 10,000 at 6% = RM 600, the leader's 2% override RM 200 — "整张单谁都不拿钱").
+describe('no commission: nobody is paid on a bill that still counts (2026-11-14)', () => {
+  // A 6% Specialist under the 7% Team Assistant, under the 9% Team Leader (2% over the Team Assistant).
+  const SIX: HierarchyNode[] = [node('tl', null, 'tl_9'), node('ta', 'tl', 'ta_7'), node('rs', 'ta', 'rs_6')]
+  const noComm = (o: SalesOrder): SalesOrder => ({ ...o, noCommission: true })
+  const bill = (id: string, amount: number) => order(id, 'rs', [['MATTRESS', 'M1', 1, amount]])
+
+  it('pays RM 10,000 at 6% nothing, not RM 600 — no line at all', () => {
+    expect(find(run({ hierarchy: SIX, orders: [bill('1', 10_000)] }).statements, 'rs').productCommission).toBe(600)
+    const rs = find(run({ hierarchy: SIX, orders: [noComm(bill('1', 10_000))] }).statements, 'rs')
+    expect(rs.productCommission).toBe(0)
+    expect(rs.totalCommission).toBe(0)
+    expect(rs.lines.filter(l => l.sourceOrderId === '1')).toEqual([])
+  })
+
+  it('pays no override up the line on it — the leader’s RM 200 is nothing', () => {
+    const paid = run({ hierarchy: SIX, orders: [bill('1', 10_000)] })
+    expect(find(paid.statements, 'tl').overrideCommission).toBe(200) // (9 − 7)% of 10,000
+    const r = run({ hierarchy: SIX, orders: [noComm(bill('1', 10_000))] })
+    expect(find(r.statements, 'ta').overrideCommission).toBe(0)
+    expect(find(r.statements, 'tl').overrideCommission).toBe(0)
+    expect(find(r.statements, 'rs').penaltyWeightedRevenue).toBe(0)
+  })
+
+  it('counts its sales in full — own, group, and the rung they climb', () => {
+    const r = run({ hierarchy: SIX, orders: [noComm(bill('1', 10_000))] })
+    expect(find(r.statements, 'rs').productRevenue).toBe(10_000)
+    expect(find(r.statements, 'ta').groupRevenue).toBe(10_000)
+    expect(find(r.statements, 'tl').groupRevenue).toBe(10_000)
+    // RM 300,000 of group sales lifts a variable 6% to Team Assistant — and the 7% pays on the bills that pay.
+    const variable = [node('rs', null, 'rs_6', 'variable')]
+    const lifted = find(run({ hierarchy: variable, orders: [noComm(bill('1', 300_000)), bill('2', 10_000)] }).statements, 'rs')
+    expect(lifted.effectiveRankKey).toBe('ta_7')
+    expect(lifted.productCommission).toBe(700) // 7% of the RM 10,000 that pays
+  })
+
+  it('counts in the month’s margin', () => {
+    const r = run({ hierarchy: SIX, orders: [noComm(order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_000]]))] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginRevenue).toBe(10_000)
+    expect(rs.marginCost).toBe(6_000)
+    expect(rs.marginPct).toBeCloseTo(0.4)
+  })
+
+  it('pays nothing for its KPI items — and still counts them on the ladder', () => {
+    // 6 items on a bill that pays + 4 on one that pays nothing = 10, the ladder's +20% — on the 6 paid only.
+    const paying = order('1', 'rs', [['MATTRESS', 'M1', 1, 5_000], ['ACC', 'AK-CS AIRLOFT COMFY PIL', 6, 0]])
+    const none = noComm(order('2', 'rs', [['MATTRESS', 'M1', 1, 5_000], ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0]]))
+    const rs = find(run({ hierarchy: SIX, orders: [paying, none] }).statements, 'rs')
+    expect(rs.kpiQty).toBe(10)
+    expect(rs.kpiThresholdPct).toBe(0.2)
+    expect(rs.kpiBase).toBe(300) // 6 × RM 50
+    expect(rs.kpiCommission).toBe(360) // 300 + 20%
+    expect(rs.lines.filter(l => l.sourceOrderId === '2')).toEqual([])
+    // Without the bill that pays nothing, 6 items climb no rung.
+    expect(find(run({ hierarchy: SIX, orders: [paying] }).statements, 'rs').kpiThresholdPct).toBe(0)
+  })
+
+  it('takes no penalty and records none — its sales are cut by its margin as any bill’s', () => {
+    // 26% on Akemi's ladder: Below margin Tier 1 × 0.5.
+    const thin = noComm(order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]]))
+    const r = run({ hierarchy: SIX, orders: [thin] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(0)
+    expect(rs.marginPenaltyWithheld).toBe(0)
+    expect(r.penalised).toEqual([])
+    expect(rs.productRevenue).toBe(5_000)
+  })
+
+  it('wins over half comm — nothing is left to halve', () => {
+    const both = { ...noComm(bill('1', 10_000)), halfComm: true }
+    const r = run({ hierarchy: SIX, orders: [both] })
+    expect(find(r.statements, 'rs').productCommission).toBe(0)
+    expect(find(r.statements, 'tl').overrideCommission).toBe(0)
+  })
+
+  it('pays no holder’s part of a shared bill', () => {
+    const parts = splitOrdersByShares([noComm(bill('1', 10_000))], [{ orderId: '1', staffId: 'ta', pct: 0.5 }])
+    const r = run({ hierarchy: SIX, orders: parts })
+    expect(find(r.statements, 'rs').productCommission).toBe(0)
+    expect(find(r.statements, 'ta').productCommission).toBe(0)
+    expect(find(r.statements, 'tl').overrideCommission).toBe(0)
+    expect(find(r.statements, 'rs').productRevenue).toBe(5_000)
+  })
+
+  it('pays nothing on a director’s own bill, nor on an old bill topped up', () => {
+    const head = run({
+      hierarchy: SIX, departmentHeadIds: ['director'],
+      directors: [{ staffId: 'director', rankKey: 'rs_6', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0 }],
+      orders: [{ ...noComm(bill('1', 5_000)), staffId: 'director' }],
+    })
+    expect(find(head.statements, 'director').productCommission).toBe(0)
+    expect(find(head.statements, 'director').productRevenue).toBe(5_000)
+    const old = run({ hierarchy: SIX, orders: [{ ...noComm(bill('1', 5_000)), commissionOnly: true }] })
+    expect(old.statements.find(s => s.staffId === 'rs')?.productCommission ?? 0).toBe(0)
+  })
+
+  it('leaves a bill without it as it was', () => {
+    const r = run({ hierarchy: SIX, orders: [bill('1', 10_000), noComm(bill('2', 10_000))] })
+    expect(find(r.statements, 'rs').productCommission).toBe(600)
+    expect(find(r.statements, 'rs').productRevenue).toBe(20_000)
+    expect(find(r.statements, 'tl').overrideCommission).toBe(200)
   })
 })
 

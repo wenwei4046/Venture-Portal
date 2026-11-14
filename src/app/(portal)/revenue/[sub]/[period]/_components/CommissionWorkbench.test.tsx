@@ -25,7 +25,8 @@ const { refresh, push, excludeOrder, includeOrder, setOrderBrand, shareOrder, un
     },
   }
 })
-vi.mock('../../../run-actions', () => ({ excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder }))
+const { setNoComm } = vi.hoisted(() => ({ setNoComm: vi.fn() }))
+vi.mock('../../../run-actions', () => ({ excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder, setNoComm }))
 vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
@@ -1008,6 +1009,38 @@ describe('CommissionWorkbench — where it stands is the URL (user 2026-09-27)',
   })
 })
 
+// 2026-11-14 — Don't count's first kind: "完全不出 commission，但他还是有算在 revenue，还有算在 margin 等等".
+describe('CommissionWorkbench — a bill that pays nobody, on its ledger (2026-11-14)', () => {
+  function noCommFixture() {
+    const data = fixture()
+    data.input = { ...data.input, orders: [sale('one', 1_000, { noCommission: true }), sale('two', 2_000)] }
+    data.noComms = { one: { note: 'keyed for ANTHONY', byName: 'HR', at: '2026-11-13T17:30:00Z' } }
+    return data
+  }
+
+  it('wears a No commission chip with the why, pays nothing on it and keeps it in the sales', () => {
+    renderBoard(noCommFixture(), 'computed')
+    choose('Anthony')
+    const row = salesRow(personalTable(), 'SO-one')
+    expect(within(row).getByText('No commission').closest('.chip')).toHaveAttribute('title', 'No commission by HR on 14 Nov 2026 — keyed for ANTHONY')
+    expect(within(salesRow(personalTable(), 'SO-two')).queryByText('No commission')).toBeNull()
+  })
+
+  it('offers Count this bill again — and no Half comm — on its menu', async () => {
+    setNoComm.mockResolvedValue({ ok: true, result: { orderNo: 'SO-one', changed: true } })
+    renderBoard(noCommFixture(), 'computed')
+    choose('Anthony')
+    fireEvent.contextMenu(within(salesRow(personalTable(), 'SO-one')).getByText('Arena'), { clientX: 400, clientY: 260 })
+    const menu = screen.getByRole('menu', { name: 'Actions for SO-one' })
+    expect(within(menu).queryByRole('menuitem', { name: /Half comm/ })).toBeNull()
+    const again = within(menu).getByRole('menuitem', { name: 'Count this bill again' })
+    expect(again).toHaveAttribute('title', 'No commission by HR on 14 Nov 2026 — keyed for ANTHONY')
+    fireEvent.click(again)
+    await waitFor(() => expect(setNoComm).toHaveBeenCalledWith('one', false, null))
+    expect(await screen.findByText(/^SO-one pays its commission again\./)).toBeInTheDocument()
+  })
+})
+
 describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () => {
   // "I want the right-click, the same as on All bills: right-click the order,
   // choose that it does not count, and it is out of the commission."
@@ -1020,7 +1053,8 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     expect(within(menu).getByRole('menuitem', { name: 'Open bill' })).toBeVisible()
 
     fireEvent.click(within(menu).getByRole('menuitem', { name: /Don't count this bill/ }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: "Don't count this bill" }))
+    // Not counted — Don't count's second kind (2026-11-14), the one out of the month altogether.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Not counted' }))
     await waitFor(() => expect(excludeOrder).toHaveBeenCalledWith('one', ''))
     expect(refresh).toHaveBeenCalled()
     const notice = await screen.findByText(/SO-one no longer counts in August 2026\./)

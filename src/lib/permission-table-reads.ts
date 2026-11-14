@@ -63,6 +63,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   catalogue_skus: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   claims: ['claims.approve', 'claims.view:own', 'reconciliation.create', 'reconciliation.edit', 'reports.export', 'reports.view'],
   comm_agent_aliases: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
+  comm_brand_cost_ratios: ['product_list.edit', 'product_list.view', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_brands: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_cost_ratio_brands: ['product_list.edit', 'product_list.view', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_cost_ratios: ['product_list.edit', 'product_list.view', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
@@ -165,6 +166,8 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   sales_order_erp_changes: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_exclusions: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_half_comm: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
+  // No commission (2026-11-14, mig 20261114200000): whoever reads a month's bills.
+  sales_order_no_comm: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_reassignments: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_lines: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_shares: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],

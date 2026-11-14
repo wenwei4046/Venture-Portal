@@ -360,6 +360,13 @@ export interface QuoteRules {
    */
   costRatiosByBrand?: { productCode: string; brand: string; ratio: number }[];
   /**
+   * The sub-department's ratio for a brand (Costing Setting, 2026-11-14): in a
+   * cart that answers to that brand's ladder, a SKU with no ratio of its own is
+   * divided by it instead of the divisor. Server-only, as every ratio. Absent =
+   * none.
+   */
+  brandDivisors?: { brand: string; ratio: number }[];
+  /**
    * The gifts with purchase (Product List › GWP, 2026-11-08; no dates):
    * a cart with one of a GWP's buy SKUs leaves up to its units of the gift
    * SKUs out of the cost, cheapest first, as the run reads the bill. Nothing
