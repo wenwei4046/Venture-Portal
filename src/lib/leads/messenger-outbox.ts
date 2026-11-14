@@ -19,7 +19,7 @@ export async function sendLeadOutbox(client: SupabaseClient, contacts: string[],
   const results: Array<{ id: number; mid?: string; error?: string }> = []
   // One after another: a template's messages must reach the customer in their order.
   for (const row of rows) {
-    const r = row.mediaPath ? await sendFile(client, row, systemToken) : await deliver(row, systemToken)
+    const r = row.mediaPath ? await sendFile(client, { ...row, automatic: true }, systemToken) : await deliver({ ...row, automatic: true }, systemToken)
     results.push('mid' in r ? { id: row.id, mid: r.mid } : { id: row.id, error: r.error })
   }
   if (results.length) {
