@@ -4,6 +4,7 @@ import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import type { HandExclusion } from '@/lib/commission/bill-exclusion'
 import type { BrandOption } from '@/lib/commission/bill-brand'
 import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
+import type { NoCommMark } from '@/lib/commission/bill-no-comm'
 
 /**
  * A month's sales orders, as `revenue_month_orders` returns them.
@@ -285,6 +286,27 @@ export async function loadHalfComms(
   const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
     supabase
       .from('sales_order_half_comm')
+      .select('order_id, note, set_by_name, set_at')
+      .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  )
+  return new Map(rows.map(r => [r.order_id, { note: r.note, byName: r.set_by_name, at: r.set_at }]))
+}
+
+// ─── No commission (2026-11-14) ─────────────────────────────────────────────
+
+/**
+ * The bills that count and pay nobody (`sales_order_no_comm` — *Don't count
+ * this bill…* › No commission), with who and why, by order id. Chunked like
+ * the shares: a month is hundreds of ids.
+ */
+export async function loadNoComms(
+  supabase: SupabaseClient,
+  orderIds: readonly string[],
+): Promise<Map<string, NoCommMark>> {
+  type Row = { order_id: string; note: string | null; set_by_name: string | null; set_at: string }
+  const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
+    supabase
+      .from('sales_order_no_comm')
       .select('order_id, note, set_by_name, set_at')
       .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
   )

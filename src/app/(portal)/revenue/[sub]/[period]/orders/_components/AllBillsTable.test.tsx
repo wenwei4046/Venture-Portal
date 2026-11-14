@@ -99,7 +99,8 @@ describe('AllBillsTable — the bill menu', () => {
     table()
     fireEvent.contextMenu(screen.getByText('Sarida'), { clientX: 400, clientY: 260 })
     fireEvent.click(screen.getByRole('menuitem', { name: /Don't count this bill/ }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: "Don't count this bill" }))
+    // Not counted — Don't count's second kind (2026-11-14), the one out of the month altogether.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Not counted' }))
 
     const notice = await screen.findByText(/HC-SO-013493 no longer counts in September 2026\./)
     expect(notice).toHaveTextContent('Payroll follows when the salesperson is sent.')

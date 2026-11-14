@@ -263,6 +263,8 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   // Half comm (2026-11-10, mig 20261110160000).
   sales_order_half_comm: each(REVENUE_WORK),
   sales_order_lines: each(REVENUE_WORK),
+  // No commission (2026-11-14, mig 20261114200000).
+  sales_order_no_comm: each(REVENUE_WORK),
   sales_order_reassignments: each(REVENUE_WORK),
   sales_order_shares: each(REVENUE_WORK),
   sales_orders: each(REVENUE_WORK),

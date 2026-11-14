@@ -24,6 +24,7 @@ import { useEntryScroll } from '@/components/layout/useEntryScroll'
 import BillContextMenu, { type BillBrandOutcome, type BillHalfCommOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
 import HalfCommNotice from '../orders/_components/HalfCommNotice'
 import { billHalfCommAction, describeHalfComm, HALF_COMM_LABEL, type BillHalfCommAction } from '@/lib/commission/bill-half-comm'
+import { describeNoComm, NO_COMM_LABEL } from '@/lib/commission/bill-no-comm'
 import BillCountNotice from '../orders/_components/BillCountNotice'
 import BillShareNotice from '../orders/_components/BillShareNotice'
 import BillMoveNotice from '../orders/_components/BillMoveNotice'
@@ -573,10 +574,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     // A closed salesperson's bills stay as they were closed (2026-09-27) —
     // the action refuses them too; the menu says so before anybody tries.
     const closed = closedHolder(row, 'changing which bills count')
-    if (closed) return { kind: 'locked', excludedByHand: false, reason: closed }
-    // Every bill on a ledger is live: an excluded one is not in the engine's input.
+    if (closed) return { kind: 'locked', excludedByHand: false, ...(row.noComm ? { noComm: true } : {}), reason: closed }
+    // Every bill on a ledger is live: an excluded one is not in the engine's input. One may pay nobody (2026-11-14).
     return billCountAction(
-      { cancelled: false, excludedReason: null, erpStatus: null, erpOnHold: false, excludedByHand: false },
+      { cancelled: false, excludedReason: null, erpStatus: null, erpOnHold: false, excludedByHand: false, noComm: !!row.noComm },
       { runLocked: lockedMonths.has(row.periodMonth), monthLabel: monthName(row.periodMonth) },
     )
   }
@@ -630,8 +631,9 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     setShareDone(null)
     setMoveDone(outcome)
   }
-  // Half comm (2026-11-10): locked where Don't count is — a paid run, a closed holder.
+  // Half comm (2026-11-10): locked where Don't count is — a paid run, a closed holder. None on a bill that pays nobody.
   function halfActionFor(row: CommissionOrderRow | OverrideOrderRow): BillHalfCommAction | null {
+    if ((row as CommissionOrderRow).noComm) return null
     return billHalfCommAction(
       { halfComm: !!row.halfComm, upsale: row.upsale },
       { runLocked: lockedMonths.has(row.periodMonth), closedReason: closedHolder(row, 'changing what this bill pays'), monthLabel: monthName(row.periodMonth) },
@@ -640,6 +642,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   function halfDetail(orderId: string): string | null {
     const mark = data.halfComms?.[orderId]
     return mark ? describeHalfComm(mark) : null
+  }
+  // No commission (2026-11-14): who took the bill's commission off, and why.
+  function noCommDetail(orderId: string): string | null {
+    const mark = data.noComms?.[orderId]
+    return mark ? describeNoComm(mark) : null
   }
   function halfMenuDone(outcome: BillHalfCommOutcome) {
     billMenu.closeMenu()
@@ -742,9 +749,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       // Why a row from another month is here: a word on a wash, and the month it came from.
       case 'status': {
         // Half comm (2026-11-10): its own chip, the why on hover — beside where the row came from.
-        const half = row.halfComm
-          ? <span className="chip danger" title={halfDetail(row.orderId) ?? undefined}><span className="dot" />{HALF_COMM_LABEL}</span>
-          : null
+        // No commission (2026-11-14) the same way: it counts, and pays nobody.
+        const half = own.noComm
+          ? <span className="chip danger" title={noCommDetail(row.orderId) ?? undefined}><span className="dot" />{NO_COMM_LABEL}</span>
+          : row.halfComm
+            ? <span className="chip danger" title={halfDetail(row.orderId) ?? undefined}><span className="dot" />{HALF_COMM_LABEL}</span>
+            : null
         return origin
           ? <>{half}<span className={`chip ${ORIGIN_TONE[origin.kind]}`}><span className="dot" />{origin.label}</span><small>{origin.detail}</small></>
           : half ?? <span className={s.muted}>—</span>
@@ -1147,7 +1157,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         // A shared bill is every holder's: the heading names them all.
         who: holdersOf(billMenu.menu.row).map(holder => holder.name).join(' + '),
         action: countActionFor(billMenu.menu.row),
-        exclusionDetail: null,
+        // Every bill on a ledger counts; one that pays nobody says who said so (2026-11-14).
+        exclusionDetail: billMenu.menu.row.noComm ? noCommDetail(billMenu.menu.row.orderId) : null,
       }}
       anchor={billMenu.menu.anchor} link={billMenu.menu.link} monthLabel={monthLabel}
       brand={(() => {

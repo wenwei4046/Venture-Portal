@@ -26,6 +26,13 @@ const bandText = (key: string) => key.replace(/_/g, " ").replace(/\b\w/g, c => c
  */
 export const OLD_BILL_NOTE = "An old bill you collected the top-up for: it pays you commission only, and is not counted in your sales, your target or the Arena.";
 
+/**
+ * A bill HR set to pay no commission (2026-11-14 — the user: "完全不出 commission，但他还是有算在 revenue，还有算在
+ * margin 等等"; nobody is paid on it, "整张单谁都不拿钱"): listed at RM 0, and still in their sales and margin.
+ */
+export const NO_COMMISSION = "No commission";
+export const NO_COMMISSION_NOTE = "HR set this bill to pay no commission. It still counts in your sales and your margin.";
+
 /** A brand list the way the prototype writes it: "Akemi, Ergotex and Zanotti". */
 function brandList(codes: readonly string[]): string {
   const names = codes.map(brandName);
@@ -182,15 +189,18 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
     // An old bill topped up (2026-11-07): commission only, no sale of theirs — its margin cuts its commission as any
     // bill's does ("need follow the margin as well"), so it is said beside it.
     const old = b.commissionOnly === true;
+    // No commission (2026-11-14): HR took its commission off — it still counts in their sales and margin.
+    const none = b.noCommission === true;
     sheets[id] = {
       no: b.no,
       // An old bill (2026-11-07) was sold at a fair months before: no week of this month is its.
       meta: [o?.customer, old ? null : weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
       tag: waiting ? "Waiting for deposit"
+        : none ? (margin === null || own ? NO_COMMISSION : `${NO_COMMISSION} · ${margin.toFixed(1)}% margin`)
         : old ? (margin === null || own ? "Commission only" : `Commission only · ${margin.toFixed(1)}% margin`)
         : own ? OWN_SCHEME_PILL
         : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
-      tone: waiting ? "warn" : own || (old && margin === null) ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
+      tone: waiting ? "warn" : none || own || (old && margin === null) ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
       amt: rm(o?.total ?? b.orderTotal ?? b.commissionable),
       commLabel: "Commission",
       comm: waiting ? "Waiting" : money(commission),
@@ -205,13 +215,14 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
       })),
       total: money(waiting ? 0 : b.pay),
       note: waiting ? "Its commission is added in the month the deposit clears."
+        : none ? NO_COMMISSION_NOTE
         : old ? `${OLD_BILL_NOTE} Commission is shared across lines by line amount.`
         : `${b.sharePct !== null ? `Your ${Math.round(b.sharePct * 100)}% of a shared bill. ` : ""}Commission is shared across lines by line amount.${b.kpi > 0 ? " Each KPI item pays as listed." : ""}`,
     };
     return {
       id, no: b.no, meta: [o?.customer, old ? null : weekOf(o), brand].filter(Boolean).join(" · "),
       pay: waiting ? "Waiting" : money(b.pay), held: waiting,
-      sub: waiting ? "Deposit due" : old ? "Not in sales" : b.kpi > 0 ? `incl. KPI ${money(b.kpi)}` : `of ${rm(b.commissionable)}`,
+      sub: waiting ? "Deposit due" : none ? NO_COMMISSION : old ? "Not in sales" : b.kpi > 0 ? `incl. KPI ${money(b.kpi)}` : `of ${rm(b.commissionable)}`,
     };
   });
 

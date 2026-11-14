@@ -279,6 +279,8 @@ export interface SalesOrderRow {
   source?: string | null
   /** Half comm (2026-11-10, `sales_order_half_comm`): set by the loader, never a column. */
   half_comm?: boolean
+  /** No commission (2026-11-14, `sales_order_no_comm`): set by the loader, never a column. */
+  no_comm?: boolean
   sales_order_lines: SalesLineRow[] | null
 }
 
@@ -570,6 +572,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         ? { commissionOnly: true } : {}),
       // Half comm (2026-11-10): the bill's own commission and override base halved.
       ...(o.half_comm ? { halfComm: true } : {}),
+      // No commission (2026-11-14): nobody is paid on the bill; it counts in sales, margin and the KPI count.
+      ...(o.no_comm ? { noCommission: true } : {}),
       manualMarginPct: numOrNull(o.manual_margin_pct),
       brandCode: o.brand_code?.trim() || null,
       lines: (o.sales_order_lines ?? []).map(l => ({
