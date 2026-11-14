@@ -118,3 +118,20 @@ describe("share order (2026-10-21)", () => {
     expect(items.map(n => [n.id, n.link])).toEqual([["nt-n7", "Open share request"]]);
   });
 });
+
+describe("not my order (2026-11-14)", () => {
+  const rejected = {
+    id: "n9", kind: "share" as const, title: "HC-SO-2611-044 · request rejected", body: "HR: “You sold it.” It stays in your sales.",
+    refKind: "not_mine_request" as const, refId: "r1", at: "2026-11-14T06:00:00Z", read: false,
+  };
+
+  it("HR's answer is a request update that opens the request", () => {
+    const { items, count } = notifications({ ...base, requests: [], memos: [], notices: [rejected], shares: [], staffId: "shawn" });
+    expect(items.map(n => [n.id, n.kind, n.tab, n.open, n.title, n.sub, n.link, n.go])).toEqual([
+      ["nt-n9", "req", "requests", false, "HC-SO-2611-044 · request rejected", "HR: “You sold it.” It stays in your sales.", "Open request",
+        { to: "notMine", requestId: "r1" }],
+    ]);
+    expect(count).toBe(0);
+    expect(notifGroups(items, "all", null).map(g => [g.title, g.items.map(n => n.id)])).toEqual([["REQUEST UPDATES", ["nt-n9"]]]);
+  });
+});

@@ -581,6 +581,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
   'member_share_order_context', 'member_share_order_send', 'member_share_order_answer', 'member_share_order_cancel',
   'member_share_requests', 'revenue_share_requests', 'revenue_share_request_decide',
+  // Not my order (mig 20261114210000): a bill's sheet, a request sent and withdrawn by the salesperson on the bill (the send
+  // also asks Profile · Requests · Create); one's own list (View as: the Principal's member context); Comm Cal's Requests
+  // read by Revenue · View / Edit, decided by Revenue · Edit on the month page's tab.
+  'member_not_mine_context', 'member_not_mine_send', 'member_not_mine_cancel', 'member_not_mine_requests',
+  'revenue_not_mine_requests', 'revenue_not_mine_decide',
   // Whose sale (mig 20261031030000): Comm Cal's held bills read by Revenue · View / Edit, answered by Revenue · Edit;
   // a bill the ERP gave to somebody else answered the same way (mig 20261031040000).
   'revenue_seller_checks', 'revenue_answer_seller_check', 'revenue_answer_seller_move',

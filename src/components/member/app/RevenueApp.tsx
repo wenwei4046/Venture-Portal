@@ -35,6 +35,10 @@ import { DateSheet, OrderSheet, TiersSheet } from "./insight/InsightSheets";
 import ShareOrderSheet from "./insight/share/ShareOrderSheet";
 import ShareRequestSheet from "./insight/share/ShareRequestSheet";
 import { useShareRequests } from "./insight/share/useShareRequests";
+import NotMineSheet from "./insight/notmine/NotMineSheet";
+import NotMineRequestSheet from "./insight/notmine/NotMineRequestSheet";
+import { useNotMineRequests } from "./insight/notmine/useNotMineRequests";
+import { notMineStatus } from "@/lib/member/not-mine-requests";
 import { shareStatus, type ShareSendInput } from "@/lib/member/share-requests";
 import ArenaHub from "./arena/ArenaHub";
 import ArenaBoard from "./arena/ArenaBoard";
@@ -536,6 +540,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const shares = useShareRequests({ source, on: live && !data.demo && !fixture && readable, context, staffId: shareStaff, gen, signal: shareSignal });
   const [sharePick, setSharePick] = useState<string | null>(() => new URLSearchParams(startSearch).get("share"));
   const [shareOrder, setShareOrder] = useState<string | null>(null);
+  // ── Not my order (2026-11-14): the requests the member sent, read again when HR's answer comes in; a tapped notice's
+  // (`?notmine=<id>`) opens over the first drawing. View as reads the viewed member's, and sends nothing.
+  const notMineSignal = useMemo(() => liveNotices.items.filter(n => n.refKind === "not_mine_request").map(n => n.id).join(","), [liveNotices.items]);
+  const notMines = useNotMineRequests({ source, on: live && !data.demo && !fixture && readable, context, gen, signal: notMineSignal });
+  const [notMinePick, setNotMinePick] = useState<string | null>(() => new URLSearchParams(startSearch).get("notmine"));
+  const [notMineOrder, setNotMineOrder] = useState<string | null>(null);
   // The bell's dot counts what the database told them since they last opened it; opening it reads those, and they stay
   // marked new in the list until it opens again. One coming in after that counts again.
   const [seenNew, setSeenNew] = useState<ReadonlySet<string>>(() => new Set());
@@ -545,7 +555,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed && !ownMode ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
-    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || go.to === "share" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
+    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || go.to === "share" || go.to === "notMine" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
     notices: principal ? [] : shownNotices,
     shares: shares.waiting, staffId: shareStaff,
   }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, shownNotices, shares.waiting, shareStaff]);
@@ -640,6 +650,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     setSoPick(null);
     setShareOrder(null);
     setSharePick(null);
+    setNotMineOrder(null);
+    setNotMinePick(null);
     setTiersOpen(false);
     setFairsOpen(false);
     setChampOpen(false);
@@ -807,6 +819,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     else if (n.go.to === "it") { goScreen("account", { pf: "it" }); setItPick(n.go.requestId); }
     // A share request (2026-10-21): its sheet, over whatever page is open.
     else if (n.go.to === "share") setSharePick(n.go.requestId);
+    // A Not my order request HR answered (2026-11-14): its sheet, over whatever page is open.
+    else if (n.go.to === "notMine") setNotMinePick(n.go.requestId);
     else if (n.go.to === "none") return;
     else openBoard("sales", settled?.period ?? null);
   };
@@ -958,6 +972,25 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (res.ok) sharePut(res.data);
     return res;
   }, [source, sharePut]);
+  // Not my order (2026-11-14): the bill's request still with HR, the sheet's read and writes — each replaces the request in
+  // the list at once. A person's bill is never the reader's to send.
+  const soNotMine = soPick && !personId ? notMines.onBill(soPick) : null;
+  const notMinePickVM = notMinePick ? notMines.find(notMinePick) : null;
+  const notMinePut = notMines.put;
+  const loadNotMine = useCallback((orderId: string) => (source.notMineContext
+    ? settleRead(source.notMineContext(orderId, context)) : Promise.resolve({ ok: false as const, error: "Preview data only." })), [source, context]);
+  const sendNotMine = useCallback(async (orderId: string, reason: string) => {
+    if (!source.notMineSend) return { ok: false as const, error: "Preview data only." };
+    const res = await settleRead(source.notMineSend(orderId, reason));
+    if (res.ok) notMinePut(res.data);
+    return res;
+  }, [source, notMinePut]);
+  const withdrawNotMine = useCallback(async (id: string) => {
+    if (!source.notMineCancel) return { ok: false as const, error: "Preview data only." };
+    const res = await settleRead(source.notMineCancel(id));
+    if (res.ok) notMinePut(res.data);
+    return res;
+  }, [source, notMinePut]);
   const insDateLabel = fixture?.insight?.dateLabel ?? insPeriod.label;
   const dateOptions = useMemo(() => periodOptions(insKind, period, monthState), [insKind, period, monthState]);
 
@@ -1448,7 +1481,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const ownPassword = changePassword && !viewed && !data.demo && !fixture ? changePassword : null;
   const ownEmail = requestEmail && !viewed && !data.demo && !fixture ? requestEmail : null;
   const anyPanel = sheet !== null || dateOpen || soPick !== null || tiersOpen || fairsOpen || champOpen || quotePanel || profilePanel
-    || shareOrder !== null || sharePick !== null;
+    || shareOrder !== null || sharePick !== null || notMineOrder !== null || notMinePick !== null;
   // A pull only from the page itself — never while a sheet is up — and never on the preview's fixtures,
   // nor on the Product List, which holds its edits until Save.
   // Nor in the CRM (`onCrm`), which reads itself every 5 s and scrolls inside its own lists: a pull listener there (a non-passive
@@ -1763,7 +1796,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             canShare={!personId && !fixture && !data.demo && !!source.shareSend && !closed.sends.includes("requests")}
             request={soRequest ? { id: soRequest.id, status: shareStatus(soRequest).text } : null}
             // The share sheets take the bill sheet's place: it is a peek, and a tap in a sheet above it would close it anyway.
-            onShare={() => { setShareOrder(soPick); setSoPick(null); }} onRequest={id => { setSharePick(id); setSoPick(null); }} />}
+            onShare={() => { setShareOrder(soPick); setSoPick(null); }} onRequest={id => { setSharePick(id); setSoPick(null); }}
+            canNotMine={!personId && !fixture && !data.demo && !!source.notMineSend && !closed.sends.includes("requests")}
+            notMine={soNotMine ? { id: soNotMine.id, status: notMineStatus(soNotMine).text } : null}
+            onNotMine={() => { setNotMineOrder(soPick); setSoPick(null); }} onNotMineRequest={id => { setNotMinePick(id); setSoPick(null); }} />}
         </>
       )}
       {route.screen === "arena" && route.arena === "board" && boardVM && (
@@ -1829,6 +1865,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       <ShareRequestSheet open={sharePick !== null} request={sharePickVM} staffId={shareStaff} readOnly={readOnlyView}
         error={sharePick && !sharePickVM ? shares.error ?? (shares.list ? "That share request is not there any more." : null) : null}
         onAnswer={answerShare} onWithdraw={withdrawShare} onClose={() => setSharePick(null)} />
+      <NotMineSheet open={notMineOrder !== null} orderId={notMineOrder} readOnly={readOnlyView} load={loadNotMine} onSend={sendNotMine}
+        onOpenRequest={r => { notMines.put(r); setNotMineOrder(null); setNotMinePick(r.id); }} onClose={() => setNotMineOrder(null)} />
+      <NotMineRequestSheet open={notMinePick !== null} request={notMinePickVM} readOnly={readOnlyView}
+        error={notMinePick && !notMinePickVM ? notMines.error ?? (notMines.list ? "That request is not there any more." : null) : null}
+        onWithdraw={withdrawNotMine} onClose={() => setNotMinePick(null)} />
     </div>
   );
 

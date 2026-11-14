@@ -30,6 +30,7 @@ import { fetchMemberCrmUnread } from "./chat-badge-actions";
 import { fetchMemberNotices } from "./bell-actions";
 import { fetchItDesk, fetchMyItRequests } from "./it-actions";
 import { fetchShareRequests } from "./share-actions";
+import { fetchNotMineRequests } from "./not-mine-actions";
 
 /** One of the Revenue app's reads, named by the action it calls. */
 export type MemberRead =
@@ -66,7 +67,9 @@ export type MemberRead =
   | { kind: "itMine" }
   | { kind: "itDesk" }
   // Share order (2026-10-21): the share requests one sent and was sent — or, View as, the viewed member's.
-  | { kind: "shareRequests"; context?: MemberReadContext };
+  | { kind: "shareRequests"; context?: MemberReadContext }
+  // Not my order (2026-11-14): the requests one sent — or, View as, the viewed member's.
+  | { kind: "notMineRequests"; context?: MemberReadContext };
 
 /** A read's answer, or the message of what it threw — the client rejects that read alone. */
 export type MemberReadSlot = { value: unknown } | { thrown: string };
@@ -122,6 +125,7 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "itMine": return fetchMyItRequests();
     case "itDesk": return fetchItDesk();
     case "shareRequests": return fetchShareRequests(read.context);
+    case "notMineRequests": return fetchNotMineRequests(read.context);
     default: return Promise.reject(new Error("Unknown read."));
   }
 }
