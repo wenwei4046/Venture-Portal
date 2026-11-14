@@ -35,6 +35,8 @@ import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import ShareRequestsPanel from './_components/ShareRequestsPanel'
 import { shareRequestsFromRow, type ShareRequest } from '@/lib/member/share-requests'
+import NotMineRequestsPanel from './_components/NotMineRequestsPanel'
+import { notMineRequestsFromRow, type NotMineRequest } from '@/lib/member/not-mine-requests'
 import SellerChecksPanel from './_components/SellerChecksPanel'
 import { isWaiting, sellerChecksFromRow, type SellerCheck } from '@/lib/commission/seller-checks'
 import { canDo } from '@/lib/permission-actions'
@@ -245,6 +247,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       ? { requests: [] as ShareRequest[], unavailable: error.message }
       : { requests: shareRequestsFromRow(data), unavailable: null }))
     .catch((err: unknown) => ({ requests: [] as ShareRequest[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
+  // Not my order (2026-11-14): the salespeople's requests that a bill of this month is not theirs — HR approves or rejects
+  // them on the same tab. Read softly, as the share requests.
+  const notMineRead = once(supabase.rpc('revenue_not_mine_requests', { p_sub_department: subDept.id, p_period: period }))
+    .then(({ data, error }) => (error
+      ? { requests: [] as NotMineRequest[], unavailable: error.message }
+      : { requests: notMineRequestsFromRow(data), unavailable: null }))
+    .catch((err: unknown) => ({ requests: [] as NotMineRequest[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
   // Whose sale (2026-10-31): the month's bills the feed held because their paper is on another salesperson's order.
   // Read softly, as the requests.
   const sellerChecksRead = once(supabase.rpc('revenue_seller_checks', { p_sub_department: subDept.id, p_period: period }))
@@ -517,7 +526,18 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       canDecide={canDo(acting, 'revenue', 'edit')} basePath={revenuePath(subDept.slug)}
       returnTo={`${revenuePath(subDept.slug, period)}?view=requests`} period={period} />
   )
+  // Not my order (2026-11-14): first on the tab — each waits for HR (Approve = Don't count this bill, in HR's name).
+  const notMine = await notMineRead
+  const requestsPanel = (
+    <div key="requests" className="flex flex-col gap-8">
+      <NotMineRequestsPanel requests={notMine.requests} unavailable={notMine.unavailable}
+        canDecide={canDo(acting, 'revenue', 'edit')} basePath={revenuePath(subDept.slug)}
+        returnTo={`${revenuePath(subDept.slug, period)}?view=requests`} period={period} />
+      {shareRequestsPanel}
+    </div>
+  )
   const requestsWaiting = shareRequests.requests.filter(q => q.status === 'hr').length
+    + notMine.requests.filter(q => q.status === 'hr').length
   // Whose sale: what waits is a held bill nobody answered — Revenue · Edit on this page's tab answers it.
   const sellerChecks = await sellerChecksRead
   const sellerChecksPanel = (
@@ -607,7 +627,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           changes: { panel: erpChangesPanel, count: changesWaiting },
           claims: doubleClaimPanel ? { panel: doubleClaimPanel, count: claimsWaiting } : undefined,
           sellers: { panel: sellerChecksPanel, count: sellersWaiting },
-          requests: { panel: shareRequestsPanel, count: requestsWaiting },
+          requests: { panel: requestsPanel, count: requestsWaiting },
         }}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: sales.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}

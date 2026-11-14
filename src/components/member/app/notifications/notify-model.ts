@@ -17,6 +17,8 @@ export type NotifGo =
   | { to: "it"; requestId: string }
   // Share order (2026-10-21): a bill shared with them to accept, or news of one — its request's sheet.
   | { to: "share"; requestId: string }
+  // Not my order (2026-11-14): HR approved or rejected one's request — its sheet.
+  | { to: "notMine"; requestId: string }
   | { to: "none" };
 
 export interface NotifItem {
@@ -172,6 +174,14 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
       items.push({
         id: `nt-${n.id}`, kind: "share", tab: "updates", icon: ICON.share, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
         unread: !n.read, big: null, link: "Open share request", done: null, go: { to: "share", requestId: n.refId },
+      });
+      continue;
+    }
+    // Not my order (2026-11-14): HR's answer to one's own request — a request update, opening that request.
+    if (n.refKind === "not_mine_request") {
+      items.push({
+        id: `nt-${n.id}`, kind: "req", tab: "requests", icon: ICON.notMine, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
+        unread: !n.read, big: null, link: "Open request", done: null, go: { to: "notMine", requestId: n.refId },
       });
       continue;
     }

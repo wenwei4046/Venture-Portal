@@ -467,6 +467,25 @@ BEGIN
 END
 $fn$;
 
+-- The guard the scan reads (tab-write-guards.test.ts): the decision asks the month's page in the database, as the app's gate
+-- in front of it does (requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')). The body above carries it already;
+-- this only checks it is there.
+CREATE OR REPLACE FUNCTION pg_temp.tab_guard(p_sig text, p_pages text, p_wants text[])
+RETURNS void
+LANGUAGE plpgsql AS $g$
+DECLARE
+  v_line text := format('PERFORM public.tab_write_guard(%s, ARRAY[%s]);', p_pages,
+    array_to_string(ARRAY(SELECT quote_literal(w) FROM unnest(p_wants) w), ', '));
+BEGIN
+  IF position(v_line IN (SELECT prosrc FROM pg_proc WHERE oid = p_sig::regprocedure)) = 0 THEN
+    RAISE EXCEPTION '% does not ask its page: % is not in its body', p_sig, v_line;
+  END IF;
+END
+$g$;
+
+SELECT pg_temp.tab_guard('public.revenue_not_mine_decide(uuid, boolean, text)',
+  $$ARRAY['/revenue/[sub]/[period]']$$, ARRAY['revenue.edit']);
+
 REVOKE ALL ON FUNCTION public.member_not_mine_context(uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.member_not_mine_send(uuid, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.member_not_mine_cancel(uuid) FROM PUBLIC, anon;
