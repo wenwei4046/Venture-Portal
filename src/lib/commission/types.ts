@@ -82,6 +82,11 @@ export interface SalesLine {
    */
   specialMoney?: Readonly<Record<string, number>>
   /**
+   * The base model of the line's SKU on its brand's own SKU master (`erp_products.base_model`, 2026-11-14) — how a
+   * brand's own model item is found. Loaded for the bills of a brand with a model item; absent = none.
+   */
+  model?: string
+  /**
    * The one line of an upsale HR recorded by hand (`comm_upsales`, 2026-09-24).
    * Always commissionable whatever the scheme's item groups say, never a KPI
    * item, and never part of a margin — it carries no cost and it is not goods
