@@ -217,7 +217,7 @@ export function channelsVM(ctx: DeskCtx) {
       const pageRow = (p: (typeof pages)[number]) => ({ id: p.id, title: `Facebook · ${p.name}`, sub: `Messenger · Page ${p.id.length > 8 ? `${p.id.slice(0, 4)}…${p.id.slice(-4)}` : p.id}`, linked: p.on,
         act: p.on ? () => patch({ chTab: "page" }) : () => setLink("page", p.id, p.name, true, false, `${p.name} linked · its chats come into Inbox`), actLabel: p.on ? "Manage" : "Link",
         // Two switches (2026-11-14, the owner: "分成两个开关"): the Page's Messenger chats (kind 'page') and its Instant Form
-        // leads (kind 'form', mig 20261114120000) come into the CRM apart. Off asks first; on goes at once. CRM · Manage.
+        // leads (kind 'form', mig 20261114142712) come into the CRM apart. Off asks first; on goes at once. CRM · Manage.
         switches: ([["page", "Messenger chats", p.on], ["form", "Instant Form leads", isLinked("form", p.id)]] as const).map(([k, label, on]) => ({
           label, on, can,
           toggle: () => { if (!can) return; if (on) patch({ chDlg: { kind: "unlink", id: `${k}:${p.id}` } });

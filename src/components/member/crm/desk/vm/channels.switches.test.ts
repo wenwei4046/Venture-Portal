@@ -1,5 +1,5 @@
 // Channels › Connections: a Page's two switches (2026-11-14 — the owner: "如果我现在不想要让messanger 的客户进来crm",
-// then "分成两个开关"). Messenger chats are kind 'page', Instant Form leads kind 'form' (mig 20261114120000); turning
+// then "分成两个开关"). Messenger chats are kind 'page', Instant Form leads kind 'form' (mig 20261114142712); turning
 // one off asks first and touches only its own kind; turning one on goes at once.
 import { describe, expect, it, vi } from "vitest";
 import type { MetaChannels } from "@/app/(member)/member/crm-channels-actions";
