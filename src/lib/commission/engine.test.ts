@@ -2507,7 +2507,7 @@ describe('a brand with its own scheme — 2990s (2026-11-11)', () => {
         const rs = find(r.statements, 'rs')
         // 5,000 commissionable − the Boaat's 3,000 (its corner is the model's) = 2,000 at 4%; RM 40 + the delivery's RM 5.
         expect([rs.productRevenue, rs.productCommission, rs.kpiCommission, rs.totalCommission]).toEqual([2_000, 80, 45, 125])
-        expect(rs.lines.filter(l => l.component === 'kpi_item').map(l => [l.basisAmount, l.qty, l.amount]).sort((a, b) => b[0] - a[0]))
+        expect(rs.lines.filter(l => l.component === 'kpi_item').map(l => [l.basisAmount ?? 0, l.qty ?? 0, l.amount]).sort((a, b) => b[0] - a[0]))
           .toEqual([[3_000, 1, 40], [0, 1, 5]])
         expect(find(r.statements, 'ta').lines.find(l => l.component === 'override')).toMatchObject({ basisAmount: 2_000, amount: 40 })
       })
