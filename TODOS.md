@@ -137,17 +137,24 @@ Shipped: the items, the run, Comm Cal's month and bill page
 (`.claude/rules/revenue/comm-cal.md` › 2990s' OWN KPI ITEMS), the Revenue
 app's KPI readings (`revenue-app.md` › 2990s' OWN KPI ITEMS COUNT IN THE APP),
 Rules › KPI items editing a brand's items (`comm-cal.md` › A BRAND'S OWN
-KPI ITEMS ARE EDITED ON RULES), an item's cost a unit — what comes off the
-bill (`comm-cal.md` › A BRAND'S KPI ITEM HAS A COST) and, since 2026-11-14,
-only that cost — a corner sofa's its corner cost (`comm-cal.md` › A BRAND'S
-KPI ITEM TAKES OFF ONLY ITS COST), and My team's KPI hit and the
-Championship's threshold reading Fair's own units (`revenue-app.md` › ONE
-FIGURE, TWO LADDERS — live from 2026-11-13, when the owner switched Fair's
-KPI on; split 2026-11-14). Still owed:
+KPI ITEMS ARE EDITED ON RULES), items of every kind picked as Fair's — a SKU,
+a model, a compartment, a special, a fabric series — what the bill charged
+coming off, no cost (`comm-cal.md` › 2990s' OWN KPI ITEMS ARE PICKED AS
+FAIR'S, 2026-11-14, which ended the cost and corner cost of 2026-11-13 / -14),
+and My team's KPI hit and the Championship's threshold reading Fair's own
+units (`revenue-app.md` › ONE FIGURE, TWO LADDERS — live from 2026-11-13, when
+the owner switched Fair's KPI on; split 2026-11-14). Still owed:
 - **A brand's item cannot be renamed in place.** The writer keeps an item's
-  name through a change; Rules renames by taking the item off and adding its
-  special again under the new name, in one Save. A rename of its own needs
+  name through a change; Rules renames by taking the item off and adding it
+  again under the new name, in one Save. A rename of its own needs
   `catalogue_save_kpi_items` to take a change's `label`.
+- **The two dead cost columns.** `comm_kpi_items.cost_amount` and
+  `corner_cost_amount` (with `kpi_item_cost_in_range`, `kpi_item_cost_is_a_brands`,
+  `kpi_item_corner_cost_in_range`, `kpi_item_corner_cost_is_a_brands`) are no
+  longer read or written since `20261114230000` and are NULL everywhere; they
+  stayed because the build before it still named them. Drop them in a
+  migration of their own once nothing deployed reads them (`KPI_ITEM_COLUMNS`
+  no longer does).
 - **The app's Commission scheme sheet says nothing of a brand on its own
   scheme.** Profile › Commission scheme lists the member's rate and each
   brand's margin ladder. For 2990s it should say the rate their rung pays on a

@@ -36,7 +36,10 @@ import {
   ownSchemesOf,
   round2,
 } from './engine'
-import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, toUnitTiers, type FabricSeriesRow } from './kpi'
+import {
+  EMPTY_FABRIC_SERIES, indexFabricFamilies, indexFabricSeries, isKpiItemPool, isKpiOptionPool, lineKpiFactsOf, toUnitTiers,
+  type FabricSeriesRow, type KpiItemPool,
+} from './kpi'
 import { isOldBillDate } from './row-origin'
 import { gwpFreeParts, type GwpRule } from '@/lib/catalogue/gwp'
 import type {
@@ -112,6 +115,23 @@ export interface BrandRow {
   own_scheme?: boolean | null
   /** Switched off, it is no brand of its own scheme (as the database reads it). Absent in older fixtures = on. */
   is_active?: boolean | null
+  /**
+   * The ERP company whose every bill is this brand's (2990s: 2; 2026-11-14): its own SKU master and fabric list are
+   * what its own KPI items are found on. Absent / null = the ERP's first.
+   */
+  erp_company_id?: number | string | null
+}
+
+/**
+ * A SKU of a brand's own SKU master and its base model (`erp_products`, 2026-11-14): what a brand's own model item is
+ * found by. Read for the bills of a brand with a model item.
+ */
+export interface BrandSkuModelRow {
+  erp_company_id: number | string
+  item_code: string
+  base_model: string | null
+  erp_id?: string | null
+  removed_at?: string | null
 }
 
 /**
@@ -156,10 +176,6 @@ export interface KpiItemRow {
   brand_id?: string | null
   /** A brand's own item alone: `[{min_qty, amount}]` — what a unit pays once the month's units reach a tier. */
   unit_tiers?: unknown
-  /** A brand's own item alone (2026-11-13): RM a unit taken off the bill; null / absent = what the bill charged. */
-  cost_amount?: Num | null
-  /** A brand's own item alone (2026-11-14): RM a unit taken off the bill of a sofa with a corner; null / absent = its cost. */
-  corner_cost_amount?: Num | null
 }
 
 /** A SKU's own cost ratio (`comm_cost_ratios`, Product List › Costing Setting). */
@@ -338,9 +354,13 @@ export interface RunSourceRows {
   gwp?: GwpRow[]
   /**
    * The ERP's fabric list (`erp_fabrics`), read only while a KPI item is a
-   * fabric series (2026-10-29). Absent = no line's fabric has a series.
+   * fabric series (2026-10-29). Absent = no line's fabric has a series. Rows of
+   * another company (`erp_company_id`, 2026-11-14) are a brand's own: its bills'
+   * fabrics are read on its own company's list (`indexFabricFamilies`).
    */
   fabrics?: FabricSeriesRow[]
+  /** The base models of the SKUs on the bills of a brand with a model item (2026-11-14). Absent = none. */
+  brandSkuModels?: BrandSkuModelRow[]
   /**
    * Who among the sellers holds a title that heads the department
    * (`titles.is_department_head`). Absent = nobody.
@@ -407,26 +427,22 @@ export function toKpiItems(rows: readonly KpiItemRow[], ownBrands: ReadonlyMap<s
   return rows.flatMap((k): KpiItem[] => {
     const kpiAmount = num(k.kpi_amount)
     const label = k.product_name ?? null
-    // A brand's own item (2026-11-12): its brand's code, its tiers, its cost and its corner cost (2026-11-14).
-    // One whose brand is not on its own scheme — switched off, or no longer on
-    // it — is found on no bill: never read as the sub-department's own.
-    let brand: Pick<KpiItem, 'brandCode' | 'unitTiers' | 'cost' | 'cornerCost'> = {}
+    // A brand's own item (2026-11-12): its brand's code and its tiers. One whose brand is not on its own scheme —
+    // switched off, or no longer on it — is found on no bill: never read as the sub-department's own.
+    let brand: Pick<KpiItem, 'brandCode' | 'unitTiers'> = {}
     if (k.brand_id) {
       const brandCode = ownBrands.get(k.brand_id) ?? ownBrands.get(k.brand_id.toLowerCase())
       if (!brandCode) return []
       const unitTiers = toUnitTiers(k.unit_tiers)
-      const cost = k.cost_amount === null || k.cost_amount === undefined ? 0 : num(k.cost_amount)
-      const cornerCost = k.corner_cost_amount === null || k.corner_cost_amount === undefined ? 0 : num(k.corner_cost_amount)
-      brand = {
-        brandCode, ...(unitTiers.length > 0 ? { unitTiers } : {}), ...(cost > 0 ? { cost } : {}),
-        ...(cornerCost > 0 ? { cornerCost } : {}),
-      }
+      brand = { brandCode, ...(unitTiers.length > 0 ? { unitTiers } : {}) }
     }
     if ((k.source ?? 'sku') === 'sku') {
       return k.product_code ? [{ source: 'sku', productCode: k.product_code, label, kpiAmount, ...brand }] : []
     }
-    return k.option_pool && isKpiOptionPool(k.option_pool) && k.option_value
-      ? [{ source: 'option', optionPool: k.option_pool, optionValue: k.option_value, label, kpiAmount, ...brand }]
+    // A model or a compartment (2026-11-14) is a brand's own alone (`kpi_item_pool_is_a_brands`).
+    const pool = k.option_pool
+    return pool && k.option_value && (isKpiOptionPool(pool) || (k.brand_id && isKpiItemPool(pool)))
+      ? [{ source: 'option', optionPool: pool as KpiItemPool, optionValue: k.option_value, label, kpiAmount, ...brand }]
       : []
   })
 }
@@ -463,6 +479,71 @@ export function specialMoneyByLine(rows: readonly SpecialMoneyRow[] | undefined)
   return byLine
 }
 
+/** How the lines of one bill are read for KPI items (`kpiLineReaders`). */
+export interface KpiLineReaders {
+  /** The ERP company of a bill of a brand on its own scheme (2990s: 2); null for every other bill. */
+  companyOf(brandCode: string | null | undefined): number | null
+  /** A line's specials and fabric series, on its bill's company's fabric list. */
+  factsOf(
+    line: { item_group: string | null | undefined; description2?: string | null; variants?: unknown },
+    company: number | null,
+  ): { specials?: string[]; fabricSeries?: string }
+  /** The base model of a SKU on a brand's own SKU master, if it has one. */
+  modelOf(company: number | null, productCode: string | null | undefined): string | undefined
+}
+
+const companyNumber = (value: number | string | null | undefined): number => {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : 1
+}
+
+/**
+ * How a bill's lines are read for KPI items (2026-11-14). A bill of a brand on its own scheme (2990s) reads its
+ * fabrics on its own company's list — a fabric with no series in its code's family (`brandFabricSeriesOf`) — and its
+ * SKUs' base models on its own SKU master; every other bill reads the ERP's first list, as before. The twin of
+ * `comm_kpi_hits`' series and brand_series.
+ */
+export function kpiLineReaders(
+  brands: readonly BrandRow[] | undefined,
+  fabrics: readonly FabricSeriesRow[] | undefined,
+  skuModels: readonly BrandSkuModelRow[] | undefined,
+): KpiLineReaders {
+  const companies = new Map((brands ?? []).flatMap(b => {
+    const code = (b.code ?? '').trim().toUpperCase()
+    return b.own_scheme && b.is_active !== false && code ? [[code, companyNumber(b.erp_company_id)] as const] : []
+  }))
+  const rows = fabrics ?? []
+  const own = rows.length > 0 ? indexFabricSeries(rows.filter(r => companyNumber(r.erp_company_id) === 1)) : EMPTY_FABRIC_SERIES
+  const families = new Map<number, ReturnType<typeof indexFabricFamilies>>()
+  const familiesOf = (company: number) => {
+    const held = families.get(company)
+    if (held) return held
+    const made = indexFabricFamilies(rows.filter(r => companyNumber(r.erp_company_id) === company))
+    families.set(company, made)
+    return made
+  }
+  // A code's base model: a live SKU's first, then the first by its id (`comm_kpi_hits`' brand_lines).
+  const models = new Map<string, BrandSkuModelRow>()
+  for (const row of skuModels ?? []) {
+    if (!(row.base_model ?? '').trim()) continue
+    const key = `${companyNumber(row.erp_company_id)}\u0000${(row.item_code ?? '').trim().toUpperCase()}`
+    const held = models.get(key)
+    const better = !held
+      || (held.removed_at && !row.removed_at)
+      || (!held.removed_at === !row.removed_at && String(row.erp_id ?? '') < String(held.erp_id ?? ''))
+    if (better) models.set(key, row)
+  }
+  return {
+    companyOf: brandCode => companies.get((brandCode ?? '').trim().toUpperCase()) ?? null,
+    factsOf: (line, company) => company === null
+      ? lineKpiFactsOf(line.item_group, line.description2, line.variants, own)
+      : lineKpiFactsOf(line.item_group, line.description2, line.variants, EMPTY_FABRIC_SERIES, familiesOf(company)),
+    modelOf: (company, productCode) => company === null
+      ? undefined
+      : models.get(`${company}\u0000${(productCode ?? '').trim().toUpperCase()}`)?.base_model?.trim() || undefined,
+  }
+}
+
 /**
  * A rank's rates for the brands with their own scheme, as the engine reads
  * them: `comm_rank_defs.brand_rates` is keyed by the brand's id (a brand may be
@@ -485,9 +566,9 @@ export function toBrandRates(raw: unknown, ownBrands: ReadonlyMap<string, string
 export function toEngineInput(rows: RunSourceRows): EngineInput {
   const released = new Set(rows.releasedOrderNos)
   // (2026-11-07) An old bill topped up: commission only.
-  // A bed frame's or a sofa's specials and fabric series — how an option KPI item is found.
-  const fabrics = rows.fabrics?.length ? indexFabricSeries(rows.fabrics) : EMPTY_FABRIC_SERIES
-  const lineFacts = (l: SalesLineRow) => lineKpiFactsOf(l.item_group, l.description2, l.variants, fabrics)
+  // A bed frame's or a sofa's specials and fabric series — how an option KPI item is found; a brand's bill's on its
+  // own company's list, with its SKUs' base models (2026-11-14).
+  const readers = kpiLineReaders(rows.brands, rows.fabrics, rows.brandSkuModels)
   // (2026-11-11) The brands that follow their own scheme — 2990s.
   const ownBrands = ownSchemeBrandsOf(rows.brands)
 
@@ -573,7 +654,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
   // and the import wizard are where that gets resolved, loudly.
   const wholeOrders: SalesOrder[] = rows.orders
     .filter(o => o.staff_id !== null)
-    .map(o => ({
+    .map(o => ({ o, company: readers.companyOf(o.brand_code) }))
+    .map(({ o, company }) => ({
       id: o.id,
       orderNo: o.order_no,
       staffId: o.staff_id as string,
@@ -603,8 +685,9 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         costAmount: numOrNull(l.cost_amount) ?? undefined,
         // Only when there is one: a line without a charge reads exactly as it always has.
         ...(numOrNull(l.option_charge_amount) ? { optionCharge: numOrNull(l.option_charge_amount)! } : {}),
-        ...lineFacts(l),
+        ...readers.factsOf(l, company),
         ...(specialMoney.has(l.id) ? { specialMoney: specialMoney.get(l.id)! } : {}),
+        ...(readers.modelOf(company, l.product_code) ? { model: readers.modelOf(company, l.product_code)! } : {}),
       })),
     }))
     // A gift with purchase (Product List › GWP, 2026-11-08), worked out on the whole bill before it is shared.
