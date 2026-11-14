@@ -142,6 +142,8 @@ export interface KpiItemRow {
   unit_tiers?: unknown
   /** A brand's own item alone (2026-11-13): RM a unit taken off the bill; null = what the bill's special order charges. */
   cost_amount?: number | string | null
+  /** A brand's own item alone (2026-11-14): RM a unit taken off the bill of a sofa with a corner; null = its cost. */
+  corner_cost_amount?: number | string | null
 }
 
 /** A special of the Bedframe or Sofa Maintenance pool — what Rules › KPI items picks from. */

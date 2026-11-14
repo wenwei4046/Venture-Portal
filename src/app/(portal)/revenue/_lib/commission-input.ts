@@ -67,10 +67,10 @@ async function readByKeys<T>(
 
 /**
  * A KPI item is a SKU, a Maintenance special (2026-09-27) or a fabric series (2026-10-29) — the sub-department's
- * own, or (brand_id, unit_tiers, cost_amount) a brand's own on its own commission scheme (2026-11-12; its cost
- * 2026-11-13).
+ * own, or (brand_id, unit_tiers, cost_amount, corner_cost_amount) a brand's own on its own commission scheme
+ * (2026-11-12; its cost 2026-11-13, its corner cost 2026-11-14).
  */
-const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers, cost_amount'
+const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount, brand_id, unit_tiers, cost_amount, corner_cost_amount'
 
 function periodEnd(period: string): string {
   if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(period)) {

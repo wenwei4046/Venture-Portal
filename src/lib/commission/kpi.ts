@@ -51,10 +51,14 @@
  * the whole bill's commission and the bonus: "i need a place at kpi item rules
  * set there fill in cost, so that it can dedecut the cost out and change to kpi
  * amount only"; a brand on its own scheme has no Product List to price an
- * upgrade on) — or what the bill charged for the special when that is more
- * (`KpiLine.specialMoney`: the ERP's special order on the line; a corner sofa
- * charged double) — "升级的钱只拿 bonus". An item with no cost takes off what
- * the bill charged alone, nothing where it charges nothing. What is PAID is the
+ * upgrade on) — and ONLY that cost, whatever the bill charged (2026-11-14, the
+ * user: "only follow the cost set in venture"; until then what the bill charged
+ * when that was more). A sofa with a CORNER — a piece of that model on the bill
+ * whose module is CNR — takes the item's corner cost instead when it has one
+ * (`KpiItem.cornerCost`; the user: "yes need to be corner as well, if that is a
+ * compartment of corner sofa"). An item with no cost takes off what the bill
+ * charged for the special (`KpiLine.specialMoney`: the ERP's special order on
+ * the line), nothing where it charges nothing. What is PAID is the
  * item's amount a unit — or its tier's, by the month's units (`kpiUnitPay`:
  * 1–4 RM 50, 5–9 RM 70 → six are 6 × 70). Counted once per sofa SET, as a
  * fabric series is. Paid whatever the sub-department's own KPI switch says.
@@ -68,8 +72,13 @@
  *     main   2,990 × 4% = 119.60
  *     KPI    RM 50                    → RM 169.60   (RM 189.60 with no cost)
  *
+ *   RM 6,500 corner sofa (2A + CNR + 2A) with Latex Seat charged RM 1,000,
+ *   cost RM 500, corner cost RM 1,000, rate 4%, bonus RM 50
+ *     main   5,500 × 4% = 220.00
+ *     KPI    RM 50                    → RM 270.00   (RM 290.00 with no corner cost: RM 500 off)
+ *
  * The twin of the SQL in migrations 20260927050000, 20261030010000,
- * 20261112200000, 20261114030000 and 20261114040000 (`comm_kpi_hits`); the run, the month page, the member app
+ * 20261112200000, 20261114030000, 20261114040000 and 20261114100000 (`comm_kpi_hits`); the run, the month page, the member app
  * and the calculator must find the same items. The calculator's cart names no
  * fabric, so a quote finds no fabric series.
  */
@@ -128,7 +137,7 @@ export interface KpiItem {
   /**
    * RM per unit — taken off the bill and paid as the KPI allowance. A brand's
    * own item: what a unit PAYS below its first tier (what comes off the bill is
-   * what the bill charged).
+   * its cost — `kpiUnitOffBy`).
    */
   kpiAmount: number
   /**
@@ -143,28 +152,74 @@ export interface KpiItem {
    * A brand's own item alone (2026-11-13, `comm_kpi_items.cost_amount`): RM a
    * unit taken OFF the bill's commissionable sales — the upgrade's price, set on
    * Rules › KPI items, whatever the bill's special order says of it (its price
-   * is sometimes written in the remark). A special order charging MORE takes
-   * that off instead (`kpiUnitOff`). Absent, null or 0 = no cost: what the
-   * special order charges alone.
+   * is sometimes written in the remark; 2026-11-14, the user: "only follow the
+   * cost set in venture" — a special order charging more no longer takes the
+   * more off). Absent, null or 0 = no cost: what the special order charges.
    */
   cost?: number | null
+  /**
+   * A brand's own item alone (2026-11-14, `comm_kpi_items.corner_cost_amount`;
+   * the user: "yes need to be corner as well, if that is a compartment of corner
+   * sofa"): RM a unit taken off the bill of a sofa with a CORNER — a piece of
+   * that model on the bill whose module is CNR (`isCornerCode`). Absent, null or
+   * 0 = its cost, as any sofa's.
+   */
+  cornerCost?: number | null
+}
+
+/** A positive amount, else 0 (none set). */
+function setAmount(value: number | null | undefined): number {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) && n > 0 ? n : 0
 }
 
 /** A brand's own item's cost a unit; 0 = none set. */
 export function kpiItemCost(item: Pick<KpiItem, 'cost'>): number {
-  const cost = Number(item.cost ?? 0)
-  return Number.isFinite(cost) && cost > 0 ? cost : 0
+  return setAmount(item.cost)
+}
+
+/** A brand's own item's cost a unit on a sofa with a corner; 0 = none set (its cost then). */
+export function kpiItemCornerCost(item: Pick<KpiItem, 'cornerCost'>): number {
+  return setAmount(item.cornerCost)
+}
+
+/** What took a brand's own item off its bill: its cost, its corner cost, or what the bill charged (no cost set). */
+export type KpiOffBy = 'cost' | 'corner' | 'charged'
+
+/**
+ * What a unit of a brand's own item takes off its bill, and by what
+ * (2026-11-14 — the user: "only follow the cost set in venture"): on a sofa
+ * with a corner its corner cost when it has one, else its cost when it has one
+ * — whatever the bill charged, so a bill charging more earns its commission on
+ * the rest; an item with no cost, what the bill's special order charges for it
+ * (nothing where it charges nothing). The twin of `comm_kpi_hits`' COALESCE.
+ */
+export function kpiUnitOffBy(
+  item: Pick<KpiItem, 'cost' | 'cornerCost'>, charged: number, corner = false,
+): { amount: number; by: KpiOffBy } {
+  const cornerCost = corner ? kpiItemCornerCost(item) : 0
+  if (cornerCost > 0) return { amount: cornerCost, by: 'corner' }
+  const cost = kpiItemCost(item)
+  if (cost > 0) return { amount: cost, by: 'cost' }
+  return { amount: charged > 0 ? charged : 0, by: 'charged' }
+}
+
+/** What a unit of a brand's own item takes off its bill (`kpiUnitOffBy`'s amount). */
+export function kpiUnitOff(item: Pick<KpiItem, 'cost' | 'cornerCost'>, charged: number, corner = false): number {
+  return kpiUnitOffBy(item, charged, corner).amount
 }
 
 /**
- * What a unit of a brand's own item takes off its bill: the item's cost, or
- * what the bill's special order charges for it when that is more — never less
- * than the rule says, so an amount left empty or typed short pays no commission
- * on the upgrade's money (补钱容易、扣钱难), and a dearer one (a corner sofa's)
- * is taken off whole. The twin of `comm_kpi_hits`' GREATEST.
+ * A sofa piece's module, as the costing reads a piece (`catalogue_apply_sofa_charges`): its code after its last '-',
+ * no spaces, before its brackets — BOOQIT-CNR → CNR, XAMMAR-CNR (P) → CNR, 8030-2A(LHF) → 2A.
  */
-export function kpiUnitOff(item: Pick<KpiItem, 'cost'>, charged: number): number {
-  return Math.max(charged > 0 ? charged : 0, kpiItemCost(item))
+export function sofaModuleOf(code: string | null | undefined): string {
+  return kpiCodeKey(code).replace(/^.*-/, '').replace(/\s+/g, '').replace(/\(.*$/, '')
+}
+
+/** Whether a sofa piece is a corner: its module is CNR (`comm_kpi_hits`' corners). */
+export function isCornerCode(code: string | null | undefined): boolean {
+  return sofaModuleOf(code) === 'CNR'
 }
 
 /** A step of a brand's own item (`comm_kpi_items.unit_tiers`): from `minQty` units in a month EVERY unit pays `amount`. */
@@ -426,8 +481,8 @@ export interface KpiHit {
   qty: number
   /**
    * What it takes OFF the bill's commissionable sales: qty × the item's amount
-   * — a brand's own item, qty × its cost, or what the bill charged for it when
-   * that is more (`kpiUnitOff`).
+   * — a brand's own item, qty × its cost (its corner cost on a sofa with a
+   * corner), or what the bill charged for it when it has none (`kpiUnitOffBy`).
    */
   amount: number
   /**
@@ -436,6 +491,8 @@ export interface KpiHit {
    * its month's tier (`kpiUnitPay` — the run pays qty × that).
    */
   paid: number
+  /** A brand's own item alone: what took it off the bill — its cost, its corner cost, or what the bill charged. */
+  offBy?: KpiOffBy
 }
 
 /** A bill as far as finding its KPI items needs it. */
@@ -476,6 +533,8 @@ interface SofaSet {
   item: KpiItem
   itemKey: string
   lineId: string
+  /** The model (`sofaModelOf`) — what a corner piece is looked for by. */
+  model: string
   sum: number
   fewest: number
   /** A brand's own item: the dearest copy of what the set's special order charges for it. */
@@ -508,8 +567,9 @@ export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
   const perSet = new Map<string, SofaSet>()
   const intoSet = (line: KpiLine, item: KpiItem, charged = 0) => {
     const key = kpiItemKey(item)
-    const setKey = `${sofaModelOf(line)}\u0000${key}`
-    const set = perSet.get(setKey) ?? { item, itemKey: key, lineId: line.id, sum: 0, fewest: Infinity, charged: 0 }
+    const model = sofaModelOf(line)
+    const setKey = `${model}\u0000${key}`
+    const set = perSet.get(setKey) ?? { item, itemKey: key, lineId: line.id, model, sum: 0, fewest: Infinity, charged: 0 }
     set.sum += line.qty
     set.fewest = Math.min(set.fewest, Math.abs(line.qty))
     set.charged = Math.max(set.charged, charged)
@@ -565,6 +625,15 @@ export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
     }
   }
 
+  // The sofas with a corner (2026-11-14): a piece of that model on the bill whose module is CNR — whether or not the
+  // piece names the special. A model only (a code with nothing before its '-' is no sofa of a model).
+  const corners = new Set(order.lines.flatMap(line => {
+    const model = kpiCodeKey(line.productCode).split('-')[0]
+    return !line.upsale && line.qty !== 0 && model && kpiCodeKey(line.itemGroup) === 'SOFA' && isCornerCode(line.productCode)
+      ? [model]
+      : []
+  }))
+
   // A shared bill's part: its part of each unit counted once a bill or once a set.
   const part = billPartOf(order)
   for (const hit of perBill.values()) {
@@ -582,11 +651,12 @@ export function orderKpiHits(order: KpiOrder, index: KpiIndex): KpiHit[] {
       hits.push(own(set.item, set.lineId, qty))
       continue
     }
-    // A brand's own item: its cost — what the bill charged, when that is more — comes off its sales, the item's
-    // amount a unit is what it pays.
+    // A brand's own item: its cost — its corner cost on a sofa with a corner — comes off its sales, what the bill
+    // charged when it has none; the item's amount a unit is what it pays.
+    const off = kpiUnitOffBy(set.item, set.charged, corners.has(set.model))
     hits.push({
       item: set.item, itemKey: set.itemKey, lineId: set.lineId, qty,
-      amount: round2(qty * kpiUnitOff(set.item, set.charged)), paid: round2(qty * set.item.kpiAmount),
+      amount: round2(qty * off.amount), paid: round2(qty * set.item.kpiAmount), offBy: off.by,
     })
   }
   return hits

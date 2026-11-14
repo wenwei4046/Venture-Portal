@@ -21,10 +21,11 @@ import {
 const BRAND = '383ddd53-18fd-4dfd-b31e-57df4e1d42d9'
 const FABRIC_ID = '11111111-1111-4111-8111-111111111111'
 const LATEX_ID = '22222222-2222-4222-8222-222222222222'
-// Neither had a cost that day (the box came the same evening: what a unit takes off its bill).
-const FABRIC: BrandKpiListed = { id: FABRIC_ID, special: 'Sofa Full Fabric', name: 'Upgrade fabric', cost: null, amount: 50, tiers: [] }
+// Neither had a cost that day (the box came the same evening: what a unit takes off its bill), nor a corner cost (the
+// box came the next night).
+const FABRIC: BrandKpiListed = { id: FABRIC_ID, special: 'Sofa Full Fabric', name: 'Upgrade fabric', cost: null, cornerCost: null, amount: 50, tiers: [] }
 const LATEX: BrandKpiListed = {
-  id: LATEX_ID, special: 'Latex Seat', name: 'Upgrade latex seat', cost: null, amount: 50,
+  id: LATEX_ID, special: 'Latex Seat', name: 'Upgrade latex seat', cost: null, cornerCost: null, amount: 50,
   tiers: [{ minQty: 5, amount: 70 }, { minQty: 10, amount: 100 }],
 }
 const LISTED = [FABRIC, LATEX]
@@ -43,6 +44,14 @@ describe("a brand's KPI items as Rules lists them", () => {
     expect(bare).toEqual({ ...FABRIC, name: null })
     expect(brandKpiTitle(bare)).toBe('Sofa Full Fabric')
     expect(brandKpiTitle(FABRIC)).toBe('Upgrade fabric')
+  })
+
+  it('reads its corner cost a unit — none where the row has none, or nothing above 0 (2026-11-14)', () => {
+    const row = { id: LATEX_ID, option_value: 'Latex Seat', product_name: 'Upgrade latex seat', kpi_amount: 50 }
+    expect(toBrandKpiListed({ ...row, cost_amount: '500.00', corner_cost_amount: '1000.00' })).toMatchObject({ cost: 500, cornerCost: 1_000 })
+    for (const none of [null, undefined, 0, '0.00', '', 'abc', -5]) {
+      expect(toBrandKpiListed({ ...row, corner_cost_amount: none }).cornerCost).toBeNull()
+    }
   })
 
   it('reads its cost a unit — none where the row has none, or nothing above 0', () => {
@@ -120,7 +129,7 @@ describe('what counts as a change', () => {
     expect(brandKpiChanges(LISTED, draft({
       amounts: new Map([[FABRIC_ID, '55']]),
       removing: new Set([LATEX_ID]),
-      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: '', cost: '', amount: '30', tiers: [] }],
+      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: '', cost: '', cornerCost: '', amount: '30', tiers: [] }],
     }))).toBe(3)
   })
 
@@ -146,7 +155,7 @@ describe('the specials still to pick', () => {
 
   it('never one the ERP removed, one picked already, or a second spelling of one', () => {
     const pool = [...POOL, { value: 'Wooden Arm', removed: true }, { value: ' nylon  FABRIC ', removed: false }, { value: '  ', removed: false }]
-    const picked = draft({ added: [{ key: 'new:neylon fabric', special: 'Neylon Fabric', name: '', cost: '', amount: '', tiers: [] }] })
+    const picked = draft({ added: [{ key: 'new:neylon fabric', special: 'Neylon Fabric', name: '', cost: '', cornerCost: '', amount: '', tiers: [] }] })
     expect(specialsLeft(pool, LISTED, picked)).toEqual(['Nylon Fabric', 'Separate Backrest Packing'])
     // An item is matched to the pool whatever its spelling.
     expect(specialsLeft(POOL, [{ ...LATEX, special: 'LATEX  seat' }], EMPTY_BRAND_KPI_DRAFT)).not.toContain('Latex Seat')
@@ -218,14 +227,17 @@ describe('what a Save sends', () => {
   it("an added item goes under the brand: the special, its name when one was typed, its cost when one was, its bonus and its tiers", () => {
     const edit = brandKpiEditOf(BRAND, LISTED, draft({
       added: [
-        { key: 'new:nylon fabric', special: 'Nylon Fabric', name: ' Upgrade nylon ', cost: ' 125 ', amount: ' 30 ', tiers: [{ minQty: '5', amount: '40' }, { minQty: ' ', amount: '' }] },
-        { key: 'new:separate backrest packing', special: 'Separate Backrest Packing', name: '  ', cost: ' ', amount: '', tiers: [] },
+        {
+          key: 'new:nylon fabric', special: 'Nylon Fabric', name: ' Upgrade nylon ', cost: ' 125 ', cornerCost: ' 250 ', amount: ' 30 ',
+          tiers: [{ minQty: '5', amount: '40' }, { minQty: ' ', amount: '' }],
+        },
+        { key: 'new:separate backrest packing', special: 'Separate Backrest Packing', name: '  ', cost: ' ', cornerCost: '', amount: '', tiers: [] },
       ],
     }))
     expect(edit.adds).toEqual([
       {
         source: 'option', optionPool: 'sofa_specials', optionValue: 'Nylon Fabric', amount: '30', brandId: BRAND,
-        name: 'Upgrade nylon', tiers: [{ minQty: '5', amount: '40' }], label: 'Upgrade nylon', cost: '125',
+        name: 'Upgrade nylon', tiers: [{ minQty: '5', amount: '40' }], label: 'Upgrade nylon', cost: '125', cornerCost: '250',
       },
       {
         source: 'option', optionPool: 'sofa_specials', optionValue: 'Separate Backrest Packing', amount: null, brandId: BRAND,
@@ -239,17 +251,42 @@ describe('what a Save sends', () => {
   it('is what the database takes once checked', () => {
     const edit = brandKpiEditOf(BRAND, LISTED, draft({
       costs: new Map([[LATEX_ID, '500']]),
+      cornerCosts: new Map([[LATEX_ID, '1,000']]),
       amounts: new Map([[FABRIC_ID, '60']]),
       tiers: new Map([[LATEX_ID, [{ minQty: '5', amount: '70' }]]]),
-      added: [{ key: 'new:nylon fabric', special: 'Nylon Fabric', name: 'Upgrade nylon', cost: '125', amount: '30', tiers: [{ minQty: '3', amount: '40' }] }],
+      added: [{
+        key: 'new:nylon fabric', special: 'Nylon Fabric', name: 'Upgrade nylon', cost: '125', cornerCost: '250', amount: '30',
+        tiers: [{ minQty: '3', amount: '40' }],
+      }],
     }))
     expect(validateKpiItems(edit)).toEqual({
       adds: [{
         source: 'option', option_pool: 'sofa_specials', option_value: 'Nylon Fabric', kpi_amount: 30, brand_id: BRAND,
-        label: 'Upgrade nylon', unit_tiers: [{ min_qty: 3, amount: 40 }], cost_amount: 125,
+        label: 'Upgrade nylon', unit_tiers: [{ min_qty: 3, amount: 40 }], cost_amount: 125, corner_cost_amount: 250,
       }],
-      changes: [{ id: FABRIC_ID, kpi_amount: 60 }, { id: LATEX_ID, unit_tiers: [{ min_qty: 5, amount: 70 }], cost_amount: 500 }],
+      changes: [
+        { id: FABRIC_ID, kpi_amount: 60 },
+        { id: LATEX_ID, unit_tiers: [{ min_qty: 5, amount: 70 }], cost_amount: 500, corner_cost_amount: 1_000 },
+      ],
       removes: [],
     })
+  })
+
+  // 2026-11-14 — the user: "yes need to be corner as well, if that is a compartment of corner sofa".
+  it('sends a corner cost alone when it alone changed — emptied, none any more — and refuses one that is no amount', () => {
+    const costed = { ...LATEX, cost: 500, cornerCost: 1_000 }
+    const alone = brandKpiEditOf(BRAND, [costed], draft({ cornerCosts: new Map([[LATEX_ID, '1200']]) }))
+    expect(alone.changes).toEqual([{ id: LATEX_ID, cornerCost: '1200', label: 'Upgrade latex seat' }])
+    expect(validateKpiItems(alone).changes).toEqual([{ id: LATEX_ID, corner_cost_amount: 1_200 }])
+    const emptied = brandKpiEditOf(BRAND, [costed], draft({ cornerCosts: new Map([[LATEX_ID, ' ']]) }))
+    expect(emptied.changes).toEqual([{ id: LATEX_ID, cornerCost: null, label: 'Upgrade latex seat' }])
+    expect(validateKpiItems(emptied).changes).toEqual([{ id: LATEX_ID, corner_cost_amount: 0 }])
+    // The same figure typed again is no change.
+    expect(brandItemEdited(costed, draft({ cornerCosts: new Map([[LATEX_ID, '1,000.00']]) }))).toBe(false)
+    expect(brandKpiChanges([costed], draft({ cornerCosts: new Map([[LATEX_ID, '900']]) }))).toBe(1)
+    expect(() => validateKpiItems(brandKpiEditOf(BRAND, [costed], draft({ cornerCosts: new Map([[LATEX_ID, '-1']]) }))))
+      .toThrow(/Upgrade latex seat: a corner cost cannot be negative/)
+    expect(() => validateKpiItems(brandKpiEditOf(BRAND, [costed], draft({ cornerCosts: new Map([[LATEX_ID, '2,000,000']]) }))))
+      .toThrow(/Upgrade latex seat: a corner cost is at most RM 1,000,000 a unit/)
   })
 })

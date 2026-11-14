@@ -39,6 +39,8 @@ const NO_ITEMS: KpiItemRow[] = []
 const NO_SPECIALS: BrandKpiSpecialRow[] = []
 /** An item with no cost: what the bill's special order charges for it comes off the bill. */
 const NO_COST = 'As billed'
+/** An item with no corner cost: a sofa with a corner takes its cost. */
+const NO_CORNER = 'As cost'
 
 /**
  * The KPI items of the brands on their own commission scheme (2026-11-12 —
@@ -47,13 +49,16 @@ const NO_COST = 'As billed'
  * on its bills wherever the sofa names it — its cost a unit off the bill's
  * sales (2026-11-13, the user: "i need a place at kpi item rules set there fill
  * in cost, so that it can dedecut the cost out and change to kpi amount only";
- * what the bill charged when that is more, or when no cost is set), the bonus a
- * unit paid, at the tier the month's units reach. Paid whatever the
+ * ONLY the cost since 2026-11-14 — "only follow the cost set in venture" —
+ * what the bill charged when no cost is set), its corner cost off a sofa with a
+ * corner piece (2026-11-14: "yes need to be corner as well"), the bonus a unit
+ * paid, at the tier the month's units reach. Paid whatever the
  * sub-department's KPI switch says, so the head says *Always paid*.
  *
  * One block a brand, each with its own draft and its own Save (2026-11-13):
- * the cost or the bonus retyped, tiers added, retyped or dropped, an item
- * taken off, a special of the brand's pool added under a name of its own.
+ * the cost, the corner cost or the bonus retyped, tiers added, retyped or
+ * dropped, an item taken off, a special of the brand's pool added under a name
+ * of its own.
  * Whoever may not manage the rules reads the list — and sees a brand only once
  * it has an item.
  */
@@ -119,6 +124,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
   const [pick, setPick] = useState('')
   const [pickName, setPickName] = useState('')
   const [pickCost, setPickCost] = useState('')
+  const [pickCorner, setPickCorner] = useState('')
   const [pickAmount, setPickAmount] = useState('')
   const [pending, startSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -164,6 +170,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
     setNotice(null)
   }
   const setCost = (id: string, text: string) => update(d => ({ ...d, costs: new Map(d.costs).set(id, text) }))
+  const setCornerCost = (id: string, text: string) => update(d => ({ ...d, cornerCosts: new Map(d.cornerCosts).set(id, text) }))
   const setAmount = (id: string, text: string) => update(d => ({ ...d, amounts: new Map(d.amounts).set(id, text) }))
   const setTiers = (item: BrandKpiListed, change: (tiers: TierDraft[]) => TierDraft[]) =>
     update(d => ({ ...d, tiers: new Map(d.tiers).set(item.id, change([...(d.tiers.get(item.id) ?? tierDrafts(item.tiers))])) }))
@@ -181,11 +188,14 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
     if (!picked) return
     update(d => ({
       ...d,
-      added: [...d.added, { key: `new:${valueKey(picked)}`, special: picked, name: pickName, cost: pickCost, amount: pickAmount, tiers: [] }],
+      added: [...d.added, {
+        key: `new:${valueKey(picked)}`, special: picked, name: pickName, cost: pickCost, cornerCost: pickCorner, amount: pickAmount, tiers: [],
+      }],
     }))
     setPick('')
     setPickName('')
     setPickCost('')
+    setPickCorner('')
     setPickAmount('')
   }
   function cancel() {
@@ -199,7 +209,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
     try {
       validateKpiItems(edit)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Check the cost, the bonus and the tiers.')
+      setError(e instanceof Error ? e.message : 'Check the costs, the bonus and the tiers.')
       return
     }
     setError(null)
@@ -278,6 +288,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                 <th className="whitespace-nowrap">Counted</th>
                 {/* The two money headings may wrap: on a narrow screen the boxes set their columns' width, not the words. */}
                 <th className="right">Cost a unit · RM</th>
+                <th className="right">Corner cost · RM</th>
                 <th className="right">Bonus a unit · RM</th>
                 <th>By the month&apos;s units</th>
                 {canManage ? <th className="w-24 relative"><span className="sr-only">Remove</span></th> : null}
@@ -288,6 +299,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                 const title = brandKpiTitle(item)
                 const going = draft.removing.has(item.id)
                 const cost = draft.costs.get(item.id)
+                const cornerCost = draft.cornerCosts.get(item.id)
                 const amount = draft.amounts.get(item.id)
                 const tiers = draft.tiers.get(item.id)
                 // Said only when known: a pool that could not be read names nothing gone.
@@ -319,6 +331,23 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                           placeholder={NO_COST}
                           aria-label={`${title} cost a unit`}
                           className={`${INPUT} w-24 text-right tabular-nums ${cost !== undefined && costDiffers(cost, item.cost) ? CHANGED : ''}`}
+                        />
+                      )}
+                    </td>
+                    <td className="num">
+                      {!canManage || going ? (
+                        <span className={going ? 'line-through' : undefined}>
+                          {item.cornerCost === null ? NO_CORNER : formatMoneyBare(item.cornerCost)}
+                        </span>
+                      ) : (
+                        <input
+                          value={cornerCost ?? (item.cornerCost === null ? '' : String(item.cornerCost))}
+                          onChange={e => setCornerCost(item.id, e.target.value)}
+                          disabled={saving}
+                          inputMode="decimal"
+                          placeholder={NO_CORNER}
+                          aria-label={`${title} corner cost a unit`}
+                          className={`${INPUT} w-24 text-right tabular-nums ${cornerCost !== undefined && costDiffers(cornerCost, item.cornerCost) ? CHANGED : ''}`}
                         />
                       )}
                     </td>
@@ -376,6 +405,17 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                     </td>
                     <td className="num">
                       <input
+                        value={a.cornerCost}
+                        onChange={e => setAdded(a.key, row => ({ ...row, cornerCost: e.target.value }))}
+                        disabled={saving}
+                        inputMode="decimal"
+                        placeholder={NO_CORNER}
+                        aria-label={`${title} corner cost a unit`}
+                        className={`${INPUT} w-24 text-right tabular-nums ${CHANGED}`}
+                      />
+                    </td>
+                    <td className="num">
+                      <input
                         value={a.amount}
                         onChange={e => setAdded(a.key, row => ({ ...row, amount: e.target.value }))}
                         disabled={saving}
@@ -397,7 +437,7 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
               })}
               {listed.length + draft.added.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 6 : 5} className="text-center text-sm py-6">{brand.name} has no KPI items yet.</td>
+                  <td colSpan={canManage ? 7 : 6} className="text-center text-sm py-6">{brand.name} has no KPI items yet.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -420,6 +460,8 @@ function BrandKpiBlock({ brand, scheme, items, pool, canManage }: {
                     placeholder="Name" aria-label={`${brand.name} new item name`} className={`${INPUT} w-40`} />
                   <input value={pickCost} onChange={e => setPickCost(e.target.value)} disabled={saving} inputMode="decimal"
                     placeholder="Cost" aria-label={`${brand.name} new item cost a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
+                  <input value={pickCorner} onChange={e => setPickCorner(e.target.value)} disabled={saving} inputMode="decimal"
+                    placeholder="Corner cost" aria-label={`${brand.name} new item corner cost a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
                   <input value={pickAmount} onChange={e => setPickAmount(e.target.value)} disabled={saving} inputMode="decimal"
                     placeholder="Bonus" aria-label={`${brand.name} new item bonus a unit`} className={`${INPUT} w-24 text-right tabular-nums`} />
                   <button type="button" className={BUTTON_QUIET} disabled={saving} onClick={add}

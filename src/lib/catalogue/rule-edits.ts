@@ -130,6 +130,8 @@ export type KpiItemAdd =
       tiers?: ReadonlyArray<KpiTierInput>
       /** A brand's own item (2026-11-13): RM a unit taken off the bill. Blank = none — what the bill's special order charges. */
       cost?: string | null
+      /** A brand's own item (2026-11-14): RM a unit taken off the bill of a sofa with a corner. Blank = none — its cost. */
+      cornerCost?: string | null
     }
 
 export interface KpiItemsEdit {
@@ -137,11 +139,12 @@ export interface KpiItemsEdit {
   /**
    * `amount` absent = the amount stays as stored (a brand's item whose tiers alone changed — only what changed is
    * sent); null = the box was emptied, which is refused. `tiers`: a brand's own item's, sent whole when they
-   * changed — absent, they stay as stored. `cost` (2026-11-13): a brand's own item's, sent when it changed —
-   * absent, it stays as stored; null or blank = the box was emptied, and the item has no cost again.
+   * changed — absent, they stay as stored. `cost` (2026-11-13) and `cornerCost` (2026-11-14): a brand's own item's,
+   * each sent when it changed — absent, it stays as stored; null or blank = the box was emptied, and it is none again.
    */
   changes: ReadonlyArray<{
     id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput>; cost?: string | null
+    cornerCost?: string | null
   }>
   removes: ReadonlyArray<string>
 }
@@ -159,12 +162,17 @@ export type KpiAddRow =
       brand_id?: string; label?: string; unit_tiers?: KpiTierRow[]
       /** Above 0 only: an item added with no cost names none. */
       cost_amount?: number
+      /** Above 0 only: an item added with no corner cost names none. */
+      corner_cost_amount?: number
     }
 
 export interface KpiItemsPlan {
   adds: KpiAddRow[]
-  /** `cost_amount`: the new cost; 0 = none any more (`catalogue_save_kpi_items` stores NULL — a key left out stays). */
-  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[]; cost_amount?: number }>
+  /**
+   * `cost_amount` / `corner_cost_amount`: the new cost / corner cost; 0 = none any more (`catalogue_save_kpi_items`
+   * stores NULL — a key left out stays).
+   */
+  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[]; cost_amount?: number; corner_cost_amount?: number }>
   removes: string[]
 }
 
@@ -215,13 +223,14 @@ function kpiAmount(raw: string | null | undefined, name: string): number {
 
 /**
  * A brand's own item's cost a unit (2026-11-13) — what comes off the bill: RM 0.01 – 1,000,000 (the column's CHECK),
- * or 0 for a box left blank: no cost, the bill's special order says what comes off.
+ * or 0 for a box left blank: no cost, the bill's special order says what comes off. Its corner cost (2026-11-14,
+ * `what` 'corner cost') the same — blank: its cost.
  */
-export function kpiCost(raw: string | null | undefined, name: string): number {
-  const cost = parseMoney(raw, `${name}: cost`, true)
+export function kpiCost(raw: string | null | undefined, name: string, what: 'cost' | 'corner cost' = 'cost'): number {
+  const cost = parseMoney(raw, `${name}: ${what}`, true)
   if (cost === null) return 0
-  if (cost < 0) throw new EditError(`${name}: a cost cannot be negative`)
-  if (cost > 1_000_000) throw new EditError(`${name}: a cost is at most RM 1,000,000 a unit`)
+  if (cost < 0) throw new EditError(`${name}: a ${what} cannot be negative`)
+  if (cost > 1_000_000) throw new EditError(`${name}: a ${what} is at most RM 1,000,000 a unit`)
   return cost
 }
 
@@ -244,15 +253,18 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
     if (changed.has(c.id)) throw new EditError(`${name} is changed twice`)
     if (removing.has(c.id)) throw new EditError(`${name} is both changed and removed`)
     changed.add(c.id)
-    if (c.amount === undefined && c.tiers === undefined && c.cost === undefined) throw new EditError(`${name}: nothing changed`)
+    if (c.amount === undefined && c.tiers === undefined && c.cost === undefined && c.cornerCost === undefined) {
+      throw new EditError(`${name}: nothing changed`)
+    }
     // What the row does not name stays as stored (the database reads it so): the amount when the tiers alone
-    // changed. A brand's own item's tiers go whole when they changed, its cost when it did (0 = none any more);
-    // whose item it is, the database knows (it refuses tiers and a cost on the sub-department's own).
+    // changed. A brand's own item's tiers go whole when they changed, its cost and its corner cost each when it did
+    // (0 = none any more); whose item it is, the database knows (it refuses tiers and a cost on the sub-department's own).
     return {
       id: c.id,
       ...(c.amount === undefined ? {} : { kpi_amount: kpiAmount(c.amount, name) }),
       ...(c.tiers === undefined ? {} : { unit_tiers: kpiTiers(c.tiers, name) }),
       ...(c.cost === undefined ? {} : { cost_amount: kpiCost(c.cost, name) }),
+      ...(c.cornerCost === undefined ? {} : { corner_cost_amount: kpiCost(c.cornerCost, name, 'corner cost') }),
     }
   })
 
@@ -286,13 +298,14 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
       added.add(key)
       const tiers = kpiTiers(a.tiers, name)
       const cost = kpiCost(a.cost, name)
+      const cornerCost = kpiCost(a.cornerCost, name, 'corner cost')
       return {
         source: 'option', option_pool: a.optionPool, option_value: value, kpi_amount: kpiAmount(a.amount, name),
         brand_id: a.brandId, ...(own ? { label: own } : {}), ...(tiers.length > 0 ? { unit_tiers: tiers } : {}),
-        ...(cost > 0 ? { cost_amount: cost } : {}),
+        ...(cost > 0 ? { cost_amount: cost } : {}), ...(cornerCost > 0 ? { corner_cost_amount: cornerCost } : {}),
       }
     }
-    if (a.tiers !== undefined || a.name !== undefined || a.cost !== undefined) {
+    if (a.tiers !== undefined || a.name !== undefined || a.cost !== undefined || a.cornerCost !== undefined) {
       throw new EditError("Only a brand's own KPI item has a name, tiers and a cost of its own")
     }
     const name = a.label?.trim() || value
