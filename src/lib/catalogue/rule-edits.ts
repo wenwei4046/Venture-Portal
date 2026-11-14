@@ -22,7 +22,7 @@
 
 import { EditError, parseMoney } from './edits'
 import { valueKey } from './keys'
-import { isFabricSeriesPool, isKpiOptionPool, type KpiOptionPool } from '@/lib/commission/kpi'
+import { isFabricSeriesPool, isKpiItemPool, isKpiOptionPool, type KpiItemPool } from '@/lib/commission/kpi'
 
 export { EditError }
 
@@ -142,32 +142,25 @@ export interface KpiTierInput {
   amount: string | null
 }
 
+/** A brand's own item (2026-11-12): the brand (`comm_brands.id`), the name it is listed under, and its tiers. */
+interface BrandKpiAddFields {
+  brandId?: string
+  name?: string | null
+  tiers?: ReadonlyArray<KpiTierInput>
+}
+
 export type KpiItemAdd =
-  | { source: 'sku'; erpId: string; amount: string | null; label?: string }
-  | {
-      source: 'option'; optionPool: string; optionValue: string; amount: string | null; label?: string
-      /** A brand's own item: the brand (`comm_brands.id`), the name it is listed under, and its tiers. */
-      brandId?: string
-      name?: string | null
-      tiers?: ReadonlyArray<KpiTierInput>
-      /** A brand's own item (2026-11-13): RM a unit taken off the bill. Blank = none — what the bill's special order charges. */
-      cost?: string | null
-      /** A brand's own item (2026-11-14): RM a unit taken off the bill of a sofa with a corner. Blank = none — its cost. */
-      cornerCost?: string | null
-    }
+  | ({ source: 'sku'; erpId: string; amount: string | null; label?: string } & BrandKpiAddFields)
+  | ({ source: 'option'; optionPool: string; optionValue: string; amount: string | null; label?: string } & BrandKpiAddFields)
 
 export interface KpiItemsEdit {
   adds: ReadonlyArray<KpiItemAdd>
   /**
    * `amount` absent = the amount stays as stored (a brand's item whose tiers alone changed — only what changed is
    * sent); null = the box was emptied, which is refused. `tiers`: a brand's own item's, sent whole when they
-   * changed — absent, they stay as stored. `cost` (2026-11-13) and `cornerCost` (2026-11-14): a brand's own item's,
-   * each sent when it changed — absent, it stays as stored; null or blank = the box was emptied, and it is none again.
+   * changed — absent, they stay as stored.
    */
-  changes: ReadonlyArray<{
-    id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput>; cost?: string | null
-    cornerCost?: string | null
-  }>
+  changes: ReadonlyArray<{ id: string; amount?: string | null; label?: string; tiers?: ReadonlyArray<KpiTierInput> }>
   removes: ReadonlyArray<string>
 }
 
@@ -177,33 +170,28 @@ export interface KpiTierRow {
   amount: number
 }
 
+/** A brand's own item's add (2026-11-12): its brand, the name it is listed under, its tiers. */
+interface BrandKpiAddRow {
+  brand_id?: string
+  label?: string
+  unit_tiers?: KpiTierRow[]
+}
+
 export type KpiAddRow =
-  | { source: 'sku'; erp_product_id: string; kpi_amount: number }
-  | {
-      source: 'option'; option_pool: KpiOptionPool; option_value: string; kpi_amount: number
-      brand_id?: string; label?: string; unit_tiers?: KpiTierRow[]
-      /** Above 0 only: an item added with no cost names none. */
-      cost_amount?: number
-      /** Above 0 only: an item added with no corner cost names none. */
-      corner_cost_amount?: number
-    }
+  | ({ source: 'sku'; erp_product_id: string; kpi_amount: number } & BrandKpiAddRow)
+  | ({ source: 'option'; option_pool: KpiItemPool; option_value: string; kpi_amount: number } & BrandKpiAddRow)
 
 export interface KpiItemsPlan {
   adds: KpiAddRow[]
-  /**
-   * `cost_amount` / `corner_cost_amount`: the new cost / corner cost; 0 = none any more (`catalogue_save_kpi_items`
-   * stores NULL — a key left out stays).
-   */
-  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[]; cost_amount?: number; corner_cost_amount?: number }>
+  changes: Array<{ id: string; kpi_amount?: number; unit_tiers?: KpiTierRow[] }>
   removes: string[]
 }
 
 /** One key per item, whichever row names it: a SKU by its id, a special by pool and spelling — a brand's own, by its brand too. */
 export function kpiAddKey(
-  add: { source: 'sku'; erpId: string } | { source: 'option'; optionPool: string; optionValue: string; brandId?: string },
+  add: { source: 'sku'; erpId: string; brandId?: string } | { source: 'option'; optionPool: string; optionValue: string; brandId?: string },
 ): string {
-  if (add.source === 'sku') return `sku:${add.erpId}`
-  const key = `option:${add.optionPool}:${valueKey(add.optionValue) ?? ''}`
+  const key = add.source === 'sku' ? `sku:${add.erpId}` : `option:${add.optionPool}:${valueKey(add.optionValue) ?? ''}`
   return add.brandId ? `brand:${add.brandId.toLowerCase()}:${key}` : key
 }
 
@@ -243,17 +231,13 @@ function kpiAmount(raw: string | null | undefined, name: string): number {
   return amount
 }
 
-/**
- * A brand's own item's cost a unit (2026-11-13) — what comes off the bill: RM 0.01 – 1,000,000 (the column's CHECK),
- * or 0 for a box left blank: no cost, the bill's special order says what comes off. Its corner cost (2026-11-14,
- * `what` 'corner cost') the same — blank: its cost.
- */
-export function kpiCost(raw: string | null | undefined, name: string, what: 'cost' | 'corner cost' = 'cost'): number {
-  const cost = parseMoney(raw, `${name}: ${what}`, true)
-  if (cost === null) return 0
-  if (cost < 0) throw new EditError(`${name}: a ${what} cannot be negative`)
-  if (cost > 1_000_000) throw new EditError(`${name}: a ${what} is at most RM 1,000,000 a unit`)
-  return cost
+/** A brand's own item's brand, its own name, its tiers (2026-11-12) — what only such an item has. */
+function brandFields(a: BrandKpiAddFields, value: string): { brandId: string; own: string; name: string; tiers: KpiTierRow[] } {
+  if (typeof a.brandId !== 'string' || !UUID.test(a.brandId)) throw new EditError('An added row names no brand')
+  const own = typeof a.name === 'string' ? a.name.trim().replace(/\s+/g, ' ') : ''
+  if (own.length > 120) throw new EditError(`${own.slice(0, 40)}…: a name is at most 120 characters`)
+  const name = own || value
+  return { brandId: a.brandId, own, name, tiers: kpiTiers(a.tiers, name) }
 }
 
 export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
@@ -275,66 +259,72 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
     if (changed.has(c.id)) throw new EditError(`${name} is changed twice`)
     if (removing.has(c.id)) throw new EditError(`${name} is both changed and removed`)
     changed.add(c.id)
-    if (c.amount === undefined && c.tiers === undefined && c.cost === undefined && c.cornerCost === undefined) {
-      throw new EditError(`${name}: nothing changed`)
-    }
+    if (c.amount === undefined && c.tiers === undefined) throw new EditError(`${name}: nothing changed`)
     // What the row does not name stays as stored (the database reads it so): the amount when the tiers alone
-    // changed. A brand's own item's tiers go whole when they changed, its cost and its corner cost each when it did
-    // (0 = none any more); whose item it is, the database knows (it refuses tiers and a cost on the sub-department's own).
+    // changed. A brand's own item's tiers go whole when they changed; whose item it is, the database knows (it
+    // refuses tiers on the sub-department's own).
     return {
       id: c.id,
       ...(c.amount === undefined ? {} : { kpi_amount: kpiAmount(c.amount, name) }),
       ...(c.tiers === undefined ? {} : { unit_tiers: kpiTiers(c.tiers, name) }),
-      ...(c.cost === undefined ? {} : { cost_amount: kpiCost(c.cost, name) }),
-      ...(c.cornerCost === undefined ? {} : { corner_cost_amount: kpiCost(c.cornerCost, name, 'corner cost') }),
     }
   })
 
   const added = new Set<string>()
   const adds = addsIn.map((a): KpiAddRow => {
     if (!a || (a.source !== 'sku' && a.source !== 'option')) throw new EditError('A KPI item is a SKU, a special or a fabric series')
+    const ownFieldsSent = a.tiers !== undefined || a.name !== undefined
     if (a.source === 'sku') {
       if (typeof a.erpId !== 'string' || !ERP_ID.test(a.erpId)) throw new EditError('An added row names no SKU')
+      // A brand's own SKU (2026-11-14): of the brand's own SKU master (the database checks), its name and its tiers.
+      if (a.brandId !== undefined) {
+        const brand = brandFields(a, a.label?.trim() || a.erpId)
+        const key = kpiAddKey({ source: 'sku', erpId: a.erpId, brandId: brand.brandId })
+        if (added.has(key)) throw new EditError(`${brand.name} is added twice`)
+        added.add(key)
+        return {
+          source: 'sku', erp_product_id: a.erpId, kpi_amount: kpiAmount(a.amount, brand.name), brand_id: brand.brandId,
+          ...(brand.own ? { label: brand.own } : {}), ...(brand.tiers.length > 0 ? { unit_tiers: brand.tiers } : {}),
+        }
+      }
+      if (ownFieldsSent) throw new EditError("Only a brand's own KPI item has a name and tiers of its own")
       const name = a.label?.trim() || a.erpId
       const key = kpiAddKey(a)
       if (added.has(key)) throw new EditError(`${name} is added twice`)
       added.add(key)
       return { source: 'sku', erp_product_id: a.erpId, kpi_amount: kpiAmount(a.amount, name) }
     }
-    if (typeof a.optionPool !== 'string' || !isKpiOptionPool(a.optionPool)) {
-      throw new EditError("Only a bed frame's or a sofa's special or fabric series can be a KPI item")
+    // A model or a compartment (2026-11-14) is a brand's own alone.
+    const brandItem = a.brandId !== undefined
+    const pool: KpiItemPool | null = typeof a.optionPool === 'string'
+      && (brandItem ? isKpiItemPool(a.optionPool) : isKpiOptionPool(a.optionPool)) ? a.optionPool as KpiItemPool : null
+    if (!pool) {
+      throw new EditError(brandItem
+        ? "A brand's own KPI item is a SKU, a model, a compartment, a special or a fabric series"
+        : "Only a bed frame's or a sofa's special or fabric series can be a KPI item")
     }
     const value = typeof a.optionValue === 'string' ? a.optionValue.trim() : ''
     if (!value || value.length > 200) {
-      throw new EditError(isFabricSeriesPool(a.optionPool) ? 'An added fabric series has no name' : 'An added special has no name')
+      throw new EditError(isFabricSeriesPool(pool) ? 'An added fabric series has no name' : 'An added special has no name')
     }
-    // A brand's own item (2026-11-12): a sofa special of the brand's, with a name of its own and, maybe, tiers.
-    if (a.brandId !== undefined) {
-      if (typeof a.brandId !== 'string' || !UUID.test(a.brandId)) throw new EditError('An added row names no brand')
-      if (a.optionPool !== 'sofa_specials') throw new EditError("A brand's own KPI item is a sofa special")
-      const own = typeof a.name === 'string' ? a.name.trim().replace(/\s+/g, ' ') : ''
-      if (own.length > 120) throw new EditError(`${own.slice(0, 40)}…: a name is at most 120 characters`)
-      const name = own || value
-      const key = kpiAddKey({ source: 'option', optionPool: a.optionPool, optionValue: value, brandId: a.brandId })
-      if (added.has(key)) throw new EditError(`${name} is added twice`)
+    // A brand's own item (2026-11-12): of the brand's own ERP company, with a name of its own and, maybe, tiers.
+    if (brandItem) {
+      const brand = brandFields(a, value)
+      const key = kpiAddKey({ source: 'option', optionPool: pool, optionValue: value, brandId: brand.brandId })
+      if (added.has(key)) throw new EditError(`${brand.name} is added twice`)
       added.add(key)
-      const tiers = kpiTiers(a.tiers, name)
-      const cost = kpiCost(a.cost, name)
-      const cornerCost = kpiCost(a.cornerCost, name, 'corner cost')
       return {
-        source: 'option', option_pool: a.optionPool, option_value: value, kpi_amount: kpiAmount(a.amount, name),
-        brand_id: a.brandId, ...(own ? { label: own } : {}), ...(tiers.length > 0 ? { unit_tiers: tiers } : {}),
-        ...(cost > 0 ? { cost_amount: cost } : {}), ...(cornerCost > 0 ? { corner_cost_amount: cornerCost } : {}),
+        source: 'option', option_pool: pool, option_value: value, kpi_amount: kpiAmount(a.amount, brand.name),
+        brand_id: brand.brandId, ...(brand.own ? { label: brand.own } : {}),
+        ...(brand.tiers.length > 0 ? { unit_tiers: brand.tiers } : {}),
       }
     }
-    if (a.tiers !== undefined || a.name !== undefined || a.cost !== undefined || a.cornerCost !== undefined) {
-      throw new EditError("Only a brand's own KPI item has a name, tiers and a cost of its own")
-    }
+    if (ownFieldsSent) throw new EditError("Only a brand's own KPI item has a name and tiers of its own")
     const name = a.label?.trim() || value
-    const key = kpiAddKey({ source: 'option', optionPool: a.optionPool, optionValue: value })
+    const key = kpiAddKey({ source: 'option', optionPool: pool, optionValue: value })
     if (added.has(key)) throw new EditError(`${name} is added twice`)
     added.add(key)
-    return { source: 'option', option_pool: a.optionPool, option_value: value, kpi_amount: kpiAmount(a.amount, name) }
+    return { source: 'option', option_pool: pool, option_value: value, kpi_amount: kpiAmount(a.amount, name) }
   })
 
   if (adds.length === 0 && changes.length === 0 && removes.length === 0) throw new EditError('Nothing to save')

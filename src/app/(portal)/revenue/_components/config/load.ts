@@ -4,7 +4,9 @@ import { homeSubDepartmentOf } from '@/lib/revenue'
 import { listSubDepartments } from '../../_lib/sub-departments'
 import { readFabricSeries } from '../../_lib/fabric-series'
 import { fabricSeriesList } from '@/lib/commission/kpi-items-edit'
+import { brandCompartmentList, brandFabricSeriesList, brandModelList, type BrandSkuRow } from '@/lib/commission/brand-kpi-edit'
 import type { FabricSeriesRow } from '@/lib/commission/kpi'
+import { fetchAllRowsParallel } from '@/lib/paginate'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
@@ -232,10 +234,12 @@ export async function loadCommissionSettings(
   // what each is paid here. And which KPI SKUs the ERP has since removed.
   const subDepartmentId = (scheme.data as SchemeRow | null)?.sub_department_id ?? null
   const kpiSkuIds = [...new Set(rows<KpiItemRow>(kpiItems.data).map(k => k.erp_product_id).filter((id): id is string => !!id))]
-  // A brand on its own commission scheme picks its own KPI items from its own ERP company's sofa specials (2026-11-12).
+  // A brand on its own commission scheme picks its own KPI items from its own ERP company (2026-11-12; since 2026-11-14
+  // of every kind): its specials, its fabric list, its SKU master's models and sofa compartments — its SKUs are
+  // searched for. A list that cannot be read offers none, as the sub-department's own, never a page that fails.
   const brandCompanies = [...new Set(rows<{ own_scheme?: boolean | null; erp_company_id?: number | null }>(brands.data)
-    .filter(b => b.own_scheme && b.erp_company_id != null).map(b => Number(b.erp_company_id)))]
-  const [directorRows, payRows, kpiSkus, brandSpecials] = await Promise.all([
+    .filter(b => b.own_scheme).map(b => Number(b.erp_company_id ?? 1)))]
+  const [directorRows, payRows, kpiSkus, brandSpecials, brandFabrics, brandSkus] = await Promise.all([
     subDepartmentId
       ? supabase.from('comm_sub_department_directors')
         .select('staff_id, hr_staff_costs (employee_name, employee_code, titles (name))')
@@ -250,9 +254,20 @@ export async function loadCommissionSettings(
       ? supabase.from('erp_products').select('erp_id, removed_at').in('erp_id', kpiSkuIds)
       : Promise.resolve({ data: [] }),
     brandCompanies.length > 0
-      ? supabase.from('erp_maintenance_options').select('erp_company_id, value, label, sort_order, removed_at')
-        .in('erp_company_id', brandCompanies).eq('pool', 'sofa_specials').order('erp_company_id').order('sort_order').order('value')
+      ? supabase.from('erp_maintenance_options').select('erp_company_id, pool, value, label, sort_order, removed_at')
+        .in('erp_company_id', brandCompanies).in('pool', ['bedframe_specials', 'sofa_specials'])
+        .order('erp_company_id').order('pool').order('sort_order').order('value')
       : Promise.resolve({ data: [] }),
+    brandCompanies.length > 0
+      ? readFabricSeries(supabase, brandCompanies).catch((): FabricSeriesRow[] => [])
+      : Promise.resolve([] as FabricSeriesRow[]),
+    brandCompanies.length > 0
+      ? fetchAllRowsParallel<BrandSkuRow & { erp_company_id: number | string }>((from, to, withCount) =>
+        supabase.from('erp_products')
+          .select('erp_company_id, item_code, base_model, category, description, removed_at', withCount ? { count: 'exact' } : undefined)
+          .in('erp_company_id', brandCompanies).is('removed_at', null)
+          .order('erp_id').range(from, to), "Could not read a brand's SKU master").catch(() => [])
+      : Promise.resolve([] as Array<BrandSkuRow & { erp_company_id: number | string }>),
   ])
   const payByStaff = new Map(rows<{ staff_id: string; fixed_amount: number | string; sales_threshold: number | string | null; incentive_amount: number | string }>(payRows.data)
     .map(p => [p.staff_id, p]))
@@ -283,14 +298,25 @@ export async function loadCommissionSettings(
     // The sub-department's own items are what the tab edits; a brand's own (2026-11-12) are listed under them.
     kpiItems: rows<KpiItemRow>(kpiItems.data).filter(k => !k.brand_id),
     brandKpiItems: rows<KpiItemRow>(kpiItems.data).filter(k => !!k.brand_id),
-    brandKpiSpecials: rows<{ erp_company_id: number | string; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(brandSpecials.data)
-      .map(o => ({
-        companyId: Number(o.erp_company_id),
-        value: o.value,
-        label: o.label ?? o.value,
-        sort_order: Number(o.sort_order ?? 0),
-        removed: o.removed_at !== null && o.removed_at !== undefined,
-      })),
+    brandKpiCatalogues: brandCompanies.map(companyId => {
+      const ofCompany = <T extends { erp_company_id?: number | string | null }>(list: readonly T[]) =>
+        list.filter(row => Number(row.erp_company_id ?? 1) === companyId)
+      const skus = ofCompany(brandSkus)
+      return {
+        companyId,
+        specials: ofCompany(rows<{ erp_company_id: number | string; pool: KpiSpecialRow['pool']; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(brandSpecials.data))
+          .map(o => ({
+            pool: o.pool,
+            value: o.value,
+            label: o.label ?? o.value,
+            sort_order: Number(o.sort_order ?? 0),
+            removed: o.removed_at !== null && o.removed_at !== undefined,
+          })),
+        fabricSeries: brandFabricSeriesList(ofCompany(brandFabrics)),
+        models: brandModelList(skus),
+        compartments: brandCompartmentList(skus),
+      }
+    }),
     kpiThresholds: rows(kpiThresholds.data),
     kpiSpecials: rows<{ pool: KpiSpecialRow['pool']; value: string; label: string | null; sort_order: number | null; removed_at: string | null }>(kpiSpecials.data)
       .map(o => ({

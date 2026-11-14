@@ -147,7 +147,7 @@ export function orderRevenueSplit(
   const commissionable = sum(
     order.lines.filter(l => classifyLine(l, groupIndex) === 'commissionable').map(l => l.lineAmount),
   )
-  const foundHits = orderKpiHits(order, kpiIndex)
+  const foundHits = orderKpiHits(order, kpiIndex, group => groupIndex.get(normaliseCode(group)) === true)
   const { main, covered } = coverKpi(commissionable, kpiAmountOf(foundHits))
   const kpiHits = covered ? foundHits : []
   return { commissionable, foundHits, kpiHits, kpiAmount: kpiAmountOf(kpiHits), main, uncovered: !covered }
@@ -296,7 +296,7 @@ export function marginBase(
       cost = round2(cost + (line.costAmount * (1 - given)) / costDivisorFor(line.productCode, basis, brandCode))
     }
   }
-  if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
+  if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex, group => groupIndex.get(normaliseCode(group)) === true))).main
   // What its bed frames' divan, leg, gap and total height were charged is the customer's
   // price for an option, not the product's (2026-10-05): out of the margin on
   // both sides — it was never in the cost — while the rate is still paid on it.

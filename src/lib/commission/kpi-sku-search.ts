@@ -27,15 +27,20 @@ const FAILED = 'The SKU Master could not be searched just now. Try again.'
  * screen until a reload — on production five times out of five. A read in the
  * browser is not in that queue. RLS answers it exactly as it answered the
  * action (erp_products: Revenue, the Product List).
+ *
+ * `companyId` (2026-11-14): one ERP company's SKU master alone — a brand on its own scheme (2990s: 2) picks its own
+ * items from its own.
  */
-export async function searchSkuMaster(sb: SupabaseClient, query: string): Promise<SearchKpiSkusResult> {
+export async function searchSkuMaster(sb: SupabaseClient, query: string, companyId?: number): Promise<SearchKpiSkusResult> {
   const filter = kpiSkuSearchFilter(typeof query === 'string' ? query : '')
   if (!filter) return { ok: true, hits: [], total: 0 }
   try {
-    const { data, error, count } = await sb
+    let request = sb
       .from('erp_products')
       .select('erp_id, item_code, description, category, active', { count: 'exact' })
       .is('removed_at', null)
+    if (companyId !== undefined) request = request.eq('erp_company_id', companyId)
+    const { data, error, count } = await request
       .or(filter)
       .order('item_code')
       .order('erp_id')

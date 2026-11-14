@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeCommissionRun } from './engine'
 import {
+  kpiLineReaders,
   ownSchemeBrandsOf,
   releasedOrders,
   specialMoneyByLine,
@@ -806,59 +807,124 @@ describe('a brand with its own scheme — 2990s', () => {
       expect(releasedOrders(input, result).map(r => [r.order_no, r.product_revenue])).toEqual([['SO-001', 2_990]])
     })
 
-    // 2026-11-13 — the user: "i need a place at kpi item rules set there fill in cost, so that it can dedecut the
-    // cost out and change to kpi amount only" (`comm_kpi_items.cost_amount`).
-    it('reads a brand’s item’s cost a unit — none where the row has none, never one on the sub-department’s own', () => {
-      const withCost = (cost: unknown) => toEngineInput(baseRows({
-        ranks, brands: BRANDS,
-        kpiItems: [
-          { ...KPI[0], cost_amount: cost as never },
-          { ...KPI[2], cost_amount: cost as never },
-        ],
-      })).kpiItems
-      expect(withCost('250.00')).toEqual([
-        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S', cost: 250 },
-        { source: 'sku', productCode: 'PIL-01', label: 'Pillow', kpiAmount: 50 },
-      ])
-      for (const none of [null, undefined, 0, '0.00']) {
-        expect(withCost(none)[0]).toEqual(
-          { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S' })
-      }
-    })
-
-    // 2026-11-14 — the user: "yes need to be corner as well" (`comm_kpi_items.corner_cost_amount`).
-    it('reads a brand’s item’s corner cost a unit — none where the row has none, never one on the sub-department’s own', () => {
-      const withCorner = (corner: unknown) => toEngineInput(baseRows({
-        ranks, brands: BRANDS,
-        kpiItems: [
-          { ...KPI[0], cost_amount: '125.00', corner_cost_amount: corner as never },
-          { ...KPI[2], corner_cost_amount: corner as never },
-        ],
-      })).kpiItems
-      expect(withCorner('250.00')).toEqual([
-        { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S', cost: 125, cornerCost: 250 },
-        { source: 'sku', productCode: 'PIL-01', label: 'Pillow', kpiAmount: 50 },
-      ])
-      for (const none of [null, undefined, 0, '0.00']) {
-        expect(withCorner(none)[0]).toEqual(
-          { source: 'option', optionPool: 'sofa_specials', optionValue: 'Sofa Full Fabric', label: 'Upgrade fabric', kpiAmount: 50, brandCode: '2990S', cost: 125 })
-      }
-    })
-
-    it('a bill whose special order charges nothing loses the item’s cost: 4% of 2,990 and the RM 50 bonus, not 4% of 3,490', () => {
-      // The same sofa at RM 3,490, its fabric upgrade's RM 250 … and a latex seat whose RM 500 is in the remark.
+    it('a special whose price is in the remark takes nothing off: its bonus is paid on top of 4% of the whole sofa', () => {
+      // The same sofa at RM 3,490, its fabric upgrade's RM 250 … and a latex seat whose RM 500 is in the remark, not on
+      // the bill's special order (2026-11-14: what comes off is what the bill charged — no cost is typed any more).
       const lines = sofa.map(l => (l.item_group === 'SOFA'
         ? { ...l, line_amount: '1870.00', variants: { specials: ['Sofa Full Fabric', 'Latex Seat'] } } : l))
       const input = toEngineInput(baseRows({
-        ranks, brands: BRANDS, specialMoney: MONEY,
-        kpiItems: [KPI[0], { ...KPI[1], cost_amount: '500.00' }],
+        ranks, brands: BRANDS, specialMoney: MONEY, kpiItems: KPI,
         itemGroups: [{ item_group: 'SOFA', commissionable: true }, { item_group: 'TRANS', commissionable: false }],
         scheme: { ...SCHEME, enable_kpi: false },
         orders: [order({ brand_code: '2990S', order_total: '3990.00', paid_amount: '3990.00', sales_order_lines: lines })],
       }))
       const statement = computeCommissionRun(input).statements.find(s => s.staffId === 'staff-a')!
-      // 3,740 of sofa − 250 the bill charged for the fabric − 500 the latex seat costs = 2,990.
-      expect([statement.productRevenue, statement.productCommission, statement.kpiCommission, statement.totalCommission]).toEqual([2_990, 119.6, 100, 219.6])
+      // 3,740 of sofa − 250 the bill charged for the fabric = 3,490; RM 50 + RM 50.
+      expect([statement.productRevenue, statement.productCommission, statement.kpiCommission, statement.totalCommission]).toEqual([3_490, 139.6, 100, 239.6])
+    })
+
+    // 2026-11-14 — the user: "我只需要像 Fair 一样选 KPI 就好，不需要去选它的 cost"; "by model、by special 或者是 by
+    // compartment"; what comes off is what the bill charged ("扣掉再发 bonus"), a compartment once a set ("每组沙发算 1 个").
+    describe('of every kind, found on its own company’s SKU master and fabric list', () => {
+      const OWN_BRANDS = BRANDS.map(b => (b.id === 'brand-2990' ? { ...b, erp_company_id: 2 } : b))
+      const ITEMS: RunSourceRows['kpiItems'] = [
+        { source: 'option', product_code: null, product_name: null, option_pool: 'models', option_value: 'Boaat', kpi_amount: '40.00', brand_id: 'brand-2990' },
+        { source: 'option', product_code: null, product_name: null, option_pool: 'compartments', option_value: 'CNR', kpi_amount: '30.00', brand_id: 'brand-2990' },
+        {
+          source: 'option', product_code: null, product_name: 'EZ · Sofa fabric', option_pool: 'sofa_fabric_series', option_value: 'EZ',
+          kpi_amount: '50.00', brand_id: 'brand-2990',
+        },
+        { source: 'sku', product_code: 'SQUARE PILLOW-M', product_name: 'Square pillow', kpi_amount: '10.00', brand_id: 'brand-2990' },
+        // A model of the sub-department's (the database refuses one) is nobody's.
+        { source: 'option', product_code: null, product_name: null, option_pool: 'models', option_value: 'Boaat', kpi_amount: '99.00', brand_id: null },
+      ]
+      const SKU_MODELS: NonNullable<RunSourceRows['brandSkuModels']> = [
+        { erp_company_id: 2, item_code: 'BOAAT-2A', base_model: 'Boaat', erp_id: '9001' },
+        { erp_company_id: '2', item_code: ' boaat-cnr ', base_model: 'Boaat', erp_id: '9002' },
+        // Houzs' own SKU of a code is not 2990s'.
+        { erp_company_id: 1, item_code: 'XAMMAR-2A(LHF)', base_model: 'Xammar', erp_id: '1001' },
+      ]
+      // EZ-007 has no series on 2990s' list — its code's family, EZ; Houzs' list calls the same code EASY.
+      const FABRICS: NonNullable<RunSourceRows['fabrics']> = [
+        { fabric_code: 'EZ-007', series: null, erp_company_id: 2 },
+        { fabric_code: 'EZ-007', series: 'EASY', erp_company_id: 1 },
+      ]
+      const piece = (id: string, product_code: string, line_amount: string, variants?: unknown) => ({
+        id, item_group: 'SOFA', product_code, product_name: product_code, qty: '1.000', line_amount, brand_code: '2990S', cost_amount: null,
+        ...(variants ? { variants } : {}),
+      })
+      const boaat = order({
+        id: 'order-boaat', order_no: '2990-SO-1', brand_code: '2990S', order_total: '3250.00', paid_amount: '3250.00',
+        sales_order_lines: [
+          piece('b-1', 'BOAAT-2A', '2000.00', { fabricCode: 'EZ-007' }),
+          piece('b-2', 'BOAAT-CNR', '1000.00', { fabricCode: 'EZ-007' }),
+          { id: 'b-svc', item_group: 'TRANS', product_code: 'SVC-DELIVERY', product_name: 'Delivery', qty: '1.000', line_amount: '250.00', brand_code: '2990S', cost_amount: null },
+        ],
+      })
+      const xammar = order({
+        id: 'order-xammar', order_no: '2990-SO-2', brand_code: '2990S', order_total: '4000.00', paid_amount: '4000.00',
+        sales_order_lines: [piece('x-1', 'XAMMAR-2A(LHF)', '1500.00'), piece('x-2', 'XAMMAR-CNR', '1000.00'), piece('x-3', 'XAMMAR-2A(RHF)', '1500.00')],
+      })
+      const rows = (orders = [boaat, xammar]) => baseRows({
+        ranks, brands: OWN_BRANDS, kpiItems: ITEMS, fabrics: FABRICS, brandSkuModels: SKU_MODELS,
+        itemGroups: [{ item_group: 'SOFA', commissionable: true }, { item_group: 'TRANS', commissionable: false }],
+        scheme: { ...SCHEME, enable_kpi: false },
+        orders,
+      })
+
+      it('reads the brand’s items of every kind', () => {
+        expect(toEngineInput(rows()).kpiItems).toEqual([
+          { source: 'option', optionPool: 'models', optionValue: 'Boaat', label: null, kpiAmount: 40, brandCode: '2990S' },
+          { source: 'option', optionPool: 'compartments', optionValue: 'CNR', label: null, kpiAmount: 30, brandCode: '2990S' },
+          { source: 'option', optionPool: 'sofa_fabric_series', optionValue: 'EZ', label: 'EZ · Sofa fabric', kpiAmount: 50, brandCode: '2990S' },
+          { source: 'sku', productCode: 'SQUARE PILLOW-M', label: 'Square pillow', kpiAmount: 10, brandCode: '2990S' },
+        ])
+      })
+
+      it('puts on a brand’s line its model and its fabric’s family — on its own company’s lists only', () => {
+        const [b, x] = toEngineInput(rows()).orders
+        expect(b.lines.map(l => [l.id, l.model, l.fabricSeries])).toEqual([
+          ['b-1', 'Boaat', 'EZ'], ['b-2', 'Boaat', 'EZ'], ['b-svc', undefined, undefined],
+        ])
+        expect(x.lines.map(l => l.model)).toEqual([undefined, undefined, undefined])
+        // A bill of any other brand reads Houzs' list, and no model.
+        const houzs = toEngineInput(rows([{ ...boaat, brand_code: 'AKEMI' }])).orders[0]
+        expect(houzs.lines.map(l => [l.model, l.fabricSeries])).toEqual([[undefined, 'EASY'], [undefined, 'EASY'], [undefined, undefined]])
+      })
+
+      it('takes off what the bill charged — the Boaat whole, the Xammar’s corner once — and pays the bonuses', () => {
+        const input = toEngineInput(rows())
+        const result = computeCommissionRun(input)
+        const statement = result.statements.find(s => s.staffId === 'staff-a')!
+        // Boaat: RM 3,000 of sofa off for the model (its corner is the model's, no compartment's), RM 40 + RM 50 EZ.
+        // Xammar: RM 1,000 of corner off, RM 30. 4% of what is left, RM 3,000 = RM 120; bonuses RM 120.
+        expect([statement.productRevenue, statement.productCommission, statement.kpiCommission, statement.totalCommission]).toEqual([3_000, 120, 120, 240])
+        expect(result.warnings).toEqual([])
+      })
+    })
+  })
+
+  describe('kpiLineReaders — how a bill’s lines are read for KPI items', () => {
+    const OWN = [{ id: 'brand-2990', code: ' 2990s ', own_scheme: true, erp_company_id: '2' }, { id: 'brand-off', code: 'OFF', own_scheme: true, is_active: false, erp_company_id: 3 }]
+
+    it('knows a brand’s bill’s company — none for a bill of a brand not on its own scheme, or switched off', () => {
+      const readers = kpiLineReaders(OWN, [], [])
+      expect(['2990S', ' 2990s ', 'OFF', 'AKEMI', null].map(code => readers.companyOf(code))).toEqual([2, 2, null, null, null])
+      // A brand with no company of its own reads the ERP's first.
+      expect(kpiLineReaders([{ id: 'b', code: '2990S', own_scheme: true }], [], []).companyOf('2990S')).toBe(1)
+    })
+
+    it('reads a code’s base model from a live SKU first, then the first by its id', () => {
+      const readers = kpiLineReaders(OWN, [], [
+        { erp_company_id: 2, item_code: 'LOTTI-2A', base_model: 'Lotti old', erp_id: '1', removed_at: '2026-10-01' },
+        { erp_company_id: 2, item_code: 'LOTTI-2A', base_model: 'Lotti', erp_id: '9' },
+        { erp_company_id: 2, item_code: 'LOTTI-2A', base_model: 'Lotti B', erp_id: '5' },
+        { erp_company_id: 2, item_code: 'BLANK-1', base_model: '  ', erp_id: '2' },
+      ])
+      expect(readers.modelOf(2, ' lotti-2a ')).toBe('Lotti B')
+      expect(readers.modelOf(2, 'BLANK-1')).toBeUndefined()
+      expect(readers.modelOf(null, 'LOTTI-2A')).toBeUndefined()
+      expect(readers.modelOf(3, 'LOTTI-2A')).toBeUndefined()
     })
   })
 })

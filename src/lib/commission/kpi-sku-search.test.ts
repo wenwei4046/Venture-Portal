@@ -7,17 +7,18 @@ import { searchSkuMaster } from './kpi-sku-search'
 // ran made Next drop, and a Back during the refresh stuck on the skeleton.
 
 const m = {
-  from: vi.fn(), select: vi.fn(), is: vi.fn(), or: vi.fn(), order: vi.fn(), limit: vi.fn(),
+  from: vi.fn(), select: vi.fn(), is: vi.fn(), eq: vi.fn(), or: vi.fn(), order: vi.fn(), limit: vi.fn(),
 }
 const sb = { from: m.from } as unknown as SupabaseClient
 
 beforeEach(() => {
   vi.resetAllMocks()
-  // erp_products → select → is → or → order → order → limit
-  const chain = { select: m.select, is: m.is, or: m.or, order: m.order, limit: m.limit }
+  // erp_products → select → is → (eq) → or → order → order → limit
+  const chain = { select: m.select, is: m.is, eq: m.eq, or: m.or, order: m.order, limit: m.limit }
   m.from.mockReturnValue(chain)
   m.select.mockReturnValue(chain)
   m.is.mockReturnValue(chain)
+  m.eq.mockReturnValue(chain)
   m.or.mockReturnValue(chain)
   m.order.mockReturnValue(chain)
   m.limit.mockResolvedValue({ data: [], error: null, count: 0 })
@@ -47,6 +48,15 @@ describe('Rules › KPI items — finding a SKU', () => {
     expect(m.is).toHaveBeenCalledExactlyOnceWith('removed_at', null)
     expect(m.or).toHaveBeenCalledExactlyOnceWith('item_code.ilike."*pil*",description.ilike."*pil*"')
     expect(m.limit).toHaveBeenCalledExactlyOnceWith(20)
+    // Every company's SKUs: the sub-department's own picker.
+    expect(m.eq).not.toHaveBeenCalled()
+  })
+
+  // 2026-11-14 — a brand on its own scheme (2990s) picks its own KPI items from its own ERP company's SKU master.
+  it("searches one company's SKU master alone when asked", async () => {
+    await searchSkuMaster(sb, 'pillow', 2)
+    expect(m.eq).toHaveBeenCalledExactlyOnceWith('erp_company_id', 2)
+    expect(m.is).toHaveBeenCalledExactlyOnceWith('removed_at', null)
   })
 
   it('asks nothing for an empty search', async () => {
