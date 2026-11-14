@@ -135,7 +135,7 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | customer | `header.debtor_name`, `header.debtor_code` | |
 | branch | `header.sales_location` | the WAREHOUSE the goods ship from (KL / PG / SRW). Stored as `location`; descriptive only |
 | **venue** | `header.venue` | **the fair itself** — "SUNWAY PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB". Free text the ERP types (`venue_id` is present but never populated). Its own column since 2026-09-16, with sales grouped by it on the month page |
-| brand | `header.branding`, then `vpBrand`, then `fair.brand` | matched to `comm_brands` by code, name or sub-brand (`sub_brands` — HAPPI SLEEP is Akemi's, mig `20261031200000`), case-insensitive: the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else the brand of the fair booth (not a cancelled one); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
+| brand | `fair.brand`, then `header.branding`, then `vpBrand` | matched to `comm_brands` by code, name or sub-brand (`sub_brands` — HAPPI SLEEP is Akemi's, mig `20261031200000`), case-insensitive: the brand of the booth the bill was opened at (not a cancelled one — since 2026-11-14, mig `20261114123500`, ahead of the rest); else the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
 | sales value | `header.local_total_sen` / 100 | the list's "Amount" (`subtotal_sen` as fallback) |
 | balance | `header.balance_sen_live` / 100 (else `balance_sen`) | what the deposit gate measures |
 | created at | `header.created_at` | orders the 1st / 2nd / 3rd bill of the day |
@@ -175,12 +175,18 @@ ERP's `branding` is never changed by it.
 | `null` / absent | not asked (the products name a brand), or skipped |
 
 Anything but a string is no pick — never a reason to refuse the sale. The
-bill's brand, in order: Branding when it names a brand → `vpBrand` → a brand
-picked on the portal (Sales orders › right-click › *Brand for the margin*, only
-on a bill nothing else names a brand for; `sales_order_brand_picks`, kept
-through every re-send) → the fair's brand → the lines (`erp_sync_order_brand`).
-The picks and the fair come BEFORE the lines on purpose: a Dunlopillo pillow sold
-at an Ergotex fair is an Ergotex bill.
+bill's brand, in order: the fair's brand — the booth it was opened at → Branding
+when it names a brand → `vpBrand` → a brand picked on the portal (Sales orders ›
+right-click › *Brand for the margin*, only on a bill nothing else names a brand
+for; `sales_order_brand_picks`, kept through every re-send) → the lines
+(`erp_sync_order_brand`; another ERP company's order is that company's brand
+before all of them). The picks and the fair come BEFORE the lines on purpose: a
+Dunlopillo pillow sold at an Ergotex fair is an Ergotex bill. **Since 2026-11-14
+the booth comes first of all** (mig `20261114123500`; the user: "你应该是可以
+capture 得到每一张销售单都是在什么 brand 的 booth 开单的，所以你就可以跟着那个
+brand 的 margin 去计算" — "全跟 booth"): an Akemi mattress opened at the ZANOTTI
+booth is a Zanotti bill — its margin ladder, its brand's cost ratio and the brand
+every page shows. A line keeps its product's brand. Nothing changes on the ERP side.
 
 
 ### 3.4 The fair — what the salesperson picked (2026-09-27)
