@@ -101,6 +101,11 @@ interface Props {
    * who halved it and why while it is half. Null or absent: no row.
    */
   halfComm?: { action: BillHalfCommAction; detail: string | null } | null
+  /**
+   * Opened by a row's own *Don't count…* (2026-11-14, a ledger's Review column): open straight on Don't count's two
+   * kinds beside the menu. Nothing is chosen for HR.
+   */
+  startWith?: 'dontCount'
   onClose: () => void
   onDone: (outcome: BillMenuOutcome) => void
   onBrandDone?: (outcome: BillBrandOutcome) => void
@@ -123,7 +128,7 @@ interface Props {
  * menu itself since 2026-10-12, and in the panel — gives a part back to the
  * owner.
  */
-export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, move = null, halfComm = null, onClose, onDone, onBrandDone, onShareDone, onMoveDone, onHalfCommDone }: Props) {
+export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, move = null, halfComm = null, startWith, onClose, onDone, onBrandDone, onShareDone, onMoveDone, onHalfCommDone }: Props) {
   const router = useRouter()
   const boundary = useRef<HTMLDivElement>(null)
   const countButton = useRef<HTMLButtonElement>(null)
@@ -196,6 +201,15 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     restoreFocus.current?.focus({ preventScroll: true })
     restoreFocus.current = null
   }, [confirm, brandPanel, sharePanel, movePanel, halfPanel])
+
+  // Opened by a row's own Don't count… (2026-11-14): straight onto its two kinds, once — the menu's own row
+  // is drawn by then, so the panel hangs beside it as if it had been chosen there.
+  const started = useRef(false)
+  useEffect(() => {
+    if (started.current || startWith !== 'dontCount' || action.kind !== 'exclude') return
+    started.current = true
+    openConfirm()
+  })
 
   function openConfirm() {
     if (writing.current || !countButton.current) return

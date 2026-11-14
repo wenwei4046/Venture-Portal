@@ -589,10 +589,10 @@ function actionOf(verdict: ClaimVerdict, pattern: ClaimPattern, bills: DoubleCla
       const more = c.sales === 'differs' && c.earning !== 'same' && extra > 0 && original
         ? ` If the customer really did add to the order, only the ${money(extra)} above ${original.orderNo} is new.`
         : ''
-      return `If it is the same sale, take ${list(copies.map(b => b.orderNo))} out of ${claimMonth(copy.periodMonth)}: right-click it on All bills or on ${salesperson(copy)}’s ledger › Don’t count this bill.${more} If it is a different sale, its Ref No. in the ERP carries the wrong paper number — correct it there, then mark this checked.`
+      return `If it is the same sale, take ${list(copies.map(b => b.orderNo))} out of ${claimMonth(copy.periodMonth)}: right-click it on All bills or on ${salesperson(copy)}’s ledger › Don’t count this bill › Not counted.${more} If it is a different sale, its Ref No. in the ERP carries the wrong paper number — correct it there, then mark this checked.`
     }
     case 'copy':
-      return `Unless the customer really bought the same thing twice, take ${list(copies.map(b => b.orderNo))} out (right-click it › Don’t count this bill). If they are two sales, mark this checked.`
+      return `Unless the customer really bought the same thing twice, take ${list(copies.map(b => b.orderNo))} out (right-click it › Don’t count this bill › Not counted). If they are two sales, mark this checked.`
     case 'split':
       return `If ${bills[0].billRef} is one sale written as ${bills.length} documents, mark this checked — each document earns only on its own lines.`
     case 'second_sale': {

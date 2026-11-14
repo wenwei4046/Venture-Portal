@@ -25,6 +25,11 @@ export interface OpenBillMenu<Row> {
   /** Another link the right-click landed on — the salesperson's bills, the venue. */
   link: { href: string; label: string } | null
   byRightClick: boolean
+  /**
+   * Opened by a row's own *Don't count…* (2026-11-14): the menu opens on Don't count's two kinds — No commission ·
+   * Not counted — as the menu's own row does, never on one of them chosen for HR.
+   */
+  start?: 'dontCount'
 }
 
 /**
@@ -83,10 +88,10 @@ export function useBillMenu<Row>(keyOf: (row: Row) => string, hrefOf: (row: Row)
     setMenu({ row, anchor, link, byRightClick: true })
   }
 
-  function onMenuButton(button: HTMLButtonElement, row: Row) {
-    if (menu && keyOf(menu.row) === keyOf(row)) return setMenu(null)
+  function onMenuButton(button: HTMLButtonElement, row: Row, start?: 'dontCount') {
+    if (menu && keyOf(menu.row) === keyOf(row) && menu.start === start) return setMenu(null)
     const rect = button.getBoundingClientRect()
-    setMenu({ row, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom }, link: null, byRightClick: false })
+    setMenu({ row, anchor: { left: rect.left, top: rect.top, bottom: rect.bottom }, link: null, byRightClick: false, ...(start ? { start } : {}) })
   }
 
   const isOpenOn = (row: Row) => menu !== null && keyOf(menu.row) === keyOf(row)
