@@ -11,6 +11,12 @@ import t from "../share/share.module.css";
 type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
+ * The reason box's example names nobody (2026-11-14, found on production's E2E as ANTHONY): it read *e.g. Keyed for
+ * ANTHONY* to every salesperson — ANTHONY himself was asked to say the bill he keyed was his own.
+ */
+export const NOT_MINE_REASON_PLACEHOLDER = "e.g. Keyed in for a colleague";
+
+/**
  * Not my order (2026-11-14 — the user: a salesperson selects their sales order on the phone and writes a request "not my
  * order"; HR approves, and the bill counts for nothing — "完完全全 don't count"): say whose order it is, or why it is not
  * yours, and send it to HR. The sheet asks the database first whether it may be sent now (a bill that does not count, a
@@ -83,7 +89,7 @@ export default function NotMineSheet({ open, orderId, readOnly, load, onSend, on
           <label className={p.field}>
             <span className={p.fieldLabel}>Whose order is it?</span>
             <textarea className={`${p.input} ${p.textarea}`} rows={3} maxLength={NOT_MINE_REASON_MAX} value={reason}
-              placeholder="e.g. Keyed for ANTHONY" onChange={e => { setReason(e.target.value); setFailed(null); }} />
+              placeholder={NOT_MINE_REASON_PLACEHOLDER} onChange={e => { setReason(e.target.value); setFailed(null); }} />
           </label>
           {failed && <p className={p.formError}>{failed}</p>}
           <button className={p.primary} onClick={() => void send()} disabled={busy || readOnly || empty}>

@@ -21,7 +21,7 @@ import { gwpRulesOf } from "@/lib/catalogue/gwp";
  */
 export function quoteCostRules(
   raw: unknown,
-): Pick<QuoteRules, "costDivisor" | "costRatios" | "costRatiosByBrand" | "gwp"> | null {
+): Pick<QuoteRules, "costDivisor" | "costRatios" | "costRatiosByBrand" | "brandDivisors" | "gwp"> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
   if (typeof value.costDivisor !== "number" && typeof value.costDivisor !== "string") return null;
@@ -31,9 +31,24 @@ export function quoteCostRules(
     costDivisor,
     costRatios: quoteCostRatios(value.costRatios),
     costRatiosByBrand: quoteCostRatiosByBrand(value.costRatioBrands),
+    // A brand's own ratio (Costing Setting, 2026-11-14): { brand: ratio }.
+    brandDivisors: quoteBrandDivisors(value.brandDivisors),
     // Product List › GWP (2026-11-08): every one, as member_quote_cost_rules hands them.
     gwp: gwpRulesOf(value.gwp),
   };
+}
+
+/**
+ * The sub-department's ratio for each brand (Costing Setting, 2026-11-14):
+ * `{ "<brand>": ratio }`. Anything that is not a positive number is left out —
+ * that brand keeps the default.
+ */
+export function quoteBrandDivisors(raw: unknown): { brand: string; ratio: number }[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  return Object.entries(raw as Record<string, unknown>).flatMap(([brand, value]) => {
+    const ratio = Number(value);
+    return brand.trim() && Number.isFinite(ratio) && ratio > 0 ? [{ brand, ratio }] : [];
+  });
 }
 
 /**

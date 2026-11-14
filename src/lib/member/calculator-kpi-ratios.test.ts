@@ -114,6 +114,33 @@ describe("a rider SKU's ratio by brand", () => {
   });
 });
 
+// 2026-11-14 (Costing Setting — the user, of Fair's 0.70: "我要这个 ratio 这边，它是可以能够被 separate by brand 去填的"): a cart that
+// answers to a brand with a ratio of its own divides every SKU with none of its own by it, as the run reads the bill.
+describe("a brand's own ratio", () => {
+  const rules: QuoteRules = { costDivisor: 0.7, brandDivisors: [{ brand: "ZANOTTI", ratio: 0.5 }, { brand: "AKEMI", ratio: 0.6 }] };
+
+  it("divides a Zanotti cart by Zanotti's ratio — the sofa and the bed frame riding on it", () => {
+    // 1A(LHF) 1,000 ÷ 0.5 + Y04 800 ÷ 0.5 = 2,000 + 1,600.
+    const r = calculateQuote(quote([one("a"), one("y04-q")], sofa, "6000"), products, bands, rules, pricing);
+    expect(r.valid).toBe(true);
+    expect(r.margin).toBeCloseTo(((6000 - 2000 - 1600) / 6000) * 100, 10);
+  });
+
+  it("keeps a SKU's own ratio, and its ratio for the brand, ahead of the brand's", () => {
+    const own = calculateQuote(quote([one("a"), one("y04-q")], sofa, "6000"), products, bands,
+      { ...rules, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.8 }] }, pricing);
+    expect(own.margin).toBeCloseTo(((6000 - 2000 - 1000) / 6000) * 100, 10); // the frame 800 ÷ its own 0.8
+    const forBrand = calculateQuote(quote([one("a"), one("y04-q")], sofa, "6000"), products, bands,
+      { ...rules, costRatiosByBrand: [{ productCode: "Y04-(Q)", brand: "ZANOTTI", ratio: 0.4 }] }, pricing);
+    expect(forBrand.margin).toBeCloseTo(((6000 - 2000 - 2000) / 6000) * 100, 10); // the frame 800 ÷ 0.4 for Zanotti
+  });
+
+  it("riders alone answer to no brand: the department's ratio", () => {
+    const alone = calculateQuote(quote([one("y04-q")], undefined, "2000"), products, bands, rules, pricing);
+    expect(alone.margin).toBeCloseTo(((2000 - 1142.86) / 2000) * 100, 10); // 800 ÷ 0.7
+  });
+});
+
 // 2026-11-08 (Product List › GWP — the user: "dullop mattress ecobliss, set a gwp 2 micorfibre pillow. so the
 // margin calculator and margin leader will not calculate the cost in for those 2 pillow"): with the mattress in
 // the cart, up to two pillows a mattress leave the cost — found by themselves, the Quote unchanged, as the run
@@ -298,9 +325,18 @@ describe("the quote context's rules, read defensively", () => {
   // 2026-10-05: the cost rules arrive from member_quote_cost_rules (service role only).
   it("reads the cost rules, and refuses an answer with no usable ratio", () => {
     expect(quoteCostRules({ costDivisor: "0.7000", costRatios: { "Y04-(Q)": 0.6, bad: -1 } })).toEqual({
-      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }], costRatiosByBrand: [], gwp: [],
+      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }], costRatiosByBrand: [], brandDivisors: [], gwp: [],
     });
-    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [], costRatiosByBrand: [], gwp: [] });
+    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [], costRatiosByBrand: [], brandDivisors: [], gwp: [] });
+    // 2026-11-14: a brand's own ratio — anything not a positive number is left out.
+    expect(quoteCostRules({
+      costDivisor: 0.7,
+      brandDivisors: { ERGOTEX: "0.6000", DUNLOP: 0.65, AKEMI: 0, ZANOTTI: "x", " ": 0.6 },
+    })?.brandDivisors).toEqual([
+      { brand: "ERGOTEX", ratio: 0.6 },
+      { brand: "DUNLOP", ratio: 0.65 },
+    ]);
+    expect(quoteCostRules({ costDivisor: 0.7, brandDivisors: [0.6] })?.brandDivisors).toEqual([]);
     // 2026-11-08: the gifts with purchase, as member_quote_cost_rules hands them.
     expect(quoteCostRules({
       costDivisor: 0.7,

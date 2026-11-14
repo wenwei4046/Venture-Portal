@@ -7,6 +7,7 @@ import { officeTime } from '@/lib/office-time'
 import { revenuePath } from '@/lib/revenue'
 import { listSubDepartments } from '@/app/(portal)/revenue/_lib/sub-departments'
 import {
+  loadBrandDivisors,
   loadCombos,
   loadCostRatioBrands,
   loadCostRatios,
@@ -148,9 +149,9 @@ export default async function ProductListPage({
     if (!current || !current.schemeId || !rules) {
       body = <Notice tone="error">{current ? `${current.name} has no active scheme yet.` : 'No Revenue sub-department is set up yet.'}</Notice>
     } else {
-      const [skus, ratios, kivCosts, byBrand, brands] = await Promise.all([
+      const [skus, ratios, kivCosts, byBrand, brands, brandDivisors] = await Promise.all([
         loadSkus(), loadCostRatios(current.schemeId), loadKivCosts(),
-        loadCostRatioBrands(current.schemeId), loadSchemeBrands(current.schemeId),
+        loadCostRatioBrands(current.schemeId), loadSchemeBrands(current.schemeId), loadBrandDivisors(current.schemeId),
       ])
       body = (
         <CostSettingTab
@@ -162,6 +163,7 @@ export default async function ProductListPage({
           ratios={ratios}
           byBrand={byBrand}
           brands={brands}
+          brandDivisors={brandDivisors}
           skus={skus.map(toPickSku)}
           kivCosts={kivCosts}
         />

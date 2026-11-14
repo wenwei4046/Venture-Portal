@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatMoneyBare } from '@/lib/utils'
 import { valueKey } from '@/lib/catalogue/keys'
-import { isFabricSeriesPool, kpiItemKind, type KpiOptionPool } from '@/lib/commission/kpi'
+import { isFabricSeriesPool, isKpiOptionPool, kpiItemKind, type KpiOptionPool } from '@/lib/commission/kpi'
 import { validateKpiItems } from '@/lib/catalogue/rule-edits'
 import {
   amountDiffers,
@@ -64,7 +64,8 @@ function toListed(row: KpiItemRow): KpiListedItem {
     erpId: row.erp_product_id ?? null,
     code: row.product_code,
     name: row.product_name,
-    optionPool: row.option_pool,
+    // The sub-department's own item is never a model or a compartment (`kpi_item_pool_is_a_brands`).
+    optionPool: row.option_pool && isKpiOptionPool(row.option_pool) ? row.option_pool : null,
     optionValue: row.option_value,
     amount: Number(row.kpi_amount),
   }
