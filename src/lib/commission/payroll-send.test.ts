@@ -42,10 +42,10 @@ describe('unassignedOldBillWarnings (2026-11-07)', () => {
   it('names the bill and the fix, and nothing when there is none', () => {
     expect(unassignedOldBillWarnings([])).toEqual([])
     expect(unassignedOldBillWarnings(['HC-SO-006572'])).toEqual([
-      "HC-SO-006572 is a departed salesperson's old bill, topped up since by nobody the portal pays: give it to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill.",
+      "HC-SO-006572 is a departed salesperson's old bill, topped up since by nobody the portal pays: give it to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill → Not counted.",
     ])
     expect(unassignedOldBillWarnings(['HC-SO-006572', 'HC-SO-008957'])).toEqual([
-      "2 departed salespeople's old bills were topped up since by nobody the portal pays (HC-SO-006572, HC-SO-008957): give each to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill.",
+      "2 departed salespeople's old bills were topped up since by nobody the portal pays (HC-SO-006572, HC-SO-008957): give each to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill → Not counted.",
     ])
   })
 })

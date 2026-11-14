@@ -45,7 +45,7 @@ export function unassignedOldBillWarnings(orderNos: readonly string[]): string[]
     ? `${orderNos[0]} is a departed salesperson's old bill, topped up since by nobody the portal pays`
     : `${orderNos.length} departed salespeople's old bills were topped up since by nobody the portal pays (${orderNos.join(', ')})`
   const it = orderNos.length === 1 ? 'it' : 'each'
-  return [`${which}: give ${it} to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill.`]
+  return [`${which}: give ${it} to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill → Not counted.`]
 }
 
 const PERSON_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi

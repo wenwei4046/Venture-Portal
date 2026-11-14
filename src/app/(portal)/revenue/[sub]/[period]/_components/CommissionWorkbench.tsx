@@ -18,7 +18,7 @@ import { computeRevenuePay } from '@/lib/revenue-pay'
 import { personPayLinesLock } from '@/lib/revenue-pay-lines'
 import { brandLabel, exhibitionQuery, NO_BRAND, type ExhibitionSales } from '@/lib/exhibitions'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
-import { excludeOrder, includeOrder } from '../../../run-actions'
+import { includeOrder, setNoComm } from '../../../run-actions'
 import { nameWarnings, payrollState, unassignedOldBillWarnings, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
 import BillContextMenu, { type BillBrandOutcome, type BillHalfCommOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
@@ -711,15 +711,20 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       </button>
     </div>
   }
-  function dontCount(row: CommissionOrderRow | OverrideOrderRow) {
+  // No commission (2026-11-14): the Review column's Count again pays a bill again in one click — the menu's own
+  // Count this bill again; the notice and its Undo are the menu's.
+  function commAgain(row: CommissionOrderRow | OverrideOrderRow) {
     setError(''); setNotice(''); setBillDone(null); setShareDone(null); setBillBusy(row.orderId)
     startBill(async () => {
       try {
-        const result = await excludeOrder(row.orderId, null)
-        setBillDone(result.changed ? { orderId: row.orderId, orderNo: row.orderNo, excluded: true, result } : null)
+        const answer = await setNoComm(row.orderId, false)
+        if (!answer.ok) { setError(answer.reason); return }
+        setBillDone(answer.result.changed
+          ? { orderId: row.orderId, orderNo: row.orderNo, excluded: false, noComm: true, result: { orderNo: answer.result.orderNo, changed: true } }
+          : null)
         router.refresh()
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'That bill could not be taken out.'
+        const message = err instanceof Error ? err.message : 'That bill could not be paid again.'
         if (!message.includes('NEXT_REDIRECT')) setError(message)
       } finally { setBillBusy(null) }
     })
@@ -818,9 +823,16 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
             {overriding && <td>{(row as OverrideOrderRow).downlineName}</td>}
             {visibleColumns.map(([key]) => <td key={key} className={NUMERIC_COLUMNS.includes(key) ? s.numeric : undefined}>{cell(row, key, overriding, origin)}</td>)}
             <td>{row.upsale ? <span className={s.muted}>Not a bill</span>
-              : <button type="button" className={s.ghostButton} disabled={lockedMonths.has(row.periodMonth) || billPending}
-                title={lockedMonths.has(row.periodMonth) ? `${monthName(row.periodMonth)} is in payroll — a bill cannot leave it now` : 'Take this bill out of the commission; it stays out whatever the ERP sends next'}
-                onClick={() => dontCount(row)}>{billBusy === row.orderId ? 'Taking out…' : 'Don’t count'}</button>}</td>
+              // No commission (2026-11-14): it counts and pays nobody — Count again pays it again, in one click.
+              : (row as CommissionOrderRow).noComm
+                ? <button type="button" className={s.ghostButton} disabled={lockedMonths.has(row.periodMonth) || billPending}
+                  title={lockedMonths.has(row.periodMonth) ? `${monthName(row.periodMonth)} is in payroll — what its bills pay cannot change now` : noCommDetail(row.orderId) ?? undefined}
+                  onClick={() => commAgain(row)}>{billBusy === row.orderId ? 'Counting…' : 'Count again'}</button>
+                // Don't count is two kinds (2026-11-14): the button opens them, as the bill's menu does — never one chosen for HR.
+                : <button type="button" className={s.ghostButton} disabled={lockedMonths.has(row.periodMonth) || billPending}
+                  aria-haspopup="dialog"
+                  title={lockedMonths.has(row.periodMonth) ? `${monthName(row.periodMonth)} is in payroll — a bill cannot leave it now` : `No commission on it, or out of ${monthName(row.periodMonth)} altogether`}
+                  onClick={event => billMenu.onMenuButton(event.currentTarget, row, 'dontCount')}>Don’t count…</button>}</td>
             <td className={s.stickyTotal}>{money(row.totalCommission)}{overriding && <small>{pct((row as OverrideOrderRow).overrideRate)} overriding</small>}</td>
           </tr>})}</tbody>
           <tfoot><tr><td className={s.stickyFirst}>Visible subtotal</td><td colSpan={visibleColumns.length + (overriding ? 2 : 1)}>{filtered.length} sales orders</td><td className={s.stickyTotal}>{money(sum(filtered, r => r.totalCommission))}</td></tr></tfoot>
@@ -1150,6 +1162,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     </div>
 
     {billMenu.menu && <BillContextMenu
+      // A new menu for every row and every way in: one opened by Don't count… starts on its two kinds.
+      key={`${billMenu.menu.row.key}:${billMenu.menu.start ?? ''}`} startWith={billMenu.menu.start}
       bill={{
         orderId: billMenu.menu.row.orderId,
         orderNo: billMenu.menu.row.orderNo,

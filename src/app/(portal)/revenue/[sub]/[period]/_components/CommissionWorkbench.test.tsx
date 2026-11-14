@@ -472,11 +472,17 @@ describe('CommissionWorkbench', () => {
   // User 2026-09-27: the one thing adjusted in the portal is whether a bill
   // counts — so this button takes it out for real, as right-click does on
   // All bills, and it stays out whatever the ERP sends next.
-  it("takes a bill out for real with Don't count, and puts it back with Undo", async () => {
+  // 2026-11-14: Don't count is two kinds — the Review column's button opens them, as the bill's menu does, and
+  // chooses neither for HR ("make sure all place that got show not count need follow the new setting").
+  it("takes a bill out for real with Don't count… › Not counted, and puts it back with Undo", async () => {
     renderBoard()
     choose('Anthony')
-    fireEvent.click(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Don’t count' }))
-    await waitFor(() => expect(excludeOrder).toHaveBeenCalledWith('one', null))
+    fireEvent.click(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Don’t count…' }))
+    expect(excludeOrder).not.toHaveBeenCalled()
+    const panel = await screen.findByRole('dialog', { name: "Don't count SO-one" })
+    expect(within(panel).getAllByRole('button').map(b => b.textContent)).toEqual(['Cancel', 'No commission', 'Not counted'])
+    fireEvent.click(within(panel).getByRole('button', { name: 'Not counted' }))
+    await waitFor(() => expect(excludeOrder).toHaveBeenCalledWith('one', ''))
     expect(refresh).toHaveBeenCalledOnce()
     // The same notice, and the same Undo, as the right-click menu's.
     const notice = await screen.findByText(/SO-one no longer counts in August 2026\./)
@@ -511,14 +517,14 @@ describe('CommissionWorkbench', () => {
     data.input.orders = [...data.input.orders, ...upsalesToOrders([{ id: 'up', staff_id: 'agent', amount: 300, sold_on: '2026-08-20', original_ref: 'HC5315' }], '2026-08-01')]
     renderBoard(data)
     choose('Anthony')
-    expect(within(salesRow(personalTable(), 'UPSALE HC5315')).queryByRole('button', { name: 'Don’t count' })).toBeNull()
+    expect(within(salesRow(personalTable(), 'UPSALE HC5315')).queryByRole('button', { name: 'Don’t count…' })).toBeNull()
     expect(salesRow(personalTable(), 'UPSALE HC5315')).toHaveTextContent('Not a bill')
     cleanup()
     visit('')
     render(<CommissionWorkbench data={fixture()} sub="fair" period="2026-08-01" runStatus="applied" savedTotals={[]} monthStats={monthStats}
       lockedPeriods={['2026-08-01']} />)
     choose('Anthony')
-    expect(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Don’t count' })).toBeDisabled()
+    expect(within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Don’t count…' })).toBeDisabled()
   })
 
   // User 2026-10-03: follow erp sales order number, but with reference
@@ -1039,6 +1045,29 @@ describe('CommissionWorkbench — a bill that pays nobody, on its ledger (2026-1
     await waitFor(() => expect(setNoComm).toHaveBeenCalledWith('one', false, null))
     expect(await screen.findByText(/^SO-one pays its commission again\./)).toBeInTheDocument()
   })
+
+  it('its Review column says Count again, in one click', async () => {
+    setNoComm.mockResolvedValue({ ok: true, result: { orderNo: 'SO-one', changed: true } })
+    renderBoard(noCommFixture(), 'computed')
+    choose('Anthony')
+    expect(within(salesRow(personalTable(), 'SO-two')).getByRole('button', { name: 'Don’t count…' })).toBeEnabled()
+    const again = within(salesRow(personalTable(), 'SO-one')).getByRole('button', { name: 'Count again' })
+    expect(again).toHaveAttribute('title', 'No commission by HR on 14 Nov 2026 — keyed for ANTHONY')
+    fireEvent.click(again)
+    await waitFor(() => expect(setNoComm).toHaveBeenCalledWith('one', false))
+    expect(await screen.findByText(/^SO-one pays its commission again\./)).toBeInTheDocument()
+  })
+
+  it('the Review column’s Don’t count… can choose No commission too', async () => {
+    setNoComm.mockResolvedValue({ ok: true, result: { orderNo: 'SO-two', changed: true, halfCommOff: false } })
+    renderBoard(noCommFixture(), 'computed')
+    choose('Anthony')
+    fireEvent.click(within(salesRow(personalTable(), 'SO-two')).getByRole('button', { name: 'Don’t count…' }))
+    const panel = await screen.findByRole('dialog', { name: "Don't count SO-two" })
+    fireEvent.click(within(panel).getByRole('button', { name: 'No commission' }))
+    await waitFor(() => expect(setNoComm).toHaveBeenCalledWith('two', true, ''))
+    expect(await screen.findByText(/^SO-two pays no commission in August 2026/)).toBeInTheDocument()
+  })
 })
 
 describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () => {
@@ -1332,7 +1361,7 @@ describe('CommissionWorkbench — rows from another month (user 2026-10-12)', ()
     fireEvent.doubleClick(within(salesRow(personalTable(), 'SO-two')).getByText('Convention Centre'))
     expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/revenue\/fair\/2026-08-01\/orders\/two\?from=/))
     push.mockClear()
-    fireEvent.doubleClick(within(salesRow(personalTable(), 'SO-two')).getByRole('button', { name: 'Don’t count' }))
+    fireEvent.doubleClick(within(salesRow(personalTable(), 'SO-two')).getByRole('button', { name: 'Don’t count…' }))
     expect(push).not.toHaveBeenCalled()
     // The upsell opens the bill it changed.
     fireEvent.doubleClick(within(salesRow(personalTable(), 'UPSALE HC13254')).getAllByRole('cell')[3])
