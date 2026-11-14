@@ -13,6 +13,8 @@ const FIELDS = [
   { name: "confirm", label: "Confirm password", placeholder: "Type it again" },
 ] as const;
 
+const ACTIVATE = { form: "Set your password", submit: "Activate account", pending: "Activating…" };
+
 /**
  * An invite link's two boxes (2026-10-16): the new password and the same again,
  * each with the sign-in page's eye, and Activate. The boxes are checked here
@@ -24,9 +26,12 @@ const FIELDS = [
 export default function WelcomeForm({
   action,
   token,
+  words = ACTIVATE,
 }: {
   action: (form: FormData) => Promise<WelcomeState | void>;
   token: string;
+  /** The form's name and button — /reset-password (2026-11-14) saves rather than activates. */
+  words?: { form: string; submit: string; pending: string };
 }) {
   const id = useId();
   const [values, setValues] = useState({ password: "", confirm: "" });
@@ -48,7 +53,7 @@ export default function WelcomeForm({
   );
 
   return (
-    <form className={s.form} action={formAction} aria-label="Set your password" aria-busy={pending}>
+    <form className={s.form} action={formAction} aria-label={words.form} aria-busy={pending}>
       {state.error && (
         <p className={s.error} role="alert">
           {state.error}
@@ -90,7 +95,7 @@ export default function WelcomeForm({
       ))}
       <button className={s.submit} type="submit" disabled={pending}>
         {pending && <span className={s.submitSpinner} aria-hidden="true" />}
-        {pending ? "Activating…" : "Activate account"}
+        {pending ? words.pending : words.submit}
       </button>
     </form>
   );

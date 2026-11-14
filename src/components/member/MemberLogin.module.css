@@ -72,6 +72,7 @@
 .passwordToggle:hover { background: rgb(var(--paper)); }
 .helpToggle { display: inline-flex; align-items: center; min-height: 30px; padding: 2px 0; border: 0; background: transparent; font-size: 12px !important; font-weight: 500; color: rgb(var(--accent)); text-align: right; }
 .helpToggle:hover { text-decoration: underline; }
+.backLink { justify-self: center; }
 .helpPanel { padding: 14px 16px; border-radius: 10px; background: rgb(var(--paper)); color: rgb(var(--graphite)); font-size: 13px; line-height: 1.65; }
 .submit { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 54px; padding: 14px 20px; border: 1px solid transparent; border-radius: 12px; background: #5a3e2b; color: #fcfaf7; font-size: 15px !important; font-weight: 500; transition: background 160ms, transform 160ms; margin-top: 2px; }
 .submit:hover { background: #49301f; }

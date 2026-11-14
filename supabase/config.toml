@@ -239,6 +239,11 @@ otp_expiry = 3600
 subject = "Your HOUZS Venture account"
 content_path = "./supabase/templates/invite.html"
 
+# The reset-password email (2026-11-14) — the sign-in's Forgot password?; pushed the same way.
+[auth.email.template.recovery]
+subject = "Reset your HOUZS Venture password"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
