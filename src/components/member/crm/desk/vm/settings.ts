@@ -5,6 +5,7 @@
  * Notifications page (Unread | Read, categories, Select, Delete with a 30 s Undo). The read state is the phone's
  * (crm_read_notifs); what the Principal or Director sets here is what everybody's CRM uses.
  */
+import { HUMAN_AGENT_APPROVED } from "@/lib/messenger/send";
 import { formFromRow, infoLabel } from "@/lib/crm-partner/model";
 import type { CrmLeave, CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
@@ -228,8 +229,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       { t: "Urgent", s: "The row turns oxblood", v: h(cur.replyUrgentH), key: "replyUrgentH" },
       { t: "Overdue", s: "The person's own phone is told", v: `${h(cur.replyOverdueH)}+`, key: "replyOverdueH" }] },
     { title: "Cold leads", sub: "Meta allows free replies for 24 hours after the customer's last message", rows: [
-      { t: "Reply window", s: "Set by WhatsApp and Messenger", v: "24 h" },
-      { t: "Move to Cold leads", s: "When the reply window shuts · only a template can reopen the chat", v: "24 h" },
+      { t: "Reply window", s: "Set by WhatsApp and Messenger · Messenger takes a person's reply for 7 days (Human Agent)", v: HUMAN_AGENT_APPROVED ? "24 h · Messenger 7 d" : "24 h" },
+      { t: "Move to Cold leads", s: "When the reply window shuts · only a template can reopen the chat", v: HUMAN_AGENT_APPROVED ? "24 h · Messenger 7 d" : "24 h" },
       { t: "Suggest a template", s: "Shows the template button on a cold chat", v: cur.suggestTemplate ? "On" : "Off", key: "suggestTemplate" }] },
     { title: "Notifications", sub: "Only a person's own customers ever notify", rows: [
       { t: "Push for new messages", s: cur.pushMessages ? "Each phone turns its own on · Revenue app › Settings" : "Off · no phone is told of a customer's message", v: cur.pushMessages ? "On" : "Off", key: "pushMessages" },
