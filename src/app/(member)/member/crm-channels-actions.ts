@@ -17,7 +17,7 @@ import {
   templateBody, pageProfileBody, uploadWaPhoto, waProfileBody, type BusinessProfile, type MessengerProfile, type MetaPermission, type MetaTemplate, type PageInfo, type WaAutomation, type WaNumber, type WaProfile,
 } from "@/lib/meta/channels";
 
-export interface ChannelLink { kind: "page" | "wa" | "ig" | "ads"; externalId: string; name: string; linked: boolean; isDefault: boolean; updatedAt: string }
+export interface ChannelLink { kind: "page" | "wa" | "ig" | "ads" | "form"; externalId: string; name: string; linked: boolean; isDefault: boolean; updatedAt: string }
 export interface MetaChannels {
   pages: (PageInfo & { msgr: MessengerProfile | null })[];
   wa: (WaNumber & { profile: WaProfile | null; automation: WaAutomation | null })[];

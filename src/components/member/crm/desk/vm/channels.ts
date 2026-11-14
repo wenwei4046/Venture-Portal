@@ -47,7 +47,7 @@ export function channelsVM(ctx: DeskCtx) {
   const pageDef = defOf("page", pages), waDef = defOf("wa", nums);
   const page = pages.find(p => p.id === pageDef) ?? pages[0];
 
-  const setLink = (kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean, done: string) =>
+  const setLink = (kind: "page" | "wa" | "form", id: string, name: string, linked: boolean, isDefault: boolean, done: string) =>
     void ctx.deskAct.setChannel(kind, id, name, linked, isDefault).then(ok => { if (ok) { toast(done); meta.reload(); } });
   const GT: Record<string, [string, string, string, string, string]> = {
     page: ["Facebook Pages", "Messages from these Pages come into Inbox", "var(--crm-messenger)", "f", "Link a Page"],
@@ -72,15 +72,17 @@ export function channelsVM(ctx: DeskCtx) {
 
   // The dialogs: Unlink (the CRM's own), and "Link …" — Embedded Signup is Meta's, so Continue opens Meta.
   const dlg = ui.chDlg;
-  const UNLINK: Record<string, string> = { page: "Messages from this Page stop coming into Inbox. Chats you already have stay.", wa: "This number stops sending and receiving in the CRM. Chats you already have stay. The number stays in your Meta account.",
+  const UNLINK: Record<string, string> = { page: "Messenger chats from this Page stop coming into Inbox. Chats you already have stay. Its Instant Form leads keep coming in — they have their own switch.",
+    form: "Instant Form leads from this Page stop coming into the CRM. Customers you already have stay. Its Messenger chats keep coming in — they have their own switch.", wa: "This number stops sending and receiving in the CRM. Chats you already have stay. The number stays in your Meta account.",
     ig: "Instagram messages stop coming into Inbox. Chats you already have stay.", ads: "Ads Performance and Assignment stop reading this account." };
   // One shape for every dialog the design draws (Add a number's two steps and Link's picker are Meta's now: never shown).
   const NODLG = { isUnlink: false, isLink1: false, isLink2: false, isWa1: false, isWa2: false, title: "", body: "", confirm: () => {}, next: () => {},
     cands: [] as { n: string; sub: string; bd: string; chk: string; bg: string; toggle: () => void }[], linkBg: "var(--crm-line)", num: "", setNum: () => {},
     vias: [] as { v: string; bg: string; fg: string; sh: string; pick: () => void }[], nextBg: "var(--crm-line)", sentTo: "", code: "", setCode: () => {}, resend: () => {} };
-  const chDlg = !dlg ? NODLG : dlg.kind === "unlink" ? (() => { const [k, id] = dlg.id.split(":"); const x = rowsOf[k]?.find(r => r.id === id);
-    return { ...NODLG, isUnlink: true, title: `Unlink ${x?.name ?? "this"}?`, body: UNLINK[k] ?? "",
-      confirm: () => { patch({ chDlg: null }); if (x && (k === "page" || k === "wa")) setLink(k, x.id, x.name, false, false, `${x.name} unlinked`); } }; })()
+  const chDlg = !dlg ? NODLG : dlg.kind === "unlink" ? (() => { const [k, id] = dlg.id.split(":"); const x = rowsOf[k === "form" ? "page" : k]?.find(r => r.id === id);
+    const what = k === "page" ? "Messenger chats" : k === "form" ? "Instant Form leads" : "";
+    return { ...NODLG, isUnlink: true, title: what ? `Stop ${what} from ${x?.name ?? "this Page"}?` : `Unlink ${x?.name ?? "this"}?`, body: UNLINK[k] ?? "",
+      confirm: () => { patch({ chDlg: null }); if (x && (k === "page" || k === "wa" || k === "form")) setLink(k, x.id, x.name, false, false, what ? `${x.name} · ${what} off` : `${x.name} unlinked`); } }; })()
     : { ...NODLG, isLink1: true, title: GT[dlg.id]?.[4] ?? "Link", next: () => { patch({ chDlg: null }); open(dlg.id === "wa" ? WA_MANAGER : META_SUITE); toast("Opened Meta — link it there, then Refresh here"); } };
 
   // Facebook Page.
@@ -213,7 +215,13 @@ export function channelsVM(ctx: DeskCtx) {
       const same = (a: string, b: string) => { const x = digits(a), y = digits(b); return !!x && !!y && (x.endsWith(y.slice(-8)) || y.endsWith(x.slice(-8))); };
       const used = new Set<string>();
       const pageRow = (p: (typeof pages)[number]) => ({ id: p.id, title: `Facebook · ${p.name}`, sub: `Messenger · Page ${p.id.length > 8 ? `${p.id.slice(0, 4)}…${p.id.slice(-4)}` : p.id}`, linked: p.on,
-        act: p.on ? () => patch({ chTab: "page" }) : () => setLink("page", p.id, p.name, true, false, `${p.name} linked · its chats come into Inbox`), actLabel: p.on ? "Manage" : "Link" });
+        act: p.on ? () => patch({ chTab: "page" }) : () => setLink("page", p.id, p.name, true, false, `${p.name} linked · its chats come into Inbox`), actLabel: p.on ? "Manage" : "Link",
+        // Two switches (2026-11-14, the owner: "分成两个开关"): the Page's Messenger chats (kind 'page') and its Instant Form
+        // leads (kind 'form', mig 20261114120000) come into the CRM apart. Off asks first; on goes at once. CRM · Manage.
+        switches: ([["page", "Messenger chats", p.on], ["form", "Instant Form leads", isLinked("form", p.id)]] as const).map(([k, label, on]) => ({
+          label, on, can,
+          toggle: () => { if (!can) return; if (on) patch({ chDlg: { kind: "unlink", id: `${k}:${p.id}` } });
+            else setLink(k, p.id, p.name, true, false, `${p.name} · ${label} on`); } })) });
       const cards = nums.map(n => {
         // The Page whose listed phone is this number, else (it lists none, or another) the Page named as the number's
         // verified business (the owner, 2026-10-18: "channel 一直保持这样" — Dream Crafter Design's Page lists no number,

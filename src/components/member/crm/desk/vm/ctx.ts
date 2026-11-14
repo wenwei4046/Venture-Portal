@@ -355,7 +355,7 @@ export interface DeskActions {
   saveRoomDraft(room: string, draft: Record<string, unknown> | null): Promise<boolean>;
   deleteRoom(roomId: string): Promise<boolean>;
   /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
-  setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
+  setChannel(kind: "page" | "wa" | "form", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
   saveRecents(list: string[]): void;
   /** One's own screen choices on the server (crm_save_ui_pref, mig 20261110120000) — read back as data.uiPrefs[key]. */
