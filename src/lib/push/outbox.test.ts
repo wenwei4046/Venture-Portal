@@ -119,6 +119,12 @@ describe('a notice', () => {
     expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'claims', title: 'A claim to approve — CHIN YEE RU', body: '', refKind: 'payment_request', refId: 'p1', at: 'x', read: false }] }).items)
       .toHaveLength(1)
     expect(noticeUrl({ refKind: 'share_request', refId: 's1' }, 'hr')).toBe('/member?share=s1')
+    // A Not my order request HR answered (2026-11-14): the Revenue app's, its request open, from either app — and the bells
+    // read the notice.
+    expect(noticeUrl({ refKind: 'not_mine_request', refId: 'n 1' }, 'revenue')).toBe('/member?notmine=n%201')
+    expect(noticeUrl({ refKind: 'not_mine_request', refId: 'n1' }, 'hr')).toBe('/member?notmine=n1')
+    expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'share', title: 'HC-SO-2611-044 · not counted', body: '', refKind: 'not_mine_request', refId: 'n1', at: 'x', read: false }] }).items)
+      .toHaveLength(1)
     // A share that took effect on its Accept (2026-11-07), to HR: Comm Cal's month, its Requests tab — nothing else.
     expect(noticeUrl({ refKind: 'share_taken', refId: 'fair/2026-11-01' }, 'hr')).toBe('/revenue/fair/2026-11-01?view=requests')
     expect(noticeUrl({ refKind: 'share_taken', refId: '//evil.example/x' }, 'hr')).toBe('/revenue')
