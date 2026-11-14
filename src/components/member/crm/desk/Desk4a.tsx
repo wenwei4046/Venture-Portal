@@ -1921,7 +1921,8 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
   );
 }
 
-interface ChRow { title: string; sub: string; linked: boolean; act: () => void; actLabel: string }
+interface ChSwitch { label: string; on: boolean; can: boolean; toggle: () => void }
+interface ChRow { title: string; sub: string; linked: boolean; act: () => void; actLabel: string; switches?: readonly ChSwitch[] }
 interface ChannelsBits {
   ch4: {
     cards: { number: string; label: string; route: string; edit: () => void; wa: ChRow; page: ChRow }[];
@@ -1936,6 +1937,21 @@ function ChannelRow({ r, wa }: { r: ChRow; wa: boolean }) {
       <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
         <span style={{ font: "500 13px Inter, sans-serif", color: r.linked ? "var(--crm-ink)" : "var(--crm-muted)" }}>{r.title}</span>
         <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>{r.sub}</span>
+        {r.switches && (
+          // Two switches (2026-11-14): the Page's Messenger chats and its Instant Form leads come into the CRM apart.
+          <span style={{ display: "flex", flexWrap: "wrap", gap: "14px", marginTop: "6px" }}>
+            {r.switches.map(w => (
+              <button key={w.label} type="button" role="switch" aria-checked={w.on} disabled={!w.can} onClick={w.toggle}
+                title={w.can ? (w.on ? `${w.label} come into the CRM — turn off` : `${w.label} are kept out of the CRM — turn on`) : "Only CRM · Manage can change this"}
+                style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "6px", font: "500 11.5px Inter, sans-serif", color: w.on ? "var(--crm-ink)" : "var(--crm-muted)", cursor: w.can ? "pointer" : "default" }}>
+                <span style={{ position: "relative", width: "26px", height: "15px", borderRadius: "8px", flex: "none", background: w.on ? "var(--crm-brown)" : "var(--crm-rule)", transition: "background .15s" }}>
+                  <span style={{ position: "absolute", top: "2px", left: w.on ? "13px" : "2px", width: "11px", height: "11px", borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                </span>
+                {w.label}
+              </button>
+            ))}
+          </span>
+        )}
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: "6px", font: "400 12px Inter, sans-serif", color: r.linked ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap" }}>
         <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: r.linked ? "var(--crm-brown)" : "var(--crm-faint-2)" }} />{r.linked ? "Connected" : "Not linked"}
