@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notMineRequestFromRow, type NotMineContext, type NotMineRequest } from "@/lib/member/not-mine-requests";
 import { OrderSheet } from "../InsightSheets";
 import type { OrderSheetVM } from "../insight-model";
-import NotMineSheet from "./NotMineSheet";
+import NotMineSheet, { NOT_MINE_REASON_PLACEHOLDER } from "./NotMineSheet";
 import NotMineRequestSheet from "./NotMineRequestSheet";
 import { notMineRequestVM } from "./not-mine-model";
 
@@ -78,6 +78,15 @@ describe("Not my order sheet", () => {
     fireEvent.click(send);
     await waitFor(() => expect(onOpenRequest).toHaveBeenCalledWith(request()));
     expect(onSend).toHaveBeenCalledWith(ORDER, "Keyed for ANTHONY");
+  });
+
+  it("gives an example that names nobody — never a salesperson's own name (production, 2026-11-14)", async () => {
+    render(<NotMineSheet open orderId={ORDER} readOnly={false} load={async () => ({ ok: true, data: context() })}
+      onSend={vi.fn()} onOpenRequest={() => {}} onClose={() => {}} />);
+    const box = await screen.findByRole("textbox") as HTMLTextAreaElement;
+    expect(box.placeholder).toBe(NOT_MINE_REASON_PLACEHOLDER);
+    expect(box.placeholder).toBe("e.g. Keyed in for a colleague");
+    expect(box.placeholder).not.toMatch(/[A-Z]{3,}/);
   });
 
   it("says the database's refusal, and keeps what was typed", async () => {
