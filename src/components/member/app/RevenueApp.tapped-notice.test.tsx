@@ -30,6 +30,7 @@ vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
 vi.mock("@/app/(member)/member/it-actions", () => ({}));
 vi.mock("@/app/(member)/member/share-actions", () => ({}));
+vi.mock("@/app/(member)/member/not-mine-actions", () => ({}));
 vi.mock("@/app/(member)/member/arena-actions", () => ({}));
 vi.mock("@/app/(member)/member/kpi-summary-actions", () => ({}));
 vi.mock("@/app/(member)/member/batch-actions", () => ({}));
