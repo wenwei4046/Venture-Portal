@@ -941,6 +941,71 @@ describe("a rider SKU's ratio by brand — 2026-11-07", () => {
   })
 })
 
+describe("a brand's own ratio — 2026-11-14", () => {
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+  // Fair at 0.7; Ergotex 0.6 and Dunlopillo 0.65 of their own, Akemi and Zanotti none. M2 has a ratio of its own (0.8);
+  // TRION a ratio for Dunlopillo (0.55).
+  const basis = costBasisOf(0.7, [{ productCode: 'M2', ratio: 0.8 }], [{ productCode: 'TRION (K)', brand: 'DUNLOP', ratio: 0.55 }], [
+    { brand: ' ergotex ', ratio: 0.6 },
+    { brand: 'DUNLOP', ratio: 0.65 },
+    { brand: 'AKEMI', ratio: 0 },
+  ])
+
+  it("divides a SKU with no ratio of its own by the brand's, else the default", () => {
+    expect(costDivisorFor('M1', basis, 'ERGOTEX')).toBe(0.6)
+    expect(costDivisorFor('M1', basis, 'dunlop')).toBe(0.65)
+    // A brand with none — or a ratio that is no ratio — divides by the sub-department's.
+    expect(costDivisorFor('M1', basis, 'ZANOTTI')).toBe(0.7)
+    expect(costDivisorFor('M1', basis, 'AKEMI')).toBe(0.7)
+    // No brand: the sub-department's.
+    expect(costDivisorFor('M1', basis, null)).toBe(0.7)
+    expect(costDivisorFor('M1', basis)).toBe(0.7)
+  })
+
+  it("a SKU's own ratio, and its ratio for the brand, stay ahead of the brand's", () => {
+    expect(costDivisorFor('M2', basis, 'ERGOTEX')).toBe(0.8)
+    expect(costDivisorFor('TRION (K)', basis, 'DUNLOP')).toBe(0.55)
+    // The frame has none for Ergotex and none of its own: Ergotex's.
+    expect(costDivisorFor('TRION (K)', basis, 'ERGOTEX')).toBe(0.6)
+  })
+
+  it("costs a bill's lines at its brand's ratio", () => {
+    const lines = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 3_000, 600],
+      ['MATTRESS', 'M2', 1, 1_000, 200],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 330],
+    ]).lines
+    // Ergotex: 600 ÷ 0.6 + 200 ÷ 0.8 + 330 ÷ 0.6 = 1,000 + 250 + 550.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'ERGOTEX').cost).toBe(1_800)
+    // Dunlopillo: 600 ÷ 0.65 + 250 + 330 ÷ 0.55 = 923.08 + 250 + 600.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'DUNLOP').cost).toBe(1_773.08)
+    // Zanotti has none: 600 ÷ 0.7 + 250 + 330 ÷ 0.7.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'ZANOTTI').cost).toBe(1_578.57)
+  })
+
+  it('a bill with no brand of its own answers to the brand its goods sell the most of', () => {
+    const lines = order('2', 'rs', [
+      ['MATTRESS', 'M1', 1, 3_000, 600, 'ERGOTEX'],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 330],
+    ]).lines
+    const base = marginBase(lines, indexKpiItems([]), groupIndex, basis)
+    expect(base.brandCode).toBe('ERGOTEX')
+    expect(base.cost).toBe(1_550) // 600 ÷ 0.6 + 330 ÷ 0.6
+  })
+
+  it('carries them into the run: one mattress, two brands, two margins', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 1_000, 300]], { brandCode: 'ERGOTEX' }),
+        order('2', 'ta', [['MATTRESS', 'M1', 1, 1_000, 300]], { brandCode: 'AKEMI' }),
+      ],
+      scheme: { ...SCHEME, costDivisor: 0.7, brandDivisors: [{ brand: 'ERGOTEX', ratio: 0.6 }] },
+    })
+    expect(find(r.statements, 'rs').marginPct).toBeCloseTo(0.5, 10) // 1 − 300 ÷ 0.6 ÷ 1,000
+    expect(find(r.statements, 'ta').marginPct).toBeCloseTo(0.5714, 4) // 1 − 300 ÷ 0.7 ÷ 1,000
+  })
+})
+
 // ─── Hierarchy override ─────────────────────────────────────────────────────
 
 describe('hierarchy override — differential roll-up', () => {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { parseRatio, teamCost, validateCostSetting, type CostSettingEdit } from '@/lib/catalogue/rule-edits'
 import { saveCostSetting } from '../actions'
-import type { CostRatioBrandRow, CostRatioRow, KivCostRow, PickSku, SchemeBrand } from '../load'
+import type { BrandDivisorRow, CostRatioBrandRow, CostRatioRow, KivCostRow, PickSku, SchemeBrand } from '../load'
 import KivCostsSection from './KivCostsSection'
 import PageScrolledTable from './PageScrolledTable'
 import ProductRowMenu, { type ProductRowMenuAnchor, type ProductRowMenuItem } from './ProductRowMenu'
@@ -61,6 +61,7 @@ const brandKeyOf = (erpId: string, brand: string) => `${erpId}\u0000${brand}`
 const NO_KIV: KivCostRow[] = []
 const NO_BRAND_RATIOS: CostRatioBrandRow[] = []
 const NO_BRANDS: SchemeBrand[] = []
+const NO_BRAND_DIVISORS: BrandDivisorRow[] = []
 
 interface Line {
   erpId: string
@@ -92,6 +93,14 @@ interface Line {
  * adds the ticked SKUs with their brands at once. A brand left blank follows the
  * SKU's own ratio, else the sub-department's; a SKU may be listed for its brands
  * alone.
+ *
+ * THE SUB-DEPARTMENT'S RATIO BY BRAND (2026-11-14 — the user, of Fair's 0.70:
+ * "我要这个 ratio 这边，它是可以能够被 separate by brand 去填的 … 它其实是有 4
+ * 个，如果说我调主要的一个的话，这样它就是 override 全部"): under the ratio, a
+ * box per brand with a ladder. A brand left blank divides by the main ratio (its
+ * placeholder); a figure is that brand's own, for every line of a bill of it
+ * whose SKU has no ratio of its own. Typing in the main ratio sends every brand
+ * back to it — a brand's own ratio is taken off unless typed again after.
  */
 export default function CostSettingTab({
   sub,
@@ -103,6 +112,7 @@ export default function CostSettingTab({
   kivCosts = NO_KIV,
   byBrand = NO_BRAND_RATIOS,
   brands = NO_BRANDS,
+  brandDivisors = NO_BRAND_DIVISORS,
 }: {
   sub: SubRef
   subs: SubRef[]
@@ -116,12 +126,16 @@ export default function CostSettingTab({
   byBrand?: CostRatioBrandRow[]
   /** The sub-department's brands with a ladder — what a ratio by brand is set for. */
   brands?: SchemeBrand[]
+  /** The brands with a ratio of their own, as saved (2026-11-14); one left out divides by `divisor`. */
+  brandDivisors?: BrandDivisorRow[]
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [divisorDraft, setDivisorDraft] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(new Map())
   const [brandDrafts, setBrandDrafts] = useState<ReadonlyMap<string, string>>(new Map())
+  /** The brands' own ratios as typed this time, by brand code; '' = back to the main ratio. */
+  const [brandDivisorDrafts, setBrandDivisorDrafts] = useState<ReadonlyMap<string, string>>(new Map())
   /** SKUs split by brand this time, before a brand of theirs has a figure. */
   const [split, setSplit] = useState<ReadonlySet<string>>(new Set())
   const [added, setAdded] = useState<string[]>([])
@@ -138,6 +152,7 @@ export default function CostSettingTab({
     setDivisorDraft(null)
     setDrafts(new Map())
     setBrandDrafts(new Map())
+    setBrandDivisorDrafts(new Map())
     setSplit(new Set())
     setAdded([])
     setTicked(new Set())
@@ -151,7 +166,7 @@ export default function CostSettingTab({
   // moment (prod, 2026-09-27). Settled when the server's rows change — or,
   // should the refresh never land, a little later.
   const [settling, setSettling] = useState(false)
-  const settleFrom = useRef<{ ratios: CostRatioRow[]; divisor: number; byBrand: CostRatioBrandRow[] } | null>(null)
+  const settleFrom = useRef<{ ratios: CostRatioRow[]; divisor: number; byBrand: CostRatioBrandRow[]; brandDivisors: BrandDivisorRow[] } | null>(null)
   const settle = useCallback(() => {
     settleFrom.current = null
     setSettling(false)
@@ -160,8 +175,9 @@ export default function CostSettingTab({
   }, [reset])
   useEffect(() => {
     const from = settleFrom.current
-    if (settling && from && (from.ratios !== ratios || from.divisor !== divisor || from.byBrand !== byBrand)) settle()
-  }, [settling, ratios, divisor, byBrand, settle])
+    if (settling && from && (from.ratios !== ratios || from.divisor !== divisor || from.byBrand !== byBrand
+      || from.brandDivisors !== brandDivisors)) settle()
+  }, [settling, ratios, divisor, byBrand, brandDivisors, settle])
   useEffect(() => {
     if (!settling) return
     const timer = window.setTimeout(settle, 15_000)
@@ -172,6 +188,7 @@ export default function CostSettingTab({
   const byBrandOn = brands.length > 0
   const skuById = useMemo(() => new Map(skus.map(s => [s.erpId, s])), [skus])
   const savedBrand = useMemo(() => new Map(byBrand.map(r => [brandKeyOf(r.erpId, r.brand), r.ratio])), [byBrand])
+  const savedBrandDivisor = useMemo(() => new Map(brandDivisors.map(r => [r.brand, r.ratio])), [brandDivisors])
   const lines = useMemo<Line[]>(() => {
     const listed = new Map<string, Line>()
     for (const r of ratios) listed.set(r.erpId, { erpId: r.erpId, saved: r, sku: skuById.get(r.erpId), listed: true, savedCode: r.code })
@@ -223,6 +240,21 @@ export default function CostSettingTab({
     if (saved === undefined) return text.trim() === '' ? undefined : text.trim()
     return differs(text, saved) ? text.trim() : undefined
   }
+  /** A brand's own ratio as it stands in the draft: typed, else saved, else blank (it divides by the main ratio). */
+  const brandDivisorTextOf = (brand: string): string => {
+    const text = brandDivisorDrafts.get(brand)
+    if (text !== undefined) return text
+    const saved = savedBrandDivisor.get(brand)
+    return saved === undefined ? '' : formatRatio(saved)
+  }
+  /** What saving sends for a brand's own ratio: undefined = nothing; '' = taken off. */
+  const brandDivisorChangeOf = (brand: string): string | undefined => {
+    const text = brandDivisorDrafts.get(brand)
+    if (text === undefined) return undefined
+    const saved = savedBrandDivisor.get(brand)
+    if (saved === undefined) return text.trim() === '' ? undefined : text.trim()
+    return differs(text, saved) ? text.trim() : undefined
+  }
   /** Split by brand: a brand of it has a figure, or it was split this time. */
   const isSplit = (l: Line): boolean =>
     riderLine(l) && (split.has(l.erpId) || brands.some(b => brandTextOf(l.erpId, b.code).trim() !== ''))
@@ -241,7 +273,8 @@ export default function CostSettingTab({
   const brandsOnly = (l: Line) =>
     !l.listed && changeOf(l) === '' && brandChanges.some(ch => ch.l.erpId === l.erpId && brandChangeOf(l.erpId, ch.brand) !== '')
   const changed = editing ? lines.filter(l => changeOf(l) !== undefined && !brandsOnly(l)) : []
-  const dirty = editing ? (divisorChanged ? 1 : 0) + changed.length + brandChanges.length : 0
+  const brandDivisorChanges = editing ? brands.filter(b => brandDivisorChangeOf(b.code) !== undefined) : []
+  const dirty = editing ? (divisorChanged ? 1 : 0) + changed.length + brandChanges.length + brandDivisorChanges.length : 0
   const renamedCount = lines.filter(renamed).length
   // The KIV costs below keep drafts of their own; one guard holds both.
   const [kivDraft, setKivDraft] = useState({ changes: 0, saving: false })
@@ -249,6 +282,19 @@ export default function CostSettingTab({
 
   const draftDivisor = divisorDraft === null ? divisor : readRatio(divisorDraft)
   const shownDivisor = typeof draftDivisor === 'number' ? draftDivisor : divisor
+  /** What a bill of this brand divides a SKU without a ratio of its own by, once saved: the brand's, else the main. */
+  const brandDivisorOf = (brand: string): number => {
+    const n = readRatio(brandDivisorTextOf(brand))
+    return typeof n === 'number' ? n : shownDivisor
+  }
+  /** The brand has a ratio of its own once saved. */
+  const ownBrandDivisor = (brand: string): boolean => {
+    const n = readRatio(brandDivisorTextOf(brand))
+    return typeof n === 'number'
+  }
+  /** Every ratio a SKU without one of its own may be divided by: the main (riders alone), and each brand's. */
+  const everyDivisor = [shownDivisor, ...brands.map(b => brandDivisorOf(b.code))]
+  const anyBrandOwn = brands.some(b => ownBrandDivisor(b.code) && brandDivisorOf(b.code) !== shownDivisor)
   /** The ratio a line is judged at once saved; null = its sub-department's. */
   const ratioOf = (l: Line): number | null => {
     const text = drafts.get(l.erpId)
@@ -256,13 +302,13 @@ export default function CostSettingTab({
     const n = readRatio(text)
     return n === 'bad' ? l.saved?.ratio ?? null : n
   }
-  /** Every ratio a line may be divided by once saved: each brand's, else its own, else the sub-department's. */
+  /** Every ratio a line may be divided by once saved: each brand's, else its own, else the brand's, else the main. */
   const ratiosOf = (l: Line): number[] => {
-    const own = ratioOf(l) ?? shownDivisor
-    if (!isSplit(l)) return [own]
+    const own = ratioOf(l)
+    if (!isSplit(l)) return [own ?? shownDivisor]
     return brands.map(b => {
       const n = readRatio(brandTextOf(l.erpId, b.code))
-      return typeof n === 'number' ? n : own
+      return typeof n === 'number' ? n : own ?? brandDivisorOf(b.code)
     })
   }
 
@@ -301,6 +347,18 @@ export default function CostSettingTab({
 
   function setDraft(erpId: string, text: string) {
     setDrafts(previous => new Map(previous).set(erpId, text))
+    setNotice(null)
+  }
+
+  /** The main ratio typed: every brand goes back to it (the user: "如果说我调主要的一个的话，这样它就是 override 全部"). */
+  function setMainDraft(text: string) {
+    setDivisorDraft(text)
+    setBrandDivisorDrafts(new Map(brands.map(b => [b.code, ''])))
+    setNotice(null)
+  }
+
+  function setBrandDivisorDraft(brand: string, text: string) {
+    setBrandDivisorDrafts(previous => new Map(previous).set(brand, text))
     setNotice(null)
   }
 
@@ -432,6 +490,9 @@ export default function CostSettingTab({
       ...(brandChanges.length > 0
         ? { brands: brandChanges.map(({ l, brand }) => ({ erpId: l.erpId, brand, ratio: brandChangeOf(l.erpId, brand) ?? '', label: codeOf(l) })) }
         : {}),
+      ...(brandDivisorChanges.length > 0
+        ? { brandRatios: brandDivisorChanges.map(b => ({ brand: b.code, ratio: brandDivisorChangeOf(b.code) ?? '', label: b.name })) }
+        : {}),
     }
     try {
       validateCostSetting(edit)
@@ -441,7 +502,7 @@ export default function CostSettingTab({
     }
     setError(null)
     setNotice(null)
-    const before = { ratios, divisor, byBrand }
+    const before = { ratios, divisor, byBrand, brandDivisors }
     startSaving(async () => {
       try {
         await saveCostSetting(schemeId, edit)
@@ -502,10 +563,7 @@ export default function CostSettingTab({
               <input
                 className={c.figInput}
                 value={divisorDraft ?? formatRatio(divisor)}
-                onChange={e => {
-                  setDivisorDraft(e.target.value)
-                  setNotice(null)
-                }}
+                onChange={e => setMainDraft(e.target.value)}
                 disabled={saving}
                 inputMode="decimal"
                 aria-label={`${sub.name} cost ratio`}
@@ -515,8 +573,27 @@ export default function CostSettingTab({
             )}
             <span className={c.figAfter}>divides every SKU&rsquo;s cost</span>
           </div>
+          {byBrandOn ? (
+            <div className={c.figBrands} role="group" aria-label={`${sub.name} cost ratio by brand`}>
+              <span className={c.figBrandsLabel}>BY BRAND</span>
+              {brands.map(b =>
+                editing ? (
+                  <label key={b.code} className={c.brandInput}>
+                    <span>{b.name}</span>
+                    <CellInput value={brandDivisorTextOf(b.code)} onChange={v => setBrandDivisorDraft(b.code, v)}
+                      edited={brandDivisorChangeOf(b.code) !== undefined} width={64} disabled={saving}
+                      placeholder={formatRatio(shownDivisor)} label={`${b.name} cost ratio`} />
+                  </label>
+                ) : (
+                  <span key={b.code} className={c.brandRatio} data-follows={!ownBrandDivisor(b.code) || undefined}>
+                    {b.name} <b>{formatRatio(brandDivisorOf(b.code))}</b>
+                  </span>
+                ),
+              )}
+            </div>
+          ) : null}
           <span className={c.figSub}>
-            The Revenue Team&rsquo;s cost is the Product List cost divided by this ratio. Every margin in the calculator, the month and the run is judged against it. SKUs below divide by a ratio of their own.
+            The Revenue Team&rsquo;s cost is the Product List cost divided by this ratio &mdash; or by the brand&rsquo;s, where a brand has one. Every margin in the calculator, the month and the run is judged against it. SKUs below divide by a ratio of their own.
           </span>
         </div>
         <div className={c.figSide}>
@@ -528,7 +605,7 @@ export default function CostSettingTab({
         </div>
       </div>
 
-      <KivCostsSection costs={kivCosts} divisor={shownDivisor} onDraft={setKivDraft} />
+      <KivCostsSection costs={kivCosts} divisors={everyDivisor} onDraft={setKivDraft} />
 
       <Heading title="SKUs at their own ratio" sub={plural(lines.filter(l => l.listed).length, 'SKU')} />
       <ActionRow>
@@ -578,7 +655,7 @@ export default function CostSettingTab({
                   <span className={c.selectLabel}>{b.name}</span>
                   <input className={`${c.pickerAmountInput} ${c.pickerBrandInput}`} value={pickBrands.get(b.code) ?? ''} disabled={saving}
                     onChange={e => { const v = e.target.value; setPickBrands(previous => new Map(previous).set(b.code, v)) }}
-                    inputMode="decimal" placeholder={pickRatio.trim() || formatRatio(shownDivisor)} aria-label={`${b.name} ratio for the ticked SKUs`} />
+                    inputMode="decimal" placeholder={pickRatio.trim() || formatRatio(brandDivisorOf(b.code))} aria-label={`${b.name} ratio for the ticked SKUs`} />
                 </label>
               ))}
             </div>
@@ -666,7 +743,7 @@ export default function CostSettingTab({
                                     <span>{b.name}</span>
                                     <CellInput value={brandTextOf(l.erpId, b.code)} onChange={v => setBrandDraft(l.erpId, b.code, v)}
                                       edited={typed !== undefined && brandChangeOf(l.erpId, b.code) !== undefined} width={64} disabled={saving}
-                                      placeholder={formatRatio(ratioOf(l) ?? shownDivisor)} label={`${codeOf(l)} · ${b.name} ratio`} />
+                                      placeholder={formatRatio(ratioOf(l) ?? brandDivisorOf(b.code))} label={`${codeOf(l)} · ${b.name} ratio`} />
                                   </label>
                                 )
                               })}
@@ -703,12 +780,12 @@ export default function CostSettingTab({
                 )
               })}
               {lines.length === 0 ? (
-                <tr><td colSpan={columns} className={c.empty}>Every {sub.name} SKU divides by {formatRatio(divisor)}.</td></tr>
+                <tr><td colSpan={columns} className={c.empty}>Every {sub.name} SKU divides by {formatRatio(divisor)}{anyBrandOwn ? <> or its brand&rsquo;s</> : null}.</td></tr>
               ) : null}
             </tbody>
           </table>
         </PageScrolledTable>
-        <TableFoot shown={`${plural(lines.length, 'SKU')} · every other SKU divides by ${formatRatio(shownDivisor)}`} />
+        <TableFoot shown={`${plural(lines.length, 'SKU')} · every other SKU divides by ${formatRatio(shownDivisor)}${anyBrandOwn ? ' or its brand’s' : ''}`} />
       </div>
 
       {menu && menuLine ? (

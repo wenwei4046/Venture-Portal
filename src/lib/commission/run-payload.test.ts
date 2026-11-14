@@ -163,6 +163,24 @@ describe('toEngineInput', () => {
     ])
   })
 
+  // 2026-11-14: a brand's own ratio (Costing Setting) — strings read, anything else left out.
+  it("carries the brands' own ratios, and no key at all while none has one", () => {
+    expect(toEngineInput(baseRows()).scheme).not.toHaveProperty('brandDivisors')
+    expect(toEngineInput(baseRows({ brandCostRatios: [] })).scheme).not.toHaveProperty('brandDivisors')
+    const input = toEngineInput(baseRows({
+      brandCostRatios: [
+        { brand_code: 'ERGOTEX', ratio: '0.6000' },
+        { brand_code: 'DUNLOP', ratio: 0.65 },
+        { brand_code: 'AKEMI', ratio: '0' },
+        { brand_code: ' ', ratio: '0.6' },
+      ],
+    }))
+    expect(input.scheme.brandDivisors).toEqual([
+      { brand: 'ERGOTEX', ratio: 0.6 },
+      { brand: 'DUNLOP', ratio: 0.65 },
+    ])
+  })
+
   it('carries each rung\'s title, and the title a person holds, into the engine', () => {
     const input = toEngineInput(
       baseRows({

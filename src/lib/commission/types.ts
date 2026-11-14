@@ -17,10 +17,10 @@
 
 import type { IrGroup } from './ir-groups'
 import type { KpiItem } from './kpi'
-import type { CostRatio, CostRatioByBrand } from './cost-basis'
+import type { BrandDivisor, CostRatio, CostRatioByBrand } from './cost-basis'
 
 export type { KpiItem, KpiOptionPool } from './kpi'
-export type { CostRatio, CostRatioByBrand } from './cost-basis'
+export type { BrandDivisor, CostRatio, CostRatioByBrand } from './cost-basis'
 
 // ─── Imported facts ─────────────────────────────────────────────────────────
 
@@ -411,6 +411,13 @@ export interface CommissionScheme {
    * none.
    */
   costRatiosByBrand?: CostRatioByBrand[]
+  /**
+   * The sub-department's ratio for a brand (Product List › Costing Setting,
+   * 2026-11-14): on a bill that answers to that brand's ladder, a line whose
+   * SKU has no ratio of its own is divided by it instead of `costDivisor`.
+   * Absent = no brand has one.
+   */
+  brandDivisors?: BrandDivisor[]
 }
 
 export interface EngineInput {

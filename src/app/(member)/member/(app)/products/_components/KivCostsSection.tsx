@@ -19,6 +19,14 @@ function readCost(text: string): number | null | 'bad' {
   }
 }
 
+/** A cost to the Revenue Team over every ratio it may be divided by: one figure, or the lowest to the highest. */
+function teamCostLabel(cost: number, divisors: readonly number[]): string {
+  const list = divisors.length > 0 ? divisors : [1]
+  const low = money(teamCost(cost, Math.max(...list)))
+  const high = money(teamCost(cost, Math.min(...list)))
+  return low === high ? low : `${low} – ${high}`
+}
+
 /**
  * Costing Setting › KIV bed frames (2026-10-31 — the user: "只要 detect 到 bed frame 它是 KIV 的话 … 就拿最贵的 bed
  * frame 按照这样子的 costing 去计算它的 margin", King 1000, Queen 820, Super single 600, Single 550, and a place on
@@ -27,10 +35,13 @@ function readCost(text: string): number | null | 'bad' {
  * Every sub-department alike. Its unsaved changes are the tab's (`onDraft`): one guard keeps a page from being left
  * with them.
  */
-export default function KivCostsSection({ costs, divisor, onDraft }: {
+export default function KivCostsSection({ costs, divisors, onDraft }: {
   costs: KivCostRow[]
-  /** The open sub-department's ratio: what each cost is to its Revenue Team. */
-  divisor: number
+  /**
+   * The open sub-department's ratios a KIV frame may be divided by: the main one (riders alone) and each brand's
+   * (2026-11-14) — what each cost is to its Revenue Team, lowest to highest.
+   */
+  divisors: readonly number[]
   onDraft: (state: { changes: number; saving: boolean }) => void
 }) {
   const router = useRouter()
@@ -138,7 +149,7 @@ export default function KivCostsSection({ costs, divisor, onDraft }: {
                 <span className={c.kivCost}>{shown !== null ? money(shown) : '—'}</span>
               )}
               <span className={c.kivTeam}>
-                {shown !== null ? `Team cost ${money(teamCost(shown, divisor))}` : 'Not set · the dearest'}
+                {shown !== null ? `Team cost ${teamCostLabel(shown, divisors)}` : 'Not set · the dearest'}
               </span>
             </div>
           )

@@ -20,7 +20,7 @@ import {
   type SalesLine,
 } from '@/lib/commission/engine'
 import { indexBrandKpiItems, isFabricSeriesPool, kpiCodeKey, kpiItemLabel } from '@/lib/commission/kpi'
-import { kpiLineReaders, ownSchemeBrandsOf, specialMoneyByLine, toCostRatiosByBrand, toGwpRules, toKpiItems, type BrandRow, type CostRatioBrandRow, type CostRatioRow, type GwpRow, type KpiItemRow } from '@/lib/commission/run-payload'
+import { kpiLineReaders, ownSchemeBrandsOf, specialMoneyByLine, toBrandDivisors, toCostRatiosByBrand, toGwpRules, toKpiItems, type BrandCostRatioRow, type BrandRow, type CostRatioBrandRow, type CostRatioRow, type GwpRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { gwpFreeParts } from '@/lib/catalogue/gwp'
 import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
@@ -222,7 +222,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }, { data: brandDivisorData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -303,6 +303,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       subDept.schemeId
         ? supabase.from('comm_brands').select('id, code, erp_company_id').eq('scheme_id', subDept.schemeId).eq('own_scheme', true).eq('is_active', true)
         : Promise.resolve({ data: null }),
+      // A brand's own ratio, for a line whose SKU has none (Costing Setting, 2026-11-14).
+      subDept.schemeId
+        ? supabase.from('comm_brand_cost_ratios').select('brand_code, ratio').eq('scheme_id', subDept.schemeId)
+        : Promise.resolve({ data: null }),
     ])
   // A bill of a brand that follows its own scheme: paid at that brand's rate for the rank, in no margin, and found
   // none of the sub-department's KPI items — its brand's own instead — as the run reads it (`ownSchemesOf`).
@@ -374,6 +378,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     scheme?.revenue_cost_divisor === null || scheme?.revenue_cost_divisor === undefined ? 1 : Number(scheme.revenue_cost_divisor),
     ((ratioData ?? []) as CostRatioRow[]).map(r => ({ productCode: r.product_code, ratio: Number(r.ratio) })),
     toCostRatiosByBrand((brandRatioData ?? []) as CostRatioBrandRow[]),
+    toBrandDivisors((brandDivisorData ?? []) as BrandCostRatioRow[]),
   )
 
   // The part of each line a purchase earned free (Product List › GWP, 2026-11-08), on the whole bill, as the run reads it.

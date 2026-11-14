@@ -63,6 +63,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   catalogue_skus: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   claims: ['claims.approve', 'claims.view:own', 'reconciliation.create', 'reconciliation.edit', 'reports.export', 'reports.view'],
   comm_agent_aliases: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
+  comm_brand_cost_ratios: ['product_list.edit', 'product_list.view', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_brands: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_cost_ratio_brands: ['product_list.edit', 'product_list.view', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   comm_cost_ratios: ['product_list.edit', 'product_list.view', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
