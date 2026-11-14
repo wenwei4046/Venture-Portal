@@ -181,6 +181,8 @@ const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly W
   revenue_exclude_order: { sales_order_exclusions: ['INSERT'], sales_orders: ['UPDATE'] },
   revenue_full_comm_order: { sales_order_half_comm: ['DELETE'] },
   revenue_half_comm_order: { sales_order_half_comm: ['INSERT', 'UPDATE'] },
+  revenue_comm_again_order: { sales_order_no_comm: ['DELETE'] },
+  revenue_no_comm_order: { sales_order_half_comm: ['DELETE'], sales_order_no_comm: ['INSERT', 'UPDATE'] },
   revenue_include_order: { sales_order_exclusions: ['DELETE'], sales_orders: ['UPDATE'] },
   revenue_move_order: { sales_order_reassignments: ['INSERT', 'UPDATE', 'DELETE'], sales_order_shares: ['DELETE'], sales_orders: ['UPDATE'] },
   revenue_set_order_brand: { sales_order_brand_picks: ['INSERT', 'UPDATE', 'DELETE'], sales_order_lines: ['UPDATE'], sales_orders: ['UPDATE'] },

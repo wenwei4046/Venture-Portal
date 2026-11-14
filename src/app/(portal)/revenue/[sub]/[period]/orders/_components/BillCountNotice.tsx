@@ -2,20 +2,24 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { includeOrder } from '../../../../run-actions'
+import { includeOrder, setNoComm } from '../../../../run-actions'
+import { noCommNotice } from '@/lib/commission/bill-no-comm'
 import type { BillMenuOutcome } from './BillContextMenu'
 
 /** What taking a bill out — or counting it again — did, in words. */
 export function billOutcomeMessage(outcome: BillMenuOutcome, monthLabel: string, hasRun: boolean): string {
+  const payroll = hasRun ? ' Payroll follows when the salesperson is sent.' : ''
+  // No commission (2026-11-14): the kind that still counts in sales and margin.
+  if (outcome.noComm) {
+    return noCommNotice({ orderNo: outcome.orderNo, noComm: outcome.excluded, halfCommOff: outcome.halfCommOff }, monthLabel) + payroll
+  }
   if (outcome.excluded) {
-    return `${outcome.orderNo} no longer counts in ${monthLabel}.`
-      + (hasRun ? ' Payroll follows when the salesperson is sent.' : '')
+    return `${outcome.orderNo} no longer counts in ${monthLabel}.` + payroll
   }
   if (outcome.result.counts === false) {
     return `${outcome.orderNo} is no longer out by hand, but it still does not count: ${outcome.result.stillOut ?? 'it is excluded'}.`
   }
-  return `${outcome.orderNo} counts again.`
-    + (hasRun ? ' Payroll follows when the salesperson is sent.' : '')
+  return `${outcome.orderNo} counts again.` + payroll
 }
 
 interface Props {
@@ -32,9 +36,10 @@ interface Props {
 
 /**
  * The line a bill's menu leaves behind (2026-09-27, shared by All bills and a
- * salesperson's ledger): what changed, and — while the bill is out — one
- * click to put it back. An error stays on the line; the notice does not claim
- * a count it did not make. Key it by the outcome so each one starts clean.
+ * salesperson's ledger): what changed, and — while the bill is out, or pays
+ * nobody (2026-11-14) — one click to put it back. An error stays on the line;
+ * the notice does not claim a count it did not make. Key it by the outcome so
+ * each one starts clean.
  */
 export default function BillCountNotice({ outcome, monthLabel, hasRun, className, buttonClassName, onChange }: Props) {
   const router = useRouter()
@@ -45,6 +50,20 @@ export default function BillCountNotice({ outcome, monthLabel, hasRun, className
     setError(null)
     startUndo(async () => {
       try {
+        if (outcome.noComm) {
+          // A refusal (a closed month, a paid run) comes back as words.
+          const answer = await setNoComm(outcome.orderId, false)
+          if (!answer.ok) {
+            setError(answer.reason)
+            return
+          }
+          router.refresh()
+          onChange({
+            orderId: outcome.orderId, orderNo: outcome.orderNo, excluded: false, noComm: true,
+            result: { orderNo: answer.result.orderNo, changed: answer.result.changed },
+          })
+          return
+        }
         const result = await includeOrder(outcome.orderId)
         router.refresh()
         onChange({ orderId: outcome.orderId, orderNo: outcome.orderNo, excluded: false, result })

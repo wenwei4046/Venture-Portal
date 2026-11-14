@@ -207,6 +207,9 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
   revenue_full_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_orders'],
   revenue_half_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_orders', 'users'],
+  // No commission (2026-11-14): the list, and the half comm it takes off.
+  revenue_comm_again_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_no_comm', 'sales_orders'],
+  revenue_no_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_order_no_comm', 'sales_orders', 'users'],
   revenue_fair_calendar: ['comm_organisers', 'comm_venue_events', 'comm_venues', 'sales_import_batches', 'sales_orders'],
   revenue_fair_calendar_moves: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],

@@ -137,6 +137,8 @@ export interface ClosedBill {
   commissionOnly?: true
   /** Half comm (2026-11-10): it paid half its commission. */
   halfComm?: true
+  /** No commission (2026-11-14): it counted in their sales and margin and paid nobody. */
+  noComm?: true
 }
 
 /** An override line as it stood at close: who it came from, and how much. */
@@ -182,6 +184,7 @@ export function closeSummary(person: WorkbenchPerson, nameOf: (staffId: string) 
       id: r.orderId, no: r.orderNo, status: r.status, total: r.totalCommission,
       ...(r.commissionOnly ? { commissionOnly: true as const } : {}),
       ...(r.halfComm ? { halfComm: true as const } : {}),
+      ...(r.noComm ? { noComm: true as const } : {}),
     })),
     overrides: [...overrides].map(([staffId, amount]) => ({ staffId, name: nameOf(staffId), amount })),
   }
@@ -269,7 +272,12 @@ export function parseCloseSummary(raw: unknown, fallbackName: string): CloseSumm
       const id = r ? str(r.id) : null
       if (!r || !id) return []
       const status = STATUSES.find(s => s === r.status) ?? 'eligible'
-      return [{ id, no: str(r.no) ?? id, status, total: num(r.total), ...(r.commissionOnly === true ? { commissionOnly: true as const } : {}), ...(r.halfComm === true ? { halfComm: true as const } : {}) }]
+      return [{
+        id, no: str(r.no) ?? id, status, total: num(r.total),
+        ...(r.commissionOnly === true ? { commissionOnly: true as const } : {}),
+        ...(r.halfComm === true ? { halfComm: true as const } : {}),
+        ...(r.noComm === true ? { noComm: true as const } : {}),
+      }]
     }),
     overrides: overrides.flatMap(v => {
       const r = v && typeof v === 'object' ? v as Record<string, unknown> : null

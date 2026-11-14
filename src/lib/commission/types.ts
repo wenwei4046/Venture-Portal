@@ -168,6 +168,18 @@ export interface SalesOrder {
    */
   halfComm?: boolean
   /**
+   * No commission (2026-11-14, a bill's *Don't count this bill…* on Comm Cal;
+   * `sales_order_no_comm` — the user: "完全不出 commission，但他还是有算在
+   * revenue，还有算在 margin 等等"; asked who else goes unpaid, "整张单谁都不拿钱"):
+   * NOBODY is paid on the bill — no commission line, nothing in its holder's
+   * override base (so no override on it), no KPI pay for its items. It counts
+   * everywhere else: its SALES (the rung, the group's revenue, a group
+   * incentive's target, the month's figures), the month's MARGIN, and its KPI
+   * items' COUNT on the quantity ladder. Wins over `halfComm` (nothing is left
+   * to halve). A shared bill's every part carries it.
+   */
+  noCommission?: boolean
+  /**
    * Set on every part of a SHARED bill, the owner's included
    * (`splitOrdersByShares`, 2026-09-30): whose bill it is and who holds which
    * part. Display only — the engine pays each part as the ordinary bill it is,

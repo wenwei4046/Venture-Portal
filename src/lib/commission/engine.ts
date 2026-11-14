@@ -891,6 +891,19 @@ function halfNote(order: Pick<SalesOrder, 'halfComm'>): string {
   return order.halfComm ? ' · half comm' : ''
 }
 
+/**
+ * NO COMMISSION (2026-11-14, a bill's *Don't count this bill…* on Comm Cal —
+ * the user: "完全不出 commission，但他还是有算在 revenue，还有算在 margin 等等";
+ * asked who else goes unpaid, "整张单谁都不拿钱"). What of an amount the bill
+ * puts in its holder's override base: nothing on a no-commission bill, half
+ * on a half-comm one, else all. Its own commission line and its KPI pay are
+ * left out where they are paid; its sales, its margin and its KPI items'
+ * count are not touched.
+ */
+function payShareOf(order: Pick<SalesOrder, 'halfComm' | 'noCommission'>): number {
+  return order.noCommission ? 0 : halfOf(order)
+}
+
 export function computeCommissionRun(input: EngineInput): EngineResult {
   const warnings: string[] = []
   const { scheme } = input
@@ -1221,6 +1234,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     if (heads.has(draft.staffId)) {
       if (!scheme.enableProductRevenue) continue
       for (const order of draft.eligibleOrders) {
+        // No commission (2026-11-14): a director's own bill pays nothing either — its sales stand.
+        if (order.noCommission) continue
         const ownBrand = own.brandOf(order)
         // Their rung's rate — on a bill of a brand with its own scheme, that rung's rate for the brand.
         const headRate = billRate(draft.staffId, ownBrand)
@@ -1243,6 +1258,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // An old bill topped up (2026-11-07): their rate on it too, and — as
       // their own bills — nothing else, no margin penalty either.
       for (const order of draft.commissionOnlyOrders) {
+        if (order.noCommission) continue
         const line = commissionOnlyLine(order, billRate(draft.staffId, own.brandOf(order)), input.periodMonth, kpiIndexOf(order), groupIndex)
         if (line) draft.lines.push(line)
       }
@@ -1296,9 +1312,14 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
         if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
       }
-      // The override base: cut by the margin, and halved on a half-comm bill —
-      // kept apart for each brand paid at its own rate.
-      const overridden = opr * multiplier * halfOf(order)
+      // The override base: cut by the margin, halved on a half-comm bill and
+      // nothing on a no-commission one (2026-11-14) — kept apart for each
+      // brand paid at its own rate.
+      const overridden = opr * multiplier * payShareOf(order)
+      // No commission (2026-11-14): nobody is paid on it — no line, no KPI
+      // pay, no penalty to record — while its sales (Pass A), its margin
+      // (above) and its KPI items' count (below) stand.
+      const paysNothing = !!order.noCommission
       draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + overridden)
       draft.overrideBase.set(ownBrand ?? '', round2((draft.overrideBase.get(ownBrand ?? '') ?? 0) + overridden))
 
@@ -1308,7 +1329,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       let withheldOnThisBill = 0
 
       // C1 — one line per order, so the drill-down reads like a ledger.
-      if (scheme.enableProductRevenue && opr !== 0 && rate > 0) {
+      if (scheme.enableProductRevenue && opr !== 0 && rate > 0 && !paysNothing) {
         const full = round2(opr * rate)
         const cut = round2(full * multiplier)
         // What the margin withheld; half comm is no penalty and is not counted in it.
@@ -1335,6 +1356,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         // the sub-department's KPI switch says. No part of the sub-department's
         // quantity ladder, nor of any override base.
         if (hit.item.brandCode) {
+          // A no-commission bill's units already count in the month's (`brandUnits`); it pays none.
+          if (paysNothing) continue
           const units = brandUnits.get(hit.itemKey) ?? 0
           const unit = kpiUnitPay(hit.item, units)
           draft.lines.push({
@@ -1352,8 +1375,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           })
           continue
         }
-        draft.kpiRevenue = round2(draft.kpiRevenue + hit.amount)
+        // The ladder counts every item the month sold (the user: KPI 件数照算) —
+        // a no-commission bill's too — but pays, and lifts by its %, only the
+        // items of bills that pay.
         draft.kpiQty += hit.qty
+        if (paysNothing) continue
+        draft.kpiRevenue = round2(draft.kpiRevenue + hit.amount)
         draft.kpiBase = round2(draft.kpiBase + hit.amount)
         draft.lines.push({
           component: 'kpi_item',
@@ -1367,7 +1394,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         })
       }
 
-      if (penaltyBand) {
+      // A bill that pays nothing has nothing withheld.
+      if (penaltyBand && !paysNothing) {
         draft.marginPenaltyWithheld = round2(draft.marginPenaltyWithheld + withheldOnThisBill)
         penalised.push({
           staffId: draft.staffId,
@@ -1389,6 +1417,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     // and nothing else: no margin tally or incentive, no KPI, no override base
     // (after the KPI tally above, which it is no part of).
     for (const order of scheme.enableProductRevenue ? draft.commissionOnlyOrders : []) {
+      // No commission (2026-11-14): an old bill's commission is all it ever paid — now nothing.
+      if (order.noCommission) continue
       const { base, bill, band: penaltyBand, multiplier, ownBrand } = penaltyOf(order)
       const rate = billRate(draft.staffId, ownBrand)
       if (ownBrand === null && scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++

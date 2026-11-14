@@ -8,7 +8,7 @@ import { ownSchemeBrandsOf, toEngineInput } from '@/lib/commission/run-payload'
 import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
 import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
-import { loadHalfComms, loadMonthOrders } from './month-orders'
+import { loadHalfComms, loadMonthOrders, loadNoComms } from './month-orders'
 import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
@@ -33,6 +33,7 @@ import type {
 } from '@/lib/commission/run-payload'
 import type { DirectorTerms, EngineInput } from '@/lib/commission/types'
 import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
+import type { NoCommMark } from '@/lib/commission/bill-no-comm'
 import { sharesOfUpsales, upsaleBillId, type UpsaleRow } from '@/lib/commission/upsales'
 
 interface QueryResult {
@@ -94,6 +95,8 @@ export interface CommissionInputContext {
   unmatchedOrderNos: string[]
   /** Half comm (2026-11-10): who halved which bill, and why — the Status chip's tooltip. Absent in older fixtures. */
   halfComms?: Map<string, HalfCommMark>
+  /** No commission (2026-11-14): who took which bill's commission off, and why — the chip's tooltip. Absent in older fixtures. */
+  noComms?: Map<string, NoCommMark>
 }
 
 export interface CommissionInputOptions {
@@ -328,7 +331,7 @@ export async function loadCommissionInput(
   // A brand's own KPI items (2026-11-12) are found where its bill's special order charges for them: read for the
   // bills of a brand that has such items, and for no other.
   const brandKpiBills = billsWithBrandKpi(orderRows, brands, [...kpiItems, ...currentKpiItems])
-  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney] = await Promise.all([
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney, noComms] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -352,6 +355,8 @@ export async function loadCommissionInput(
           .in('id', chunk).order('id').range(from, to))
       : Promise.resolve([]),
     readSpecialMoney(supabase, brandKpiBills),
+    // No commission (2026-11-14): the bills that count and pay nobody.
+    loadNoComms(supabase, orderIds),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
   const ownBrandCodes = new Set(ownBrands.values())
@@ -374,6 +379,7 @@ export async function loadCommissionInput(
   for (const order of orderRows) {
     order.sales_order_lines = linesByOrder.get(order.id) ?? []
     if (halfComms.has(order.id)) order.half_comm = true
+    if (noComms.has(order.id)) order.no_comm = true
   }
 
   // Load statements directly: nested arrays have their own PostgREST row cap.
@@ -448,5 +454,6 @@ export async function loadCommissionInput(
     subDepartmentId: scheme.sub_department_id,
     unmatchedOrderNos: [...new Set(orderRows.filter(order => order.staff_id === null).map(order => order.order_no))],
     halfComms,
+    noComms,
   }
 }
