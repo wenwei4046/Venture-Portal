@@ -28,7 +28,8 @@ describe("notes/12 · a Messenger failure past the window looks sent until Human
   it("draws the quiet failure as sent — its tick — and every other failure as failed", () => {
     expect(quietFailure("failed", WINDOW, false)).toBe(true);
     expect(shownStatus(msg("failed", WINDOW), false)).toBe("sent");
-    expect(shownStatus(msg("failed", WINDOW), true)).toBe("failed");
+    expect(shownStatus(msg("failed", WINDOW), true)).toBe("sent");
+    expect(shownStatus(msg("failed", WINDOW.replace("24 hours", "7 days")), true)).toBe("failed");
     expect(shownStatus(msg("failed", "131053 could not open"), false)).toBe("failed");
     expect(shownStatus(msg("read"), false)).toBe("read");
   });

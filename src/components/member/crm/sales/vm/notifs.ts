@@ -109,13 +109,14 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   }
   for (const c of rem ? data.customers : []) {
     if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || isFbBlocked(c, data) || c.status === "won" || c.status === "lost") continue;
-    // Messenger's window is 7 days since Human Agent was approved (2026-11-14); WhatsApp's stays 24 hours.
-    const seven = c.channel === "messenger" && HUMAN_AGENT_APPROVED, span = seven ? 7 * DAY : DAY;
-    const left = new Date(c.lastCustomerAt).getTime() + span - now.getTime();
+    // Messenger's window is 7 days since Human Agent was approved (2026-11-14), and its closing is not told (the owner,
+    // 2026-11-15: "Messenger 聊天剩最后的小时不用提醒"); WhatsApp's 24 hours are.
+    if (c.channel === "messenger" && HUMAN_AGENT_APPROVED) continue;
+    const left = new Date(c.lastCustomerAt).getTime() + DAY - now.getTime();
     if (left <= 0 || left > 3 * 3_600_000) continue;
-    const t = new Date(c.lastCustomerAt).getTime() + span - 3 * 3_600_000;
+    const t = new Date(c.lastCustomerAt).getTime() + 21 * 3_600_000;
     out.push({ id: `x${c.id}@${c.lastCustomerAt}`, customerId: c.id, tone: "wait", kind: "status", from: c.name, ini: ini(c.name), lead: c.name, at: atLabel(t, now), time: t, ok: false, pending: false,
-      text: `Chat closes in ${Math.max(1, Math.ceil(left / 3_600_000))} h · reply before ${seven ? "Messenger’s 7-day" : "the 24-hour"} window shuts` });
+      text: `Chat closes in ${Math.max(1, Math.ceil(left / 3_600_000))} h · reply before the 24-hour window shuts` });
   }
   for (const e of data.events) {
     if (e.owner !== me || !e.actor || e.actor === me || (e.kind !== "appt_booked" && e.kind !== "appt_changed" && e.kind !== "appt_cancelled")) continue;
