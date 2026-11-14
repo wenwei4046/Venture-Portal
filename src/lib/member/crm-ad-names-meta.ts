@@ -307,8 +307,11 @@ export async function metaAdPermalink(adId: string, token: string, fetchImpl: ty
     })
     if (!res.ok) return null
     const body = (await res.json()) as { creative?: { effective_object_story_id?: unknown; instagram_permalink_url?: unknown } }
-    const story = body.creative?.effective_object_story_id
-    if (typeof story === 'string' && /^\d+_\d+$/.test(story)) return `https://www.facebook.com/${story}`
+    // An ad's post is unpublished ("dark"): Facebook answers "This isn't available" at facebook.com/<page>_<post> and opens
+    // it at facebook.com/<page>/posts/<post>, a video ad's too (the owner's phone, signed in, 2026-11-13; and 2026-11-14:
+    // "在crm insight 的ads 中，所有广告点进去的链接是看不到的").
+    const story = typeof body.creative?.effective_object_story_id === 'string' ? body.creative.effective_object_story_id.match(/^(\d+)_(\d+)$/) : null
+    if (story) return `https://www.facebook.com/${story[1]}/posts/${story[2]}`
     const ig = body.creative?.instagram_permalink_url
     if (typeof ig === 'string' && /^https:\/\/(www\.)?instagram\.com\//.test(ig)) return ig
     return null
