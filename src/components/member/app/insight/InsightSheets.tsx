@@ -79,13 +79,16 @@ export function TiersSheet({ open, vm, onClose }: { open: boolean; vm: BrandPage
 
 /** The bill's share request still open (2026-10-21): its id, and its state in words. */
 export interface OrderShareRequest { id: string; status: string }
+/** The bill's Not my order request still with HR (2026-11-14): its id, and its state in words. */
+export interface OrderNotMineRequest { id: string; status: string }
 
 /**
  * One bill: amount, margin, KPI items and every product line (1779–1805). Its ⋯ (2026-10-21 — the user, circling the
  * deposit chip: "加一个三点，可以 share order request") shares the reader's own bill with colleagues, or opens the request
- * already open on it; a shared bill says who holds what.
+ * already open on it; a shared bill says who holds what. Beside it (2026-11-14 — the user: "现在是多了一个 function"), *Not my
+ * order* sends HR a request to take the reader's own bill off them, or opens the one already with HR.
  */
-export function OrderSheet({ open, vm, onClose, canShare = false, request = null, onShare, onRequest }: {
+export function OrderSheet({ open, vm, onClose, canShare = false, request = null, onShare, onRequest, canNotMine = false, notMine = null, onNotMine, onNotMineRequest }: {
   open: boolean;
   vm: OrderSheetVM | null;
   onClose: () => void;
@@ -94,11 +97,18 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
   request?: OrderShareRequest | null;
   onShare?: () => void;
   onRequest?: (id: string) => void;
+  /** Not my order is in the ⋯ too: the reader's own bill, and a sender (or View as, whose sheet sends nothing). */
+  canNotMine?: boolean;
+  notMine?: OrderNotMineRequest | null;
+  onNotMine?: () => void;
+  onNotMineRequest?: (id: string) => void;
 }) {
   const st = vm ? TONES[vm.statusTone] : TONES.none;
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const hasMenu = !!vm?.own && (canShare || !!request);
+  const shareItem = canShare || !!request;
+  const notMineItem = canNotMine || !!notMine;
+  const hasMenu = !!vm?.own && (shareItem || notMineItem);
   useEffect(() => { if (!open) setMenu(false); }, [open, vm?.no]);
   useEffect(() => {
     if (!menu) return;
@@ -127,7 +137,7 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
               )}
               {hasMenu && menu && (
                 <div className={t.menu} role="menu">
-                  {request ? (
+                  {shareItem && (request ? (
                     <button className={t.menuItem} role="menuitem" onClick={() => { setMenu(false); onRequest?.(request.id); }}>
                       <Svg d={ICON.share} size={18} sw={1.9} /><span className={t.menuText}>Share request</span>
                     </button>
@@ -135,7 +145,16 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
                     <button className={t.menuItem} role="menuitem" onClick={() => { setMenu(false); onShare?.(); }}>
                       <Svg d={ICON.share} size={18} sw={1.9} /><span className={t.menuText}>Share order</span>
                     </button>
-                  )}
+                  ))}
+                  {notMineItem && (notMine ? (
+                    <button className={t.menuItem} role="menuitem" onClick={() => { setMenu(false); onNotMineRequest?.(notMine.id); }}>
+                      <Svg d={ICON.notMine} size={18} sw={1.9} /><span className={t.menuText}>Not my order request</span>
+                    </button>
+                  ) : (
+                    <button className={t.menuItem} role="menuitem" onClick={() => { setMenu(false); onNotMine?.(); }}>
+                      <Svg d={ICON.notMine} size={18} sw={1.9} /><span className={t.menuText}>Not my order</span>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -144,6 +163,13 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
             <button className={t.shareRow} onClick={() => onRequest?.(request.id)}>
               <span className={t.shareIcon}><Svg d={ICON.share} size={18} sw={1.9} /></span>
               <span className={t.shareText}><span className={t.shareLabel}>SHARE REQUEST</span><span className={t.shareWait}>{request.status}</span></span>
+              <Svg d={ICON.chevronRight} size={16} sw={2} />
+            </button>
+          )}
+          {notMine && vm.own && (
+            <button className={t.shareRow} onClick={() => onNotMineRequest?.(notMine.id)}>
+              <span className={t.shareIcon}><Svg d={ICON.notMine} size={18} sw={1.9} /></span>
+              <span className={t.shareText}><span className={t.shareLabel}>NOT MY ORDER</span><span className={t.shareWait}>{notMine.status}</span></span>
               <Svg d={ICON.chevronRight} size={16} sw={2} />
             </button>
           )}
