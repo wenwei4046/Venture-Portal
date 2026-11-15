@@ -233,3 +233,15 @@ describe("Commission by order — a bill of a brand on its own scheme", () => {
     expect(vm.sheets[vm.mine.rows[0].id]).toMatchObject({ tag: "Cost pending", tone: "warn" });
   });
 });
+
+// 2026-11-15 — SALLY's October: UPSALE HC13001 (RM 400 × 7% = RM 28) read RM 0 and *Cost pending* on My income.
+describe("Commission by order — an upsell or a drop", () => {
+  it("calls an upsell an upsell and a drop a drop — never Cost pending, which is a margin's word", () => {
+    const vm = incomeOrdersVM(data(month({ bills: [
+      bill({ orderId: "u1", no: "UPSALE HC13001", upsale: true, commissionable: 400, orderTotal: 0, personal: 28, pay: 28, marginPct: null, brand: null }),
+      bill({ orderId: "u2", no: "DROP HC13002", upsale: true, commissionable: -200, orderTotal: 0, personal: -14, pay: -14, marginPct: null, brand: null }),
+    ] })), null, [], false);
+    expect(vm.sheets["m:u1"]).toMatchObject({ tag: "Upsell", tone: "good", comm: "RM 28.00", total: "RM 28.00" });
+    expect(vm.sheets["m:u2"]).toMatchObject({ tag: "Drop sales", tone: "warn" });
+  });
+});

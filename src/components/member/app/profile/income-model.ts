@@ -195,12 +195,14 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
       no: b.no,
       // An old bill (2026-11-07) was sold at a fair months before: no week of this month is its.
       meta: [o?.customer, old ? null : weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
-      tag: waiting ? "Waiting for deposit"
+      // An upsell / drop is outside every margin (2026-11-15) — never *Cost pending*.
+      tag: b.upsale ? (b.commissionable < 0 ? "Drop sales" : "Upsell")
+        : waiting ? "Waiting for deposit"
         : none ? (margin === null || own ? NO_COMMISSION : `${NO_COMMISSION} · ${margin.toFixed(1)}% margin`)
         : old ? (margin === null || own ? "Commission only" : `Commission only · ${margin.toFixed(1)}% margin`)
         : own ? OWN_SCHEME_PILL
         : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
-      tone: waiting ? "warn" : none || own || (old && margin === null) ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
+      tone: b.upsale ? (b.commissionable < 0 ? "warn" : "good") : waiting ? "warn" : none || own || (old && margin === null) ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
       amt: rm(o?.total ?? b.orderTotal ?? b.commissionable),
       commLabel: "Commission",
       comm: waiting ? "Waiting" : money(commission),
