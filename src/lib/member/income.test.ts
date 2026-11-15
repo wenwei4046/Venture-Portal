@@ -101,6 +101,23 @@ describe("closedIncome — the month as HR closed it", () => {
     ]);
   });
 
+  // 2026-11-15 — SALLY's October close paid UPSALE HC13001 RM 28; My income read it RM 0.
+  it("pays an upsell or a drop from its own line — the run keeps no bill on it, only its name", () => {
+    const withUpsale = closedIncome({
+      ...close,
+      summary: { ...close.summary, bills: [...close.summary.bills, { id: "u1", no: "UPSALE HC13001", status: "eligible", total: 28 }, { id: "u2", no: "DROP HC13002", status: "eligible", total: -14 }] } as unknown as CloseSummary,
+      statement: { ...close.statement, lines: [...close.statement.lines,
+        line({ source_order_id: null, basis_amount: 400, rate: 0.07, amount: 28, note: "UPSALE HC13001 · 2026-10-18" }),
+        line({ source_order_id: null, basis_amount: -200, rate: 0.07, amount: -14, note: "DROP HC13002 · 2026-10-20" }),
+      ] } as unknown as StatementDto,
+    }, facts, extra);
+    expect(withUpsale.bills.filter(b => b.upsale).map(b => [b.no, b.commissionable, b.personal, b.pay])).toEqual([
+      ["UPSALE HC13001", 400, 28, 28],
+      ["DROP HC13002", -200, -14, -14],
+    ]);
+    expect(withUpsale.bills.find(b => b.no === "SO-1")?.upsale).toBe(false);
+  });
+
   it("names the override's bill and seller, by the bill or else by the seller", () => {
     expect(m.overrides.map(o => [o.no, o.seller, o.amount])).toEqual([["SO-9", "ANTHONY", 120], ["—", "BEN", 20]]);
   });

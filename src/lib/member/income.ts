@@ -242,11 +242,21 @@ export function closedIncome(close: {
     else if (l.component === "kpi_item" || l.component === "kpi_threshold") { o.kpi = round2(o.kpi + l.amount); o.kpiQty += l.qty ?? 0; }
     byOrder.set(l.source_order_id, o);
   }
+  // An upsell or a drop is no bill: its statement line carries no source_order_id (the FK is
+  // to sales_orders), so it is found by the name the run gave it — "UPSALE HC13001 · 2026-10-18".
+  const byName = new Map<string, { personal: number; basis: number }>();
+  for (const l of lines) {
+    if (l.source_order_id || l.source_staff_id || l.component !== "product_revenue" || !l.note) continue;
+    const name = l.note.split(" · ")[0];
+    const o = byName.get(name) ?? { personal: 0, basis: 0 };
+    byName.set(name, { personal: round2(o.personal + l.amount), basis: round2(o.basis + l.basis_amount) });
+  }
   const deferred = new Set(close.deferred.map(d => d.orderId));
   const bills: IncomeBill[] = close.summary.bills.filter(b => b.status !== "excluded").map(b => {
-    const o = byOrder.get(b.id);
+    const named = byOrder.has(b.id) ? undefined : byName.get(b.no);
+    const o = byOrder.get(b.id) ?? (named ? { ...named, kpi: 0, kpiQty: 0 } : undefined);
     return {
-      orderId: b.id, no: b.no, status: deferred.has(b.id) ? "deposit_pending" : b.status, upsale: false,
+      orderId: b.id, no: b.no, status: deferred.has(b.id) ? "deposit_pending" : b.status, upsale: !!named,
       commissionable: o?.basis ?? 0, orderTotal: 0, personal: o?.personal ?? 0, kpi: o?.kpi ?? 0, kpiQty: o?.kpiQty ?? 0,
       pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0)), marginPct: null, sharePct: null, brand: null,
       ...(b.commissionOnly ? { commissionOnly: true as const } : {}),
