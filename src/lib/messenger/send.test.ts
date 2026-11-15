@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { facebookUrl, messengerError, messengerRequest, messengerWindow, pageToken, postPermalink, profileName, reelOf, sendMessengerText } from "./send";
+import { HUMAN_AGENT_APPROVED, facebookUrl, messengerError, messengerRequest, messengerWindow, pageToken, postPermalink, profileName, reelOf, sendMessengerText } from "./send";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -12,9 +12,14 @@ describe("Messenger's reply windows", () => {
     expect(messengerWindow("2026-10-03T11:00:00Z", now, true)).toBe("shut");
     expect(messengerWindow(null, now, true)).toBe("shut");
   });
-  it("until Meta approves Human Agent: shut after 24 hours (a cold lead)", () => {
+  it("Human Agent approved (2026-11-14): 24 h – 7 days is the HUMAN_AGENT window, then shut", () => {
+    expect(HUMAN_AGENT_APPROVED).toBe(true);
     expect(messengerWindow("2026-10-10T00:00:00Z", now)).toBe("open");
-    expect(messengerWindow("2026-10-09T11:00:00Z", now)).toBe("shut");
+    expect(messengerWindow("2026-10-09T11:00:00Z", now)).toBe("human_agent");
+    expect(messengerWindow("2026-10-01T11:00:00Z", now)).toBe("shut");
+  });
+  it("without the approval (an automatic send): shut after 24 hours", () => {
+    expect(messengerWindow("2026-10-09T11:00:00Z", now, false)).toBe("shut");
   });
 });
 

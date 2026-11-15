@@ -7,6 +7,7 @@
 import { gb, day0, DAY, firstName, ini, isCold, urgencyOf, type SalesCtx } from "./common";
 import { URGENCY_THRESHOLDS } from "@/lib/member/crm";
 import { isFbBlocked } from "../../shared/fb-blocked";
+import { HUMAN_AGENT_APPROVED } from "@/lib/messenger/send";
 
 export interface SalesNotif {
   id: string;
@@ -108,6 +109,9 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   }
   for (const c of rem ? data.customers : []) {
     if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || isFbBlocked(c, data) || c.status === "won" || c.status === "lost") continue;
+    // Messenger's window is 7 days since Human Agent was approved (2026-11-14), and its closing is not told (the owner,
+    // 2026-11-15: "Messenger 聊天剩最后的小时不用提醒"); WhatsApp's 24 hours are.
+    if (c.channel === "messenger" && HUMAN_AGENT_APPROVED) continue;
     const left = new Date(c.lastCustomerAt).getTime() + DAY - now.getTime();
     if (left <= 0 || left > 3 * 3_600_000) continue;
     const t = new Date(c.lastCustomerAt).getTime() + 21 * 3_600_000;

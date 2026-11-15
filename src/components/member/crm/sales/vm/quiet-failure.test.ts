@@ -9,7 +9,10 @@ const PAST = "More than 24 hours since the customer’s last message — Messeng
 describe("a reply past the 24-hour window says nothing", () => {
   it("hidden until Human Agent is approved", () => {
     expect(quietFailure("failed", PAST, false)).toBe(true);
-    expect(quietFailure("failed", PAST, true)).toBe(false);
+    // Approved (2026-11-14): the replies held back during the review stay hidden; one refused since (past 7 days) says so.
+    expect(quietFailure("failed", PAST, true)).toBe(true);
+    expect(quietFailure("failed", "More than 7 days since the customer’s last message — Messenger does not allow a reply now.", true)).toBe(false);
+    expect(quietFailure("failed", "131053 Media upload error", true)).toBe(false);
   });
   it("another refusal, or a message that went, is not hidden", () => {
     expect(quietFailure("failed", "131053 Media upload error", false)).toBe(false);

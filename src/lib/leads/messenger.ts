@@ -4,7 +4,7 @@
 // this adds Lead View's rules: Meta's window (24 hours; Human Agent waits for App Review), a template's buttons, and the
 // answer the database keeps — Meta's id, or why it was not sent. Every token stays on the server.
 
-import { messengerError, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from '@/lib/messenger/send'
+import { HUMAN_AGENT_APPROVED, messengerError, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from '@/lib/messenger/send'
 import { GRAPH_VERSION } from '@/lib/whatsapp/send'
 
 export interface Outgoing {
@@ -15,6 +15,11 @@ export interface Outgoing {
   buttons?: string[] | null
   /** When the customer last wrote — Meta's window runs from it. */
   lastInAt: string | null
+  /**
+   * Sent by no person — a template's or the AI Agent's (the outbox). Meta lets only a human agent's reply carry the
+   * HUMAN_AGENT tag, so an automatic send keeps to the 24-hour window whatever Human Agent's approval (2026-11-14).
+   */
+  automatic?: boolean
   /** Meta's id of the message this reply answers (mig 20261027220000); Meta quotes it above the reply. */
   replyToMid?: string | null
   /** A template's photo or file (mig 20261102120000): its object in `lead-media` and its type. */
@@ -54,7 +59,7 @@ export function messageOf(body: string, buttons?: string[] | null): { text: stri
 /** Send one message; answers Meta's id or why not — never throws. */
 export async function deliver(o: Outgoing, systemToken: string | undefined, now: Date = new Date(), fetchImpl: typeof fetch = fetch): Promise<Delivered> {
   if (!o.pageId) return { error: NO_PAGE }
-  const window = messengerWindow(o.lastInAt, now)
+  const window = messengerWindow(o.lastInAt, now, !o.automatic && HUMAN_AGENT_APPROVED)
   if (window === 'shut') return { error: WINDOW_SHUT }
   if (!systemToken) return { error: NOT_CONNECTED }
   const token = await pageToken(o.pageId, systemToken, fetchImpl)
@@ -100,11 +105,11 @@ export function attachmentKind(mime: string): 'image' | 'video' | 'audio' | 'fil
 
 /** Send one photo or file (2026-10-27, mig 20261027140000); Meta's id or why not — never throws. */
 export async function deliverFile(
-  o: Pick<Outgoing, 'pageId' | 'psid' | 'lastInAt'>, file: Blob, filename: string, mime: string,
+  o: Pick<Outgoing, 'pageId' | 'psid' | 'lastInAt' | 'automatic'>, file: Blob, filename: string, mime: string,
   systemToken: string | undefined, now: Date = new Date(), fetchImpl: typeof fetch = fetch,
 ): Promise<Delivered> {
   if (!o.pageId) return { error: NO_PAGE }
-  const window = messengerWindow(o.lastInAt, now)
+  const window = messengerWindow(o.lastInAt, now, !o.automatic && HUMAN_AGENT_APPROVED)
   if (window === 'shut') return { error: WINDOW_SHUT }
   if (!systemToken) return { error: NOT_CONNECTED }
   if (file.size > FILE_LIMIT) return { error: TOO_BIG }

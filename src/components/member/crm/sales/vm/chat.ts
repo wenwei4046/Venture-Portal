@@ -113,7 +113,11 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
  * A message refused for any other reason (a file WhatsApp could not open …) still says so.
  */
 export const quietFailure = (status: string | null | undefined, error: string | null | undefined, approved = HUMAN_AGENT_APPROVED) =>
-  status === "failed" && !approved && !!error && /since the customer’s last message/.test(error);
+  status === "failed" && !!error && /since the customer’s last message/.test(error)
+  // Approved 2026-11-14: only what failed after it says so (the owner, 2026-11-15: "旧讯息继续隐藏，只对之后的讯息显示").
+  // A reply held back during the review was refused at 24 hours ("More than 24 hours … Messenger"); one refused since
+  // is past the 7 days and says so.
+  && (!approved || /More than 24 hours/.test(error));
 
 /** The status a message is DRAWN with: a quiet failure (above) is drawn as sent — the same tick and time (notes/12). */
 export const shownStatus = (m: Pick<CrmChatMessage, "status" | "error">, approved = HUMAN_AGENT_APPROVED) =>

@@ -23,10 +23,25 @@ describe('Lead View › Messenger out', () => {
   it('refuses before asking Meta: no Page, the window shut, no token', async () => {
     const f = vi.fn()
     expect(await deliver({ pageId: null, psid: '123456', body: 'Hi', lastInAt: now.toISOString() }, 't', now, f)).toEqual({ error: NO_PAGE })
-    expect(await deliver({ pageId: '946946021838962', psid: '123456', body: 'Hi', lastInAt: '2026-10-27T01:00:00Z' }, 't', now, f)).toEqual({ error: WINDOW_SHUT })
+    expect(await deliver({ pageId: '946946021838962', psid: '123456', body: 'Hi', lastInAt: '2026-10-27T01:00:00Z', automatic: true }, 't', now, f)).toEqual({ error: WINDOW_SHUT })
+    expect(await deliver({ pageId: '946946021838962', psid: '123456', body: 'Hi', lastInAt: '2026-10-20T01:00:00Z' }, 't', now, f)).toEqual({ error: WINDOW_SHUT })
     expect(await deliver({ pageId: '946946021838962', psid: '123456', body: 'Hi', lastInAt: null }, 't', now, f)).toEqual({ error: WINDOW_SHUT })
     expect(await deliver({ pageId: '946946021838962', psid: '123456', body: 'Hi', lastInAt: '2026-10-28T02:00:00Z' }, undefined, now, f)).toEqual({ error: NOT_CONNECTED })
     expect(f).not.toHaveBeenCalled()
+  })
+
+  // Human Agent approved (2026-11-14): a person's reply 24 h – 7 days after the customer's last message carries the
+  // HUMAN_AGENT tag; a template's or the AI's (automatic) never does — it stops at 24 h.
+  it('a person past 24 h replies with the HUMAN_AGENT tag; an automatic send does not', async () => {
+    const calls: Array<{ url: string; body?: string }> = []
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body as string | undefined })
+      return String(url).includes('fields=access_token') ? json(200, { access_token: 'PAGE' }) : json(200, { message_id: 'm_h' })
+    }) as unknown as typeof fetch
+    expect(await deliver({ pageId: '504171022789980', psid: '7654321', body: 'Still keen?', lastInAt: '2026-10-26T03:00:00Z' }, 'SYS-h', now, f)).toEqual({ mid: 'm_h' })
+    const sent = JSON.parse(calls.find(c => c.url.endsWith('/messages'))!.body!)
+    expect(sent).toMatchObject({ messaging_type: 'MESSAGE_TAG', tag: 'HUMAN_AGENT', message: { text: 'Still keen?' } })
+    expect(await deliver({ pageId: '504171022789980', psid: '7654321', body: 'Hi', lastInAt: '2026-10-26T03:00:00Z', automatic: true }, 'SYS-h', now, f)).toEqual({ error: WINDOW_SHUT })
   })
 
   it('sends inside the window as a response, with the template’s quick replies, and keeps Meta’s id', async () => {
@@ -59,7 +74,8 @@ describe('Lead View › a photo or file out', () => {
   it('refuses before asking Meta: shut window, too big', async () => {
     const f = vi.fn()
     const small = new Blob(['x'], { type: 'image/png' })
-    expect(await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-27T01:00:00Z' }, small, 'a.png', 'image/png', 'SYS', now, f)).toEqual({ error: WINDOW_SHUT })
+    expect(await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-27T01:00:00Z', automatic: true }, small, 'a.png', 'image/png', 'SYS', now, f)).toEqual({ error: WINDOW_SHUT })
+    expect(await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-20T01:00:00Z' }, small, 'a.png', 'image/png', 'SYS', now, f)).toEqual({ error: WINDOW_SHUT })
     const big = { size: FILE_LIMIT + 1, type: 'application/pdf' } as Blob
     expect(await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-28T02:30:00Z' }, big, 'a.pdf', 'application/pdf', 'SYS', now, f)).toEqual({ error: TOO_BIG })
     expect(f).not.toHaveBeenCalled()
