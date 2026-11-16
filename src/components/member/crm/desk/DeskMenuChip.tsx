@@ -56,6 +56,12 @@ export interface InboxFilterBits {
 const pill = (on: boolean, h: number): CSSProperties => ({ ...BTN, height: `${h}px`, padding: h === 34 ? "0 11px" : "0 13px", borderRadius: `${h / 2}px`, display: "flex", alignItems: "center", gap: h === 34 ? "6px" : "7px",
   font: "500 13px Inter, sans-serif", background: on ? "var(--crm-sel)" : "#fff", border: `1px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, color: "var(--crm-ink)", whiteSpace: "nowrap" });
 
+/** A People picker row (a team or a person), drawn as MenuChip's options: 34 px, sand when picked, the count, the tick. */
+const pickRow = (on: boolean): CSSProperties => ({ ...BTN, minHeight: "34px", padding: "6px 8px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "10px",
+  background: on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" });
+const COUNT: CSSProperties = { flex: "none", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" };
+const TICK: CSSProperties = { flex: "none", width: "16px", display: "flex", color: "var(--crm-rust)" };
+
 /** D5a's filter: People / Status buttons, the tags, the result line; each button opens its own picker (People: teams and people; Status: statuses; 2026-11-11). */
 const POP_W = 400;
 
@@ -104,32 +110,32 @@ export function InboxFilter({ f }: { f: InboxFilterBits }) {
               <button type="button" onClick={() => setDraft(d.sec === "people" ? { ...d, who: [] } : { ...d, st: [] })} style={{ ...BTN, marginLeft: "auto", font: "500 14px Inter, sans-serif", color: "var(--crm-rust)" }}>Clear</button>
             </div>
             {d.sec === "people" && <div data-ib-sec="people" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <span style={{ marginTop: "-10px", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick teams or people</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              <span style={{ marginTop: "-10px", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick a whole team or its people</span>
+              {/* Grouped by team (the owner, 2026-11-16: "Team Anthony" then Anthony, Lawrence … one a row): the team's row
+                  picks the whole team, a person's row that person. A picked team ticks its people too; picking one of
+                  them then narrows the team to them (the team goes, the person stays). */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {f.teams.map(t => { const on = t.val ? d.who.includes(t.val) : t.people.length > 0 && t.people.every(p => d.who.includes(p.id));
-                  return <button key={t.key} type="button" aria-pressed={on} onClick={() => setDraft({ ...d, who: t.val ? tg(d.who, t.val) : on ? d.who.filter(x => !t.people.some(p => p.id === x)) : [...d.who, ...t.people.map(p => p.id).filter(id => !d.who.includes(id))] })} style={pill(on, 38)}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: t.dot }} />{t.label}<span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{t.n}</span>
-                    {on && <span style={{ display: "flex", color: "var(--crm-rust)" }}><Ic name="check" size={13} /></span>}</button>; })}
+                  return (
+                    <div key={t.key} role="group" aria-label={t.label} style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                      <button type="button" aria-pressed={on} data-ib-team={t.key} onClick={() => setDraft({ ...d, who: t.val ? tg(d.who, t.val) : on ? d.who.filter(x => !t.people.some(p => p.id === x)) : [...d.who, ...t.people.map(p => p.id).filter(id => !d.who.includes(id))] })}
+                        style={pickRow(on)} className="crm4a-row">
+                        <span style={{ width: "8px", height: "8px", flex: "none", borderRadius: "50%", background: t.dot }} />
+                        <span style={{ flex: 1, minWidth: 0, font: "600 13.5px Inter, sans-serif", color: "var(--crm-ink)" }}>{t.label}</span>
+                        <span style={COUNT}>{t.n}</span>
+                        <span style={TICK}>{on && <Ic name="check" size={14} />}</span>
+                      </button>
+                      {t.people.map(p => { const mine = d.who.includes(p.id), via = !mine && on && !!t.val;
+                        return <button key={p.id} type="button" aria-pressed={mine || via} data-ib-person={p.id}
+                          onClick={() => setDraft({ ...d, who: mine ? d.who.filter(x => x !== p.id) : [...d.who.filter(x => x !== t.val), p.id] })}
+                          style={{ ...pickRow(mine), paddingLeft: "26px" }} className="crm4a-row">
+                          <span style={{ flex: 1, minWidth: 0, font: `${mine ? 600 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>{p.label}</span>
+                          <span style={COUNT}>{p.n}</span>
+                          <span style={{ ...TICK, opacity: via ? 0.45 : 1 }}>{(mine || via) && <Ic name="check" size={14} />}</span>
+                        </button>; })}
+                    </div>
+                  ); })}
               </div>
-              {f.teams.filter(t => t.val && d.who.includes(t.val) && t.people.length).map(t => (
-                <div key={t.key} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 12px", borderRadius: "14px", background: "var(--crm-hover)" }}>
-                  <div style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{t.label} · people</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {t.people.map(p => { const on = d.who.includes(p.id);
-                      // A person picked inside a team narrows it to them (the team's chip goes, the person stays).
-                      return <button key={p.id} type="button" aria-pressed={on} onClick={() => setDraft({ ...d, who: on ? d.who.filter(x => x !== p.id) : [...d.who.filter(x => x !== t.val), p.id] })} style={pill(on, 34)}>
-                        {p.label}<span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{p.n}</span></button>; })}
-                  </div>
-                </div>
-              ))}
-              {/* People picked whose team chip is not on: still shown so they can be taken off. */}
-              {f.teams.flatMap(t => (t.val && d.who.includes(t.val) ? [] : t.people.filter(p => d.who.includes(p.id)).map(p => ({ t, p })))).length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {f.teams.flatMap(t => (t.val && d.who.includes(t.val) ? [] : t.people.filter(p => d.who.includes(p.id)).map(p => (
-                    <button key={p.id} type="button" aria-pressed onClick={() => setDraft({ ...d, who: d.who.filter(x => x !== p.id) })} style={pill(true, 34)}>
-                      <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: t.dot }} />{p.label}<span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{p.n}</span></button>))))}
-                </div>
-              )}
             </div>}
             {d.sec === "status" && <div data-ib-sec="status" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <span style={{ marginTop: "-10px", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick one or more</span>

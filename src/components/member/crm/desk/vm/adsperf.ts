@@ -135,9 +135,55 @@ export function feeTier(spend: number): { tier: (typeof FEE_TIERS)[number]; toNe
 export function feeWorking(spend: number): string {
   const rm = (v: number) => `RM ${Math.round(v).toLocaleString("en-MY")}`;
   if (spend <= 0) return "No spend, no fee";
-  if (spend < FEE_MIN_UNTIL) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}, under the minimum → ${rm(FEE_MIN)}`;
+  // Under RM 10,000 the month pays the minimum, which its Tier 1 line already says (the owner, 2026-11-16, crossing out
+  // "25% × RM 4,642 = RM 1,161, under the minimum → RM 2,500"): no working line.
+  if (spend < FEE_MIN_UNTIL) return "";
   if (spend <= FEE_STEP) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}`;
   return `25% × ${rm(FEE_STEP)} + 20% × ${rm(spend - FEE_STEP)} = ${rm(FEE_STEP * FEE_LOW)} + ${rm((spend - FEE_STEP) * FEE_HIGH)} = ${rm(marketingFee(spend) ?? 0)}`;
+}
+/** A phone as one person's: the digits without Malaysia's 60 and the trunk 0s ("+60 0186…" and "+60186…" agree). */
+const phoneKey = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").replace(/^60/, "").replace(/^0+/, "");
+const REPEAT_MS = 10 * 60_000;
+/**
+ * The "no ad" customers who are already one of an ad's leads (the owner, 2026-11-16, of November's 17 "WhatsApp · no ad" /
+ * "Messenger · no ad" leads, 6 of them the same people as Instant Form leads: "他们的聊天室不动，但是 ads performance 的数字要
+ * 更动，不然数据会不准"). Their chats stay as they are; Ads Performance does not count them a second time:
+ * - the same phone as an ad's customer (an Instant Form number typed "+60 0…" opened a second WhatsApp chat — four pairs
+ *   from before #1074, left unmerged by the owner's "只修不合并");
+ * - the same name as an ad's customer who came within 10 minutes (an Instant Form lead's Messenger chat, opened with it).
+ */
+export function noAdRepeats(customers: Pick<CrmCustomer, "id" | "adId" | "phone" | "name" | "createdAt">[]): Set<string> {
+  const withAd = customers.filter(c => c.adId);
+  const phones = new Set(withAd.map(c => phoneKey(c.phone)).filter(k => k.length >= 8));
+  const nameOf = (n: string) => n.trim().toLowerCase();
+  const out = new Set<string>();
+  for (const c of customers) {
+    if (c.adId) continue;
+    const k = phoneKey(c.phone), at = new Date(c.createdAt).getTime();
+    if ((k.length >= 8 && phones.has(k))
+      || (!!nameOf(c.name ?? "") && withAd.some(a => nameOf(a.name ?? "") === nameOf(c.name ?? "") && Math.abs(new Date(a.createdAt).getTime() - at) <= REPEAT_MS))) out.add(c.id);
+  }
+  return out;
+}
+/**
+ * Spent's and Leads' hover on the figure strip (the owner, 2026-11-16: "增加指向 spent 要出现 running ads fee, & pause ads
+ * fee", "leads 也是"): the running ads' part and the rest (paused, or Meta says nothing yet). Spend is the fee's months over
+ * every ad of the source (`feeIds`, hidden ones too — Total cost's own spend, so the two parts add up to it); null until
+ * every month is read. Leads are the range's over the ads the list shows (`listAds`), so with Running picked the running
+ * part is the Leads figure.
+ */
+export function runSplit<A extends { id: string; cs: CrmCustomer[] }>(listAds: A[], status: (id: string) => string | null,
+  feeIds: string[], feeRanges: [number, number][], ra: number, rb: number,
+  spendOf: (ids: string[], a: number, b: number) => number | null, leadsOf: (cs: CrmCustomer[], a: number, b: number) => number) {
+  const isRun = (id: string) => status(id) === "Running";
+  const runIds = feeIds.filter(id => isRun(id)), restIds = feeIds.filter(id => !isRun(id));
+  const known = feeRanges.length > 0 && feeRanges.every(([a, b]) => spendOf(feeIds, a, b) != null);
+  const sum = (ids: string[]) => feeRanges.reduce((n, [a, b]) => n + (ids.length ? spendOf(ids, a, b) ?? 0 : 0), 0);
+  const leads = (ads: A[]) => leadsOf(ads.flatMap(x => x.cs), ra, rb);
+  return {
+    spend: known ? { running: sum(runIds), paused: sum(restIds) } : null,
+    leads: { running: leads(listAds.filter(x => isRun(x.id))), paused: leads(listAds.filter(x => !isRun(x.id))) },
+  };
 }
 /**
  * The calendar months a range touches, each whole from its 1st to its last day — or to today for the month still running.
@@ -198,13 +244,15 @@ export function adsPerfVM(ctx: DeskCtx) {
   // Every ad, as Ads to teams lists them (the owner, 2026-10-22: "全部的广告也要在这里"): the ones that brought leads, and the
   // ones added before their first lead (adNames' `added`, crm_add_ad) with 0s.
   const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);
+  // A "no ad" customer who is already one of an ad's leads is not a lead again (noAdRepeats, 2026-11-16).
+  const repeats = noAdRepeats(data.customers);
   // An ad hidden by a right click on its name (crm_hide_ad, CRM · Manage; the owner, 2026-10-24: "hide ads 的部分只需要在電腦版，
   // 你幫我做右鍵點擊廣告名稱可以選擇hide") is left out — the list and the total — unless *Hidden ads · show* is on.
   const hiddenN = new Set([...data.customers.map(c => c.adId ?? ""), ...added].filter(id => id && data.adNames?.[id]?.hidden)).size;
   // The source picked (the owner, 2026-10-27: DC and The Conts, each WhatsApp · Messenger): an ad's leads from that source, an ad
   // with none yet by its Page; the list, the chart and the total all follow it.
   const src = (ui.apSrc ?? "all") as SourcePick;
-  const adsAll = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src));
+  const adsAll = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src) && !repeats.has(c.id));
     const s0 = all[0] ? sourceOf(all[0]) : null, brand = s0?.brandLabel || (brandOf(data.adNames?.[id]?.pageId) ? BRAND_LABEL[brandOf(data.adNames?.[id]?.pageId)!] : "");
     return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, // An ad with no lead in the brand picked at the top (Insight's DC / The Conts) is listed only when its Page is that brand's — else
     // the other brand's ads stood there with 0 leads (the owner, 2026-10-30: "我在msg 跑广告怎么都没显示出来？" — the page was on Dream Crafter).
@@ -343,13 +391,26 @@ export function adsPerfVM(ctx: DeskCtx) {
       title: [
         "Per lead = (Spent + marketing fee) ÷ Leads",
         `(${r2(spent)} + ${r2(share)}) ÷ ${n} = ${r2((spent + share) / n)}`,
-        `Marketing fee here = Spent × ${(rate * 100).toFixed(1)}% (the month's fee ÷ the month's spend)`,
-        `Spent ÷ Leads = ${r2(spent)} ÷ ${n} = ${r2(spent / n)}`,
+        // The fee's share line and Spent ÷ Leads again went (the owner, 2026-11-16, circling them): the first line says it.
       ].join("\n"),
     };
   };
+  // Spent's and Leads' hover (the owner, 2026-11-16, Total cost RM 7,142 beside Spent RM 1,151 with Running picked: "增加指向
+  // spent 要出现 running ads fee, & pause ads fee", then "leads 也是"): the running ads' part and the paused ads' part.
+  const split = runSplit(ads, status, feeIds, feeRanges, ra, rb, (ids, a, b) => metaFigures(metaOf(ids, a, b), {}).spend ?? null, (cs, a, b) => crmFigures(cs, ctx, a, b).leads ?? 0);
+  const spendHint = (): { sub?: string[]; title?: string } => {
+    const s = split.spend;
+    if (!s) return {};
+    const r2 = (v: number) => `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, mon = feeRanges.map(([a]) => MON[new Date(a).getMonth()].slice(0, 3)).join(" + ");
+    return { sub: [`Running ads ${r2(s.running)}`, `Paused ads ${r2(s.paused)}`, `${mon} all ads ${r2(s.running + s.paused)} · in Total cost`] };
+  };
+  const leadsHint = (): { sub?: string[]; title?: string } => {
+    const l = split.leads;
+    return { sub: [`Running ads ${l.running}`, `Paused ads ${l.paused}`, `All ads ${l.running + l.paused}`] };
+  };
+  const hintOf = (k: string) => (k === "cpl" ? cplHint() : k === "spend" ? spendHint() : k === "leads" ? leadsHint() : {});
   const picked = slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
-    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...(k === "cpl" ? cplHint() : {}) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
+    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...hintOf(k) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
   // The Revenue Team's marketing fee and the whole cost (the owner, 2026-11-12: the spend alone is not the whole cost; "mkt
   // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
   // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after
@@ -365,7 +426,7 @@ export function adsPerfVM(ctx: DeskCtx) {
   const feeSub = !feeKnown ? [] : one ? [one.line, one.next] : [feeMon.map(m => `${monName(m.a)} T${tierOf(m).t.tier.n}`).join(" · "), "Each month billed alone"];
   const feeTitle = [
     ...FEE_TIERS.map(t => `Tier ${t.n}: ${t.rule}`), "",
-    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`, feeWorking(m.s ?? 0)]) : []),
+    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`, feeWorking(m.s ?? 0)].filter(Boolean)) : []),
   ].join("\n");
   const feeItems = [
     { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle },

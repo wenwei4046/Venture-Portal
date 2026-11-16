@@ -43,6 +43,30 @@ describe("the Inbox's list (D5a)", () => {
     expect(f.apply).toHaveBeenCalledWith(["p1"], ["Follow up"]);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+  // 2026-11-16 (the owner: People split into team + person rows): each team is a row, its people one per row under it.
+  it("People lists each team as a row with its people under it; a team row picks the whole team", () => {
+    const f = filter();
+    render(<DeskInboxList4a v={{ brandOpts, list4: { q: "", setQ: () => {}, filter: f, rows: [row] } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /^People/ }));
+    const dlg = screen.getByRole("dialog", { name: "Filter by people" });
+    const grp = within(dlg).getByRole("group", { name: "Team Cyrus" });
+    // The members show before anything is picked, one row each, after the team's own row.
+    expect(within(grp).getAllByRole("button").map(b => b.textContent)).toEqual(["Team Cyrus5", "Cyrus Lim3", "Amanda Koh2"]);
+    fireEvent.click(within(grp).getByRole("button", { name: /Team Cyrus/ }));
+    // A picked team ticks its people too.
+    expect(within(grp).getByRole("button", { name: /Amanda Koh/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Show 8 chats" }));
+    expect(f.apply).toHaveBeenCalledWith(["team:t1"], []);
+  });
+  it("Status offers Unread", () => {
+    const f = filter({ statuses: [{ label: "Unread", dot: "rust", n: 3, hot: true }, ...filter().statuses] });
+    render(<DeskInboxList4a v={{ brandOpts, list4: { q: "", setQ: () => {}, filter: f, rows: [row] } }} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
+    const dlg = screen.getByRole("dialog", { name: "Filter by status" });
+    fireEvent.click(within(dlg).getByRole("button", { name: /Unread/ }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Show 8 chats" }));
+    expect(f.apply).toHaveBeenCalledWith([], ["Unread"]);
+  });
   it("Brand is a menu beside Search; the row has the wait, owner · ad, the message and unread", () => {
     render(<DeskInboxList4a v={{ brandOpts, list4: { q: "", setQ: () => {}, filter: filter({ chips: [{ key: "st:Follow up", label: "Follow up", dot: "x", round: false, remove: vi.fn() }], statusN: 1, shownN: 3 }), rows: [row] } }} />);
     fireEvent.click(screen.getByRole("button", { name: "Brand: All brands" }));

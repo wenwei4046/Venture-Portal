@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import { teamsOf } from "../../panel/vm/common";
 import { initialDeskUi, type DeskCtx, type DeskUi } from "./ctx";
-import { inboxVM, joinPicked, stPicked } from "./inbox";
+import { inboxVM, joinPicked, stPicked, UNREAD } from "./inbox";
 import { chatRows } from "./data";
 import { FB_BLOCKED } from "../../shared/fb-blocked";
 
@@ -73,5 +73,43 @@ describe("the Inbox's list (D5a)", () => {
     const waiting = chatRows(ctx).filter(x => ["Overdue", "Urgent", "Reply soon"].includes(x.key)).map(x => x.id);
     expect(rows.filter(r => waiting.includes(r.id)).every(r => !!r.wait)).toBe(true);
     void data;
+  });
+});
+
+// 2026-11-16 (the owner: "inbox 的 status 加 unread"): Status › Unread keeps the chats with unread customer messages (the
+// red count, crm_contacts.unread) or marked unread; with other statuses it narrows them, and "N chats of M" follows it.
+describe("the Inbox's Status › Unread", () => {
+  it("is offered first with its count, and shows only unread chats", () => {
+    const { ctx, data } = ctxOf();
+    const all = inboxVM(ctx).list4;
+    const un = all.filter.statuses[0];
+    expect(un.label).toBe(UNREAD);
+    const unreadIds = chatRows(ctx).filter(x => x.c.unread > 0).map(x => x.id);
+    expect(unreadIds.length).toBeGreaterThan(0);
+    expect(un.n).toBe(all.rows.filter(r => unreadIds.includes(r.id)).length);
+    // One read chat marked unread from its ⋮ menu counts too.
+    const read = chatRows(ctx).find(x => !x.c.unread)!;
+    data.prefs[read.id] = { pinned: false, muted: false, hidden: false, blocked: false, pinnedMessageId: null, markedUnread: true };
+    const { ctx: c2 } = ctxOf({ inbF: UNREAD });
+    const L = inboxVM({ ...c2, data } as typeof c2).list4;
+    expect(L.rows.map(r => r.id).sort()).toEqual([...unreadIds, read.id].sort());
+    expect(L.filter.shownN).toBe(L.rows.length);
+    expect(L.filter.statusN).toBe(1);
+    expect(L.filter.chips.map(c => c.label)).toEqual([UNREAD]);
+    expect(L.filter.count([], [UNREAD])).toBe(L.rows.length);
+  });
+
+  it("with a status, keeps only that status's unread chats", () => {
+    const { ctx } = ctxOf();
+    const rows = chatRows(ctx);
+    const label = KNOWN.slice(1).find(l => inboxVM(ctxOf({ inbF: joinPicked([UNREAD, l]) }).ctx).list4.rows.length > 0)!;
+    expect(label).toBeTruthy();
+    const L = inboxVM(ctxOf({ inbF: joinPicked([UNREAD, label]) }).ctx).list4;
+    expect(L.rows.length).toBeGreaterThan(0);
+    const byId = new Map(rows.map(r => [r.id, r]));
+    expect(L.rows.every(r => byId.get(r.id)!.c.unread > 0)).toBe(true);
+    // Every row is also in that status (Unread narrows, it does not add the other unread chats).
+    const inStatus = new Set(inboxVM(ctxOf({ inbF: label }).ctx).list4.rows.map(r => r.id));
+    expect(L.rows.every(r => inStatus.has(r.id))).toBe(true);
   });
 });
