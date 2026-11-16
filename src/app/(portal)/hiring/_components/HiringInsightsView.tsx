@@ -15,10 +15,10 @@ import s from './hiring.module.css'
 /**
  * Hiring › Insights (README §12, portal-34): how long each request takes,
  * from submitted to acknowledged to filled, for this month, a month of the
- * last twelve, or all time — six cards with their change on the month
- * before, the roles open today (2026-11-16, whatever the period), the days
- * each fill took, by source and by department, and every request sideways.
- * A row opens its facts and trail in the 440px panel.
+ * last twelve, or all time — five cards with their change on the month
+ * before (Open roles first, 2026-11-16), the roles open today (whatever the
+ * period), the days each fill took, by source and by department, and every
+ * request sideways. A row opens its facts and trail in the 440px panel.
  */
 export default function HiringInsightsView({ board, today }: { board: HiringBoard; today: string }) {
   const router = useRouter()
