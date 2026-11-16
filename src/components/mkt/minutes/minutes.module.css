@@ -145,8 +145,8 @@
 .frowDrag { background: rgb(var(--mk-surface)); opacity: .5; }
 .grip { color: rgb(var(--mk-grip)); cursor: grab; font-size: 12px; letter-spacing: -2px; user-select: none; }
 .glyph {
-  width: 28px; height: 28px; box-sizing: border-box; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-surface));
-  display: flex; align-items: center; justify-content: center; font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-brown));
+  width: 28px; height: 28px; box-sizing: border-box; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1;
 }
 .fmain { min-width: 0; }
 .fnameRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -188,7 +188,7 @@
 .kindOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); cursor: default; }
 .kind:disabled:not(.kindOn) { opacity: .4; cursor: not-allowed; }
 .kindLocked { cursor: not-allowed; }
-.kindGlyph { font-family: var(--mk-mono); font-size: 10px; opacity: .75; }
+.kindGlyph { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #fff; font-size: 12px; line-height: 1; }
 .factions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding-top: 10px; border-top: 1px solid rgb(var(--mk-line-3)); }
 .fbtn {
   height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex;
@@ -215,7 +215,7 @@
 .tcolOn, .tcolOn:hover { background: rgb(var(--mk-pick)); box-shadow: inset 0 -2px 0 rgb(var(--mk-brown)); }
 .tcolBtn { display: block; width: 100%; font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
 .tcolTop { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.tcolGlyph { font-family: var(--mk-mono); font-size: 10px; color: rgb(var(--mk-muted)); }
+.tcolGlyph { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #fff; font-size: 12px; line-height: 1; }
 .tcolName { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgb(var(--mk-ink)); }
 .tcolNameBad { color: rgb(var(--mk-red)); }
 .tcolType { font-size: .85em; color: rgb(var(--mk-muted)); margin-top: 2px; }
@@ -273,7 +273,7 @@
   border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); transition: background-color .15s, color .15s;
 }
 .ckindOn { border-color: rgb(var(--mk-ink)); background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); }
-.ckindGlyph { font-family: var(--mk-mono); font-size: 10px; opacity: .7; }
+.ckindGlyph { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #fff; font-size: 12px; line-height: 1; }
 .popFoot { display: flex; gap: 6px; align-items: center; padding-top: 10px; border-top: 1px solid rgb(var(--mk-line-4)); }
 .popMove {
   height: 26px; padding: 0 9px; border-radius: 6px; border: 1px solid rgb(var(--mk-line)); display: flex; align-items: center; cursor: pointer;
@@ -295,8 +295,8 @@
 .card:hover:not(:disabled) { border-color: rgb(var(--mk-focus)); box-shadow: var(--mk-shadow-hover); }
 .card:disabled { opacity: .4; cursor: not-allowed; }
 .cardGlyph {
-  flex: none; width: 26px; height: 26px; border-radius: 6px; background: rgb(var(--mk-pick)); display: flex; align-items: center; justify-content: center;
-  font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-brown));
+  flex: none; width: 26px; height: 26px; border-radius: 6px; background: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
 }
 .cardLabel { display: block; font-weight: 600; }
 .cardDesc { display: block; font-size: .88em; color: rgb(var(--mk-muted)); margin-top: 1px; }

@@ -1,9 +1,12 @@
 'use client'
 
 import type { MktPerson } from '@/lib/marketing/board'
-import { COL_GLYPH, tableAnswer, type MinutesField } from '@/lib/marketing/minutes'
+import { tableAnswer, type MinutesColType, type MinutesField } from '@/lib/marketing/minutes'
 import { attendeesOf, isPeriod, type MinutesDoc, type MinutesValue } from '@/lib/marketing/project'
 import p from './project.module.css'
+
+// The table's column marks as this form has always shown them: the Builder's icons became emoji, this page did not change.
+const COL_GLYPH: Record<MinutesColType, string> = { Text: 'Aa', Number: '#', Date: '▦', Person: '◎' }
 
 // Meeting minutes as they are written (`New Project.dc.html` step 2, on the product's intake template): each field as its
 // kind asks — text, a date, a campaign's run period, a number, people from the team, a typed table, the Free space, the
