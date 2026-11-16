@@ -17,9 +17,26 @@ describe('Hiring › Insights', () => {
   it('opens on this month, compared with the one before', () => {
     render(<HiringInsightsView board={HIRING_BOARD} today="2026-10-11" />)
     expect(screen.getByText('1 Oct 2026 – 31 Oct 2026')).toBeInTheDocument()
-    expect(within(card('Requests submitted')).getByText('2')).toBeInTheDocument()
+    expect(within(card('Open roles')).getByText('3')).toBeInTheDocument()
+    expect(within(card('Open roles')).getByText('▲ 200% vs Sep')).toBeInTheDocument()
     expect(within(card('People hired')).getByText('▼ 100% vs Sep')).toBeInTheDocument()
     expect(screen.getByText('Nothing filled in this period')).toBeInTheDocument()
+  })
+
+  // 2026-11-16, the user: "上面的 Request Submitted 跟 Average Day to Acknowledge 这两个可以换掉，换成一个叫 Open Role（在招职位）；
+  // People Hired 这个可以保留".
+  it('five cards: Open roles in the place of Requests submitted and Avg days to acknowledge', () => {
+    render(<HiringInsightsView board={HIRING_BOARD} today="2026-11-16" />)
+    const cards = screen.getByRole('region', { name: 'This period' })
+    expect(within(cards).getAllByRole('group').map(g => g.getAttribute('aria-label'))).toEqual([
+      'Open roles', 'People hired', 'Avg days to fill', 'Hiring cost', 'Cost per hire',
+    ])
+    expect(screen.queryByText('Requests submitted')).toBeNull()
+    expect(screen.queryByText('Avg days to acknowledge')).toBeNull()
+    // November sent nothing new; the card counts the three still being hired, as the list under it does.
+    expect(within(card('Open roles')).getByText('3')).toBeInTheDocument()
+    expect(within(card('Open roles')).getByText('0% vs Oct')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Open roles' })).getAllByRole('button', { expanded: false })).toHaveLength(3)
   })
 
   it('all time, and a month of the last twelve', () => {

@@ -24,16 +24,17 @@ describe('periods', () => {
 describe('this month (October)', () => {
   const ins = of('this')
 
-  it('two requests came in, nobody was hired — and says how that moved on September', () => {
+  // 2026-11-16, the user: Requests submitted and Avg days to acknowledge make way for Open roles; People hired stays.
+  it('three roles open today against one as September closed, nobody hired — five cards, each moved on September', () => {
     expect(ins.cards.map(c => [c.label, c.value, c.delta])).toEqual([
-      ['Requests submitted', '2', '0% vs Sep'],
+      ['Open roles', '3', '▲ 200% vs Sep'],
       ['People hired', '0', '▼ 100% vs Sep'],
-      ['Avg days to acknowledge', '—', ''],
       ['Avg days to fill', '—', ''],
       ['Hiring cost', '—', ''],
       ['Cost per hire', '—', ''],
     ])
     expect(ins.cards[1].deltaTone).toBe('bad')
+    // More roles open is more hiring asked for — neither good nor bad.
     expect(ins.cards[0].deltaTone).toBe('flat')
   })
 
@@ -71,8 +72,8 @@ describe('this month (October)', () => {
 describe('all time', () => {
   const ins = of('all')
 
-  it('the six cards, with no month to compare', () => {
-    expect(ins.cards.map(c => c.value)).toEqual(['9', '5', '1', '34', 'RM 2,050', 'RM 410'])
+  it('the five cards, with no month to compare — Open roles is today’s', () => {
+    expect(ins.cards.map(c => c.value)).toEqual(['3', '5', '34', 'RM 2,050', 'RM 410'])
     expect(ins.cards.every(c => c.delta === '')).toBe(true)
   })
 
@@ -101,11 +102,38 @@ describe('all time', () => {
 })
 
 describe('a month: September', () => {
-  it('counts what was submitted or filled in it', () => {
+  it('counts what was submitted or filled in it; Open roles, what was open as it closed', () => {
     const ins = of('m:2026-09')
     expect(ins.range).toBe('1 Sep 2026 – 30 Sep 2026')
     expect(ins.rows.map(r => r.id)).toEqual(['HR-203', 'HR-202'])
-    expect(ins.cards.map(c => c.value).slice(0, 2)).toEqual(['2', '1'])
+    expect(ins.cards.map(c => [c.label, c.value]).slice(0, 2)).toEqual([['Open roles', '1'], ['People hired', '1']])
+  })
+})
+
+// 2026-11-16, the user: "上面的 Request Submitted 跟 Average Day to Acknowledge 这两个可以换掉，换成一个叫 Open Role（在招职位）；
+// People Hired 这个可以保留".
+describe('the Open roles card', () => {
+  const first = (period: InsightsPeriod, today = TODAY, requests: readonly HiringRequest[] = BOARD.requests) =>
+    insightsOf(requests, period, today, id => personName(BOARD, id), departmentNames(BOARD)).cards[0]
+
+  it('what was still open as the period closed: today’s while it runs, a month gone by’s at its end', () => {
+    expect(first('this')).toEqual({ label: 'Open roles', value: '3', bar: 'plain', icon: 'receipt', delta: '▲ 200% vs Sep', deltaTone: 'flat' })
+    expect(first('all')).toMatchObject({ value: '3', delta: '' })
+    // September closed with HR-203 open, August with HR-201 (cancelled on 15 Sep).
+    expect(first('m:2026-09')).toMatchObject({ value: '1', delta: '0% vs Aug', deltaTone: 'flat' })
+    // July closed with HR-198 and HR-199 open — filled on 2 and 12 Aug.
+    expect(first('m:2026-08')).toMatchObject({ value: '1', delta: '▼ 50% vs Jul', deltaTone: 'flat' })
+    // November, nothing new sent: the three October left open.
+    expect(first('this', '2026-11-16')).toMatchObject({ value: '3', delta: '0% vs Oct' })
+  })
+
+  it('every role filled today: none open, and the fall is told quietly too', () => {
+    const done = BOARD.requests.map(r =>
+      ['submitted', 'acknowledged'].includes(r.status)
+        ? { ...r, status: 'filled' as const, filledAt: '2026-10-11T03:00:00.000Z', closedAt: '2026-10-11T03:00:00.000Z', hiredNames: ['Daniel Lee'] }
+        : r,
+    )
+    expect(first('this', TODAY, done)).toMatchObject({ value: '0', delta: '▼ 100% vs Sep', deltaTone: 'flat' })
   })
 })
 
@@ -118,7 +146,7 @@ describe('a department’s open', () => {
   it('a month with nothing new still says what is being hired today', () => {
     const ins = insightsOf(BOARD.requests, 'this', '2026-11-16', id => personName(BOARD, id), departmentNames(BOARD))
     expect(ins.rows).toEqual([])
-    expect(ins.cards[0].value).toBe('0')
+    expect(ins.cards[0]).toMatchObject({ label: 'Open roles', value: '3' })
     expect(depts('this', '2026-11-16')).toEqual([
       ['Revenue', '2 open · 0 hired'],
       ['HR', '0 open · 0 hired'],

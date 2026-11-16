@@ -6,7 +6,8 @@ import { answerOf, budgetText, candidateInfo, candidateMeta, dayKey, dayLabel, h
 // each request takes, from submitted to acknowledged to filled, what it cost
 // and through which source — for this month, a month of the last twelve, or
 // all time. Pure: the page hands in the board's requests and the office's today.
-// Open roles (2026-11-16) stands apart from the period: what is being hired today.
+// Open roles (2026-11-16) stands apart from the period: what is being hired today;
+// its card counts what was still open as the period closed.
 
 /** 'this' (the office's month), 'all', or a month 'm:2026-09'. */
 export type InsightsPeriod = 'this' | 'all' | `m:${string}`
@@ -141,42 +142,49 @@ export function insightsOf(
   const all = requests.map(r => factOf(r, today))
   const rows = all.filter(x => period === 'all' || inR(x.sub) || inR(x.fill))
   const filled = rows.filter(x => x.toFill !== null && (period === 'all' || inR(x.fill)))
-  const acked = rows.filter(x => x.toAck !== null)
-  const submitted = rows.filter(x => period === 'all' || inR(x.sub))
   const pax = filled.reduce((s, x) => s + x.pax, 0)
   const cost = filled.reduce((s, x) => s + x.cost, 0)
-  const avgAck = avg(acked.map(x => x.toAck as number))
   const avgFill = avg(filled.map(x => x.toFill as number))
 
-  // The same six figures for a month, to say how this one moved.
+  // "Open" is what was still open as a period closed — today's while it runs (this month, all time), a month gone
+  // by's at its end (2026-11-16: it counted the period's own requests alone, so on 16 Nov every department read
+  // "0 open" while eight requests from October were being hired). The Open roles card and By department's count.
+  const closeOf = (rg: [number, number]) => Math.min(rg[1], utc(today) + DAY)
+  const openAt = (close: number) => all.filter(x => utc(x.sub) < close && (x.open || (!!x.end && utc(x.end) >= close)))
+  const openAtClose = openAt(closeOf(range))
+
+  // The same five figures for a month, to say how this one moved.
   const metrics = (rg: [number, number]): Array<number | null> => {
     const inG = (key: string | null) => !!key && utc(key) >= rg[0] && utc(key) < rg[1]
     const f = all.filter(x => x.toFill !== null && inG(x.fill))
-    const a = all.filter(x => x.toAck !== null && inG(x.ack))
     const px = f.reduce((s, x) => s + x.pax, 0), c = f.reduce((s, x) => s + x.cost, 0)
-    return [all.filter(x => inG(x.sub)).length, px, avg(a.map(x => x.toAck as number)), avg(f.map(x => x.toFill as number)), c, px && c ? c / px : null]
+    return [openAt(closeOf(rg)).length, px, avg(f.map(x => x.toFill as number)), c, px && c ? c / px : null]
   }
   const prev = previousOf(period, today)
   const now = metrics(range), before = prev ? metrics(prev) : null
   const prevLabel = prev ? MONTHS[new Date(prev[0]).getUTCMonth()] : ''
-  const UP_GOOD = [true, true, false, false, false, false]
+  // Up is good, down is good — or neither: more roles open is more hiring asked for, not HR doing better or worse,
+  // so Open roles' change is told in the quiet tone.
+  const UP_GOOD: Array<boolean | null> = [null, true, false, false, false]
 
+  // 2026-11-16, the user: "上面的 Request Submitted 跟 Average Day to Acknowledge 这两个可以换掉，换成一个叫 Open Role
+  // （在招职位）；People Hired 这个可以保留" — five cards, Open roles first.
   const base: Array<Omit<InsightCard, 'delta' | 'deltaTone'>> = [
-    { label: 'Requests submitted', value: String(submitted.length), bar: 'plain', icon: 'receipt' },
+    { label: 'Open roles', value: String(openAtClose.length), bar: 'plain', icon: 'receipt' },
     { label: 'People hired', value: String(pax), bar: 'ledger', icon: 'people' },
-    { label: 'Avg days to acknowledge', value: avgAck === null ? '—' : String(avgAck), bar: 'plain', icon: 'calendar' },
     { label: 'Avg days to fill', value: avgFill === null ? '—' : String(avgFill), bar: 'plain', icon: 'calendar' },
     { label: 'Hiring cost', value: cost ? money(cost) : '—', bar: 'alert', icon: 'percent' },
     { label: 'Cost per hire', value: pax && cost ? money(cost / pax) : '—', bar: 'alert', icon: 'percent' },
   ]
   const cards: InsightCard[] = base.map((c, i) => {
     if (!before) return { ...c, delta: '', deltaTone: 'quiet' }
-    const cv = now[i], pv = before[i]
-    if (cv === null || pv === null || pv === 0 || (!UP_GOOD[i] && !cv)) return { ...c, delta: '', deltaTone: 'quiet' }
+    const cv = now[i], pv = before[i], upGood = UP_GOOD[i]
+    if (cv === null || pv === null || pv === 0 || (upGood === false && !cv)) return { ...c, delta: '', deltaTone: 'quiet' }
     const pct = Math.round(((cv || 0) - pv) / pv * 100)
     if (!pct) return { ...c, delta: `0% vs ${prevLabel}`, deltaTone: 'flat' }
-    const good = (pct > 0) === UP_GOOD[i]
-    return { ...c, delta: `${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)}% vs ${prevLabel}`, deltaTone: good ? 'good' : 'bad' }
+    const delta = `${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)}% vs ${prevLabel}`
+    if (upGood === null) return { ...c, delta, deltaTone: 'flat' }
+    return { ...c, delta, deltaTone: (pct > 0) === upGood ? 'good' : 'bad' }
   })
 
   const longest = Math.max(1, ...filled.map(x => x.toFill as number))
@@ -200,11 +208,7 @@ export function insightsOf(
     .sort((a, b) => b.paxN - a.paxN)
     .map(s => ({ name: s.name, pax: s.pax, share: s.share, cost: s.cost }))
 
-  // A department's "N open" is what was still open as the period closed — today's while the period runs (this month,
-  // all time), a month gone by's at its end (2026-11-16: it counted the period's own requests alone, so on 16 Nov every
-  // department read "0 open" while eight requests from October were being hired; Open roles lists them).
-  const close = Math.min(range[1], utc(today) + DAY)
-  const openAtClose = all.filter(x => utc(x.sub) < close && (x.open || (!!x.end && utc(x.end) >= close)))
+  // A department's "N open": its requests still open as the period closed (openAtClose, above).
   const deptOf = (r: HiringRequest) => answerOf(r, 'dept').split(' · ')[0]
   const deptNames = [...departments, ...[...rows, ...openAtClose].map(x => deptOf(x.r)).filter(d => d && !departments.includes(d))]
   const departmentsOut = [...new Set(deptNames)].map(name => {

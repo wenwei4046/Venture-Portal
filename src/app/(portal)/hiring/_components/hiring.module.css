@@ -993,7 +993,8 @@
 .monthShort { font-size: 13px; font-weight: 500; }
 .monthYear { font-size: 10px; opacity: 0.7; }
 .insRange { font-size: 12.5px; color: rgb(var(--hv-body-2)); }
-.insCards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px; margin-bottom: 22px; }
+/* Five cards (2026-11-16: Open roles took the place of Requests submitted and Avg days to acknowledge). */
+.insCards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-bottom: 22px; }
 .insCard {
   display: flex;
   flex-direction: column;
@@ -1306,6 +1307,8 @@
 
 @media (max-width: 767px) {
   .insCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Five cards two by two: Open roles, the first, has the row to itself — not the last one alone at half width. */
+  .insCards > .insCard:first-child { grid-column: 1 / -1; }
   .insBars, .insTwo, .talGrid, .addGrid { grid-template-columns: minmax(0, 1fr); }
   .insBarRow { grid-template-columns: 120px minmax(0, 1fr) 44px; }
   .facts { grid-template-columns: 120px minmax(0, 1fr); }
