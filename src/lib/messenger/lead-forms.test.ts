@@ -58,6 +58,18 @@ describe("an Instant Form lead", () => {
     expect(instantLeadRow(ref, { field_data: [{ name: "sounds_good,_{{user_first_name}}._what_is_the_best_phone_number_to_reach_you_on?", values: ["0123456789"] }] }))
       .toMatchObject({ phone: "0123456789" });
   });
+  // 2026-11-16, the owner: "为什么回复会在不同的聊天室？" — "+600186670207" was kept as 600186670207; WhatsApp delivered to
+  // 60186670207 and the customer's reply from there opened a second customer with no ad.
+  it("drops the 0 typed after +60, so the customer's reply finds them", () => {
+    const ref = parseMessengerDelivery(notice).instant![0];
+    const phone = (v: string) => (instantLeadRow(ref, { field_data: [{ name: "whatsapp_number", values: [v] }] }) as { phone: string | null }).phone;
+    expect(phone("+600186670207")).toBe("+60186670207");
+    expect(phone("+60 012-681 2215")).toBe("+60126812215");
+    expect(phone("600111234567")).toBe("+60111234567");
+    expect(phone("+60186670207")).toBe("+60186670207");
+    expect(phone("0186670207")).toBe("0186670207");
+    expect(phone("+6012345")).toBe("+6012345");
+  });
   it("says why when Meta will not let it be read (no leads_retrieval)", async () => {
     const ref = parseMessengerDelivery(notice).instant![0];
     const refused = (async () => new Response(JSON.stringify({ error: { message: "(#200) Requires leads_retrieval permission" } }), { status: 403 })) as unknown as typeof fetch;
