@@ -26,6 +26,18 @@ const PHONE = /phone|mobile|whatsapp|contact_number|电话|手机/i;
 const NAME = /^(full_name|name|姓名)$/i;
 const FIRST = /^first_name$/i, LAST = /^last_name$/i;
 
+/**
+ * A Malaysian number typed with its trunk 0 after the country code — "+60 0186670207" — kept as typed became
+ * 600186670207, while WhatsApp delivers to (and the customer then writes from) 60186670207, so their reply opened a
+ * second customer with no ad (2026-11-16, the owner: "为什么回复会在不同的聊天室？"). That 0 is dropped here; anything
+ * else is passed as it came (`crm_ingest_lead` keeps the digits and turns a leading 0 into 60).
+ */
+function formPhone(v: string | null): string | null {
+  if (!v) return v;
+  const d = v.replace(/\D/g, "");
+  return /^600\d{8,10}$/.test(d) ? `+60${d.slice(3)}` : v;
+}
+
 /** An Instant Form lead's answers (Meta's field_data) → the row: its questions and answers, phone, name. */
 export function instantLeadRow(ref: InstantLeadRef, lead: { field_data?: { name?: string; values?: unknown[] }[]; ad_id?: string; form_id?: string; created_time?: string }): LeadRow {
   // inbox_url is Meta's link to the Messenger chat it opens for the lead, not the customer's answer. Every new Instant
@@ -37,7 +49,7 @@ export function instantLeadRow(ref: InstantLeadRef, lead: { field_data?: { name?
   const brand = brandOf(ref.pageId);
   const adId = lead.ad_id ?? ref.adId;
   return { kind: "instant", pageId: ref.pageId, leadId: ref.leadId, formId: lead.form_id ?? ref.formId, at: lead.created_time ? new Date(lead.created_time).toISOString() : ref.createdAt,
-    name, phone: pick(PHONE), waAccount: brand ? BRAND_WHATSAPP[brand] : null, ad: adId ? { sourceId: adId, headline: null } : null, complete: true,
+    name, phone: formPhone(pick(PHONE)), waAccount: brand ? BRAND_WHATSAPP[brand] : null, ad: adId ? { sourceId: adId, headline: null } : null, complete: true,
     answers: fields.map(f => ({ q: words(f.key), a: f.value })) };
 }
 
