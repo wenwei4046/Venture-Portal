@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { deleteMktQuote, duplicateMktQuote, readMktQuoteBook, saveMktItem, saveMktQuote } from '@/lib/marketing/quote-actions'
-import { factsPayload, mergeFacts, norm, withFacts, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
+import { archiveMktQuote, deleteMktQuote, duplicateMktQuote, readMktQuoteBook, saveMktItem, saveMktQuote } from '@/lib/marketing/quote-actions'
+import { factsPayload, mergeFacts, norm, withFacts, type CatalogItem, type ItemColumn, type ItemFacts, type ListPrefs } from '@/lib/marketing/catalog'
 import type { Product, ProductBook } from '@/lib/marketing/products'
 import { coreOf, packageLine, quoteTotals, rm, type Quote, type QuoteBook } from '@/lib/marketing/quotes'
 import AssignTasks from './AssignTasks'
@@ -72,13 +72,14 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
 
   const setItems = useCallback((fn: (items: CatalogItem[]) => CatalogItem[]) => setQbook(b => ({ ...b, items: fn(b.items) })), [])
   const setColumns = useCallback((fn: (columns: ItemColumn[]) => ItemColumn[]) => setQbook(b => ({ ...b, columns: fn(b.columns) })), [])
+  const setPrefs = useCallback((fn: (prefs: ListPrefs) => ListPrefs) => setQbook(b => ({ ...b, prefs: fn(b.prefs) })), [])
   // A quotation as the editor has it — its tasks, once assigned (here, in the window), are never taken back by it.
   const setQuote = useCallback((q: Quote) => setQbook(b => ({
     ...b, quotes: b.quotes.map(x => (x.id === q.id ? { ...q, tasks: q.tasks ?? x.tasks, assignedOn: q.assignedOn ?? x.assignedOn } : x)),
   })), [])
   const refreshQuotes = useCallback(async () => {
     const r = await readMktQuoteBook()
-    if (r.ok) setQbook(b => ({ ...r.book, items: b.items, columns: b.columns }))
+    if (r.ok) setQbook(b => ({ ...r.book, items: b.items, columns: b.columns, prefs: b.prefs }))
   }, [])
 
   // ── An item edited from a product's Items (the user, 2026-11-12: "在 package 加的品项也能改 day 等的资讯，其实他相当于在
@@ -200,6 +201,14 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
     }
   }
 
+  /** Archived (v2 §6, any status): off the list — nothing else changes; or back on it. */
+  const archiveQuote = async (q: Quote, on: boolean) => {
+    const r = await archiveMktQuote(q.id, on)
+    if (!r.ok) return flash(r.reason)
+    setQbook(b => ({ ...b, quotes: b.quotes.map(x => (x.id === q.id ? { ...x, archivedAt: r.quote.archivedAt } : x)) }))
+    flash(on ? `Archived ${q.no}` : `${q.no} is back on the list`)
+  }
+
   const clientName = (q: Quote) => (q.other ? q.client.trim() : qbook.clients.find(c => c.id === q.sub)?.name ?? '')
   const taskCount = (q: Quote) => q.lines.reduce((n, l) => n + (l.kind === 'item' ? 1 : l.items.filter(it => it.qty > 0).length), 0)
 
@@ -222,8 +231,8 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
   const assignQuote = assignFor ? qbook.quotes.find(q => q.id === assignFor) ?? null : null
   const tabs: [BuilderTab, string, string, number][] = [
     ['catalog', '📋', 'Product List', qbook.items.length],
-    ['products', '📦', 'Products', products.products.length],
-    ['quotes', '📄', 'Quotations', qbook.quotes.length],
+    ['products', '📦', 'Packages', products.products.length],
+    ['quotes', '📄', 'Quotations', qbook.quotes.filter(q => !q.archivedAt).length],
   ]
 
   return (
@@ -240,12 +249,15 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
         ))}
       </div>
 
+      <div className={qs.body}>
       {tab === 'catalog' ? (
         <CatalogTab
           items={qbook.items}
           setItems={setItems}
           columns={qbook.columns}
           setColumns={setColumns}
+          prefs={qbook.prefs}
+          setPrefs={setPrefs}
           products={products.products}
           quotes={qbook.quotes}
           workflows={products.workflows}
@@ -269,6 +281,7 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
           onItemFacts={setItemFacts}
           onQuote={p => void newQuote(p)}
           onPublished={() => void refreshQuotes()}
+          draftQuotesWith={id => qbook.quotes.filter(q => q.status === 'draft' && q.lines.some(l => l.kind === 'package' && l.product === id)).length}
           flash={flash}
         />
       ) : null}
@@ -293,9 +306,11 @@ export default function ProductBuilderApp({ initialProducts, initialQuotes, tab:
           />
         ) : (
           <QuoteList book={qbook} busy={busy} onOpen={id => { setQuoteId(id); scrollTop() }} onNew={() => void newQuote(null)}
-            onDelete={q => void deleteQuote(q, q.rev)} />
+            onDelete={q => void deleteQuote(q, q.rev)} onDuplicate={q => void duplicateQuote(q)} onArchive={(q, on) => void archiveQuote(q, on)}
+            onAssign={q => setAssignFor(q.id)} />
         )
       ) : null}
+      </div>
 
       {popup ? (
         <div className={qs.popup} role="status">

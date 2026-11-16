@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { addDays, dmy, includedOf, lineCalc, lineExtrasWords, quoteCsv, quoteTotals, rm, termOf, type QuoteCore } from '@/lib/marketing/quotes'
+import { addDays, clientLines, dmy, includedOf, lineCalc, lineExtrasWords, quoteCsv, quoteTotals, rm, termOf, type ClientShows, type QuoteCore } from '@/lib/marketing/quotes'
+import Lock from './Lock'
 import qs from './quotes.module.css'
 
 // The quotation as a document (`Product Builder.dc.html` › the client PDF and the internal pricing sheet): an A4-like
@@ -9,12 +10,14 @@ import qs from './quotes.module.css'
 // carries no cost or margin anywhere; the internal sheet adds them and what "We make". A version from the history is
 // read-only, under an amber banner. Download: the PDF (`/marketing/products/pdf`, a GET route) or the CSV.
 
-export default function QuoteDoc({ kind, quote: q, quoteId, viewing, account, onClose, flash }: {
+export default function QuoteDoc({ kind, quote: q, quoteId, viewing, account, shows = { remark: true, eta: true }, onClose, flash }: {
   kind: 'client' | 'internal'
   quote: QuoteCore & { no: string }
   quoteId: string
   viewing: { rev: number; at: string } | null
   account: string
+  /** What the client sees of the built-in columns (v2). */
+  shows?: ClientShows
   onClose: () => void
   flash: (words: string) => void
 }) {
@@ -67,7 +70,7 @@ export default function QuoteDoc({ kind, quote: q, quoteId, viewing, account, on
       <div className={qs.dialog} role="dialog" aria-modal="true" aria-label={client ? 'Client quotation' : 'Internal pricing sheet'} onClick={e => e.stopPropagation()}>
         <div className={qs.dlgHead}>
           <span className={qs.dlgTitle}>{client ? (viewing ? `Client quotation · v${viewing.rev}` : 'Client quotation') : 'Internal pricing sheet'}</span>
-          <span className={qs.dlgSub}>{client ? (viewing ? `Sent ${dmy(viewing.at)} · from history` : 'What the subsidiary receives — no costs or margins') : '🔒 Manager only'}</span>
+          <span className={qs.dlgSub}>{client ? (viewing ? `Sent ${dmy(viewing.at)} · from history` : 'What the subsidiary receives — no costs or margins') : <><Lock /> Manager only</>}</span>
           <span className={qs.grow} />
           <button type="button" className={qs.dark} disabled={busy} onClick={() => void download()}>{client ? 'Download PDF' : 'Download CSV'}</button>
           <button type="button" className={qs.close} aria-label="Close" onClick={onClose}>×</button>
@@ -95,12 +98,12 @@ export default function QuoteDoc({ kind, quote: q, quoteId, viewing, account, on
             {client ? (
               <div className={qs.dTable}>
                 <div className={`${qs.dRow} ${qs.dRowHead}`}><span>Product</span><span>What&apos;s included</span><span>Term</span><span className={qs.dR}>Amount</span></div>
-                {q.lines.map(l => (
+                {clientLines(q.lines, shows).map(({ line, shown: l }) => (
                   <div key={l.key} className={qs.dRow}>
                     <span className={qs.dCol}><b style={{ fontWeight: 600 }}>{l.name}</b>{l.eta ? <span className={qs.dEta}>Est. delivery {dmy(l.eta)}</span> : null}</span>
                     <span className={`${qs.dCol} ${qs.dInc}`}><span>{includedOf(l)}</span>{lineExtrasWords(l, true) ? <span className={qs.dExtra}>{lineExtrasWords(l, true)}</span> : null}{l.remark ? <span className={qs.dRemark}>{l.remark}</span> : null}</span>
-                    <span className={qs.dTerm}>{termOf(l)}</span>
-                    <span className={qs.dAmt}>{rm(lineCalc(l).amount)}</span>
+                    <span className={qs.dTerm}>{termOf(line)}</span>
+                    <span className={qs.dAmt}>{rm(lineCalc(line).amount)}</span>
                   </div>
                 ))}
               </div>

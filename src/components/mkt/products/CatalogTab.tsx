@@ -1,44 +1,71 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { deleteMktItem, deleteMktItemColumn, orderMktItemColumns, renameMktCatalogue, saveMktItem, saveMktItemColumn } from '@/lib/marketing/quote-actions'
-import { catalogues, COLUMN_KINDS, itemPatch, norm, usedIn, type CatalogItem, type ColumnKind, type ExtraValue, type ItemColumn } from '@/lib/marketing/catalog'
+import {
+  deleteMktItem, deleteMktItemColumn, orderMktItemColumns, renameMktCatalogue, saveMktItem, saveMktItemColumn, saveMktListPrefs, setMktItemInternal,
+} from '@/lib/marketing/quote-actions'
+import {
+  catalogueIcon, catalogues, COLUMN_KINDS, deleteImpact, itemMargin, itemPatch, norm,
+  type BuiltinColumn, type CatalogItem, type ColumnKind, type ExtraValue, type ItemColumn, type ListPrefs,
+} from '@/lib/marketing/catalog'
 import ColumnEditor from './ColumnEditor'
 import ColumnKindMenu from './ColumnKindMenu'
 import ColumnMenu from './ColumnMenu'
+import DeleteItem from './DeleteItem'
 import ExtraCell from './ExtraCell'
+import HeadMenu, { type HeadLock } from './HeadMenu'
+import IconPicker from './IconPicker'
+import ItemMenu from './ItemMenu'
+import Lock, { LOCK_TITLE } from './Lock'
 import type { ProductBook, ProductWorkflowOption } from '@/lib/marketing/products'
 import type { QuoteBook } from '@/lib/marketing/quotes'
 import MoneyInput from './MoneyInput'
+import { menuAt, type MenuAt } from './PopMenu'
 import qs from './quotes.module.css'
+import v2 from './v2.module.css'
 
-// The Product Builder's 📋 Product List tab (`Product Builder.dc.html`): every sellable item, by catalogue — its name,
-// description, price, internal cost 🔒, est. days, default workflow and remarks, each a flat input saved as it is typed.
-// Renaming an item renames it in every product and quotation (the database does it); an item a product or a quotation
-// uses is never deleted. The manager's (Marketing · Manage).
+// The Product Builder's 📋 Product List tab (v2, docs/design_handoff_product_builder_v2/ §5): every sellable item, by
+// catalogue — each catalogue its icon; an item's name, description, price, internal cost 🔒, margin, est. days, default
+// workflow and remarks, then the manager's own columns, each a flat cell saved as it is typed. A row right-clicked:
+// Internal only (off the client's PDF, still in every sum) and Delete item… (every item — out of drafts only). A column
+// head right-clicked: Internal only and Delete column. Renaming an item renames it in every product and quotation (the
+// database does it). The manager's (Marketing · Manage).
 
 const wfLabel = (w: ProductWorkflowOption) => `${w.action} · ${w.tname} · ${w.version ? `v${w.version}` : 'draft'}`
 
 // The list's own heads — a column of the manager's is never called one of them (`mkt_item_column_save` refuses it too).
-const BUILT_IN = ['item', 'description', 'price', 'cost', 'est. days', 'workflow', 'remarks']
+const BUILT_IN = ['item', 'description', 'price', 'cost', 'margin', 'est. days', 'days', 'workflow', 'remarks']
 
-const BASE_COLS = 'minmax(150px, 1.1fr) minmax(170px, 1.5fr) 104px 96px 76px minmax(200px, 1.3fr) minmax(150px, 1.2fr)'
+type Head = 'item' | 'price' | BuiltinColumn
+const HEADS: { key: Head; name: string; width: string; right?: boolean; lock: HeadLock; required?: boolean }[] = [
+  { key: 'item', name: 'Item', width: 'minmax(160px, 1.1fr)', lock: 'client', required: true },
+  { key: 'desc', name: 'Description', width: 'minmax(180px, 1.5fr)', lock: null },
+  { key: 'price', name: 'Price', width: '100px', right: true, lock: 'client', required: true },
+  { key: 'cost', name: 'Cost', width: '100px', right: true, lock: 'internal' },
+  { key: 'margin', name: 'Margin', width: '80px', right: true, lock: 'internal' },
+  { key: 'days', name: 'Days', width: '64px', right: true, lock: null },
+  { key: 'wf', name: 'Workflow', width: 'minmax(200px, 1.3fr)', lock: null },
+  { key: 'remarks', name: 'Remarks', width: 'minmax(130px, 1fr)', lock: null },
+]
+const MARGIN_LOW = 20
 
-export default function CatalogTab({ items, setItems, columns, setColumns, products, quotes, workflows, onRenamed, flash }: {
+export default function CatalogTab({ items, setItems, columns, setColumns, prefs, setPrefs, products, quotes, workflows, onRenamed, flash }: {
   items: CatalogItem[]
   setItems: (fn: (items: CatalogItem[]) => CatalogItem[]) => void
   /** The manager's own columns, in their order. */
   columns: ItemColumn[]
   setColumns: (fn: (columns: ItemColumn[]) => ItemColumn[]) => void
+  /** The Product List's own settings: catalogue icons, the built-in columns internal / hidden. */
+  prefs: ListPrefs
+  setPrefs: (fn: (prefs: ListPrefs) => ListPrefs) => void
   products: ProductBook['products']
   quotes: QuoteBook['quotes']
   workflows: ProductWorkflowOption[]
-  /** An item renamed: both books as the database now has them (its products' drafts and quotations renamed). */
+  /** An item renamed or deleted: both books as the database now has them (products' drafts and quotations changed). */
   onRenamed: (products: ProductBook | null, book: QuoteBook | null) => void
   flash: (words: string) => void
 }) {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState('All')
   const [catNew, setCatNew] = useState('')
   // A catalogue's name as it is typed (keyed by its place, so its box keeps the focus) — saved on leaving the box.
   const [catTyped, setCatTyped] = useState<Record<number, string>>({})
@@ -46,6 +73,10 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
   const [busy, setBusy] = useState(false)
   // A column head right-clicked (its menu), and one being dragged to a new place (the user, 2026-11-13).
   const [colMenu, setColMenu] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [headMenu, setHeadMenu] = useState<{ key: Head; at: MenuAt } | null>(null)
+  const [rowMenu, setRowMenu] = useState<{ id: string; at: MenuAt } | null>(null)
+  const [delFor, setDelFor] = useState<string | null>(null)
+  const [iconFor, setIconFor] = useState<{ cat: string; el: HTMLElement } | null>(null)
   const [dragCol, setDragCol] = useState<{ id: string; over: string | null } | null>(null)
   const [adding, setAdding] = useState<{ el: HTMLElement; at: { left: number; top: number; above?: number } } | null>(null)
   const saved = useRef(new Map<string, CatalogItem>(items.map(i => [i.id, i])))
@@ -53,9 +84,10 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
   const chains = useRef(new Map<string, Promise<void>>())
   const live = useRef(items)
   live.current = items
-  // What the Save button says (the user, 2026-11-13: "在右上角要放一个储存的按钮"): a change waiting or on its way, or all kept.
+  // "● All changes saved" — or a change waiting or on its way (saving stays automatic, v2 §5).
   const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving'>('saved')
   const settle = () => setSaveState(timers.current.size ? 'unsaved' : pending.current ? 'saving' : 'saved')
+  const cardRefs = useRef(new Map<string, HTMLDivElement>())
 
   const flushItem = (id: string) => {
     const t = timers.current.get(id)
@@ -113,14 +145,6 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     setSaveState('unsaved')
   }
 
-  /** Save: whatever waits goes now; told once it is all kept. */
-  const saveAll = async () => {
-    for (const id of [...timers.current.keys()]) flushItem(id)
-    await Promise.all([...chains.current.values()])
-    settle()
-    if (!timers.current.size && !pending.current) flash('Product List saved')
-  }
-
   const addInCat = async (cat: string) => {
     const r = await saveMktItem(null, { cat })
     if (!r.ok) return flash(r.reason)
@@ -128,13 +152,57 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     setItems(xs => [...xs, r.item])
   }
 
+  /** Delete item (v2 §5): every item — out of products' drafts and draft quotations; sent / accepted keep it. */
   const remove = async (x: CatalogItem) => {
-    const u = usedIn(x, products, quotes)
-    if (u.pc || u.qc) return flash(`“${x.name}” is used in ${u.text} — remove it there first`)
-    const r = await deleteMktItem(x.id)
-    if (!r.ok) return flash(r.reason)
-    setItems(xs => xs.filter(i => i.id !== x.id))
-    flash(`Removed ${x.name || 'item'}`)
+    if (busy) return
+    setBusy(true)
+    try {
+      const t = timers.current.get(x.id)
+      if (t) clearTimeout(t)
+      timers.current.delete(x.id)
+      const r = await deleteMktItem(x.id)
+      if (!r.ok) return flash(r.reason)
+      setItems(xs => xs.filter(i => i.id !== x.id))
+      saved.current.delete(x.id)
+      setDelFor(null)
+      if (r.book || r.productBook) onRenamed(r.productBook, r.book)
+      flash(`Deleted “${x.name || 'item'}”${r.drafts.length ? ` · removed from ${r.drafts.length} draft quotation${r.drafts.length === 1 ? '' : 's'}` : ''}`)
+    } finally {
+      setBusy(false)
+      settle()
+    }
+  }
+
+  /** Internal only, on or off — saved at once. */
+  const toggleInternal = async (x: CatalogItem) => {
+    setRowMenu(null)
+    const on = !x.internal
+    setItems(xs => xs.map(i => (i.id === x.id ? { ...i, internal: on } : i)))
+    const s = saved.current.get(x.id)
+    if (s) saved.current.set(x.id, { ...s, internal: on })
+    const r = await setMktItemInternal(x.id, on)
+    if (!r.ok) {
+      setItems(xs => xs.map(i => (i.id === x.id ? { ...i, internal: !on } : i)))
+      return flash(r.reason)
+    }
+    flash(on ? `“${x.name || 'Item'}” is internal · not on the client’s PDF` : `“${x.name || 'Item'}” shows on the client’s PDF again`)
+  }
+
+  /** The list's own settings saved whole — put back when refused. */
+  const savePrefs = async (key: 'icons' | 'columns', next: ListPrefs) => {
+    const before = prefs
+    setPrefs(() => next)
+    const r = await saveMktListPrefs(key, key === 'icons' ? next.icons : next.columns)
+    if (!r.ok) {
+      setPrefs(() => before)
+      flash(r.reason)
+      return false
+    }
+    return true
+  }
+  const pickIcon = (cat: string, emoji: string) => {
+    setIconFor(null)
+    void savePrefs('icons', { ...prefs, icons: { ...prefs.icons, [cat]: emoji } })
   }
 
   const renameCat = async (from: string, typed: string, place: number) => {
@@ -149,7 +217,25 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     if (!r.ok) return flash(r.reason)
     setItems(xs => xs.map(x => (x.cat === from ? { ...x, cat: to } : x)))
     for (const [id, x] of saved.current) if (x.cat === from) saved.current.set(id, { ...x, cat: to })
-    if (filter === from) setFilter(to)
+    // Its icon goes with its name.
+    if (prefs.icons[from]) {
+      const icons = { ...prefs.icons, [to]: prefs.icons[from] }
+      delete icons[from]
+      void savePrefs('icons', { ...prefs, icons })
+    }
+  }
+
+  // ── The built-in columns: internal / hidden ──
+  const pref = (k: Head) => (k === 'item' || k === 'price' ? { internal: false, hidden: false } : prefs.columns[k])
+  const headInternal = (k: Head) => (k === 'cost' || k === 'margin' ? true : pref(k).internal)
+  const setHead = async (k: Head, patch: { internal?: boolean; hidden?: boolean }) => {
+    setHeadMenu(null)
+    if (k === 'item' || k === 'price') return
+    const next = { ...prefs, columns: { ...prefs.columns, [k]: { ...prefs.columns[k], ...patch } } }
+    const name = HEADS.find(h => h.key === k)?.name ?? k
+    if (await savePrefs('columns', next)) {
+      flash(patch.hidden ? `Removed the column ${name}` : patch.internal ? `${name} is internal · not on the client’s PDF` : `${name} shows on the client’s PDF again`)
+    }
   }
 
   // ── The manager's own columns ──
@@ -254,16 +340,17 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     flash(`Removed the column ${c.name}`)
   }
   const editCol = editing ? columns.find(c => c.id === editing.id) ?? null : null
-  // The table's grid: the design's seven columns, then the manager's own (140px each), then ×.
-  const grid = columns.length
-    ? { gridTemplateColumns: `${BASE_COLS} ${columns.map(() => '140px').join(' ')} 24px`, minWidth: 1060 + columns.length * 148 }
-    : undefined
+
+  // The grid: the built-in columns not removed, then the manager's own (140px each), then +.
+  const heads = HEADS.filter(h => !pref(h.key).hidden)
+  const shown = (k: Head) => heads.some(h => h.key === k)
+  const minWidth = heads.reduce((n, h) => n + (h.width.startsWith('minmax') ? Number(h.width.match(/\d+/)?.[0] ?? 100) : Number(h.width.replace('px', ''))), 0) + columns.length * 148 + 28 + 28 + heads.length * 8
+  const grid = { gridTemplateColumns: `${heads.map(h => h.width).join(' ')}${columns.map(() => ' 140px').join('')} 28px`, minWidth }
 
   const cats = catalogues(items)
   const cq = norm(q)
   const groups = cats
     .map((cat, place) => ({ cat, place }))
-    .filter(g => filter === 'All' || filter === g.cat)
     .map(g => ({ ...g, rows: items.filter(x => x.cat === g.cat && (!cq || norm([x.name, x.desc, x.remarks, g.cat, ...Object.values(x.extra).map(String)].join(' ')).includes(cq))) }))
     .filter(g => g.rows.length || !cq)
   const addCatalogue = () => {
@@ -271,36 +358,40 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
     if (!n) return
     void addInCat(n)
     setCatNew('')
-    setFilter('All')
   }
+  const jump = (cat: string) => cardRefs.current.get(cat)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  const rowMenuItem = rowMenu ? items.find(x => x.id === rowMenu.id) ?? null : null
+  const delItem = delFor ? items.find(x => x.id === delFor) ?? null : null
 
   return (
     <div>
-      <div className={qs.head}>
-        <span className={qs.headIcon} aria-hidden="true">📋</span>
-        <span className={qs.title}>Product List</span>
-        <div className={qs.seg} style={{ marginLeft: 8 }} role="tablist" aria-label="By catalogue">
-          {['All', ...cats].map(k => (
-            <button key={k} type="button" role="tab" aria-selected={filter === k} className={`${qs.segBtn}${filter === k ? ` ${qs.segOn}` : ''}`} onClick={() => setFilter(k)}>
-              <span className={qs.lbl} data-t={k}>{k}</span>
-              <span className={qs.n}>{k === 'All' ? items.length : items.filter(x => x.cat === k).length}</span>
+      <div className={v2.toolbar}>
+        <span className={v2.searchWrap}>
+          <input type="search" className={`${v2.search} ${v2.plSearch}`} value={q} onChange={e => setQ(e.target.value)} placeholder="Search items" aria-label="Search items" />
+        </span>
+        <div className={v2.jumps} role="navigation" aria-label="Catalogues">
+          {cats.map(c => (
+            <button key={c} type="button" className={v2.jump} onClick={() => jump(c)}>
+              <span aria-hidden="true">{catalogueIcon(prefs, c)}</span>{c}<span className={v2.segN}>{items.filter(x => x.cat === c).length}</span>
             </button>
           ))}
         </div>
-        <span className={qs.grow} />
-        <input className={qs.search} value={q} onChange={e => setQ(e.target.value)} placeholder="Search items" aria-label="Search items" />
-        <button type="button" className={qs.primary} onClick={() => void addInCat(filter !== 'All' ? filter : cats[0] || 'Other')}>+ New item</button>
-        <button type="button" className={`${qs.ghost} ${qs.saveBtn}`} disabled={saveState !== 'unsaved'} onClick={() => void saveAll()} aria-live="polite">
-          {saveState === 'saving' ? 'Saving…' : saveState === 'unsaved' ? 'Save' : 'Saved ✓'}
-        </button>
+        <span className={`${v2.allSaved}${saveState === 'saved' ? '' : ` ${v2.saving}`}`} aria-live="polite">
+          {saveState === 'saved' ? 'All changes saved' : 'Saving…'}
+        </span>
+        <button type="button" className={v2.primary} onClick={() => void addInCat(cats[0] || 'Other')}>+ New item</button>
       </div>
-      <div className={qs.note}>The menu every product and quotation picks its items from. An item typed into a product or a quotation is added here, and renaming an item here renames it everywhere.</div>
-      <div className={qs.cats}>
+      <div className={v2.catCards}>
         {groups.map(g => (
-          <div key={g.place} className={qs.catCard}>
-            <div className={qs.catHead}>
+          <div key={g.place} className={v2.catCard} ref={el => { if (el) cardRefs.current.set(g.cat, el); else cardRefs.current.delete(g.cat) }}>
+            <div className={v2.catHead}>
+              <button type="button" className={v2.iconBtn} aria-label={`Icon for ${g.cat}`} aria-haspopup="dialog" aria-expanded={iconFor?.cat === g.cat}
+                onClick={e => { const el = e.currentTarget; setIconFor(cur => (cur?.cat === g.cat ? null : { cat: g.cat, el })) }}>
+                {catalogueIcon(prefs, g.cat)}<span className={v2.iconCaret} aria-hidden="true">▾</span>
+              </button>
               <input
-                className={qs.catName}
+                className={v2.catName}
                 value={catTyped[g.place] ?? g.cat}
                 aria-label="Catalogue"
                 maxLength={60}
@@ -308,11 +399,16 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
                 onBlur={e => void renameCat(g.cat, e.target.value, g.place)}
                 onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
               />
-              <span className={qs.catCount}>{g.rows.length} item{g.rows.length === 1 ? '' : 's'}</span>
+              <span className={v2.catCount}>{g.rows.length} item{g.rows.length === 1 ? '' : 's'}</span>
             </div>
             <div className={qs.scrollX}>
-              <div className={`${qs.cRow} ${qs.cHead}`} style={grid}>
-                <span>Item</span><span>Description</span><span>Price</span><span>Cost 🔒</span><span>Est. days</span><span>Workflow</span><span>Remarks</span>
+              <div className={`${v2.plRow} ${v2.plHead}`} style={grid}>
+                {heads.map(h => (
+                  <span key={h.key} className={`${v2.plHeadCell}${h.right ? ` ${v2.plHeadR}` : ''}`}
+                    onContextMenu={e => { e.preventDefault(); setEditing(null); setAdding(null); setHeadMenu({ key: h.key, at: menuAt(e) }) }}>
+                    {h.name}{headInternal(h.key) ? <Lock /> : null}
+                  </span>
+                ))}
                 {columns.map(c => (
                   <button key={c.id} type="button" title={columnTitle(c)} aria-haspopup="dialog" aria-expanded={editing?.id === c.id}
                     className={`${qs.colHead}${dragCol?.id === c.id ? ` ${qs.colDragging}` : ''}${dragCol && dragCol.over === c.id && dragCol.id !== c.id ? ` ${columns.findIndex(y => y.id === dragCol.id) < columns.findIndex(y => y.id === c.id) ? qs.colDropAfter : qs.colDropAt}` : ''}`}
@@ -323,7 +419,7 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
                     onDragEnd={() => setDragCol(null)}
                     onContextMenu={e => { e.preventDefault(); setEditing(null); setAdding(null); setColMenu({ id: c.id, x: e.clientX, y: e.clientY }) }}
                     onClick={e => openEditor(c.id, e.currentTarget)}>
-                    <span className={qs.colHeadName}>{c.name}</span>
+                    <span className={qs.colHeadName}>{c.name}</span>{!c.client ? <span title={LOCK_TITLE} style={{ marginLeft: 4 }}>🔒</span> : null}
                   </button>
                 ))}
                 <button type="button" className={qs.addCol} title="Add a column" aria-label="Add a column" disabled={busy || columns.length >= 20}
@@ -334,59 +430,98 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
                 // "Same as above" (the user, 2026-11-13): the nearest row above in this catalogue with a workflow.
                 const above = g.rows.slice(0, xi).reverse().find(r => r.wf)?.wf ?? null
                 const aboveWf = above && above !== x.wf ? workflows.find(w => w.id === above) ?? null : null
-                const u = usedIn(x, products, quotes)
+                const m = itemMargin(x.price, x.cost)
                 return (
-                  <div key={x.id} className={qs.cRow} style={grid} onBlur={() => { if (timers.current.has(x.id)) flushItem(x.id) }}>
-                    <input className={`${qs.flat} ${qs.flatName}`} value={x.name} maxLength={60} placeholder="Item name" aria-label="Item name" onChange={e => setItem(x.id, { name: e.target.value })} />
-                    <input className={qs.flat} value={x.desc} maxLength={200} placeholder="What the client gets" aria-label="Description" onChange={e => setItem(x.id, { desc: e.target.value })} />
-                    <span className={qs.rmBox}>
-                      <span className={qs.rm}>RM</span>
-                      <MoneyInput className={qs.rmIn} value={x.price} placeholder="0" label="Price" onChange={v => setItem(x.id, { price: v })} />
+                  <div key={x.id} className={`${v2.plRow}${x.internal ? ` ${v2.plInternal}` : ''}`} style={grid}
+                    onBlur={() => { if (timers.current.has(x.id)) flushItem(x.id) }}
+                    onContextMenu={e => {
+                      if (e.target instanceof HTMLInputElement && e.target.selectionStart !== e.target.selectionEnd) return
+                      e.preventDefault()
+                      setRowMenu({ id: x.id, at: menuAt(e) })
+                    }}>
+                    <span className={v2.nameCell}>
+                      {x.internal ? <span className={v2.intChip} title={LOCK_TITLE}>🔒 Internal</span> : null}
+                      <input className={`${v2.flat} ${v2.flatName}`} value={x.name} maxLength={60} placeholder="Item name" aria-label="Item name" onChange={e => setItem(x.id, { name: e.target.value })} />
                     </span>
-                    <span className={`${qs.rmBox} ${qs.rmBoxCost}`}>
-                      <span className={qs.rm}>RM</span>
-                      <MoneyInput className={qs.rmIn} value={x.cost} placeholder="—" label="Cost" onChange={v => setItem(x.id, { cost: v })} />
+                    {shown('desc') ? <input className={v2.flat} value={x.desc} maxLength={200} placeholder="What the client gets" aria-label="Description" onChange={e => setItem(x.id, { desc: e.target.value })} /> : null}
+                    <span className={v2.money}>
+                      <span className={v2.rmTag}>RM</span>
+                      <MoneyInput className={v2.moneyIn} value={x.price} placeholder="0" label="Price" onChange={v => setItem(x.id, { price: v })} />
                     </span>
-                    <span className={`${qs.rmBox} ${qs.rmBoxDays}`}>
-                      <input
-                        className={`${qs.rmIn} ${qs.rmInR}`}
-                        inputMode="numeric"
-                        value={x.days ?? ''}
-                        placeholder="—"
-                        aria-label="Est. days"
-                        onChange={e => {
-                          const t = e.target.value.replace(/\D/g, '').slice(0, 3)
-                          setItem(x.id, { days: t ? Math.min(365, Math.max(1, Number(t))) : null })
-                        }}
-                      />
-                      <span className={qs.rm}>d</span>
-                    </span>
-                    <span style={{ display: 'flex', minWidth: 0 }}>
-                      <select className={qs.cellSel} value={x.wf ?? ''} aria-label="Workflow" onChange={e => setItem(x.id, { wf: e.target.value === '__above' ? above : e.target.value || null })}>
-                        <option value="">{x.wf ? 'No workflow' : 'Link a workflow…'}</option>
-                        {aboveWf ? <option value="__above">↑ Same as above · {wfLabel(aboveWf)}</option> : null}
-                        {workflows.map(w => <option key={w.id} value={w.id}>{wfLabel(w)}</option>)}
-                      </select>
-                    </span>
-                    <input className={qs.flat} value={x.remarks} maxLength={200} placeholder="—" aria-label="Remarks" onChange={e => setItem(x.id, { remarks: e.target.value })} />
+                    {shown('cost') ? (
+                      <span className={`${v2.money} ${v2.moneyCost}`}>
+                        <span className={v2.rmTag}>RM</span>
+                        <MoneyInput className={v2.moneyIn} value={x.cost} placeholder="—" label="Cost" onChange={v => setItem(x.id, { cost: v })} />
+                      </span>
+                    ) : null}
+                    {shown('margin') ? <span className={`${v2.marginCell}${m != null && m < MARGIN_LOW ? ` ${v2.red}` : ''}`}>{m == null ? '—' : `${m}%`}</span> : null}
+                    {shown('days') ? (
+                      <span className={v2.money}>
+                        <input
+                          className={v2.daysIn}
+                          inputMode="numeric"
+                          value={x.days ?? ''}
+                          placeholder="—"
+                          aria-label="Est. days"
+                          onChange={e => {
+                            const t = e.target.value.replace(/\D/g, '').slice(0, 3)
+                            setItem(x.id, { days: t ? Math.min(365, Math.max(1, Number(t))) : null })
+                          }}
+                        />
+                        <span className={v2.rmTag}>d</span>
+                      </span>
+                    ) : null}
+                    {shown('wf') ? (
+                      <span className={`${v2.wfFlat}${x.wf ? '' : ` ${v2.wfFlatNone}`}`}>
+                        <select className={v2.wfSel} style={{ paddingRight: 24 }} value={x.wf ?? ''} aria-label="Workflow" title={workflows.find(w => w.id === x.wf) ? wfLabel(workflows.find(w => w.id === x.wf) as ProductWorkflowOption) : undefined}
+                          onChange={e => setItem(x.id, { wf: e.target.value === '__above' ? above : e.target.value || null })}>
+                          <option value="">{x.wf ? 'No workflow' : 'Link a workflow…'}</option>
+                          {aboveWf ? <option value="__above">↑ Same as above · {wfLabel(aboveWf)}</option> : null}
+                          {workflows.map(w => <option key={w.id} value={w.id}>{wfLabel(w)}</option>)}
+                        </select>
+                        <span className={v2.wfCaret} aria-hidden="true">▾</span>
+                      </span>
+                    ) : null}
+                    {shown('remarks') ? <input className={v2.flat} value={x.remarks} maxLength={200} placeholder="—" aria-label="Remarks" onChange={e => setItem(x.id, { remarks: e.target.value })} /> : null}
                     {columns.map(c => (
                       <ExtraCell key={c.id} column={c} value={x.extra[c.id]} onChange={v => setExtra(x.id, c.id, v)} />
                     ))}
-                    <button type="button" className={qs.del} title={u.text} aria-label="Remove item" onClick={() => void remove(x)}>×</button>
+                    <button type="button" className={v2.plX} title="Delete item…" aria-label="Delete item" onClick={() => setDelFor(x.id)}>×</button>
                   </div>
                 )
               })}
-              <button type="button" className={qs.addRow} onClick={() => void addInCat(g.cat)}>+ Add item</button>
+              <button type="button" className={v2.plAdd} onClick={() => void addInCat(g.cat)}>+ Add item</button>
             </div>
           </div>
         ))}
         {groups.every(g => !g.rows.length) ? <div className={qs.empty}>{items.length ? 'Nothing found' : 'No items yet — add a catalogue below, then its items'}</div> : null}
-        <div className={qs.newCat}>
-          <input className={qs.newCatIn} value={catNew} maxLength={60} placeholder="New catalogue, e.g. Photography, Events" aria-label="New catalogue"
+        <div className={v2.newCatalogue}>
+          <span className={v2.muted} aria-hidden="true">+</span>
+          <input className={v2.newCatalogueIn} value={catNew} maxLength={60} placeholder="New catalogue" aria-label="New catalogue"
             onChange={e => setCatNew(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addCatalogue() }} />
-          <button type="button" className={`${qs.newCatBtn}${catNew.trim() ? '' : ` ${qs.faded}`}`} onClick={addCatalogue}>+ Add catalogue</button>
+          {catNew.trim() ? <button type="button" className={`${v2.ghost} ${v2.ghostSm}`} onClick={addCatalogue}>+ Add catalogue</button> : null}
         </div>
       </div>
+      {iconFor ? (
+        <IconPicker anchor={iconFor.el} catalogue={iconFor.cat} value={catalogueIcon(prefs, iconFor.cat)} onPick={e => pickIcon(iconFor.cat, e)} onClose={() => setIconFor(null)} />
+      ) : null}
+      {rowMenu && rowMenuItem ? (
+        <ItemMenu item={rowMenuItem} at={rowMenu.at} onClose={() => setRowMenu(null)} onInternal={() => void toggleInternal(rowMenuItem)}
+          onDelete={() => { setRowMenu(null); setDelFor(rowMenuItem.id) }} />
+      ) : null}
+      {headMenu ? (() => {
+        const h = HEADS.find(x => x.key === headMenu.key)
+        if (!h) return null
+        return (
+          <HeadMenu name={h.name} at={headMenu.at} internal={headInternal(h.key)} lock={h.lock} required={!!h.required}
+            onClose={() => setHeadMenu(null)}
+            onInternal={() => void setHead(h.key, { internal: !pref(h.key).internal })}
+            onDelete={() => void setHead(h.key, { hidden: true })} />
+        )
+      })() : null}
+      {delItem ? (
+        <DeleteItem item={delItem} impact={deleteImpact(delItem, products, quotes)} busy={busy} onKeep={() => setDelFor(null)} onDelete={() => void remove(delItem)} />
+      ) : null}
       {colMenu && columns.some(c => c.id === colMenu.id) ? (() => {
         const c = columns.find(x => x.id === colMenu.id) as ItemColumn
         return (
@@ -397,6 +532,7 @@ export default function CatalogTab({ items, setItems, columns, setColumns, produ
             y={colMenu.y}
             first={columns[0]?.id === c.id}
             last={columns[columns.length - 1]?.id === c.id}
+            onInternal={() => { setColMenu(null); void saveColumn(c, c.client ? { client: false } : { client: true, inQuotes: true }) }}
             onSettings={() => { setColMenu(null); setEditing({ id: c.id, at: { left: colMenu.x, top: colMenu.y + 4 } }) }}
             onMove={by => { setColMenu(null); void moveColumn(c.id, by) }}
             onDelete={() => { setColMenu(null); void removeColumn(c) }}

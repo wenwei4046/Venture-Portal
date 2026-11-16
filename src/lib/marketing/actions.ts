@@ -597,7 +597,8 @@ export async function publishMktProduct(id: string, rev: number): Promise<Done<{
   return { ok: true, version: Number(r.version ?? 0), effectiveFrom: r.effectiveFrom ? String(r.effectiveFrom) : null, live: Number(r.live ?? 0), book: await freshProducts(db) }
 }
 
-/** A product still a draft, deleted (mig 20261025004100) — one once on sale is retired instead. */
+/** A product deleted (v2, mig 20261116200000): one never published is gone; one once on sale is soft-deleted — off the
+ * list, the pickers and the packages, out of draft quotations; its versions stay for the projects and quotations on them. */
 export async function deleteMktProduct(id: string, rev: number): Promise<Done<{ book: ProductBook | null }>> {
   await requireActionOn('/marketing/products', 'marketing', 'manage')
   if (!isId(id)) return { ok: false, reason: 'That product is not there any more.' }

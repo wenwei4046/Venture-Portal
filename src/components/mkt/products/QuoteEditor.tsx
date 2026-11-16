@@ -6,11 +6,13 @@ import { catalogues, norm, type CatalogItem } from '@/lib/marketing/catalog'
 import {
   addDays, coreOf, dmy, extrasWords, itemLine, lastSent, lineCalc, numOf, packageLine, quoteTotals, rm, sameCore, withExtras,
   type PackageLine, type Quote, type QuoteBook, type QuoteCore, type QuoteLine,
+  clientShows,
 } from '@/lib/marketing/quotes'
 import DeleteDraft from '../builder/DeleteDraft'
 import MoneyInput from './MoneyInput'
 import QuoteDoc from './QuoteDoc'
 import { pickDate } from './pick-date'
+import Lock from './Lock'
 import qs from './quotes.module.css'
 
 // A quotation's editor (`Product Builder.dc.html` › the quotation editor): 1 · Client (a subsidiary or Marketing's own
@@ -404,7 +406,7 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
               {t.monthly > 0 ? <div className={qs.monthly}>incl. {rm(t.monthly)} / month recurring</div> : null}
               {sumMode === 'internal' ? (
                 <div className={qs.internal}>
-                  <div className={qs.intHead}><span className={qs.capsLbl}>Internal</span><span className={qs.lockChip}>🔒 Manager only</span></div>
+                  <div className={qs.intHead}><span className={qs.capsLbl}>Internal</span><span className={qs.lockChip}><Lock /> Manager only</span></div>
                   <div className={qs.intRow}><span className={qs.sumK}>Internal cost</span><span className={qs.grow} /><span className={qs.sumV}>{t.hasCost ? rm(t.cost) : '—'}</span></div>
                   <div className={qs.intRow}><span className={qs.sumK}>Gross profit</span><span className={qs.grow} /><span className={qs.sumV}>{t.hasCost ? rm(t.profit) : '—'}</span></div>
                   <div className={qs.sumRow}>
@@ -422,7 +424,7 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
               <span aria-hidden="true">📄</span><span className={qs.dlWords}>Client quotation</span><span className={qs.dlFmt}>PDF</span>
             </button>
             <button type="button" className={qs.dlGhost} style={{ opacity: ready ? 1 : 0.45 }} onClick={() => void openDoc('internal')}>
-              <span aria-hidden="true">🔒</span><span className={qs.dlWords}>Internal pricing sheet</span><span className={qs.dlFmtMuted}>CSV</span>
+              <Lock /><span className={qs.dlWords}>Internal pricing sheet</span><span className={qs.dlFmtMuted}>CSV</span>
             </button>
             {dlHint ? <span className={qs.dlHint}>{dlHint}</span> : null}
             {canSend ? <button type="button" className={qs.sendLink} disabled={busy} onClick={() => void move()}>{sendLabel}</button> : null}
@@ -455,6 +457,7 @@ export default function QuoteEditor({ quote, setQuote, book, setItems, onBack, o
           quoteId={q.id}
           viewing={viewing ? { rev: viewing.rev, at: viewing.at } : null}
           account={ar ?? ''}
+          shows={clientShows(book.prefs)}
           onClose={() => setDoc(null)}
           flash={flash}
         />

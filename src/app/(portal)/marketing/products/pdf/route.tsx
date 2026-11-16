@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
 import { QuotePdf } from '@/lib/marketing/quote-pdf'
-import { coreOf, quoteBookFromRow, withExtras } from '@/lib/marketing/quotes'
+import { clientShows, coreOf, quoteBookFromRow, withExtras } from '@/lib/marketing/quotes'
 import { createClient } from '@/lib/supabase/server'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -36,5 +36,5 @@ export async function GET(req: Request) {
     // Each item's Product List columns as they are now (a version sent keeps its own).
     core = { ...withExtras(coreOf(q, name), book.items, book.columns), no: q.no }
   }
-  return exportPdfResponse({ filename: v !== null ? `${q.no}-v${v}` : q.no, element: <QuotePdf quote={core} /> })
+  return exportPdfResponse({ filename: v !== null ? `${q.no}-v${v}` : q.no, element: <QuotePdf quote={core} shows={clientShows(book.prefs)} /> })
 }

@@ -11,8 +11,8 @@ import {
 // figures), the totals and margin, "edited since", the CSV, the tasks an accepted quotation turns into; the Product
 // List's picker and where an item is used.
 
-const REEL: CatalogItem = { id: 'i1', cat: 'Video', name: 'Reel', desc: '', price: 800, cost: 300, days: 5, remarks: '2 rounds', wf: null, extra: {} }
-const POST: CatalogItem = { id: 'i2', cat: 'Graphic design', name: 'Image post', desc: 'A post', price: 120, cost: null, days: null, remarks: '', wf: null, extra: {} }
+const REEL: CatalogItem = { id: 'i1', cat: 'Video', name: 'Reel', desc: '', price: 800, cost: 300, days: 5, remarks: '2 rounds', wf: null, extra: {}, internal: false }
+const POST: CatalogItem = { id: 'i2', cat: 'Graphic design', name: 'Image post', desc: 'A post', price: 120, cost: null, days: null, remarks: '', wf: null, extra: {}, internal: false }
 const PACK = { id: 'p1', code: 'PRD-26001', name: 'Social Starter', kind: 'recurring' as const, version: 1, price: 1500, cost: 600,
   groups: [{ name: 'Video', items: [{ name: 'Reel', qty: 2, price: 800 }] }] }
 

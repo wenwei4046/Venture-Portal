@@ -1,15 +1,17 @@
 import React from 'react'
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { pdfText } from './audit'
-import { addDays, dmy, includedOf, lineCalc, lineExtrasWords, quoteTotals, rm, termOf, type QuoteCore } from './quotes'
+import { addDays, clientLines, dmy, includedOf, type ClientShows, lineCalc, lineExtrasWords, quoteTotals, rm, termOf, type QuoteCore } from './quotes'
 
 // A quotation's client PDF (docs/design_handoff_product_builder/ › the client quotation): what the subsidiary receives —
 // HOUZS Marketing, the quotation's number, Prepared for · Date · Valid until, each line (its est. delivery, what it
-// includes and its remark, its term, its amount), Subtotal · Discount · Total and the notes. No cost or margin anywhere.
+// includes and its remark, its term, its amount — an internal item left off, still in the sums), Subtotal · Discount · Total and the notes. No cost or margin anywhere.
 // Paper, in Helvetica as every portal PDF: its words through pdfText.
 
 export interface QuotePdfProps {
   quote: QuoteCore & { no: string }
+  /** What the client sees of the built-in columns (v2) — a remark, an est. delivery. */
+  shows?: ClientShows
 }
 
 const INK = '#33241b'
@@ -50,7 +52,8 @@ const s = StyleSheet.create({
   notes: { marginTop: 20, color: TEXT2, lineHeight: 1.45 },
 })
 
-export function QuotePdf({ quote: q }: QuotePdfProps) {
+export function QuotePdf({ quote: q, shows = { remark: true, eta: true } }: QuotePdfProps) {
+  // Every sum is the whole quotation's: an internal item is left off the page, never out of the total (2026-11-16).
   const t = quoteTotals(q)
   const T = pdfText
   return (
@@ -80,7 +83,7 @@ export function QuotePdf({ quote: q }: QuotePdfProps) {
         <View style={s.rowHead}>
           <Text style={s.cProduct}>Product</Text><Text style={s.cInc}>What&apos;s included</Text><Text style={s.cTerm}>Term</Text><Text style={s.cAmt}>Amount</Text>
         </View>
-        {q.lines.map(l => (
+        {clientLines(q.lines, shows).map(({ line, shown: l }) => (
           <View key={l.key} style={s.row} wrap={false}>
             <View style={s.cProduct}>
               <Text style={s.name}>{T(l.name)}</Text>
@@ -92,8 +95,8 @@ export function QuotePdf({ quote: q }: QuotePdfProps) {
               {l.remark ? <Text style={s.remark}>{T(l.remark)}</Text> : null}
             </View>
             {/* "RM 5,100" never breaks between its two parts. */}
-            <Text style={s.cTerm}>{T(termOf(l)).replace(/RM /g, 'RM ')}</Text>
-            <Text style={s.cAmt}>{rm(lineCalc(l).amount)}</Text>
+            <Text style={s.cTerm}>{T(termOf(line)).replace(/RM /g, 'RM ')}</Text>
+            <Text style={s.cAmt}>{rm(lineCalc(line).amount)}</Text>
           </View>
         ))}
         <View style={s.totals} wrap={false}>

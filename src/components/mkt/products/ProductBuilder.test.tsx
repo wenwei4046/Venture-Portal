@@ -28,8 +28,10 @@ import ProductBuilder from './ProductBuilder'
 const SMA = {
   id: 'p1', code: 'PRD-26001', name: 'Social Media Package A', description: '', kind: 'recurring', status: 'active',
   groups: [{ name: 'Graphic design', items: [{ name: 'Image posts', qty: 4, price: 450, workflow: 'w1' }] }],
-  intake: 'm1', price: 4800, cost: 3100, account: '5013', effectiveFrom: '2026-11-01', rev: 4, version: 3, changed: false, live: 6,
+  // v2: the list price and cost are the items' — 4 × RM 450, and 4 × the Product List's RM 200.
+  intake: 'm1', price: 1800, cost: 800, account: '5013', effectiveFrom: '2026-11-01', rev: 4, version: 3, changed: false, live: 6,
   history: [{ version: 3, at: '2026-10-01T01:00:00Z', note: '4 image posts / month', by: 'Sia Josiah' }],
+  last: { version: 3, groups: [{ name: 'Graphic design', items: [{ name: 'Image posts', qty: 4, price: 450, workflow: 'w1' }] }], price: 1800, cost: 800 },
 }
 const DRAFT = { id: 'p2', code: 'PRD-26002', name: 'Brand Book', description: '', kind: 'one', status: 'draft', groups: [], intake: null, price: null, cost: null,
   effectiveFrom: null, rev: 1, version: 0, changed: true, live: 0, history: [] }
@@ -41,8 +43,8 @@ const BOOK = {
   accounts: [{ code: '5012', name: 'Revenue - Lead Gen' }, { code: '5013', name: 'Video Shooting' }, { code: '5019', name: 'Design Income' }],
 }
 const ITEMS: CatalogItem[] = [
-  { id: 'i1', cat: 'Graphic design', name: 'Image posts', desc: 'A static post', price: 450, cost: 200, days: 3, remarks: '', wf: 'w1', extra: {} },
-  { id: 'i2', cat: 'Video', name: 'Reels video', desc: 'A 30s reel', price: 900, cost: null, days: 5, remarks: '', wf: 'w2', extra: {} },
+  { id: 'i1', cat: 'Graphic design', name: 'Image posts', desc: 'A static post', price: 450, cost: 200, days: 3, remarks: '', wf: 'w1', extra: {}, internal: false },
+  { id: 'i2', cat: 'Video', name: 'Reels video', desc: 'A 30s reel', price: 900, cost: null, days: 5, remarks: '', wf: 'w2', extra: {}, internal: false },
 ]
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }))
@@ -72,15 +74,23 @@ beforeEach(() => {
 })
 
 describe('the Product Builder', () => {
-  it('lists the products by status, prices only behind the lock', () => {
+  it('lists the packages by status and search; each card its list price, margin and running projects (v2)', () => {
     builder()
     expect(screen.getByRole('tab', { name: /All\s*3/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: /Retired\s*1/ }))
     expect(screen.getByText('Social Media Package B')).toBeTruthy()
     expect(screen.queryByText('Brand Book')).toBeNull()
-    expect(screen.getByText(/Retired 31\/07\/2026 · 2 projects still running on v2/)).toBeTruthy()
+    expect(screen.getByText(/Retired 31\/07\/2026 · 2 projects still on v2/)).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: /All\s*3/ }))
-    expect(screen.getByText('🔒 RM 4,800/mo')).toBeTruthy()
+    const card = screen.getByText('Social Media Package A').closest('[role="button"]') as HTMLElement
+    expect(card.textContent).toContain('RM 1,800/mo')
+    expect(within(card).getByText('56%')).toBeTruthy()
+    expect(within(card).getByText('6')).toBeTruthy()
+    expect(within(card).getByRole('img', { name: 'Internal only · not shown to the client' })).toBeTruthy()
+    expect(within(screen.getByText('Brand Book').closest('[role="button"]') as HTMLElement).getByText('No cost')).toBeTruthy()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search packages' }), { target: { value: 'prd-26002' } })
+    expect(screen.getByText('Brand Book')).toBeTruthy()
+    expect(screen.queryByText('Social Media Package A')).toBeNull()
   })
 
   it('a new product opens with its code made', async () => {
@@ -88,7 +98,7 @@ describe('the Product Builder', () => {
     actions.saveMktProduct.mockResolvedValue({ ok: true, id: 'p9', code: 'PRD-26003', rev: 1, book: productBookFromRow({ ...BOOK, products: [...BOOK.products, made] }) })
     builder()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '+ New product' }))
+      fireEvent.click(screen.getByRole('button', { name: '+ New package' }))
     })
     expect(actions.saveMktProduct).toHaveBeenCalledWith(null, null, { kind: 'one' })
     expect(await screen.findByText('PRD-26003')).toBeTruthy()
@@ -106,19 +116,42 @@ describe('the Product Builder', () => {
     expect(screen.getByRole('button', { name: 'Publish v4' })).toHaveProperty('disabled', true)
   })
 
-  it('saves only what changed, on the draft it was made on; the sum of items as the price; the margin', async () => {
+  it('saves only what changed, on the draft it was made on; list price and cost follow the items (v2)', async () => {
     builder('p1')
-    expect(screen.getByText('35%')).toBeTruthy()
+    expect(screen.getByText('56%')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'One more' }))
     await waitFor(() => expect(actions.saveMktProduct).toHaveBeenCalledTimes(1), { timeout: 3000 })
     const [id, rev, patch] = actions.saveMktProduct.mock.calls[0]
-    expect([id, rev, Object.keys(patch)]).toEqual(['p1', 4, ['groups']])
+    expect([id, rev, Object.keys(patch).sort()]).toEqual(['p1', 4, ['cost', 'groups', 'price']])
     expect(patch.groups[0].items[0]).toEqual({ name: 'Image posts', qty: 5, price: 450, workflow: 'w1' })
-
-    fireEvent.click(screen.getByRole('button', { name: /Use sum of items \(RM 2,250 \/ month\)/ }))
+    expect([patch.price, patch.cost]).toEqual([2250, 1000])
+    // No price or cost box to type in: the Pricing card reads them.
+    expect(screen.queryByRole('textbox', { name: 'List price' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Internal cost' })).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Unit price' }), { target: { value: '100' } })
     await waitFor(() => expect(actions.saveMktProduct).toHaveBeenCalledTimes(2), { timeout: 3000 })
-    expect(actions.saveMktProduct.mock.calls[1]).toEqual(['p1', 5, { price: 2250 }])
-    expect(screen.getByText('-38%')).toBeTruthy()
+    expect(actions.saveMktProduct.mock.calls[1][2]).toMatchObject({ price: 500 })
+    expect(screen.getByText('-100%')).toBeTruthy()
+  })
+
+  it('Until: Never by default; On a date sends its end day, Never clears it (v2)', async () => {
+    builder('p1')
+    const never = screen.getByRole('radio', { name: 'Never' })
+    expect(never.getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByLabelText('End date')).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('radio', { name: 'On a date' }))
+    fireEvent.change(screen.getByLabelText('End date'), { target: { value: '2027-06-30' } })
+    await waitFor(() => expect(actions.saveMktProduct).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(actions.saveMktProduct.mock.calls[0][2]).toEqual({ effectiveTo: '2027-06-30' })
+    fireEvent.click(never)
+    await waitFor(() => expect(actions.saveMktProduct).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    expect(actions.saveMktProduct.mock.calls[1][2]).toEqual({ effectiveTo: null })
+  })
+
+  it('no Revenue account in the builder any more (v2 — Finance’s)', () => {
+    builder('p1')
+    expect(screen.queryByRole('combobox', { name: 'Revenue account' })).toBeNull()
+    expect(screen.queryByText('Revenue account')).toBeNull()
   })
 
   it('an item reads its days from the Product List, and picking one fills its price and workflow', async () => {
@@ -198,20 +231,29 @@ describe('the Product Builder', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Publish v4' }))
     })
+    // v2: the diff first — v3 → v4, the item's Qty 4 → 5, the price before and after.
+    const dialog = await screen.findByRole('dialog', { name: 'Publish v4' })
+    expect(within(dialog).getByText('v3 → v4')).toBeTruthy()
+    expect(within(dialog).getByText('Qty')).toBeTruthy()
+    expect(within(dialog).getByText('RM 2,250')).toBeTruthy()
+    expect(actions.publishMktProduct).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Publish v4' }))
+    })
     await waitFor(() => expect(actions.publishMktProduct).toHaveBeenCalledWith('p1', 5))
     expect(await screen.findByText('Published Social Media Package A v4 · effective 01/11/2026')).toBeTruthy()
   })
 
-  it('deletes a product still a draft, asked first — back to the list; one on sale is retired instead (answer 8)', async () => {
+  it('Delete package from the editor, asked first — back to the list; one on sale shows Retire beside it (v2)', async () => {
     actions.deleteMktProduct.mockResolvedValue({ ok: true, book: productBookFromRow({ ...BOOK, products: [SMA, RETIRED] }) })
     const { unmount } = builder('p1')
-    expect(screen.queryByRole('button', { name: 'Delete draft' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete package' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retire product' })).toBeTruthy()
     unmount()
     builder('p2')
-    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete package' }))
     await act(async () => {
-      fireEvent.click(within(screen.getByRole('group', { name: 'Delete this product?' })).getByRole('button', { name: 'Delete' }))
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete Brand Book' })).getByRole('button', { name: 'Delete package' }))
     })
     expect(actions.deleteMktProduct).toHaveBeenCalledWith('p2', 1)
     expect(await screen.findByText('Deleted Brand Book')).toBeTruthy()
@@ -233,13 +275,14 @@ describe('the Product Builder', () => {
     expect(within(document.body).queryByText('Not saved')).toBeNull()
   })
 
-  it('⧉ Duplicate on a card makes a new draft and opens it', async () => {
+  it('⧉ Duplicate in a card’s ⋯ menu makes a new draft and opens it', async () => {
     const copy = { ...SMA, id: 'p8', code: 'PRD-26004', name: 'Social Media Package A (copy)', status: 'draft', version: 0, rev: 1, history: [], live: 0 }
     quoteActions.duplicateMktProduct.mockResolvedValue({ ok: true, id: 'p8', book: productBookFromRow({ ...BOOK, products: [...BOOK.products, copy] }) })
     builder()
     const card = screen.getByText('Social Media Package A').closest('[role="button"]') as HTMLElement
+    fireEvent.click(within(card).getByRole('button', { name: 'More for Social Media Package A' }))
     await act(async () => {
-      fireEvent.click(within(card).getByRole('button', { name: '⧉ Duplicate' }))
+      fireEvent.click(within(screen.getByRole('menu', { name: 'Social Media Package A' })).getByRole('menuitem', { name: '⧉ Duplicate' }))
     })
     expect(quoteActions.duplicateMktProduct).toHaveBeenCalledWith('p1')
     expect(onOpen).toHaveBeenCalledWith('p8')
@@ -252,7 +295,7 @@ describe('the Product Builder', () => {
     fireEvent.contextMenu(screen.getByText('Social Media Package A'))
     const menu = screen.getByRole('menu', { name: 'Social Media Package A' })
     expect(within(menu).getByRole('menuitemradio', { name: /Active/ }).getAttribute('aria-checked')).toBe('true')
-    expect(within(menu).getByRole('menuitemradio', { name: /Draft/ }).getAttribute('title')).toBe('Hidden from quotations while you work on it')
+    expect(within(menu).getByRole('menuitemradio', { name: /Draft/ }).textContent).toContain('Hidden from quotations')
     await act(async () => {
       fireEvent.click(within(menu).getByRole('menuitemradio', { name: /Draft/ }))
     })
@@ -271,66 +314,30 @@ describe('the Product Builder', () => {
     expect(onOpen).toHaveBeenLastCalledWith('p2')
   })
 
-  it('right-click Delete: a draft never published, asked first; one once on sale says to retire it (2026-11-13)', async () => {
-    actions.deleteMktProduct.mockResolvedValue({ ok: true, book: productBookFromRow({ ...BOOK, products: [SMA, RETIRED] }) })
+  it('right-click Delete… opens the dialog: every package may go — one published says what it keeps (v2)', async () => {
+    actions.deleteMktProduct.mockResolvedValue({ ok: true, book: productBookFromRow({ ...BOOK, products: [DRAFT, RETIRED] }) })
     builder()
     fireEvent.contextMenu(screen.getByText('Social Media Package A'))
-    const off = within(screen.getByRole('menu', { name: 'Social Media Package A' })).getByRole('menuitem', { name: /Delete/ }) as HTMLButtonElement
-    expect([off.disabled, off.textContent]).toEqual([true, 'DeleteRetire instead'])
-    fireEvent.contextMenu(screen.getByText('Brand Book'))
-    const menu = screen.getByRole('menu', { name: 'Brand Book' })
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Delete' }))
-    expect(within(menu).getByText('Delete “Brand Book”? This cannot be undone.')).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Social Media Package A' })).getByRole('menuitem', { name: 'Delete…' }))
+    const dialog = screen.getByRole('dialog', { name: 'Delete Social Media Package A' })
+    expect(within(dialog).getByText('Off the Packages list and can no longer be picked for quotations')).toBeTruthy()
+    expect(within(dialog).getByText('6 running projects and sent / accepted quotations keep v3')).toBeTruthy()
     expect(actions.deleteMktProduct).not.toHaveBeenCalled()
     await act(async () => {
-      fireEvent.click(within(menu).getByRole('button', { name: 'Delete' }))
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete package' }))
     })
-    expect(actions.deleteMktProduct).toHaveBeenCalledWith('p2', 1)
-    expect(await screen.findByText('Deleted Brand Book')).toBeTruthy()
-    expect(screen.queryByText('Brand Book')).toBeNull()
+    expect(actions.deleteMktProduct).toHaveBeenCalledWith('p1', 4)
+    expect(await screen.findByText('Deleted Social Media Package A')).toBeTruthy()
+    expect(screen.queryByText('Social Media Package A')).toBeNull()
+    fireEvent.contextMenu(screen.getByText('Brand Book'))
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Brand Book' })).getByRole('menuitem', { name: 'Delete…' }))
+    expect(within(screen.getByRole('dialog', { name: 'Delete Brand Book' })).getByText('Never published · nothing else uses it')).toBeTruthy()
   })
 
   it('a product on sale opens a quotation with it', () => {
     builder('p1')
     fireEvent.click(screen.getByRole('button', { name: '📄 New quotation' }))
     expect(onQuote).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }))
-  })
-
-  // ②b-2h (2026-10-26): the revenue account Finance's import posts a product's billing to — Finance's list, set once.
-  it('its revenue account: Finance’s list, saved the moment it is picked — no draft, no new version', async () => {
-    builder('p1')
-    const select = screen.getByRole('combobox', { name: 'Revenue account' }) as HTMLSelectElement
-    expect(select.value).toBe('5013')
-    expect([...select.options].map(o => o.textContent)).toEqual(['Pick an account…', '5012 · Revenue - Lead Gen', '5013 · Video Shooting', '5019 · Design Income'])
-    actions.setMktProductAccount.mockResolvedValue({ ok: true, account: '5019' })
-    await act(async () => {
-      fireEvent.change(select, { target: { value: '5019' } })
-    })
-    expect(actions.setMktProductAccount).toHaveBeenCalledWith('p1', '5019')
-    expect(actions.saveMktProduct).not.toHaveBeenCalled()
-    expect(await screen.findByText('Revenue account saved · 5019 · Design Income')).toBeTruthy()
-    expect(select.value).toBe('5019')
-    actions.setMktProductAccount.mockResolvedValue({ ok: true, account: null })
-    await act(async () => {
-      fireEvent.change(select, { target: { value: '' } })
-    })
-    expect(actions.setMktProductAccount).toHaveBeenLastCalledWith('p1', null)
-    expect(await screen.findByText('Revenue account cleared')).toBeTruthy()
-  })
-
-  it('an account Finance closed still shows as the product’s; a refusal is said; a retired product’s account is still set', async () => {
-    const { unmount } = builder('p1', { ...BOOK, products: [{ ...SMA, account: '5016' }, DRAFT, RETIRED] })
-    const select = screen.getByRole('combobox', { name: 'Revenue account' }) as HTMLSelectElement
-    expect(select.value).toBe('5016')
-    expect(select.options[1].textContent).toBe("5016 · no longer on Finance's list")
-    actions.setMktProductAccount.mockResolvedValue({ ok: false, reason: 'Pick its revenue account from the list.' })
-    await act(async () => {
-      fireEvent.change(select, { target: { value: '5012' } })
-    })
-    expect(await screen.findByText('Pick its revenue account from the list.')).toBeTruthy()
-    unmount()
-    builder('p3')
-    expect(screen.getByRole('combobox', { name: 'Revenue account' })).toHaveProperty('disabled', false)
   })
 
   it("the + row opens the Product List: an item picked joins its catalogue’s category (2026-11-13)", async () => {

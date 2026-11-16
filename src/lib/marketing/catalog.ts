@@ -33,6 +33,8 @@ export interface CatalogItem {
   wf: string | null
   /** The manager's own columns' values, by the column's id. */
   extra: Record<string, ExtraValue>
+  /** Seen by the team only (v2, 2026-11-16): left off the client's PDF, still counted in every total, cost and margin. */
+  internal: boolean
 }
 
 export const COLUMN_KINDS: [ColumnKind, string][] = [['text', 'Text'], ['number', 'Number'], ['money', 'Price (RM)'], ['choice', 'Dropdown'], ['check', 'Tick box']]
@@ -87,7 +89,7 @@ export function catalogItemFromRow(v: unknown): CatalogItem {
   if (isObj(r.extra)) for (const [k, x] of Object.entries(r.extra)) if (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean') extra[k] = x
   return {
     id: str(r.id), cat: str(r.cat), name: str(r.name), desc: str(r.desc), price: num(r.price), cost: num(r.cost),
-    days: days === null ? null : Math.trunc(days), remarks: str(r.remarks), wf: str(r.wf) || null, extra,
+    days: days === null ? null : Math.trunc(days), remarks: str(r.remarks), wf: str(r.wf) || null, extra, internal: r.internal === true,
   }
 }
 
@@ -200,4 +202,60 @@ export function itemsCost(groups: readonly ProductGroup[], items: readonly Catal
     else cost += x.cost * it.qty
   }
   return { cost: Math.round(cost * 100) / 100, missing }
+}
+
+// ── The Product List's own settings (v2, 2026-11-16 — mkt_product_list_prefs) ──────────────────────────────────────
+/** The built-in columns whose place on the client's PDF and in the grid the manager sets. Item and Price are the client's
+ * always; Cost and Margin internal always. */
+export type BuiltinColumn = 'desc' | 'cost' | 'margin' | 'days' | 'wf' | 'remarks'
+export const BUILTIN_COLUMNS: BuiltinColumn[] = ['desc', 'cost', 'margin', 'days', 'wf', 'remarks']
+export interface ColumnPref { internal: boolean; hidden: boolean }
+export interface ListPrefs { icons: Record<string, string>; columns: Record<BuiltinColumn, ColumnPref> }
+
+/** The design's starting icons, by catalogue (case-blind). */
+const DEFAULT_ICONS: Record<string, string> = { 'graphic design': '🎨', video: '🎬', 'brand book': '📘', 'ads management': '📣' }
+/** The picker's 21 emoji, the design's. */
+export const CATALOGUE_ICONS = ['🎨', '🎬', '📘', '📣', '📸', '✏️', '🖼️', '📱', '💻', '🎤', '🎵', '📦', '🏷️', '🛋️', '🏠', '📊', '📈', '🧩', '⭐', '🗂️', '📝']
+
+export function listPrefsFromRow(v: unknown): ListPrefs {
+  const r = isObj(v) ? v : {}
+  const icons: Record<string, string> = {}
+  if (isObj(r.icons)) for (const [k, x] of Object.entries(r.icons)) if (typeof x === 'string' && x) icons[k] = x
+  const cols = isObj(r.columns) ? r.columns : {}
+  const columns = Object.fromEntries(BUILTIN_COLUMNS.map(k => {
+    const c = isObj(cols[k]) ? (cols[k] as Record<string, unknown>) : {}
+    return [k, { internal: c.internal === true, hidden: c.hidden === true }]
+  })) as Record<BuiltinColumn, ColumnPref>
+  return { icons, columns }
+}
+
+export const emptyListPrefs = (): ListPrefs => listPrefsFromRow({})
+
+/** A catalogue's icon: the manager's, else the design's default for its name, else 📁. */
+export const catalogueIcon = (prefs: Pick<ListPrefs, 'icons'>, cat: string) => prefs.icons[cat] ?? DEFAULT_ICONS[norm(cat)] ?? '📁'
+
+/** The margin on a list price — (price − cost) ÷ price, whole per cent — or null without both. */
+export function itemMargin(price: number | null, cost: number | null): number | null {
+  if (price == null || price <= 0 || cost == null) return null
+  return Math.round(((price - cost) / price) * 100)
+}
+
+/**
+ * What deleting an item does (the v2 dialog): the products whose DRAFT names it (they lose it; versions published keep
+ * it), the DRAFT quotations with a line of it (they lose it), and the quotations sent or accepted that keep it.
+ */
+export function deleteImpact(
+  item: Pick<CatalogItem, 'id' | 'name'>,
+  products: readonly { groups: readonly ProductGroup[]; status?: string }[],
+  quotes: readonly { no: string; status: string; lines: readonly { kind: string; item?: string; items?: readonly { name: string }[] }[] }[],
+): { products: number; drafts: string[]; kept: string[] } {
+  const n = norm(item.name)
+  const prods = n ? products.filter(p => p.status !== 'retired' && p.groups.some(g => g.items.some(it => norm(it.name) === n))).length : 0
+  const holds = (q: (typeof quotes)[number], packages: boolean) =>
+    q.lines.some(l => (l.kind === 'item' && l.item === item.id) || (packages && !!n && (l.items ?? []).some(it => norm(it.name) === n)))
+  return {
+    products: prods,
+    drafts: quotes.filter(q => q.status === 'draft' && holds(q, false)).map(q => q.no),
+    kept: quotes.filter(q => q.status !== 'draft' && holds(q, true)).map(q => q.no),
+  }
 }
