@@ -89,6 +89,9 @@ describe('byCompany', () => {
     expect(act).toMatchObject({ collect: 1500, pay: 0, net: 1500, interestIn: 500, interestOut: 0, profit: 500 })
     const due = figuresOf(all, 'due')
     expect(due).toMatchObject({ collect: 2800, pay: 800, net: 2000, interestIn: 400, interestOut: 800, profit: -400, earlier: 600 })
+    // Each side split: this month's own + overdue from before (2026-11-16) — the same whichever basis is read.
+    expect(due).toMatchObject({ nowCollect: 2200, earlierCollect: 600, nowPay: 800, earlierPay: 0 })
+    expect(act).toMatchObject({ nowCollect: 2200, earlierCollect: 600, nowPay: 800, earlierPay: 0 })
     const open = openOf(all)
     expect(open.collect).toBe(1700)
     expect(open.pay).toBe(800)

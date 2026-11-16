@@ -9,7 +9,8 @@ import { figuresOf, openOf, type Basis, type CoDeal, type Company, type Figures 
 import s from './by-company.module.css'
 
 // We collect and We pay as one table, a row a company (2026-11-13, the mockup approved: "照这个做"): what we collect
-// from it and pay it, the net, the interest profit, what is still owed from earlier months; ▸ opens its deals, each
+// from it and pay it, the net, the interest profit, what is still owed from earlier months (each side its own column,
+// 2026-11-16 — under By right the this-month column leaves the overdue out, so the two add to the side); ▸ opens its deals, each
 // marked Collect or Pay. Actual (the default) reads what came in and went out; By right what the month asks — the
 // page's one switch, for the cards, the chart and this table. More columns from Columns: received / paid so far, the
 // interest each way, the next instalment, the last repayment, what is owed both ways (a sign to contra).
@@ -31,11 +32,12 @@ const COLS_KEY = 'repayment.by-company.columns'
 // The order the figures stand in (2026-11-13 — the user: "我不能自己拖着排？"): drag a heading onto another, as the hub
 // tables do; kept by the browser. Company stays first, the row's button last.
 const ORDER_KEY = 'repayment.by-company.order'
-const DEFAULT_ORDER = ['collect', 'pay', 'net', 'profit', 'earlier', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
+// Overdue stands beside its side (2026-11-16, C): a company's this-month and overdue, collect then pay.
+const DEFAULT_ORDER = ['collect', 'earlierCollect', 'pay', 'earlierPay', 'net', 'profit', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
 type ColKey = (typeof DEFAULT_ORDER)[number]
 
 type Filter = 'all' | 'both' | 'late' | 'loss'
-type SortKey = 'name' | 'collect' | 'pay' | 'net' | 'profit' | 'earlier'
+type SortKey = 'name' | 'collect' | 'pay' | 'net' | 'profit' | 'earlierCollect' | 'earlierPay'
 
 /** The cards over the tabs, as the switch says. */
 export function ByCompanyCards({ companies, basis, month }: { companies: Company[]; basis: Basis; month: string }) {
@@ -43,6 +45,8 @@ export function ByCompanyCards({ companies, basis, month }: { companies: Company
   const f = figuresOf(deals, basis)
   const open = openOf(deals)
   const mon = dayjs(`${month}-01`).format('MMM')
+  // By right's two sides said apart (2026-11-16, C): this month's own, then what is overdue from before.
+  const split = (now: number, earlier: number) => `This month ${formatMoney(now)} + overdue ${formatMoney(earlier)}`
   const profitCard = (note: string) => (
     <StatCard
       key="profit"
@@ -75,8 +79,8 @@ export function ByCompanyCards({ companies, basis, month }: { companies: Company
             <StatCard key="open" label={`Still open · ${mon}`} value={`${formatMoneyBare(open.collect)} / ${formatMoneyBare(open.pay)}`} icon="clock" note="To collect / to pay, not yet settled" />,
           ]
         : [
-            <StatCard key="in" tone="in" label={`To collect · ${mon}`} value={formatMoney(f.collect)} icon="inbox" note="Due this month + earlier unpaid" />,
-            <StatCard key="out" tone="out" label={`To pay · ${mon}`} value={formatMoney(f.pay)} icon="send" note="Due this month + earlier unpaid" />,
+            <StatCard key="in" tone="in" label={`To collect · ${mon}`} value={formatMoney(f.collect)} icon="inbox" note={split(f.nowCollect, f.earlierCollect)} />,
+            <StatCard key="out" tone="out" label={`To pay · ${mon}`} value={formatMoney(f.pay)} icon="send" note={split(f.nowPay, f.earlierPay)} />,
             netCard('Collect − pay (principal + interest)'),
             profitCard(`If all due is settled: in ${formatMoney(f.interestIn)} − out ${formatMoney(f.interestOut)}`),
             <StatCard
@@ -117,7 +121,10 @@ export default function ByCompany({
     try {
       const o = JSON.parse(window.localStorage.getItem(ORDER_KEY) ?? '[]') as ColKey[]
       if (Array.isArray(o) && o.length) {
-        const known = o.filter((k) => (DEFAULT_ORDER as readonly string[]).includes(k))
+        // An order kept before the split (2026-11-16) had one 'earlier': its place takes both sides.
+        const known = o
+          .flatMap((k) => ((k as string) === 'earlier' ? (['earlierCollect', 'earlierPay'] as ColKey[]) : [k]))
+          .filter((k, i, all) => (DEFAULT_ORDER as readonly string[]).includes(k) && all.indexOf(k) === i)
         setOrder([...known, ...DEFAULT_ORDER.filter((k) => !known.includes(k))])
       }
     } catch {
@@ -172,7 +179,9 @@ export default function ByCompany({
     .filter((c) => !q || c.name.toLowerCase().includes(q) || c.deals.some((d) => `${d.tag ?? ''} ${d.words}`.toLowerCase().includes(q)))
     .sort((a, b) => {
       if (sort.key === 'name') return a.name.localeCompare(b.name) * sort.dir
-      return (fig(a)[sort.key] - fig(b)[sort.key]) * sort.dir || a.name.localeCompare(b.name)
+      // Sorted by what the column shows: By right's this-month columns leave the overdue out.
+      const k: keyof Figures = A ? sort.key : sort.key === 'collect' ? 'nowCollect' : sort.key === 'pay' ? 'nowPay' : sort.key
+      return (fig(a)[k] - fig(b)[k]) * sort.dir || a.name.localeCompare(b.name)
     })
   const total = (k: keyof Figures) => shown.reduce((t, c) => t + fig(c)[k], 0)
   const position = shown.reduce((t, c) => t + c.position, 0)
@@ -197,20 +206,40 @@ export default function ByCompany({
     foot: () => ReactNode
   }
   const shownFig = (d: CoDeal) => (A ? d.got : d.due)
+  // By right's this-month column: the side's own instalments, the overdue apart (2026-11-16, C).
+  const nowFig = (d: CoDeal) => (A ? d.got : Math.max(0, d.due - d.earlier))
   const shownInt = (d: CoDeal) => (A ? d.gotInterest : d.dueInterest)
   const cell = (cls: string, v: ReactNode) => <td className={cls}>{v}</td>
   const COLS: Record<ColKey, Col> = {
     collect: {
-      key: 'collect', label: A ? 'Received' : 'We collect', num: true, sort: 'collect',
-      co: (_, f) => cell(`${s.num} ${f.collect >= EPS ? s.good : s.quiet}`, bare(f.collect)),
-      deal: (d) => cell(s.num, d.side === 'collect' ? bare(shownFig(d)) : ''),
-      foot: () => cell(s.num, bare(total('collect'))),
+      key: 'collect', label: A ? 'Received' : 'Collect · this month', num: true, sort: 'collect',
+      co: (_, f) => {
+        const v = A ? f.collect : f.nowCollect
+        return cell(`${s.num} ${v >= EPS ? s.good : s.quiet}`, bare(v))
+      },
+      deal: (d) => cell(s.num, d.side === 'collect' ? bare(nowFig(d)) : ''),
+      foot: () => cell(s.num, bare(total(A ? 'collect' : 'nowCollect'))),
+    },
+    earlierCollect: {
+      key: 'earlierCollect', label: 'Collect · overdue', num: true, sort: 'earlierCollect',
+      co: (_, f) => cell(`${s.num} ${f.earlierCollect >= EPS ? s.bad : s.quiet}`, bare(f.earlierCollect)),
+      deal: (d) => cell(`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`, d.side === 'collect' ? bare(d.earlier) : ''),
+      foot: () => cell(s.num, bare(total('earlierCollect'))),
     },
     pay: {
-      key: 'pay', label: A ? 'Paid' : 'We pay', num: true, sort: 'pay',
-      co: (_, f) => cell(`${s.num} ${f.pay >= EPS ? s.bad : s.quiet}`, bare(f.pay)),
-      deal: (d) => cell(s.num, d.side === 'pay' ? bare(shownFig(d)) : ''),
-      foot: () => cell(s.num, bare(total('pay'))),
+      key: 'pay', label: A ? 'Paid' : 'Pay · this month', num: true, sort: 'pay',
+      co: (_, f) => {
+        const v = A ? f.pay : f.nowPay
+        return cell(`${s.num} ${v >= EPS ? s.bad : s.quiet}`, bare(v))
+      },
+      deal: (d) => cell(s.num, d.side === 'pay' ? bare(nowFig(d)) : ''),
+      foot: () => cell(s.num, bare(total(A ? 'pay' : 'nowPay'))),
+    },
+    earlierPay: {
+      key: 'earlierPay', label: 'Pay · overdue', num: true, sort: 'earlierPay',
+      co: (_, f) => cell(`${s.num} ${f.earlierPay >= EPS ? s.bad : s.quiet}`, bare(f.earlierPay)),
+      deal: (d) => cell(`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`, d.side === 'pay' ? bare(d.earlier) : ''),
+      foot: () => cell(s.num, bare(total('earlierPay'))),
     },
     net: {
       key: 'net', label: 'Net', num: true, sort: 'net',
@@ -226,12 +255,6 @@ export default function ByCompany({
         return cell(`${s.num} ${tone(v)}`, signed(v))
       },
       foot: () => cell(s.num, signed(total('profit'))),
-    },
-    earlier: {
-      key: 'earlier', label: 'Earlier unpaid', num: true, sort: 'earlier',
-      co: (_, f) => cell(`${s.num} ${f.earlier >= EPS ? s.bad : s.quiet}`, bare(f.earlier)),
-      deal: (d) => cell(`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`, bare(d.earlier)),
-      foot: () => cell(s.num, bare(total('earlier'))),
     },
     gotCollect: {
       key: 'gotCollect', label: 'Received so far', num: true, extra: 'sofar',
@@ -351,7 +374,7 @@ export default function ByCompany({
       <div className={s.chips} role="group" aria-label="Show">
         {chip('all', 'All', counts.all)}
         {chip('both', 'Both sides', counts.both)}
-        {chip('late', 'Earlier unpaid', counts.late)}
+        {chip('late', 'Overdue', counts.late)}
         {chip('loss', 'Losing this month', counts.loss)}
       </div>
       <div className={s.panel}>
@@ -451,7 +474,7 @@ export default function ByCompany({
         </div>
       </div>
       <p className={s.note}>
-        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid' : 'collect − pay'} this month. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
+        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid this month' : 'all to collect − all to pay, this month’s and overdue together'}. Overdue = still owed from months before, each side its own column. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
         {A ? 'interest and penalty received − interest and penalty paid' : 'interest due to us − interest we owe'} this month. A contra is no cash and is left out of Actual.
       </p>
     </section>
