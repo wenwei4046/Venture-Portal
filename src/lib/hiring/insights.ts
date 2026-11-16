@@ -272,7 +272,7 @@ export interface OpenRole {
   owner: string
   ownerSet: boolean
   status: HiringStatus
-  /** How many of its candidates stand at each stage — the stages that have any, in the pipeline's order; Hired has its own column. */
+  /** How many of its candidates stand at each stage — the stages that have any, in the pipeline's order. */
   stages: Array<{ stage: CandidateStage; n: number }>
   /** "1 / 3": its candidates at Hired, of the headcount. */
   hired: string
@@ -287,7 +287,7 @@ export interface OpenRole {
   latest: { what: string; when: string; who: string; note: string } | null
 }
 
-const PILL_STAGES: readonly CandidateStage[] = ['shortlisted', 'appointment', 'offered', 'rejected']
+const PILL_STAGES: readonly CandidateStage[] = ['shortlisted', 'appointment', 'offered', 'hired', 'rejected']
 
 /**
  * Open roles (2026-11-16, the user: "我想看到 ongoing 正在招的人的 status，还有现阶段到底有什么职位在招人，能及时展开看"):

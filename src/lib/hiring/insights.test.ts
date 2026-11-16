@@ -197,7 +197,10 @@ describe('open roles', () => {
     expect([r.hired, r.hiredAll]).toEqual(['1 / 2', false])
     const both: HiringRequest = { ...moved, candidates: moved.candidates.map(c => (c.id === 'C-9' ? { ...c, stage: 'hired' as const } : c)) }
     expect(rolesOf(withRequests([both]))[0]).toMatchObject({ hired: '2 / 2', hiredAll: true })
-    expect(r.stages).toEqual([{ stage: 'offered', n: 1 }, { stage: 'rejected', n: 1 }])
+    expect(r.stages).toEqual([{ stage: 'offered', n: 1 }, { stage: 'hired', n: 1 }, { stage: 'rejected', n: 1 }])
+    // Only Hired is still candidates, never "No candidates yet".
+    const hiredOnly: HiringRequest = { ...r203, candidates: [{ ...r203.candidates[0], stage: 'hired' }] }
+    expect(rolesOf(withRequests([hiredOnly]))[0].stages).toEqual([{ stage: 'hired', n: 1 }])
     expect(r.candidates.map(c => [c.name, c.stage, c.why])).toEqual([
       ['Daniel Lee', 'hired', ''],
       ['Wong Mei', 'offered', ''],
