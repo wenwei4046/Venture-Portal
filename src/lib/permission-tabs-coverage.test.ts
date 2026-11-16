@@ -40,6 +40,7 @@ const SOMEWHERE_ELSE: Readonly<Record<string, string>> = {
   'rev.product_list': '/member/products — the product_list key',
   'rev.it_requests': 'the Revenue app’s IT requests (Profile › IT support › All, the sidebar’s row) — its own cells, IT requests · View / Edit',
   'pri.switch_views': 'the view switcher in the top bar',
+  'rev.training': 'writing IR’s Free tests and Library and reading everybody’s scores (Free test’s and Library’s Manage) — its own cells, Free test & Library · View / Create / Edit',
 }
 
 /** Revenue app screens and Profile pages with no box, and why. */
@@ -158,11 +159,15 @@ describe('every tab of every view is in People › Permissions', () => {
     expect(PERMISSION_TABS.filter(t => t.view === 'rev').map(t => t.label)).toEqual([
       'Today', 'Insight', 'Quote', 'Arena', 'Profile · My income', 'Profile · Requests', 'Profile · Waiting list & replacements',
       'Profile · Team & capacity', 'Profile · Book a room', 'Profile · Documentation',
+      // 2026-11-16: IR's Free test and Library.
+      'Profile · Free test', 'Profile · Library',
       // 2026-10-11: the rest of Profile (Memos & notifications stays open to all).
       'Profile · My honours', 'Profile · My brand weeks', 'Profile · Commission scheme',
       'Profile · My leads & appointments', 'CRM · Team', 'Product List',
       // 2026-10-20: IT support's desk.
       'IT requests',
+      // 2026-11-16: writing the Free tests and the Library.
+      'Free test & Library · Manage',
     ])
   })
 })

@@ -65,6 +65,8 @@ export const PERMISSIONS = [
   'leads',
   // IT support's desk (2026-10-20, mig 20261021020000): IT requests · View opens it — a Revenue app account may hold it.
   'it_requests',
+  // The Revenue app's Free test & Library (2026-11-16, mig 20261117010000): Free test & Library · View opens it — a Revenue app account may hold it.
+  'rev_training',
   // Marketing's own view (2026-10-23, mig 20261023214000): Marketing · View opens it.
   'marketing',
   // Marketing's own pool in that view (2026-10-28, mig 20261028120000): Marketing pool · View opens it.

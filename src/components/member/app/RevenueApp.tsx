@@ -95,6 +95,12 @@ import TrackPage, { RequestInfoSheet, type TrackSegment } from "./profile/TrackP
 import RoomsPage, { RoomBookSheet, RoomViewSheet } from "./profile/RoomsPage";
 import { useMemberRooms } from "./profile/useMemberRooms";
 import DocsPage from "./profile/DocsPage";
+import TestsPage from "./profile/TestsPage";
+import LibraryPage from "./profile/LibraryPage";
+import { liveTrainingApi } from "./profile/training-live";
+import { fixtureTrainingApi } from "@/lib/rev-training/fixture";
+import { NO_RIGHTS, type TrainingRights } from "@/lib/rev-training/api";
+import { libraryUnseen } from "@/lib/rev-training/model";
 import { useMemberDocs } from "./profile/useMemberDocs";
 import ItPage, { type ItFilter } from "./profile/ItPage";
 import ItRequestForm from "./profile/ItRequestForm";
@@ -162,6 +168,11 @@ export interface RevenueAppProps {
    * `group` (PRINCIPAL, else MANAGEMENT); `edit` = notes and statuses. Absent: IT support is one's own only.
    */
   itDesk?: { group: string; edit: boolean } | null;
+  /**
+   * Free test & Library (2026-11-16): the ACCOUNT's Free test & Library cells — View opens Manage (every test, its
+   * scores), Create / Edit write them. Absent: taking the tests and reading the Library only (IR's team).
+   */
+  training?: TrainingRights | null;
   /** Change view (2026-11-11, lib/marketing/change-view.ts): a Marketing login the CRM was opened to — the CRM's
    *  desktop module menu lists Marketing and the CRM, and goes back to Marketing. */
   crossViews?: readonly ChangeViewRow[];
@@ -234,7 +245,7 @@ const CRM_HOUSE = '[aria-label="Back to Revenue app"], [title="Back to Revenue a
 
 const NO_CROSS_VIEWS: readonly ChangeViewRow[] = [];
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, training = null, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -266,7 +277,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     [onProducts, baseRoute, closed]);
   const home = landing(closed);
   const hiddenScreens = useMemo<Screen[]>(() => (["today", "insight", "quote", "arena"] as const).filter(page => !shows(closed, page)), [closed]);
-  const closedRows = useMemo<WorkKey[]>(() => (["income", "honours", "requests", "track", "team", "rooms", "docs"] as const).filter(page => !shows(closed, page)), [closed]);
+  // Free test and Library are IR's (the owner, 2026-11-16: "只给IR") — and their writers'; the database asks the same.
+  const trainingRights: TrainingRights = training ?? (fixture || initialData.demo ? { view: true, create: true, edit: true } : NO_RIGHTS);
+  const trainingOpen = trainingRights.view || data.memberships.some(m => m.code.toUpperCase() === "IR");
+  const closedRows = useMemo<WorkKey[]>(() => [
+    ...(["income", "honours", "requests", "track", "team", "rooms", "docs", "tests", "library"] as const).filter(page => !shows(closed, page)),
+    ...(trainingOpen ? [] : (["tests", "library"] as const)),
+  ], [closed, trainingOpen]);
   // My income closed (the user, 2026-10-11: "go with your recommendations for hidden amount"): Today's income card
   // keeps its place with the amount hidden, as the eye hides it — and no eye, nor Profile's Settings, can show it.
   const incomeShut = !shows(closed, "income");
@@ -1057,6 +1074,16 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     onPage: route.screen === "account" && route.pf === "docs",
     source, staffId: principal && viewed ? viewed.id : undefined, fixture: fixture?.docs, readOnly: readOnlyView,
   });
+  // Free test and Library (2026-11-16): the Server Actions, or — the design preview — the sample in memory.
+  const trainingApi = useMemo(() => (fixture || initialData.demo ? fixtureTrainingApi() : liveTrainingApi()), [fixture, initialData.demo]);
+  const [libNew, setLibNew] = useState(0);
+  const libraryOn = memoryReady && route.screen === "account" && route.pf === null && trainingOpen && shows(closed, "library") && !(principal && viewed);
+  useEffect(() => {
+    if (!libraryOn) return;
+    let live = true;
+    void trainingApi.library().then(r => { if (live && r.ok) setLibNew(libraryUnseen(r.data)); });
+    return () => { live = false; };
+  }, [libraryOn, trainingApi]);
   // IT support (2026-10-20): the ACCOUNT's own requests while its page is open; the desk's everybody's (IT requests ·
   // View) from the open — the sidebar counts the New ones. A Principal viewing a member reads and writes nothing more
   // (View as is read-only); viewing nobody, IT support is theirs.
@@ -1637,7 +1664,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     const pf = route.pf;
     // Team & capacity too (2026-10-25): its chart is drawn round one person — viewing nobody, it said "Loading your team…"
     // for ever.
-    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "crm" && pf !== "rooms" && pf !== "it" && pf !== "itdesk" && pf !== null;
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "crm" && pf !== "rooms" && pf !== "tests" && pf !== "library" && pf !== "it" && pf !== "itdesk" && pf !== null;
     if (pick) {
       page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "docs" ? "Documentation" : pf === "track" ? "Waiting list & replacements" : pf === "team" ? "Team & capacity" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
@@ -1675,6 +1702,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           onOpenPersonal={docs.openPersonal}
         />
       );
+    } else if (pf === "tests") {
+      page = <TestsPage api={trainingApi} rights={trainingRights} readOnly={readOnlyView && !!viewed} onBack={back} />;
+    } else if (pf === "library") {
+      page = <LibraryPage api={trainingApi} rights={trainingRights} readOnly={readOnlyView && !!viewed} onBack={back} onSeen={setLibNew} />;
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
@@ -1702,7 +1733,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "brandWeeks") {
       page = <BrandWeeksPage months={bwMonths} viewing={!!context} onBack={back} />;
     } else {
-      page = <ProfileMain vm={docs.unseen ? { ...profileVM, badges: { ...profileVM.badges, docs: String(docs.unseen) } } : profileVM} hidden={hidden} closedRows={closedRows} push={!data.demo && !viewed} itReadOnly={!data.demo && !fixture && !!viewed} actions={{
+      page = <ProfileMain vm={docs.unseen || libNew ? { ...profileVM, badges: { ...profileVM.badges, ...(docs.unseen ? { docs: String(docs.unseen) } : {}), ...(libNew ? { library: libNew > 99 ? "99+" : String(libNew) } : {}) } } : profileVM} hidden={hidden} closedRows={closedRows} push={!data.demo && !viewed} itReadOnly={!data.demo && !fixture && !!viewed} actions={{
         open: (key: WorkKey) => goScreen("account", { pf: key }),
         scheme: shows(closed, "scheme") ? () => setSchemeOpen(true) : undefined,
         brandWeeks: shows(closed, "brandWeeks") ? () => goScreen("account", { pf: "brandWeeks" }) : undefined,

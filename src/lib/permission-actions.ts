@@ -31,6 +31,8 @@ export type FunctionKey =
   | 'leads'
   // IT support's desk (mig 20261021020000).
   | 'it_requests'
+  // The Revenue app's Free test and Library for IR (mig 20261117010000).
+  | 'rev_training'
   // Marketing's own view (mig 20261023214000).
   | 'marketing'
   // Marketing's own pool in that view (mig 20261028120000).
@@ -124,6 +126,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   leads: ['leads.view', 'leads.create', 'leads.edit', 'leads.manage'],
   // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
   it_requests: ['it_requests.view', 'it_requests.edit'],
+  // The Revenue app's Free test and Library (20261117010000): read everything and everybody's scores; write; change.
+  rev_training: ['rev_training.view', 'rev_training.create', 'rev_training.edit'],
   // Marketing's own view (20261023214000): its pages, starting projects, working stages, approving, the manager tools.
   marketing: ['marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve', 'marketing.manage'],
   // Marketing's own pool (20261028120000): Finance's Marketing P&L and Cash Flow, and their Excel and PDF.
@@ -195,6 +199,10 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   // IT support's desk (2026-10-20): the Revenue app's IT requests — read, and notes and statuses.
   'it_requests.edit': 'all',
   'it_requests.view': 'all',
+  // Free test & Library (2026-11-16): writing IR's tests and Library, reading everybody's scores.
+  'rev_training.create': 'all',
+  'rev_training.edit': 'all',
+  'rev_training.view': 'all',
   // Hiring (round 2, 2026-10-11).
   'hiring.approve': 'all',
   'hiring.create': 'all',

@@ -274,6 +274,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('rev', 'rooms', 'Profile · Book a room', ['member_portal'], REVENUE_APP_SENDS),
   // …and the files HR shares with the member's department (People › Documentation).
   tab('rev', 'documentation', 'Profile · Documentation', ['member_portal'], REVENUE_APP),
+  // IR's Free test and Library (2026-11-16, mig 20261117010000): taking the tests, reading the Library.
+  tab('rev', 'tests', 'Profile · Free test', ['member_portal'], REVENUE_APP),
+  tab('rev', 'library', 'Profile · Library', ['member_portal'], REVENUE_APP),
   // The rest of Profile (2026-10-11, the user: every page of every view has its row): the medals and Fair
   // records, the brand worked each fair weekend (read with the Arena's key), and the commission scheme's
   // sheet. Memos & notifications has none on purpose — HR counts every member as needing to acknowledge
@@ -288,6 +291,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // IT support's desk (2026-10-20, mig 20261021020000): everybody's IT requests — read them; write notes, set their status.
   // Sending one and following one's own need no box (open to all, as Memos).
   tab('rev', 'it_requests', 'IT requests', ['it_requests'], { view: ['it_requests.view'], edit: ['it_requests.edit'] }, 'all'),
+  // …and writing them (2026-11-16): every test with its answers and everybody's scores; write; change, publish, delete.
+  tab('rev', 'training', 'Free test & Library · Manage', ['rev_training'],
+    { view: ['rev_training.view'], create: ['rev_training.create'], edit: ['rev_training.edit'] }, 'all'),
 
   // ── Lead View (2026-10-16, mig 20261016300000): one tab a page ──
   tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),

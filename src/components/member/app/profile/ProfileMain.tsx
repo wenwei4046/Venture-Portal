@@ -18,6 +18,9 @@ const ROWS: { key: WorkKey; label: string; sub: string; d: string; tone: string 
   // The HR revamp's second package (2026-10-11, README 18.4): the meeting rooms, booked from the phone.
   { key: "rooms", label: "Book a room", sub: "See free meeting rooms and book a slot", d: ICON.room, tone: s.toneRooms },
   { key: "docs", label: "Documentation", sub: "Handbook, price list and files from HR", d: ICON.doc, tone: s.toneDocs },
+  // IR's Free test and Library (2026-11-16): tests to check what they know, and reading to get up to speed.
+  { key: "tests", label: "Free test", sub: "Check what you know — A, B or C", d: ICON.check, tone: s.toneRooms },
+  { key: "library", label: "Library", sub: "Reading to get you up to speed", d: ICON.book, tone: s.toneDocs },
   // My leads & appointments (the CRM, 2026-10-09) is no row of Profile's since 2026-10-20 — the user: "这个我们不用留了，
   // 帮我 delete 掉，因为左边那个基本上已经有 CRM 了": Today's chat button and the desktop sidebar's CRM row open it.
   { key: "memos", label: "Memos & notifications", sub: "Read published team updates", d: ICON.bell, tone: s.toneMemos },
@@ -139,7 +142,7 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
             <button key={r.key} className={s.workRow} onClick={() => actions.open(r.key)}>
               <span className={`${s.workIcon} ${r.tone}`}><Svg d={r.d} size={22} sw={1.8} /></span>
               <span className={s.workText}>
-                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
+                <span className={s.workLabel}>{r.label}{vm.badges[r.key] && <span className={r.key === "track" || r.key === "docs" || r.key === "library" ? s.workCount : s.workBadge}>{vm.badges[r.key]}</span>}</span>
                 <span className={s.workSub}>{r.sub}</span>
               </span>
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />

@@ -79,6 +79,9 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'my_it_requests', 'it_requests_desk', 'it_request_file',
   // Exact notification detail, including older than either list (mig 20261021030000): STABLE, reading only.
   'it_request_get',
+  // The Revenue app's Free test and Library (mig 20261117010000): the tests, one to take, the Library — and the writers'
+  // list, one test with its answers, its scores — all STABLE.
+  'rev_tests_mine', 'rev_test_take', 'rev_library', 'rev_tests_admin', 'rev_test_admin', 'rev_test_results',
   // Marketing's view (mig 20261023214100): its board, sidebar, search and one's own notices — all STABLE.
   'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
   // Marketing's task page (mig 20261023234000): one project, its stages' work and trail — STABLE.
