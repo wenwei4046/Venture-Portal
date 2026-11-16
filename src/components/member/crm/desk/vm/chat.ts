@@ -24,6 +24,7 @@ import { isFbBlocked } from "../../shared/fb-blocked";
 import { windowShut } from "../../sales/vm/common";
 import { ALERT_ICON, CATS, COLD_ICON, ICON as CMP_ICON, SHUT_GREY, emojiView, messengerPast7, msShutText, pushRecent, waShutText } from "../../sales/vm/composer";
 import { adKindLabel } from "../../shared/AdLink";
+import { untoldText, untoldVisits } from "../../shared/visit-untold";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -59,7 +60,9 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
         : k === "lost" ? `Marked as lost · ${e.data.reason === "other" && e.data.note ? String(e.data.note) : CRM_LOST_REASONS.find(r => r.value === e.data.reason)?.label ?? ""}`
           : k === "reminded" ? `${by || "Principal"} sent ${to} a reminder to reply` : "";
       return { at: e.at, sys: sys ? `${sys} · ${time(e.at)}` : "" }; }).filter(x => !!x.sys),
-    ...(data.notes ?? []).filter(n => n.customerId === c.id).map(n => ({ at: n.at, sys: `Note by ${n.by ? nameOf(n.by) : "—"}: ${n.text} · ${time(n.at)}` }))]
+    ...(data.notes ?? []).filter(n => n.customerId === c.id).map(n => ({ at: n.at, sys: `Note by ${n.by ? nameOf(n.by) : "—"}: ${n.text} · ${time(n.at)}` })),
+    // A visit whose card never reached the customer says so (2026-11-16, shared/visit-untold.ts).
+    ...untoldVisits(c.id, c.messages, data.events).map(u => ({ at: u.at, sys: `${untoldText(u)} · ${time(u.at)}` }))]
     .sort((a, b) => a.at.localeCompare(b.at));
   let prev = "";
   const url = (m: CrmChatMessage) => `/member/crm-media/${m.id}`;

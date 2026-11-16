@@ -36,6 +36,7 @@ import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { avatarTint } from "../../shared/palette";
 import { isFbBlocked } from "../../shared/fb-blocked";
 import { LABEL_ICON, labelSheetVM, labelSub, type ChatLabelSheet } from "../../shared/label-sheet";
+import { untoldText, untoldVisits } from "../../shared/visit-untold";
 
 const RUST = "var(--crm-rust)", INK = "var(--crm-ink)", SUB = "rgb(128 107 96)", BD = "var(--crm-rule)";
 /** Own bubbles (rev 1010 §1.2; was var(--crm-tint-attention)). */
@@ -82,6 +83,8 @@ function systemLines(ctx: SalesCtx, c: CrmCustomer): { at: string; text: string 
     if (e.kind === "share_declined") out.push({ at: e.at, text: `${nameOf(String(e.data.to ?? ""))} declined the invitation` });
     if (e.kind === "move_declined") out.push({ at: e.at, text: `${nameOf(String(e.data.to ?? ""))} declined the move request` });
   }
+  // A visit whose card never reached the customer says so (2026-11-16, shared/visit-untold.ts).
+  for (const u of untoldVisits(c.id, c.messages, data.events)) out.push({ at: u.at, text: untoldText(u) });
   // The invitation stays in the chat once answered (user 2026-10-09): the invite, then "joined" when it is accepted.
   // Lines like these are ours only — nothing here is ever sent to the customer.
   for (const i of data.invites.filter(x => x.customerId === c.id)) {
