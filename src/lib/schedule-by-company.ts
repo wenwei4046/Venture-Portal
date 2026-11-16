@@ -9,6 +9,8 @@
 //   By right — what the month asks: its instalments (a compounding month that rolls into the balance asks no cash) and,
 //              in the office's month, what is still owed from months before; interest = the instalments' interest
 //              (a rolling month's too — it is earned) and the earlier ones' unpaid interest, interest first.
+// A company is who the deal is with BY ID (2026-11-15): two deals that only share a name — a lender typed as text, a
+// loan with no company — stand apart; a lender typed as text joins its company once the deal names it.
 // The month's rows are the We collect / We pay lists' (lib/schedule-list), so the two never disagree. The six months
 // of the chart read each deal's own plan month by month (what fell due in it) and its repayments (what came in).
 
@@ -33,11 +35,15 @@ export interface DealMonth {
 export interface DealFacts {
   id: string
   side: Side
-  /** Who it is with: the company's short code (a fund source's lender otherwise). */
+  /** Who it is with: the company's short code (a fund source's lender otherwise) — the words only. */
   company: string
+  /** Who it is with, by id (2026-11-15 — the user: "按 id"): `co:<company id>`, a fund source's `dir:` / `dept:`
+   *  lender, or the deal's own (`loan:` / `fs:`) when it names no one by id — a lender typed as text, a loan with no
+   *  company. Deals stand under one company only when this is the same; two that merely share a name do not. */
+  companyKey: string
   /** Its tag as Finance writes it in its terms ("LO#5", "BI#1"); null when none. */
   tag: string | null
-  /** "RM 90,000.00 @ 4.000%/mo · 8mo · compound". */
+  /** "RM 90,000.00 @ 4.000% /mo · 8mo · compound" ("48.000% /yr · 4.000% /mo" for a deal agreed a year's rate). */
   words: string
   /** Its page (Back returns to the month). */
   href: string
@@ -75,6 +81,8 @@ export interface CoDeal {
 }
 
 export interface Company {
+  /** Its DealFacts.companyKey — what the table keys a row by. */
+  key: string
   name: string
   deals: CoDeal[]
   /** Both sides: we collect from it and pay it. */
@@ -155,10 +163,11 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
       rowsBy.set(k, [...(rowsBy.get(k) ?? []), r])
       // A row whose deal the loader did not read (should not happen): it still stands, under its own name.
       if (!factById.has(k))
-        factById.set(k, { id: r.id, side, company: r.counterparty, tag: null, words: r.detail, href: '', next: null, last: null, owe: 0, months: {} })
+        factById.set(k, { id: r.id, side, company: r.counterparty, companyKey: k, tag: null, words: r.detail, href: '', next: null, last: null, owe: 0, months: {} })
     }
 
   const deals = new Map<string, CoDeal[]>()
+  const nameOf = new Map<string, string>()
   for (const [k, f] of factById) {
     const rows = rowsBy.get(k) ?? []
     const now = rows.filter((r) => r.date >= start)
@@ -186,20 +195,22 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
       pending: rows.some((r) => r.pending),
     }
     if (rows.length === 0 && d.due < EPS && d.dueInterest < EPS && d.got < EPS) continue
-    deals.set(f.company, [...(deals.get(f.company) ?? []), d])
+    deals.set(f.companyKey, [...(deals.get(f.companyKey) ?? []), d])
+    if (!nameOf.has(f.companyKey)) nameOf.set(f.companyKey, f.company)
   }
 
   const position = new Map<string, number>()
-  for (const f of factById.values()) position.set(f.company, r2((position.get(f.company) ?? 0) + (f.side === 'collect' ? f.owe : -f.owe)))
+  for (const f of factById.values()) position.set(f.companyKey, r2((position.get(f.companyKey) ?? 0) + (f.side === 'collect' ? f.owe : -f.owe)))
 
   return [...deals.entries()]
-    .map(([name, ds]) => ({
-      name,
+    .map(([key, ds]) => ({
+      key,
+      name: nameOf.get(key) ?? key,
       deals: ds.sort((a, b) => (a.side === b.side ? (a.tag ?? a.words).localeCompare(b.tag ?? b.words) : a.side === 'collect' ? -1 : 1)),
       both: ds.some((d) => d.side === 'collect') && ds.some((d) => d.side === 'pay'),
-      position: position.get(name) ?? 0,
+      position: position.get(key) ?? 0,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key))
 }
 
 /** Deals' figures under a basis: Actual reads what came in and went out, By right what the month asks. */

@@ -13,6 +13,7 @@ import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
 import { minPayPlanFrom, minPayStartYM } from '@/lib/min-pay'
 import { owedNowOf } from '@/lib/deal-print'
+import { rateBasisOf, rateWords } from '@/lib/rate-basis'
 import { actualsOf, dueOfEntries, monthsTo, type DealFacts, type DealMonth } from '@/lib/schedule-by-company'
 import type { SchedRow, NoTermRow, CompoundRow, MinInterestRow } from '../_components/ScheduleView'
 
@@ -63,7 +64,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
+      .select('id, company_id, principal, effective_rate, rate_basis, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
       .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
@@ -278,7 +279,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, notes, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
+    supabase.from('fund_sources').select('id, status, notes, rate_basis, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -526,7 +527,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     status: string,
     payments: Array<{ date: string; type: string; amount: number }>,
     compounding: boolean,
-    head: Pick<DealFacts, 'side' | 'company' | 'tag' | 'words'>,
+    head: Pick<DealFacts, 'side' | 'company' | 'companyKey' | 'tag' | 'words'>,
   ): DealFacts => {
     const { byMonth, last } = actualsOf(payments)
     const months: Record<string, DealMonth> = {}
@@ -547,8 +548,9 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     }
   }
   const dealTag = (text: unknown) => /\[((?:LO|BI)[^\]]{0,20})\]/.exec(String(text ?? ''))?.[1]?.trim() ?? null
-  const dealWords = (principal: number, rate: number, months: number | null, compound: boolean) =>
-    `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo${months ? ` · ${months}mo` : ''}${compound ? ' · compound' : ''}`
+  // A deal agreed a year's rate is said per year, as on its own page (v4.256).
+  const dealWords = (principal: number, rate: number, basis: unknown, months: number | null, compound: boolean) =>
+    `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${rateWords(rate, rateBasisOf(basis))}${months ? ` · ${months}mo` : ''}${compound ? ' · compound' : ''}`
   const collectCompoundIds = new Set(collectCompound.map((r) => r.key))
   const repayCompoundIds = new Set(repayCompound.map((r) => r.key))
   for (const l of loans ?? []) {
@@ -574,8 +576,9 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       factsOf(plan, deal, l.status as string, payments, collectCompoundIds.has(l.id as string), {
         side: 'collect',
         company: deal.name,
+        companyKey: l.company_id ? `co:${l.company_id}` : `loan:${l.id}`,
         tag: dealTag(l.repayment_terms),
-        words: dealWords(Number(l.principal), Number(l.effective_rate), plan.months, compound),
+        words: dealWords(Number(l.principal), Number(l.effective_rate), (l as { rate_basis?: unknown }).rate_basis, plan.months, compound),
       }),
     )
   }
@@ -622,8 +625,18 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       factsOf(plan, deal, m.status as string, payments, repayCompoundIds.has(id), {
         side: 'pay',
         company: name,
+        // By id, as its name is chosen; a lender typed as text is the deal's own.
+        companyKey: m.from_company_id
+          ? `co:${String(m.from_company_id)}`
+          : m.from_freetext_name
+            ? `fs:${id}`
+            : m.from_director_id
+              ? `dir:${String(m.from_director_id)}`
+              : m.from_department_id
+                ? `dept:${String(m.from_department_id)}`
+                : `fs:${id}`,
         tag: dealTag(m.notes),
-        words: dealWords(Number(m.amount), Number(m.cost_rate), plan.months, m.compound_interest === true),
+        words: dealWords(Number(m.amount), Number(m.cost_rate), m.rate_basis, plan.months, m.compound_interest === true),
       }),
     )
   }

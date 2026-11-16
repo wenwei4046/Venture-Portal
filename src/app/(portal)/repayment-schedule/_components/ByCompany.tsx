@@ -47,7 +47,8 @@ export function ByCompanyCards({ companies, basis, month }: { companies: Company
     <StatCard
       key="profit"
       tone={f.profit >= 0 ? 'ledger' : 'danger'}
-      label={`Interest profit · ${mon}`}
+      // Actual counts a penalty paid with the interest (2026-11-15 — the user agreed it be said so).
+      label={basis === 'act' ? `Interest + penalty · ${mon}` : `Interest profit · ${mon}`}
       value={signed(f.profit) === '—' ? formatMoney(0) : `${f.profit >= 0 ? '+' : '−'}${formatMoney(Math.abs(f.profit))}`}
       icon={f.profit >= 0 ? 'check' : 'alert'}
       note={note}
@@ -70,7 +71,7 @@ export function ByCompanyCards({ companies, basis, month }: { companies: Company
             <StatCard key="in" tone="in" label={`Received · ${mon}`} value={formatMoney(f.collect)} icon="inbox" note="Really came in this month" />,
             <StatCard key="out" tone="out" label={`Paid · ${mon}`} value={formatMoney(f.pay)} icon="send" note="Really went out this month" />,
             netCard('Received − paid (principal + interest)'),
-            profitCard(`Interest received ${formatMoney(f.interestIn)} − paid ${formatMoney(f.interestOut)}`),
+            profitCard(`Interest + penalty received ${formatMoney(f.interestIn)} − paid ${formatMoney(f.interestOut)}`),
             <StatCard key="open" label={`Still open · ${mon}`} value={`${formatMoneyBare(open.collect)} / ${formatMoneyBare(open.pay)}`} icon="clock" note="To collect / to pay, not yet settled" />,
           ]
         : [
@@ -157,8 +158,8 @@ export default function ByCompany({
     keepOrder(next)
   }
 
-  const figs = useMemo(() => new Map(companies.map((c) => [c.name, figuresOf(c.deals, basis)])), [companies, basis])
-  const fig = (c: Company) => figs.get(c.name) as Figures
+  const figs = useMemo(() => new Map(companies.map((c) => [c.key, figuresOf(c.deals, basis)])), [companies, basis])
+  const fig = (c: Company) => figs.get(c.key) as Figures
   const counts = {
     all: companies.length,
     both: companies.filter((c) => c.both).length,
@@ -218,7 +219,7 @@ export default function ByCompany({
       foot: () => cell(s.num, signed(total('net'))),
     },
     profit: {
-      key: 'profit', label: 'Interest profit', num: true, sort: 'profit',
+      key: 'profit', label: A ? 'Interest + penalty' : 'Interest profit', num: true, sort: 'profit',
       co: (_, f) => cell(`${s.num} ${tone(f.profit)}`, signed(f.profit)),
       deal: (d) => {
         const v = d.side === 'collect' ? shownInt(d) : -shownInt(d)
@@ -245,7 +246,7 @@ export default function ByCompany({
       foot: () => cell(s.num, bare(total('gotPay'))),
     },
     pi: {
-      key: 'pi', label: 'Interest in / out', num: true, extra: 'pi',
+      key: 'pi', label: A ? 'Interest + penalty in / out' : 'Interest in / out', num: true, extra: 'pi',
       co: (_, f) => cell(s.num, `${formatMoneyBare(f.interestIn)} / ${formatMoneyBare(f.interestOut)}`),
       deal: (d) => cell(s.num, `P ${formatMoneyBare(Math.max(0, shownFig(d) - shownInt(d)))} · I ${formatMoneyBare(shownInt(d))}`),
       foot: () => cell(s.num, `${formatMoneyBare(total('interestIn'))} / ${formatMoneyBare(total('interestOut'))}`),
@@ -410,16 +411,16 @@ export default function ByCompany({
               ) : null}
               {shown.map((c) => {
                 const f = fig(c)
-                const isOpen = open.has(c.name)
+                const isOpen = open.has(c.key)
                 const toggle = () =>
                   setOpen((cur) => {
                     const next = new Set(cur)
-                    if (next.has(c.name)) next.delete(c.name)
-                    else next.add(c.name)
+                    if (next.has(c.key)) next.delete(c.key)
+                    else next.add(c.key)
                     return next
                   })
                 return (
-                  <Fragment key={c.name}>
+                  <Fragment key={c.key}>
                     <tr className={s.co} onClick={toggle} aria-expanded={isOpen}>
                       <td>
                         <span className={s.caret}>{isOpen ? '▾' : '▸'}</span>
@@ -450,8 +451,8 @@ export default function ByCompany({
         </div>
       </div>
       <p className={s.note}>
-        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid' : 'collect − pay'} this month. Interest profit ={' '}
-        {A ? 'interest received − interest paid' : 'interest due to us − interest we owe'} this month. A contra is no cash and is left out of Actual.
+        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid' : 'collect − pay'} this month. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
+        {A ? 'interest and penalty received − interest and penalty paid' : 'interest due to us − interest we owe'} this month. A contra is no cash and is left out of Actual.
       </p>
     </section>
   )

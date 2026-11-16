@@ -6,7 +6,7 @@ import type { ListRow } from './schedule-list'
 // 2026-11-13 — the Repayment Schedule by company (the mockup approved: "照这个做").
 
 const fact = (id: string, side: 'collect' | 'pay', company: string, over: Partial<DealFacts> = {}): DealFacts => ({
-  id, side, company, tag: null, words: 'RM 1.00', href: `/x/${id}`, next: null, last: null, owe: 0, months: {}, ...over,
+  id, side, company, companyKey: `co:${company}`, tag: null, words: 'RM 1.00', href: `/x/${id}`, next: null, last: null, owe: 0, months: {}, ...over,
 })
 const row = (id: string, date: string, over: Partial<ListRow> = {}): ListRow => ({
   key: `${id}:${date}`, id, date, counterparty: 'X', detail: '', source: null, no: 1, months: 6, principal: 1000, interest: 100,
@@ -93,6 +93,39 @@ describe('byCompany', () => {
     expect(open.collect).toBe(1700)
     expect(open.pay).toBe(800)
     expect(open.settledShare).toBeCloseTo((3600 - 2500) / 3600)
+  })
+})
+
+describe('byCompany — who a deal is with, by id (2026-11-15, the user: "按 id")', () => {
+  const m = { '2026-11': { due: 0, dueInterest: 0, got: 100, gotInterest: 10 } }
+  const cos = byCompany({
+    facts: [
+      fact('l1', 'collect', 'ABC', { companyKey: 'co:abc', owe: 5000, months: m }),
+      // The same company named on a fund source: one row, both sides.
+      fact('f1', 'pay', 'ABC', { companyKey: 'co:abc', owe: 2000, months: m }),
+      // A lender only typed as "ABC": its own row, not ABC's.
+      fact('f2', 'pay', 'ABC', { companyKey: 'fs:f2', owe: 700, months: m }),
+      // Two fund sources naming no one, and two loans with no company: each stands alone.
+      fact('f3', 'pay', 'Fund source', { companyKey: 'fs:f3', months: m }),
+      fact('f4', 'pay', 'Fund source', { companyKey: 'fs:f4', months: m }),
+      fact('l2', 'collect', '—', { companyKey: 'loan:l2', months: m }),
+      fact('l3', 'collect', '—', { companyKey: 'loan:l3', months: m }),
+    ],
+    collectList: [],
+    payList: [],
+    month: '2026-11',
+  })
+
+  it('puts deals together only when they are with the same one by id', () => {
+    // By name (a dash sorts before letters), then by key.
+    expect(cos.map((c) => c.key)).toEqual(['loan:l2', 'loan:l3', 'co:abc', 'fs:f2', 'fs:f3', 'fs:f4'])
+    const abc = cos.find((c) => c.key === 'co:abc')!
+    expect(abc.both).toBe(true)
+    expect(abc.position).toBe(3000)
+    const typed = cos.find((c) => c.key === 'fs:f2')!
+    expect(typed.name).toBe('ABC')
+    expect(typed.both).toBe(false)
+    expect(typed.position).toBe(-700)
   })
 })
 

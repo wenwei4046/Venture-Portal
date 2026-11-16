@@ -7,6 +7,7 @@ import type { Company } from '@/lib/schedule-by-company'
 
 const companies: Company[] = [
   {
+    key: 'co:car',
     name: 'CAR',
     both: true,
     position: 1000,
@@ -23,12 +24,12 @@ beforeEach(() => window.localStorage.clear())
 describe('By company’s headings', () => {
   it('move when one is dragged onto another, and keep the order', () => {
     const { unmount } = render(<ByCompany companies={companies} basis="act" monthLong="November 2026" />)
-    expect(heads()).toEqual(['Company', 'Received', 'Paid', 'Net', 'Interest profit', 'Earlier unpaid'])
+    expect(heads()).toEqual(['Company', 'Received', 'Paid', 'Net', 'Interest + penalty', 'Earlier unpaid'])
     const th = (name: string) => Array.from(document.querySelectorAll('thead th')).find((el) => el.textContent?.startsWith(name)) as HTMLElement
     fireEvent.dragStart(th('Net'))
     fireEvent.dragOver(th('Received'))
     fireEvent.drop(th('Received'))
-    expect(heads()).toEqual(['Company', 'Net', 'Received', 'Paid', 'Interest profit', 'Earlier unpaid'])
+    expect(heads()).toEqual(['Company', 'Net', 'Received', 'Paid', 'Interest + penalty', 'Earlier unpaid'])
     // The company's figures follow their heading.
     const row = screen.getByText('CAR').closest('tr') as HTMLElement
     expect(row.querySelectorAll('td')[1]).toHaveTextContent('+50.00')
