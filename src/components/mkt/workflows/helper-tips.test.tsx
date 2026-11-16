@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { canvasFromRow } from '@/lib/marketing/canvas'
 import { DEFAULT_OVERDUE, defaultFinish, PIC_ID, ASSIGN_ID } from '@/lib/marketing/flow'
 import { fixtureTask, NOW } from '@/lib/marketing/task-flow-fixture'
@@ -51,10 +51,10 @@ describe('helper lines are tooltips', () => {
       nameOf={id => approvers.find(p => p.id === id)?.first ?? id} onToggle={vi.fn()} onChange={vi.fn()} onRemove={null} />)
     expect(screen.getByText('MM')).toBeTruthy()
     expect(screen.getByText('Already approves at another level')).toBeTruthy()
-    gone('Client approves through the tracking link', 'MM picks the approver per project')
+    gone('Client approves through the tracking link', 'Whoever assigns picks the approver per project')
     const opts = screen.getAllByRole('option')
     expect(tipOn(opts[2])).toBe('Client approves through the tracking link')
-    expect(tipOn(opts[3])).toBe('MM picks the approver per project')
+    expect(tipOn(opts[3])).toBe('Whoever assigns picks the approver per project')
     expect(tipOn(opts[4])).toBe('Whoever does the next stage approves')
     expect(PIC_ID).not.toBe(ASSIGN_ID)
   })
@@ -66,18 +66,20 @@ describe('helper lines are tooltips', () => {
     gone('Double-click a name to rename · right-click for more')
     expect(tipOn(screen.getByText('Full production'))).toBe('Double-click a name to rename · right-click for more')
   })
-  it('the canvas: the legend’s words, the head hint, Requirements, a Note and Free space on hover', () => {
+  it('the canvas: the legend’s words, Requirements, a Note and Free space on hover', () => {
     const stages: WfStage[] = [{ sid: 'sa', name: 'Script', dept: 'content', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null, picText: '' }]
     const canvas = canvasFromRow({ req: { pic: true }, sections: [{ id: 'x', emoji: '🎯', title: 'Script', stage: 'sa', fields: [{ id: 'n', label: 'Keep it short', type: 'Note', stage: 'sa' }] }] })
-    render(<CanvasEditor title="Reels video · Full production" version={1} stages={stages} canvas={canvas} people={[]} onCanvas={vi.fn()} />)
+    render(<CanvasEditor title="Reels video · Full production" version={1} stages={stages} canvas={canvas} onCanvas={vi.fn()} />)
     gone('Click any section, table or column to set it up', '🔒 Locked — colleagues can\'t delete', 'Read-only note shown to whoever works on this stage.',
       'Pulled in automatically from the meeting minutes intake. Read-only for everyone.', 'Always at the bottom 🔒 — the only place colleagues can add their own blocks and tables.')
-    expect(tipOn(screen.getByText('Reels video · Full production'))).toBe('Click any section, table or column to set it up')
-    expect(tipOn(screen.getByLabelText('Show on calendar'))).toBe('Show on calendar')
-    expect(tipOn(screen.getByLabelText("Locked — colleagues can't delete"))).toBe("Locked — colleagues can't delete")
+    // The head's hint went with the 2026-11-17 handoff (§1.6): not on the page, not on hover.
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    const legend = within(screen.getByLabelText('Legend'))
+    expect(tipOn(legend.getByLabelText('Show on calendar'))).toBe('Show on calendar')
+    expect(tipOn(legend.getByLabelText("Locked — colleagues can't delete"))).toBe("Locked — colleagues can't delete")
     expect(tipOn(screen.getAllByText('Requirements')[0])).toBe('Pulled in automatically from the meeting minutes intake. Read-only for everyone.')
     expect(tipOn(screen.getByRole('button', { name: /Keep it short/ }))).toBe('Read-only note shown to whoever works on this stage.')
-    expect(tipOn(screen.getByText('Free space'))).toBe('Always at the bottom 🔒 — the only place colleagues can add their own blocks and tables.')
+    expect(tipOn(screen.getByText('🔒 Free space for colleagues'))).toBe('Always at the bottom 🔒 — the only place colleagues can add their own blocks and tables.')
   })
   it('the task page: the strip’s cards, the celebration, the PIC link’s footer', () => {
     const task = fixtureTask()

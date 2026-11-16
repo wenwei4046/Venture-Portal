@@ -292,8 +292,59 @@ export function canvasProblems(stages: readonly StageRef[], c: WfCanvas): string
 }
 
 /** How many fields and columns a stage fills in. */
-export const stageFillCount = (c: WfCanvas, sid: string) =>
-  c.sections.reduce((n, s) => n + s.fields.reduce((m, f) => m + (f.stage === sid ? 1 : 0) + (f.cols ?? []).filter(col => col.stage === sid && f.stage !== sid).length, 0), 0)
+export const stageFillCount = (c: WfCanvas, sid: string) => stageFills(c, sid).length
+
+/** One thing a stage fills in (the Workflow Builder's "🎯 What {stage} fills in", 2026-11-17 handoff §1.3). */
+export interface StageFill {
+  id: string
+  name: string
+  /** The kind's glyph (TYPE_GLYPH). */
+  glyph: string
+  /** Where it sits: its section's title, or the table a column belongs to. */
+  where: string
+  /** ⭐ before submit (a note never). */
+  req: boolean
+  /** 👁 on the PIC's link: the field and its section both shown to them. */
+  pic: boolean
+}
+
+/**
+ * What stage `sid` fills in, read off the canvas (the canvas is the only place fields are defined): every field whose
+ * stage it is, and every table column whose stage it is in a table another stage owns — the table itself counted once
+ * when it is the stage's own. In the canvas's order. The prototype's checklist / video sections have no twin here:
+ * a section is a holder of fields, never filled in itself.
+ */
+export function stageFills(c: WfCanvas, sid: string): StageFill[] {
+  const out: StageFill[] = []
+  for (const s of c.sections) {
+    const where = s.title.trim() || 'New section'
+    for (const f of s.fields) {
+      if (f.stage === sid) {
+        out.push({ id: f.id, name: f.label.trim() || 'Unnamed field', glyph: TYPE_GLYPH[f.type], where, req: f.req && f.type !== 'Note', pic: f.pic && s.pic })
+        continue
+      }
+      for (const col of f.cols ?? []) {
+        if (col.stage !== sid) continue
+        out.push({ id: `${f.id}:${col.id}`, name: col.name.replace(/ \(.*\)/, '').trim() || 'Unnamed column', glyph: TYPE_GLYPH[col.type], where: f.label.trim() || 'Table', req: col.req, pic: col.pic && s.pic })
+      }
+    }
+  }
+  return out
+}
+
+/** A stage card's "FILLS IN": "3 fields · 2 required", "1 field", or "Nothing to fill". */
+export function fillsText(fills: readonly StageFill[]): string {
+  if (!fills.length) return 'Nothing to fill'
+  const req = fills.filter(f => f.req).length
+  return `${fills.length} field${fills.length === 1 ? '' : 's'}${req ? ` · ${req} required` : ''}`
+}
+
+/** The section the canvas jumps to for a stage ("Who fills what"): its own section, else the first holding its fields. */
+export function stageSectionId(c: WfCanvas, sid: string): string | null {
+  return c.sections.find(s => s.stage === sid)?.id
+    ?? c.sections.find(s => s.fields.some(f => f.stage === sid || (f.cols ?? []).some(col => col.stage === sid)))?.id
+    ?? null
+}
 
 // ── The preview ──────────────────────────────────────────────────────────────────
 

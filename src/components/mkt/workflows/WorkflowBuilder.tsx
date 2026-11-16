@@ -8,7 +8,7 @@ import {
   renameMktWorkflow, saveMktWorkflow,
 } from '@/lib/marketing/actions'
 import {
-  canvasForStages, duplicateStageSections, ensureStageSections, renameStageSection, stageFillCount, type WfCanvas,
+  canvasForStages, duplicateStageSections, ensureStageSections, fillsText, renameStageSection, stageFills, type WfCanvas,
 } from '@/lib/marketing/canvas'
 import { GIF_MAX_BYTES, GIF_TYPES } from '@/lib/marketing/flow'
 import type { OptionLists } from '@/lib/marketing/options'
@@ -26,6 +26,7 @@ import CanvasEditor from './CanvasEditor'
 import CtxMenu, { type CtxItem } from './CtxMenu'
 import EndSettings from './EndSettings'
 import FlowRow from './FlowRow'
+import StageFills from './StageFills'
 import OverdueSettings from './OverdueSettings'
 import PreviewTab from './PreviewTab'
 import PublishReview from './PublishReview'
@@ -42,6 +43,9 @@ import w from './workflows.module.css'
 // Save draft saves at once. Deleting a stage, a template or a category shows Undo for 6 s: a stage is put back from
 // the snapshot; a template's or a category's delete reaches the database only when the 6 s are over (or the page is
 // left), so Undo has nothing to undo there — and a published template is never deleted (the user's answer 8).
+// Refined by the 2026-11-17 handoff (`docs/design_handoff_workflow_projects/` §1): the flow row scrolls sideways with
+// Done pinned (3a — the user's pick), each card says what it FILLS IN (and the list sits under the settings), "Anyone
+// can assign" replaces "MM assigns", "+ Add stage" ends the summary row, and the Canvas tab is simpler.
 
 type SaveState = { state: 'saved' } | { state: 'saving' } | { state: 'error'; reason: string; stale: boolean }
 type Tab = 'stages' | 'canvas' | 'preview'
@@ -106,6 +110,9 @@ export default function WorkflowBuilder({
   const [toast, setToast] = useState<{ text: string; undo: (() => void) | null } | null>(null)
   const [pubOpen, setPubOpen] = useState(false)
   const [hidden, setHidden] = useState<string[]>([])
+  // A card's FILLS IN flashes the list under the settings amber for 0.9 s (the 2026-11-17 handoff §1.2).
+  const [flashFills, setFlashFills] = useState(false)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // What the saves work from: the template open, the draft as typed, the draft as the database has it, its count.
   const selRef = useRef<string | null>(start?.id ?? null)
@@ -194,6 +201,7 @@ export default function WorkflowBuilder({
       if (timer.current) void flush()
       finishPending()
       if (toastTimer.current) clearTimeout(toastTimer.current)
+      if (flashTimer.current) clearTimeout(flashTimer.current)
     }
   }, [flush, finishPending])
 
@@ -236,6 +244,8 @@ export default function WorkflowBuilder({
   const locked = edit?.locked ?? false
   const run = useMemo(() => asRun(stages, locked), [stages, locked])
   const at = typeof sel === 'number' ? Math.min(sel, Math.max(0, stages.length - 1)) : null
+  // What each stage fills in, read off the canvas (a card's FILLS IN, the list under the settings).
+  const fills = useMemo(() => (edit ? stages.map(s => stageFills(edit.canvas, s.sid)) : []), [edit, stages])
   const teamSet = useMemo(() => new Set(team), [team])
   // Anybody on the team may approve (2026-11-14): the fixup only drops somebody who left.
   const approverSet = useMemo(() => new Set(people.map(p => p.id)), [people])
@@ -425,6 +435,14 @@ export default function WorkflowBuilder({
     restage(moveWfStage(stages, from, to))
     setSel(to)
   }
+  /** A card's FILLS IN: the stage picked, PIC & form open, and the list under it flashed. */
+  const showFills = (i: number) => {
+    setSel(i)
+    setSection('pic')
+    setFlashFills(true)
+    if (flashTimer.current) clearTimeout(flashTimer.current)
+    flashTimer.current = setTimeout(() => setFlashFills(false), 900)
+  }
   const fix = (f: NonNullable<WfFix>) => {
     setSel(f.at)
     setSection(f.section)
@@ -597,13 +615,13 @@ export default function WorkflowBuilder({
           <div className={w.assign}>
             <span className={w.assignLabel}>Assignment</span>
             <div className={w.seg} role="radiogroup" aria-label="Assignment">
-              {([[false, 'Handoffs allowed', 'Stages can be 🔓 handed off and split into subtasks'], [true, '🔒 MM assigns every stage', 'No handoffs, no subtasks']] as const).map(([v, label, hint]) => (
+              {([[false, 'Handoffs allowed', 'Stages can be 🔓 handed off and split into subtasks'], [true, '🔒 Assign every stage', 'No handoffs, no subtasks']] as const).map(([v, label, hint]) => (
                 <button key={label} type="button" role="radio" aria-checked={locked === v} title={hint}
                   className={`${w.segBtn} ${w.segBtnSm}${locked === v ? ` ${w.segOn}` : ''}`}
                   onClick={() => {
                     if (locked === v) return
                     change({ ...edit, locked: v })
-                    flash(v ? 'MM now assigns every stage' : 'Handoffs and subtasks are back on')
+                    flash(v ? 'Every stage is now assigned when planning' : 'Handoffs and subtasks are back on')
                   }}>
                   <span className={w.stable} data-label={label}><span>{label}</span></span>
                 </button>
@@ -621,7 +639,7 @@ export default function WorkflowBuilder({
           version={next}
           stages={stages}
           canvas={edit.canvas}
-          people={people}
+          groups={book.groups}
           onCanvas={canvas => change({ ...edit, canvas })}
           lists={lists}
           onList={(name, opts) => setLists(l => ({ ...l, [name]: opts }))}
@@ -645,6 +663,7 @@ export default function WorkflowBuilder({
               onOverdue={() => setSel('overdue')}
               onFix={fix}
               onSelect={i => setSel(i)}
+              onAddStage={() => addStage(stages.length)}
             />
             <FlowRow
               stages={run}
@@ -653,10 +672,12 @@ export default function WorkflowBuilder({
               finish={edit.finish}
               groups={book.groups}
               people={people}
+              fills={fills.map(f => (f.length ? fillsText(f) : null))}
               nameOf={nameOf}
-              onSelect={(i, s) => {
+              onSelect={(i, part) => {
+                if (part === 'fills') return showFills(i)
                 setSel(i)
-                if (s) setSection(s)
+                if (part) setSection(part)
               }}
               onMenu={(x, y, i) => openMenu(x, y, { type: 'stage', at: i })}
               onEnd={() => setSel('end')}
@@ -675,6 +696,7 @@ export default function WorkflowBuilder({
                 onPreview={() => setTab('preview')}
               />
             ) : at !== null && stages[at] ? (
+              <>
               <TemplateSettings
                 key={stages[at].sid}
                 stage={stages[at]}
@@ -685,7 +707,7 @@ export default function WorkflowBuilder({
                 startDay={bar.starts[at] ?? 0}
                 groups={book.groups}
                 people={people}
-                fills={stageFillCount(edit.canvas, stages[at].sid)}
+                fills={fills[at]?.length ?? 0}
                 nameOf={nameOf}
                 onSection={setSection}
                 onPatch={p => patchStage(at, p)}
@@ -694,6 +716,8 @@ export default function WorkflowBuilder({
                 onOpenCanvas={() => setTab('canvas')}
                 onAddGroup={addGroup}
               />
+              <StageFills name={stages[at].name || 'Untitled stage'} fills={fills[at] ?? []} flash={flashFills} onOpenCanvas={() => setTab('canvas')} />
+              </>
             ) : null}
           </div>
         </div>

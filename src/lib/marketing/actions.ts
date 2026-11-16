@@ -1291,3 +1291,25 @@ export async function readMktChat(to: string, last: number): Promise<Done> {
   if (error) return { ok: false, reason: words(error, 'Could not mark it read.') }
   return { ok: true }
 }
+
+/** Projects (2026-11-17, mig 20261117120000): a project or a task deleted — soft, a product project with its deliverables,
+ * a series with its runs — by a manager (Marketing · Manage, asked again by the database). The batch comes back for Undo. */
+export async function deleteMktProject(id: string): Promise<Done<{ batch: string; title: string }>> {
+  await requireActionOn('/marketing/projects', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That project is not there any more.' }
+  const { data, error } = await (await client()).rpc('mkt_project_delete', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'It could not be deleted. Please try again.') }
+  const r = (data ?? {}) as { batch?: string; title?: string }
+  freshen()
+  return { ok: true, batch: String(r.batch ?? ''), title: String(r.title ?? '') }
+}
+
+/** Undo: the batch a delete made, put back as it was (within the hour; the page offers it for 6 seconds). */
+export async function restoreMktProject(batch: string): Promise<Done> {
+  await requireActionOn('/marketing/projects', 'marketing', 'manage')
+  if (!isId(batch)) return { ok: false, reason: 'It can no longer be put back.' }
+  const { error } = await (await client()).rpc('mkt_project_restore', { p_batch: batch })
+  if (error) return { ok: false, reason: words(error, 'It could not be put back. Please try again.') }
+  freshen()
+  return { ok: true }
+}

@@ -9,7 +9,8 @@ import w from './workflows.module.css'
 // The summary row (2a): "{total} working days", the Promise stepper (saved per template, red when the stages run
 // longer), the ⏰ overdue chip (opens When a stage is late), the warning pills with their Fix, and under them the 10px
 // time bar — one segment per stage, sla ÷ (max(total, promise) + 1), the selected one brown — with the dashed promise
-// line; then the grey lock note while MM assigns every stage.
+// line; then the grey lock note while every stage is assigned when planning. "+ Add stage" closes the row (the
+// 2026-11-17 handoff §1.5): a 1-day stage after the last, in its group.
 
 export default function SummaryRow({
   stages,
@@ -24,6 +25,7 @@ export default function SummaryRow({
   onOverdue,
   onFix,
   onSelect,
+  onAddStage,
 }: {
   /** As they run (the lock applied). */
   stages: WfStage[]
@@ -38,6 +40,8 @@ export default function SummaryRow({
   onOverdue: () => void
   onFix: (fix: NonNullable<WfFix>) => void
   onSelect: (at: number) => void
+  /** "+ Add stage" — none when the template has as many stages as it may. */
+  onAddStage?: (() => void) | null
 }) {
   const total = totalDays(stages)
   const bar = timeBar(stages, promise)
@@ -65,6 +69,11 @@ export default function SummaryRow({
               <span key={x.key} className={w.warn}>⚠️ {x.text}</span>
             )
           ))}
+          {onAddStage ? (
+            <button type="button" className={w.addStage} title="Add a stage at the end" onClick={onAddStage}>
+              <span className={w.addStagePlus}>+</span>Add stage
+            </button>
+          ) : null}
         </div>
         <div className={w.bar}>
           {bar.segments.map((s, i) => {

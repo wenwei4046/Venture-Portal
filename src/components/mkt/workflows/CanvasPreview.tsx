@@ -3,21 +3,26 @@
 import { useState } from 'react'
 import { picView, staffView, type WfCanvas } from '@/lib/marketing/canvas'
 import { calKind } from '@/lib/marketing/tasks'
-import { personForGroup, type WfPerson, type WfStage } from '@/lib/marketing/workflows'
+import type { WfStage } from '@/lib/marketing/workflows'
 import c from './canvas.module.css'
 
-// The canvas's Preview (`Canvas Template Editor.dc.html`, the right column): the task page as one of the staff sees it
-// at a stage — every section, those the stage fills nothing in faded, a table's columns of that stage dark — or as the
-// PIC sees it on the link: only the 👁 sections and columns, the dates on their calendar, Approve and Request changes,
-// and what the link leaves out.
+// The canvas's Preview (`Canvas Template Editor.dc.html`, the right column): the task page as the doer sees it at a
+// stage — "Doer at [stage]" (the 2026-11-17 handoff §1.6; the strip's pills set it too), every section, those the stage
+// fills nothing in at 0.55, a table's columns of that stage dark, no badges — or as the PIC sees it on the link: only the
+// 👁 sections and columns, the dates on their calendar, Approve and Request changes, and what the link leaves out.
 
-export default function CanvasPreview({ title, stages, canvas, people }: { title: string; stages: WfStage[]; canvas: WfCanvas; people: WfPerson[] }) {
+export default function CanvasPreview({ title, stages, canvas, sid, onSid }: {
+  title: string
+  stages: WfStage[]
+  canvas: WfCanvas
+  /** The stage shown (null: the last). */
+  sid: string | null
+  onSid: (sid: string) => void
+}) {
   const [view, setView] = useState<'staff' | 'pic'>('staff')
-  const [sid, setSid] = useState<string | null>(null)
   const at = stages.find(s => s.sid === sid) ?? stages[stages.length - 1] ?? null
   const staff = staffView(stages, canvas, at?.sid ?? null)
   const pic = picView(canvas)
-  const who = at ? personForGroup(people, at.dept) ?? 'the team' : 'the team'
 
   return (
     <aside className={c.preview} aria-label="Preview" onClick={e => e.stopPropagation()}>
@@ -35,20 +40,18 @@ export default function CanvasPreview({ title, stages, canvas, people }: { title
       {view === 'staff' ? (
         <div className={c.pvCard}>
           {at ? (
-            <div className={c.pvWho}>
-              As {who} sees it at the{' '}
-              <select className={c.pvSelect} value={at.sid} aria-label="At the stage" onChange={e => setSid(e.target.value)}>
-                {stages.map((s, i) => <option key={s.sid} value={s.sid}>{s.name || `Stage ${i + 1}`}</option>)}
-              </select>{' '}
-              stage
-            </div>
+            <label className={c.pvWho}>
+              Doer at
+              <select className={c.pvSelect} value={at.sid} aria-label="Doer at" onChange={e => onSid(e.target.value)}>
+                {stages.map((s, i) => <option key={s.sid} value={s.sid}>{i + 1}. {s.name || 'Untitled stage'}</option>)}
+              </select>
+            </label>
           ) : null}
           {staff.map(s => (
             <div key={s.id} className={`${c.pvSec}${s.mine || s.kind === 'req' ? '' : ` ${c.pvFaded}`}`}>
               <div className={c.pvSecHead}>
                 <span>{s.emoji}</span>
                 <span className={c.pvSecTitle}>{s.title}</span>
-                {s.badges.map(b => <span key={b} className={c.pvBadge}>{b}</span>)}
               </div>
               {s.cols ? (
                 <div className={c.pvCols}>{s.cols.map((col, i) => <span key={`${col.name}-${i}`} className={`${c.pvCol}${col.mine ? ` ${c.pvColMine}` : ''}`}>{col.name}</span>)}</div>

@@ -492,6 +492,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'mkt_quote_assign', 'mkt_quote_duplicate', 'mkt_quote_states', 'mkt_product_duplicate', 'mkt_product_set_status',
   // A draft quotation deleted (mig 20261114010000) — Marketing · Manage.
   'mkt_quote_delete',
+  // A project or a task soft-deleted from Projects and put back by Undo (mig 20261117120000) — Marketing · Manage.
+  'mkt_project_delete', 'mkt_project_restore',
   // The Product Builder v2 (mig 20261116200000): an item internal, the Product List's settings, a quotation archived —
   // Marketing · Manage.
   'mkt_item_internal', 'mkt_list_prefs_save', 'mkt_quote_archive',

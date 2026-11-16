@@ -603,7 +603,7 @@ export function nextUpView(task: FlowTask, now: Date): NextView {
     }
     const picker = cur.doer ? personName(task, cur.doer) : 'MM'
     return {
-      title: `${picker} picks who does ${nx.name}`, sub: `From ${nx.cands.map(c => personName(task, c)).join(' / ') || 'the shortlist'} · or MM assigns now`,
+      title: `${picker} picks who does ${nx.name}`, sub: `From ${nx.cands.map(c => personName(task, c)).join(' / ') || 'the shortlist'} · or anyone can assign now`,
       init: '?', hue: 0, when: `${picker} is asked when this stage is done · the person picked gets “Your turn — ${nx.name}”.`,
     }
   }

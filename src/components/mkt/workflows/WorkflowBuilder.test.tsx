@@ -33,11 +33,13 @@ const RACHEL = 'r0000000-0000-4000-8000-000000000001'
 const DANIEL = 'r0000000-0000-4000-8000-000000000002'
 const SITI = 'r0000000-0000-4000-8000-000000000003'
 const AINA = 'r0000000-0000-4000-8000-000000000004'
+const MEI = 'r0000000-0000-4000-8000-000000000005'
 const people: WfPerson[] = [
   { id: RACHEL, first: 'Rachel', title: 'MARKETING MANAGER', load: 2 },
   { id: DANIEL, first: 'Daniel', title: 'ASSISTANT MARKETING MANAGER', load: 1 },
   { id: SITI, first: 'Siti', title: 'GRAPHIC DESIGNER', load: 4 },
   { id: AINA, first: 'Aina', title: 'GRAPHIC DESIGNER', load: 2 },
+  { id: MEI, first: 'Mei', title: 'VIDEO EDITOR', load: 5 },
 ]
 const team = people.map(p => p.id)
 const S = (sid: string, name: string, p: object = {}) =>
@@ -50,7 +52,12 @@ const REELS = {
     S('sfinal00', 'Final', { appr: [{ ids: [RACHEL, DANIEL], rule: 'all' }, { ids: ['pic'], rule: 'any' }], back: 1 }),
   ],
   pubStages: [S('sscript0', 'Script', { sla: 2, appr: [{ ids: [RACHEL], rule: 'any' }] }), S('sfinal00', 'Final')], pubPromise: 10,
-  canvas: { req: { pic: true }, sections: [] },
+  canvas: { req: { pic: true }, sections: [
+    { id: 'xscript', emoji: '🎯', title: 'Script', stage: 'sscript0', pic: true, fields: [
+      { id: 'fbody', label: 'Body', type: 'Text', stage: 'sscript0', req: true, pic: true },
+      { id: 'fhook', label: 'Hook', type: 'Text', stage: 'sscript0', req: false, pic: false },
+    ] },
+  ] },
 }
 const QUICK = { ...REELS, id: 'w2', tname: 'Quick edit', version: 0, changed: true, live: 0, rev: 1, pubStages: null, draft: [S('squick00', 'Edit', { sla: 2 })] }
 const BRAND = { ...QUICK, id: 'w3', categoryId: 'c2', action: 'Brand book', tname: 'Standard', emoji: '📘' }
@@ -81,7 +88,8 @@ describe('the Workflow Builder 2a', () => {
     expect(within(final).getByText('Rachel & Daniel → PIC')).toBeTruthy()
     expect(within(card(/Stage 2 · Edit/)).getByText('Siti / Aina')).toBeTruthy()
     expect(within(card(/Stage 2 · Edit/)).getByText('🔓 picked by Script')).toBeTruthy()
-    expect(within(card(/Stage 1 · Script/)).getByText('MM assigns')).toBeTruthy()
+    expect(within(card(/Stage 1 · Script/)).getByText('Anyone · 5')).toBeTruthy()
+    expect(within(card(/Stage 1 · Script/)).getByText('picked per project')).toBeTruthy()
     expect(screen.getByText('12 active tasks stay on v2')).toBeTruthy()
   })
 
@@ -155,11 +163,79 @@ describe('the Workflow Builder 2a', () => {
     expect(screen.getByRole('menu', { name: 'Stage 1 · Script' })).toBeTruthy()
   })
 
-  it('the lock: MM assigns every stage, the grey note, handoffs off', () => {
+  it('the lock: Assign every stage, the grey note, handoffs off', () => {
     builder()
-    fireEvent.click(screen.getByRole('radio', { name: '🔒 MM assigns every stage' }))
+    fireEvent.click(screen.getByRole('radio', { name: '🔒 Assign every stage' }))
+    expect(screen.getByText(/^🔒 Every stage is assigned when planning · anyone can assign./)).toBeTruthy()
     expect(screen.getByText(/Handoffs and subtasks are off on 1 stage/)).toBeTruthy()
-    expect(within(card(/Stage 2 · Edit/)).getByText('MM assigns')).toBeTruthy()
+    expect(within(card(/Stage 2 · Edit/)).getByText('Anyone · 5')).toBeTruthy()
+  })
+
+  // ── The 2026-11-17 handoff (`docs/design_handoff_workflow_projects/` §1) ─────────────────────────────────────
+  it('FILLS IN on each card, from the canvas; a click opens PIC & form and flashes “What … fills in” for 0.9 s', () => {
+    vi.useFakeTimers()
+    builder()
+    expect(within(card(/Stage 1 · Script/)).getByText('2 fields · 1 required')).toBeTruthy()
+    expect(within(card(/Stage 2 · Edit/)).getByText('Nothing to fill')).toBeTruthy()
+    fireEvent.click(within(card(/Stage 2 · Edit/)).getByText('Fills in'))
+    expect(card(/Stage 2 · Edit/).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: /PIC & form/ }).getAttribute('aria-expanded')).toBe('true')
+    const empty = screen.getByRole('region', { name: 'What Edit fills in' })
+    expect(within(empty).getByText('Nothing to fill in. The doer just submits.')).toBeTruthy()
+    fireEvent.click(within(card(/Stage 1 · Script/)).getByText('Fills in'))
+    const panel = screen.getByRole('region', { name: 'What Script fills in' })
+    expect(panel.className).toMatch(/fillsFlash/)
+    const rows = within(panel).getAllByRole('listitem')
+    expect(rows.map(r => r.textContent)).toEqual(['AaBodyScript⭐👁', 'AaHookScript⭐👁'])
+    expect(within(rows[1]).getByLabelText('Not required').className).toMatch(/fillsOff/)
+    act(() => { vi.advanceTimersByTime(900) })
+    expect(screen.getByRole('region', { name: 'What Script fills in' }).className).not.toMatch(/fillsFlash/)
+    fireEvent.click(within(panel).getByRole('button', { name: 'Edit in Canvas →' }))
+    expect(screen.getByRole('toolbar', { name: 'Who fills what' })).toBeTruthy()
+  })
+
+  it('Anyone can assign: the radio card’s words, the whole team with each one’s load — red at 5 or more', () => {
+    builder()
+    fireEvent.click(within(card(/Stage 1 · Script/)).getByText('Done by'))
+    expect(screen.getByRole('radio', { name: /Anyone can assign/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('button', { name: /Who does it/ }).textContent).toContain('👤 Anyone can assign')
+    const box = screen.getByLabelText('Can be assigned')
+    expect(within(box).getByText('· everyone on the team · 5 people')).toBeTruthy()
+    // Display only: no buttons in it.
+    expect(within(box).queryAllByRole('button')).toHaveLength(0)
+    expect(within(box).getByText('5 active').className).toMatch(/personLoadHigh/)
+    expect(within(box).getByText('4 active').className).not.toMatch(/personLoadHigh/)
+    // A handoff shows its shortlist instead.
+    fireEvent.click(within(card(/Stage 2 · Edit/)).getByText('Done by'))
+    expect(screen.queryByLabelText('Can be assigned')).toBeNull()
+    // The card's faces sit side by side — three, never overlapping (the CSS keeps them 3px apart).
+    expect(within(card(/Stage 1 · Script/)).getAllByTitle(/Rachel|Daniel|Siti/)).toHaveLength(3)
+  })
+
+  it('+ Add stage at the end of the summary row: a 1-day stage in the last stage’s group, selected, Basics open', () => {
+    builder()
+    fireEvent.click(screen.getByRole('button', { name: /Add stage/ }))
+    const added = card(/Stage 4 · New stage/)
+    expect(added.getAttribute('aria-pressed')).toBe('true')
+    expect(within(added).getByText('1d')).toBeTruthy()
+    expect(within(added).getByText('Content')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Basics/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByDisplayValue('New stage')).toBeTruthy()
+  })
+
+  it('3a scroll row: Done pinned after the cards; selecting a stage scrolls its card into view, Done’s 96px kept clear', () => {
+    builder()
+    expect(screen.getByText('3 stages')).toBeTruthy()
+    const row = screen.getByTestId('flow-row')
+    expect((row.firstElementChild as HTMLElement).style.gridTemplateColumns).toBe('repeat(3, minmax(150px, 1fr)) 84px')
+    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 900 })
+    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 400 })
+    row.getBoundingClientRect = () => ({ left: 0 }) as DOMRect
+    const cell = row.querySelector<HTMLElement>('[data-i="2"]')!
+    cell.getBoundingClientRect = () => ({ left: 600 }) as DOMRect
+    Object.defineProperty(cell, 'offsetWidth', { configurable: true, value: 160 })
+    fireEvent.click(screen.getByRole('button', { name: '3. Final · 1d' }))
+    expect(row.scrollLeft).toBe(600 + 160 - 400 + 96)
   })
 
   it('the overdue chip and the Done card open their panels', () => {

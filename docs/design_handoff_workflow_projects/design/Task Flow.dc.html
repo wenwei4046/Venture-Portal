@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:rgb(243 243 241);font-family:Inter,system-ui,sans-serif;font-size:13px;color:rgb(51 36 27)}
+a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}
+@keyframes tfIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes fwUp{0%{transform:translateY(0);opacity:1}100%{transform:translateY(var(--up));opacity:0}}
+@keyframes fwBurst{0%{transform:translate(0,0) scale(1);opacity:0}8%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
+@keyframes cfFall{0%{transform:translateY(-40px) rotate(0);opacity:1}100%{transform:translateY(var(--fall)) rotate(var(--rot));opacity:.9}}
+@keyframes clinkL{0%,100%{transform:translateX(0) rotate(-8deg)}45%,55%{transform:translateX(34px) rotate(14deg)}}
+@keyframes clinkR{0%,100%{transform:translateX(0) rotate(8deg) scaleX(-1)}45%,55%{transform:translateX(-34px) rotate(-14deg) scaleX(-1)}}
+@keyframes bubble{0%{transform:translateY(0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translateY(-140px) scale(1.1);opacity:0}}
+@keyframes clap{0%,100%{transform:rotate(0)}30%{transform:rotate(-22deg)}45%{transform:rotate(0)}}
+@keyframes beam{0%,100%{opacity:.35}50%{opacity:.7}}
+@keyframes celebIn{0%{transform:scale(.9);opacity:0}100%{transform:none;opacity:1}}
+</style>
+</helmet>
+<div style="padding:24px;display:flex;justify-content:center">
+<div style="position:relative;width:100%;max-width:1240px;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden">
+
+  <sc-if value="{{ notPic }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column">
+    <div style="padding:22px 28px 18px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid rgb(236 231 224)">
+      <div style="display:flex;align-items:center;gap:10px;font-size:0.94em;color:rgb(117 100 86);flex-wrap:wrap;white-space:nowrap"><span>← My Space</span><span>/</span><span>2990 Home</span><span>/</span><span>Red Truck Roadshow</span><span style="flex:1"></span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;padding:2px 7px;border:1px solid rgb(229 222 211);border-radius:5px">{{ tplChip }}</span></div>
+      <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:260px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(74 64 58);white-space:nowrap">MKT-2990-2611-018</span><span style="white-space:nowrap;height:22px;padding:0 9px;border-radius:999px;display:flex;align-items:center;gap:6px;font-size:0.84em;background:{{ status.bg }};border:1px solid {{ status.line }};color:{{ status.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ status.dot }}"></span>{{ status.t }}</span></div>
+          <span style="font-size:2em;font-weight:600;letter-spacing:-0.01em">{{ title }}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px 28px">
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);white-space:nowrap">Now with</span><span style="display:flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap"><span style="width:22px;height:22px;border-radius:50%;background:{{ nowWith.av }};font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ nowWith.init }}</span>{{ nowWith.name }}</span></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);white-space:nowrap">In this stage</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12.5px;font-weight:500;color:{{ inStageFg }};white-space:nowrap">{{ inStage }}</span></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);white-space:nowrap">Stage due</span><span style="font-weight:500;color:{{ stageDueFg }};white-space:nowrap">{{ stageDue }}</span></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);white-space:nowrap">Deadline</span><span style="font-weight:500;color:{{ deadlineFg }};white-space:nowrap">{{ deadline }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin:18px 28px 0;padding:14px 16px;border-radius:12px;background:{{ banner.bg }};border:1px solid {{ banner.line }};display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:background-color .2s, border-color .2s">
+      <span style="font-size:20px">{{ banner.icon }}</span>
+      <div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:1.02em">{{ banner.title }}</span><span style="font-size:0.9em;color:rgb(74 64 58);text-wrap:pretty">{{ banner.text }}</span></div>
+      <sc-for list="{{ banner.actions }}" as="b" hint-placeholder-count="1"><div onClick="{{ b.onClick }}" style="height:36px;padding:0 16px;border-radius:8px;display:flex;align-items:center;font-weight:600;font-size:0.92em;cursor:pointer;white-space:nowrap;background:{{ b.bg }};color:{{ b.fg }};border:1px solid {{ b.line }}" style-hover="filter:brightness(.97)">{{ b.label }}</div></sc-for>
+    </div>
+
+    <div style="padding:16px 28px 4px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap"><span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);white-space:nowrap">Workflow · {{ doneCount }} of {{ stageCount }} done</span><span style="font-size:0.8em;color:rgb(117 100 86);white-space:nowrap">· click a stage to see it</span><span style="flex:1"></span><span style="font-size:0.84em;color:rgb(117 100 86);white-space:nowrap">Started 2 Nov · planned {{ plannedDays }} working days</span></div>
+      <div style="display:flex;align-items:stretch;overflow-x:auto;padding:2px 2px 6px">
+        <sc-for list="{{ strip }}" as="c" hint-placeholder-count="6">
+          <div style="display:flex;align-items:stretch;flex:1 1 0;min-width:118px">
+            <div onClick="{{ c.onFocus }}" style="flex:1;min-width:0;display:flex;flex-direction:column;border-radius:10px;border:1.5px {{ c.lineStyle }} {{ c.selLine }};background:{{ c.selBg }};box-shadow:{{ c.selShadow }};overflow:hidden;cursor:pointer;transition:border-color .15s, box-shadow .15s, background-color .15s" style-hover="border-color:rgb(150 136 120)">
+              <div style="height:3px;background:{{ c.topBar }}"></div>
+              <div style="padding:7px 9px 8px;display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:18px;height:18px;flex:none;border-radius:50%;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;background:{{ c.numBg }};color:{{ c.numFg }}">{{ c.mark }}</span><span style="font-weight:600;font-size:0.92em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span><sc-if value="{{ c.isYou }}"><span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:rgb(51 36 27);color:#fff">YOU</span></sc-if></div>
+                <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="width:18px;height:18px;flex:none;border-radius:50%;background:{{ c.av }};border:1px {{ c.avStyle }} rgb(200 190 178);box-sizing:border-box;font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ c.init }}</span><span style="font-size:0.8em;color:rgb(74 64 58);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.whoShort }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;font-weight:500;color:{{ c.miniFg }};white-space:nowrap">{{ c.mini }}</span></div>
+              </div>
+            </div>
+            <sc-if value="{{ c.hasLink }}"><div style="width:12px;flex:none;display:flex;align-items:center"><span style="height:2px;width:100%;background:{{ c.linkColor }}"></span></div></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,320px);gap:20px;padding:8px 28px 24px;align-items:start;min-height:560px">
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:540px">
+        <div style="border:1.5px solid {{ fc.panelLine }};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap;background:#fff">
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:0.74em;color:rgb(117 100 86);white-space:nowrap">Stage {{ fc.n }} of {{ stageCount }}</span><span style="font-weight:600;font-size:1.1em;white-space:nowrap">{{ fc.name }}</span></div>
+          <div style="display:flex;align-items:center;gap:7px;min-width:0"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:{{ fc.av }};border:1px {{ fc.avStyle }} rgb(200 190 178);box-sizing:border-box;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ fc.init }}</span><div style="display:flex;flex-direction:column;min-width:0"><span style="font-size:0.9em;font-weight:500;white-space:nowrap">{{ fc.who }}</span><span style="font-size:0.76em;color:rgb(117 100 86);white-space:nowrap">{{ fc.whoSub }}</span></div></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:0.74em;color:rgb(117 100 86);white-space:nowrap">{{ fc.timeK }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;font-weight:500;color:{{ fc.timeFg }};white-space:nowrap">{{ fc.timeV }}</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:0.74em;color:rgb(117 100 86);white-space:nowrap">{{ fc.dueK }}</span><span style="font-size:0.86em;font-weight:500;color:{{ fc.dueFg }};white-space:nowrap">{{ fc.dueV }}</span></div>
+          <sc-if value="{{ fc.hasAppr }}"><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><sc-for list="{{ fc.gates }}" as="g" hint-placeholder-count="1"><div style="display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:7px;background:{{ g.bg }};border:1px solid {{ g.line }}"><span style="font-size:9.5px;font-weight:600;color:rgb(117 100 86);white-space:nowrap">L{{ g.n }}{{ g.rule }}</span><sc-for list="{{ g.people }}" as="p" hint-placeholder-count="1"><span style="font-size:0.8em;white-space:nowrap;color:{{ p.fg }};font-weight:{{ p.weight }}">{{ p.t }}</span></sc-for></div></sc-for></div></sc-if>
+          <span style="flex:1"></span>
+          <sc-if value="{{ fc.canReassign }}"><span onClick="{{ fc.onReassign }}" style="font-size:0.84em;font-weight:500;text-decoration:underline;text-underline-offset:2px;cursor:pointer;color:rgb(90 62 43);white-space:nowrap">⇄ Reassign</span></sc-if>
+        </div>
+        <div onClick="{{ toggleReq }}" style="border:1px solid rgb(236 231 224);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;background:rgb(252 251 249)" style-hover="border-color:rgb(214 206 196)">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">📋</span><span style="font-weight:600">Requirements</span><span style="flex:1;min-width:0;font-size:0.84em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ reqPeek }}</span><span style="font-size:9px;color:rgb(117 100 86)">{{ reqCaret }}</span></div>
+          <sc-if value="{{ reqOpen }}"><span style="font-size:0.9em;color:rgb(74 64 58);text-wrap:pretty">{{ reqText }}</span></sc-if>
+        </div>
+        <sc-if value="{{ noFocusSecs }}"><div style="padding:18px;border:1px dashed rgb(229 222 211);border-radius:12px;text-align:center;font-size:0.88em;color:rgb(117 100 86)">Nothing to fill in at {{ fc.name }}.</div></sc-if>
+        <sc-for list="{{ focusSecs }}" as="x" hint-placeholder-count="2">
+          <div style="border:1.5px solid {{ x.line }};border-radius:12px;background:#fff;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:{{ x.headBg }};flex-wrap:wrap">
+              <span style="font-size:15px">{{ x.emoji }}</span><span style="font-weight:600;white-space:nowrap">{{ x.title }}</span>
+              <sc-for list="{{ x.badges }}" as="b" hint-placeholder-count="2"><span style="font-size:0.74em;padding:2px 7px;border-radius:5px;background:rgb(246 244 240);color:rgb(90 78 68);white-space:nowrap">{{ b }}</span></sc-for>
+              <span style="flex:1"></span><span style="font-size:0.8em;font-weight:500;color:{{ x.stateFg }};white-space:nowrap">{{ x.state }}</span>
+            </div>
+            <sc-if value="{{ x.isReq }}"><div style="padding:12px 14px;border-top:1px solid rgb(244 241 236);font-size:0.9em;color:rgb(74 64 58);text-wrap:pretty">{{ reqText }}</div></sc-if>
+            <sc-for list="{{ x.fields }}" as="f" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:minmax(120px,200px) minmax(0,1fr);gap:12px;align-items:center;padding:9px 14px;border-top:1px solid rgb(244 241 236)">
+              <span style="font-size:0.88em;color:rgb(74 64 58)">{{ f.name }}<sc-if value="{{ f.req }}"><span style="color:rgb(176 40 34)"> *</span></sc-if></span>
+              <sc-if value="{{ f.editText }}"><input type="{{ f.itype }}" value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" style="height:32px;min-width:0;box-sizing:border-box;border:1px solid {{ f.line }};border-radius:7px;padding:0 10px;font:inherit;outline:none;color:rgb(51 36 27);background:#fff" style-focus="border-color:rgb(150 136 120)"></sc-if>
+              <sc-if value="{{ f.editCheck }}"><div onClick="{{ f.onToggle }}" style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="width:18px;height:18px;box-sizing:border-box;border-radius:5px;border:1.5px solid {{ f.boxLine }};background:{{ f.boxBg }};color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center">{{ f.tick }}</span><span style="font-size:0.86em">{{ f.checkLabel }}</span></div></sc-if>
+              <sc-if value="{{ f.readOnly }}"><span style="font-size:0.88em;color:{{ f.roFg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.display }}</span></sc-if>
+            </div></sc-for>
+            <sc-if value="{{ x.isTable }}"><div style="border-top:1px solid rgb(244 241 236)">
+              <div style="overflow-x:auto"><div style="display:grid;grid-template-columns:{{ x.grid }};min-width:{{ x.minW }}px">
+                <sc-for list="{{ x.cols }}" as="c" hint-placeholder-count="3"><div style="padding:7px 10px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);border-right:1px solid rgb(244 241 236);display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:0.84em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}<sc-if value="{{ c.req }}"><span style="color:rgb(176 40 34)"> *</span></sc-if></span><div style="display:flex;align-items:center;gap:4px"><span style="font-size:0.72em;color:{{ c.stageFg }};white-space:nowrap;flex:1">🎯 {{ c.stage }}</span><sc-if value="{{ c.canDel }}"><span onClick="{{ c.onDel }}" title="Remove column" style="font-size:11px;color:rgb(150 140 130);cursor:pointer" style-hover="color:rgb(176 40 34)">×</span></sc-if></div></div></sc-for>
+                <div style="background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)"></div>
+                <sc-for list="{{ x.cells }}" as="c" hint-placeholder-count="6"><div style="min-height:38px;box-sizing:border-box;padding:4px 6px;border-bottom:1px solid rgb(244 241 236);border-right:1px solid rgb(244 241 236);display:flex;align-items:center;min-width:0;background:{{ c.bg }}">
+                  <sc-if value="{{ c.isInput }}"><input type="{{ c.itype }}" value="{{ c.value }}" onChange="{{ c.onChange }}" placeholder="{{ c.ph }}" style="width:100%;min-width:0;height:28px;box-sizing:border-box;border:1px solid {{ c.line }};border-radius:6px;padding:0 8px;font:inherit;font-size:0.88em;outline:none;color:rgb(51 36 27);background:#fff" style-focus="border-color:rgb(150 136 120)"></sc-if>
+                  <sc-if value="{{ c.isCheck }}"><span onClick="{{ c.onToggle }}" style="width:18px;height:18px;box-sizing:border-box;border-radius:5px;border:1.5px solid {{ c.boxLine }};background:{{ c.boxBg }};color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer">{{ c.tick }}</span></sc-if>
+                  <sc-if value="{{ c.isText }}"><span style="font-size:0.86em;color:{{ c.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.display }}</span></sc-if>
+                  <sc-if value="{{ c.isDel }}"><span onClick="{{ c.onDel }}" title="Remove row" style="width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(150 140 130)" style-hover="background:rgb(252 236 233);color:rgb(176 40 34)">×</span></sc-if>
+                </div></sc-for>
+              </div></div>
+              <div style="display:flex;align-items:center;gap:8px 12px;padding:8px 12px;flex-wrap:wrap">
+                <sc-if value="{{ x.canAddCol }}"><span onClick="{{ x.startCol }}" style="height:30px;padding:0 12px;border-radius:7px;border:1.5px dashed rgb(214 204 190);display:flex;align-items:center;font-size:0.86em;font-weight:500;cursor:pointer;color:rgb(90 62 43);white-space:nowrap" style-hover="background:rgb(250 248 244)">+ Add column</span></sc-if>
+                <sc-if value="{{ x.addingCol }}"><div style="display:flex;align-items:center;gap:6px"><input autoFocus="{{ true }}" value="{{ x.colDraft }}" onChange="{{ x.onColDraft }}" onKeyDown="{{ x.onColKey }}" placeholder="Column name, Enter" style="height:30px;width:160px;box-sizing:border-box;border:1px solid rgb(150 136 120);border-radius:7px;padding:0 9px;font:inherit;font-size:0.86em;outline:none;color:rgb(51 36 27)"><select value="{{ x.colType }}" onChange="{{ x.onColType }}" style="height:30px;border:1px solid rgb(229 222 211);border-radius:7px;font:inherit;font-size:0.84em;background:#fff;color:rgb(51 36 27)"><sc-for list="{{ x.colTypes }}" as="ct" hint-placeholder-count="5"><option value="{{ ct }}">{{ ct }}</option></sc-for></select><span onClick="{{ x.commitCol }}" style="height:30px;padding:0 12px;border-radius:7px;background:rgb(51 36 27);color:#fff;display:flex;align-items:center;font-size:0.84em;font-weight:600;cursor:pointer">Add</span><span onClick="{{ x.cancelCol }}" style="font-size:0.84em;color:rgb(117 100 86);cursor:pointer">Cancel</span></div></sc-if>
+                <sc-if value="{{ x.canAdd }}"><span onClick="{{ x.addRow }}" style="height:30px;padding:0 12px;border-radius:7px;border:1.5px dashed rgb(214 204 190);display:flex;align-items:center;font-size:0.86em;font-weight:500;cursor:pointer;color:rgb(90 62 43);white-space:nowrap" style-hover="background:rgb(250 248 244)">+ Add row</span></sc-if>
+                <span style="font-size:0.8em;color:rgb(117 100 86)">{{ x.tableNote }}</span>
+              </div>
+            </div></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Next up</span>
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:{{ next.av }};font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ next.init }}</span><div style="display:flex;flex-direction:column;flex:1;min-width:0"><span style="font-weight:600;font-size:0.94em">{{ next.title }}</span><span style="font-size:0.82em;color:rgb(117 100 86)">{{ next.sub }}</span></div></div>
+          <div style="display:flex;gap:8px;align-items:flex-start;font-size:0.84em;color:rgb(74 64 58)"><span>🔔</span><span style="text-wrap:pretty">{{ next.when }}</span></div>
+        </div>
+        <div style="display:flex;align-items:center;margin-top:4px"><span style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);flex:1">Activity</span><span onClick="{{ toggleLog }}" style="font-size:0.82em;color:rgb(90 62 43);cursor:pointer;text-decoration:underline;text-underline-offset:2px">{{ logToggle }}</span></div>
+        <div style="border:1px solid rgb(236 231 224);border-radius:12px;display:flex;flex-direction:column;max-height:360px;overflow-y:auto">
+          <sc-for list="{{ logShown }}" as="l" hint-placeholder-count="3"><div style="display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid rgb(244 241 236)"><span style="font-size:12px;width:16px;text-align:center">{{ l.icon }}</span><span style="flex:1;min-width:0;font-size:0.86em;text-wrap:pretty">{{ l.text }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86);white-space:nowrap">{{ l.time }}</span></div></sc-for>
+        </div>
+      </div>
+    </div>
+  </div></sc-if>
+
+  <sc-if value="{{ isPic }}"><div style="padding:32px 28px 36px;background:rgb(250 248 244)">
+    <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px"><span style="width:36px;height:36px;border-radius:9px;background:rgb(51 36 27);color:#fff;font-weight:600;display:flex;align-items:center;justify-content:center">H</span><div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:0.82em;line-height:1.3;color:rgb(117 100 86);white-space:nowrap">Houzs Marketing · tracking link for 2990 Home</span><span style="font-size:1.5em;line-height:1.2;font-weight:600">{{ title }}</span></div></div>
+      <div style="padding:16px 18px;border-radius:12px;background:{{ pic.bg }};border:1px solid {{ pic.line }};display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:22px">{{ pic.icon }}</span>
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:220px"><span style="font-weight:600;font-size:1.05em">{{ pic.title }}</span><span style="font-size:0.9em;color:rgb(74 64 58);text-wrap:pretty">{{ pic.text }}</span></div>
+        <sc-for list="{{ pic.actions }}" as="b" hint-placeholder-count="0"><div onClick="{{ b.onClick }}" style="height:36px;padding:0 16px;border-radius:8px;display:flex;align-items:center;font-weight:600;cursor:pointer;white-space:nowrap;background:{{ b.bg }};color:{{ b.fg }};border:1px solid {{ b.line }}">{{ b.label }}</div></sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid rgb(236 231 224);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:4px">
+          <sc-for list="{{ pic.steps }}" as="p" hint-placeholder-count="6"><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px"><span style="height:6px;border-radius:3px;background:{{ p.bar }}"></span><span style="font-size:0.78em;color:{{ p.fg }};font-weight:{{ p.weight }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span></div></sc-for>
+        </div>
+        <span style="font-size:0.86em;color:rgb(74 64 58)">{{ pic.eta }}</span>
+      </div>
+      <sc-for list="{{ pic.secs }}" as="x" hint-placeholder-count="3"><div style="background:#fff;border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px"><span style="font-size:15px">{{ x.emoji }}</span><span style="font-weight:600;white-space:nowrap">{{ x.title }}</span></div>
+        <sc-if value="{{ x.isReq }}"><div style="padding:10px 14px 12px;border-top:1px solid rgb(244 241 236);font-size:0.9em;color:rgb(74 64 58)">{{ reqText }}</div></sc-if>
+        <sc-if value="{{ x.isTable }}"><div style="overflow-x:auto;border-top:1px solid rgb(244 241 236)"><div style="display:grid;grid-template-columns:{{ x.grid }}"><sc-for list="{{ x.cols }}" as="c" hint-placeholder-count="3"><span style="padding:7px 12px;font-size:0.82em;font-weight:600;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">{{ c }}</span></sc-for><sc-for list="{{ x.cells }}" as="c" hint-placeholder-count="6"><span style="padding:8px 12px;font-size:0.86em;color:{{ c.fg }};border-bottom:1px solid rgb(244 241 236);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.t }}</span></sc-for></div></div></sc-if>
+        <sc-for list="{{ x.fields }}" as="f" hint-placeholder-count="1"><div style="display:flex;gap:12px;padding:9px 14px;border-top:1px solid rgb(244 241 236)"><span style="font-size:0.88em;color:rgb(117 100 86);width:170px;flex:none">{{ f.name }}</span><span style="font-size:0.88em;color:{{ f.fg }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.display }}</span></div></sc-for>
+      </div></sc-for>
+      <span style="font-size:0.8em;color:rgb(117 100 86);text-align:center">You see team names only. Questions? Reply to the WhatsApp message with this link.</span>
+    </div>
+  </div></sc-if>
+
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 28px;border-top:1px dashed rgb(229 222 211);background:rgb(252 251 249);flex-wrap:wrap">
+    <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">PROTOTYPE · VIEW AS</span>
+    <sc-for list="{{ viewers }}" as="v" hint-placeholder-count="5"><div onClick="{{ v.onClick }}" style="height:28px;padding:0 10px 0 3px;border-radius:999px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.86em;border:1px solid {{ v.line }};background:{{ v.bg }};color:{{ v.fg }}"><span style="width:22px;height:22px;border-radius:50%;background:{{ v.av }};color:rgb(51 36 27);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ v.init }}</span>{{ v.label }}</div></sc-for>
+    <span style="flex:1"></span>
+    <div onClick="{{ jump }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;cursor:pointer;font-size:0.86em">⏩ +1 day</div>
+    <div onClick="{{ autoStep }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;cursor:pointer;font-size:0.86em">▶ Act as whoever’s turn</div>
+    <div onClick="{{ preview }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;cursor:pointer;font-size:0.86em">{{ celebIcon }} Preview celebration</div>
+    <div onClick="{{ reset }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;font-size:0.86em;color:rgb(117 100 86)">Reset</div>
+  </div>
+
+  <sc-if value="{{ modal.open }}" hint-placeholder-val="{{ false }}"><div onClick="{{ closeModal }}" style="position:absolute;inset:0;z-index:50;background:rgb(40 30 22 / 0.32);display:flex;align-items:center;justify-content:center;padding:24px">
+    <div onClick="{{ stop }}" style="width:min(420px,100%);background:#fff;border-radius:14px;box-shadow:0 24px 64px rgb(51 36 27 / .3);display:flex;flex-direction:column;overflow:hidden;animation:tfIn .18s ease-out">
+      <div style="padding:16px 18px 6px;display:flex;flex-direction:column;gap:4px"><span style="font-weight:600;font-size:1.1em">{{ modal.title }}</span><span style="font-size:0.88em;color:rgb(117 100 86);text-wrap:pretty">{{ modal.sub }}</span></div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ modal.people }}" as="p" hint-placeholder-count="4"><div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;cursor:pointer;background:{{ p.bg }}" style-hover="background:rgb(246 244 240)"><span style="width:28px;height:28px;border-radius:50%;background:{{ p.av }};font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.init }}</span><div style="flex:1;display:flex;flex-direction:column"><span style="font-weight:500">{{ p.name }}</span><span style="font-size:0.8em;color:rgb(117 100 86)">{{ p.role }}</span></div><span style="font-size:0.8em;color:{{ p.loadFg }}">{{ p.load }} active</span><span style="width:14px;font-size:12px">{{ p.tick }}</span></div></sc-for>
+      </div>
+      <div style="padding:10px 18px 16px;font-size:0.82em;color:rgb(117 100 86)">Load = tasks they have open right now.</div>
+    </div>
+  </div></sc-if>
+
+  <sc-if value="{{ hasCeleb }}" hint-placeholder-val="{{ false }}"><div onClick="{{ closeCeleb }}" style="position:absolute;inset:0;z-index:80;background:{{ celebBg }};overflow:hidden;cursor:pointer">
+    {{ celebArt }}
+    <div style="position:absolute;left:50%;top:58%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;animation:celebIn .5s ease-out both;animation-delay:.3s;width:min(520px,90%)">
+      <span style="font-size:2.2em;font-weight:600;letter-spacing:-0.01em;color:{{ celebInk }}">{{ celebTitle }}</span>
+      <span style="font-size:1em;color:{{ celebSub }};text-wrap:pretty">{{ celebText }}</span>
+      <span style="font-size:0.84em;color:{{ celebSub }};margin-top:8px">Click anywhere to close</span>
+    </div>
+  </div></sc-if>
+
+  <sc-if value="{{ hasToast }}"><div style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);z-index:90;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:tfIn .2s ease-out;white-space:nowrap">{{ toast }}</div></sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;celebration&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;fireworks&quot;,&quot;cheers&quot;,&quot;movie&quot;,&quot;confetti&quot;],&quot;default&quot;:&quot;fireworks&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;workflow&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+const PEOPLE = { Rachel: ['MM', 6], Daniel: ['AMM', 4], Mei: ['Director', 3], 'Ah Kit': ['Videographer', 2], Ali: ['Editor', 3], Siti: ['Graphic', 4], Hafiz: ['Graphic', 3], Aina: ['Graphic', 2], Jason: ['Social Media', 5], 'Wei Lun': ['Ads', 2] };
+const AVC = { Rachel: 'oklch(0.90 0.05 195)', Daniel: 'oklch(0.90 0.05 60)', Mei: 'oklch(0.90 0.05 295)', 'Ah Kit': 'oklch(0.90 0.05 160)', Ali: 'oklch(0.90 0.05 270)', Siti: 'oklch(0.92 0.04 350)', Hafiz: 'oklch(0.92 0.04 20)', Aina: 'oklch(0.92 0.04 320)', Jason: 'oklch(0.90 0.05 235)', 'Wei Lun': 'oklch(0.90 0.05 110)', Carmen: 'oklch(0.92 0.05 80)' };
+const ROSTER = { content: ['Mei', 'Ah Kit', 'Ali'], design: ['Siti', 'Hafiz', 'Aina'], social: ['Jason'], ads: ['Wei Lun'], brand: ['Aina'] };
+const BYNAME = { Script: 'Mei', Shoot: 'Ah Kit', 'Raw upload': 'Ah Kit', Edit: 'Ali', Final: 'Ali', Thumbnail: 'Siti', Design: 'Siti', Brief: 'Siti', Revisions: 'Siti', Publish: 'Jason', 'Content plan & captions': 'Jason', 'Design graphics': 'Siti', 'Schedule & post': 'Jason', Direction: 'Wei Lun', 'Creative production': 'Wei Lun', 'Compile & review': 'Wei Lun', 'Go live': 'Wei Lun', Discovery: 'Aina', 'Design system': 'Siti', 'Final book': 'Siti' };
+const GROUPN = { content: 'Content', social: 'Social media', design: 'Design', ads: 'Ads', brand: 'Brand' };
+const SAMPLE_FIELDS = { Script: [['Topic', 'Text'], ['Script doc', 'File / link']], Shoot: [['Shoot date', 'Date']], 'Raw upload': [['Footage folder', 'File / link']], Edit: [['Draft video', 'File / link'], ['Edit notes', 'Text', false, false]], Thumbnail: [['Cover image', 'File / link']], Final: [['Final video', 'File / link'], ['Caption', 'Text']] };
+const DEFAULT_WF = { action: 'Reels video', tname: 'Full production', ver: 2, promise: 10,
+  stages: [
+    { name: 'Script', dept: 'content', who: { mode: 'assign' }, sla: 2, appr: [{ kind: 'multi', ids: ['Rachel'], rule: 'any' }], back: 'prev', picText: 'Content team is writing the script' },
+    { name: 'Shoot', dept: 'content', who: { mode: 'assign' }, sla: 1, appr: [], back: 'prev', picText: 'Content team is shooting' },
+    { name: 'Raw upload', dept: 'content', who: { mode: 'assign' }, sla: 1, appr: [], back: 'prev', picText: 'Content team is uploading footage' },
+    { name: 'Edit', dept: 'content', who: { mode: 'prev', cands: ['Ali', 'Hafiz'] }, sla: 3, appr: [], back: 'prev', picText: 'Content team is editing' },
+    { name: 'Thumbnail', dept: 'design', who: { mode: 'prev', cands: ['Siti', 'Hafiz'] }, sla: 1, appr: [], back: 'prev', picText: 'Design team is making the cover' },
+    { name: 'Final', dept: 'content', who: { mode: 'assign' }, sla: 1, appr: [{ kind: 'multi', ids: ['Rachel'], rule: 'any' }, { kind: 'multi', ids: ['pic'], rule: 'any' }], back: 3, picText: 'Ready for your approval' },
+  ],
+  end: { notify: ['all'], after: 'close', picText: 'Your reels video is ready' }, celeb: 'fireworks', overdue: { days: 1, notify: ['doer', 'mm'], action: 'remind', repeat: true } };
+const D = s => new Date(s);
+const DAY = 864e5, HR = 36e5;
+const BASE_NOW = D('2026-11-12T15:20'), START = D('2026-11-02T09:00');
+const addWork = (d, n) => { const x = new Date(d); x.setHours(18, 0, 0, 0); let left = n; while (left > 0) { x.setDate(x.getDate() + 1); if (x.getDay() % 6) left--; } return x; };
+const fmtD = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const fmtT = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + d.toTimeString().slice(0, 5);
+const dur = ms => { const d = Math.floor(ms / DAY), h = Math.floor((ms % DAY) / HR); return d ? `${d}d ${h}h` : `${Math.max(1, h)}h`; };
+const late = (end, due) => { const diff = Math.ceil((end - due) / DAY); return diff > 0 ? diff : 0; };
+const INK = 'rgb(51 36 27)', RED = 'rgb(176 40 34)', GREEN = 'rgb(40 110 64)', MUTED = 'rgb(117 100 86)';
+const CELEB = { fireworks: '🎆', cheers: '🍻', movie: '🎬', confetti: '🎉', custom: '🖼️' };
+const ID2 = id => id === 'pic' ? 'Carmen' : id === 'assign' ? 'Daniel' : id;
+const NORM = a => a.kind === 'multi' ? a : { ids: [a.kind === 'person' ? a.who : a.kind], rule: 'any' };
+const nm = p => p === 'Carmen' ? 'Carmen (PIC)' : p;
+const sampleVal = (type, name) => type === 'Date' ? '2026-11-05' : type === 'Checkbox' ? true : /File/.test(type) ? 'drive.google.com/…/' + name.toLowerCase().replace(/\s+/g, '-') : type === 'Number' ? '1' : 'Filled · ' + name.toLowerCase();
+const cloneSt = a => a.map(x => ({ ...x, levels: x.levels.map(l => ({ ...l, ok: { ...l.ok } })) }));
+
+function sectionsFrom(wf, stages) {
+  const cv = wf.canvas;
+  if (cv && cv.sections) return cv.sections.map(sec => {
+    const st = sec.stage && sec.stage !== '—' ? sec.stage : null;
+    const mapF = f => ({ id: f.id, name: f.name, type: f.type, stage: f.stage && f.stage !== '—' ? f.stage : st, required: !!f.required, pic: f.pic !== false && sec.pic !== false });
+    const cols = sec.kind === 'table' ? (cv.cols || []).map((c, j) => ({ ...mapF({ ...c, id: c.id || sec.id + 'c' + j, type: c.type || 'Text' }), name: (c.name || 'Column').replace(/ \(.*\)/, '') })) : null;
+    const fields = sec.kind === 'req' || sec.kind === 'table' ? [] : sec.kind === 'fields' ? (sec.fields || []).map(mapF)
+      : sec.kind === 'checklist' ? [{ id: sec.id + '-c', name: 'All assets are in the folder', type: 'Checkbox', stage: st, required: !!sec.required, pic: sec.pic !== false }]
+      : [{ id: sec.id + '-v', name: sec.title, type: 'File / link', stage: st, required: !!sec.required, pic: sec.pic !== false }];
+    return { id: sec.id, emoji: sec.emoji || '🎯', title: sec.kind === 'table' ? (cv.tableName || sec.title) : sec.title, kind: sec.kind, stage: st, required: !!sec.required, pic: sec.pic !== false, fields, cols };
+  });
+  const at = k => stages[Math.min(k, stages.length - 1)].name;
+  const table = { id: 'tbl', emoji: '🎬', title: 'Shot list', kind: 'table', stage: null, required: false, pic: true, fields: [], cols: [
+    { id: 'tc0', name: 'Scene', type: 'Text', stage: at(0), required: true, pic: true },
+    { id: 'tc1', name: 'Location', type: 'Text', stage: at(0), required: false, pic: true },
+    { id: 'tc2', name: 'Shot', type: 'Checkbox', stage: at(1), required: false, pic: false },
+    { id: 'tc3', name: 'Clip link', type: 'File / link', stage: at(3), required: true, pic: false } ] };
+  return [{ id: 'req', emoji: '📋', title: 'Requirements', kind: 'req', stage: null, required: false, pic: true, fields: [] }, table,
+    ...stages.map((st, i) => ({ id: 's' + i, emoji: '🎯', title: st.name, kind: 'fields', stage: st.name, required: true, pic: true,
+      fields: (SAMPLE_FIELDS[st.name] || [['Deliverable', 'File / link'], ['Notes', 'Text', false]]).map(([n, t, rq, pic], j) => ({ id: `s${i}f${j}`, name: n, type: t, stage: st.name, required: rq !== false, pic: pic !== false })) }))];
+}
+
+function build(wfIn) {
+  const wf = wfIn && wfIn.stages && wfIn.stages.length ? wfIn : DEFAULT_WF;
+  const n = wf.stages.length, cur = n <= 1 ? 0 : Math.min(n - 1, Math.ceil(n / 2));
+  let t = START; const stages = [];
+  wf.stages.forEach((x, i) => {
+    const roster = ROSTER[x.dept] || ['Siti'], prev = x.who && x.who.mode === 'prev';
+    const cands = prev ? ((x.who.cands || []).length ? x.who.cands : roster.slice(0, 2)) : null;
+    const levels = (x.appr || []).map(NORM).filter(l => l.ids.length).map(l => ({ people: [...new Set(l.ids.map(ID2))], rule: l.rule || 'any', ok: {} }));
+    const grp = GROUPN[x.dept] || (wf.groups && wf.groups[x.dept] && wf.groups[x.dept][0]) || 'Team';
+    const st = { name: x.name || 'Untitled stage', group: grp, sla: x.sla || 1, who: prev ? null : (BYNAME[x.name] || roster[0]), cands, pickedBy: null, levels, back: typeof x.back === 'number' ? x.back : null, picText: x.picText || `${grp} team is working on ${(x.name || 'it').toLowerCase()}`, start: null, end: null, due: null };
+    if (i <= cur) { st.start = t; st.due = addWork(t, st.sla); if (!st.who) st.who = cands[0]; }
+    if (i < cur) { st.end = new Date(st.due.getTime() - 6.5 * HR); st.levels.forEach(l => l.people.forEach(p => { l.ok[p] = true; })); t = st.end; }
+    stages.push(st);
+  });
+  stages.forEach((st, i) => { if (!st.who) { const p = stages[i - 1]; st.pickedBy = p ? (p.who || p.pickedBy ? (p.who || 'whoever does ' + p.name) : 'Rachel') : 'Rachel'; } });
+  const secs = sectionsFrom(wf, stages), values = {}, rows = {};
+  const sIdx = name => stages.findIndex(x => x.name === name);
+  const SAMPLE_ROWS = [['Truck arrives at the mall', 'Mid Valley entrance', true], ['Sofa unboxing on stage', 'Truck stage', true], ['Crowd + giveaway', 'Truck stage', true]];
+  secs.filter(x => x.kind === 'table').forEach(sec => { rows[sec.id] = SAMPLE_ROWS.map((sr, ri) => { const row = { _id: sec.id + 'r' + ri, _seed: true }; sec.cols.forEach((c, ci) => { const si = sIdx(c.stage); if (si > -1 && si < cur) row[c.id] = c.type === 'Checkbox' ? true : /File/.test(c.type) ? 'drive.google.com/…/clip-' + (ri + 1) : sr[ci] != null && typeof sr[ci] === 'string' ? sr[ci] : sampleVal(c.type, c.name); }); return row; }); });
+  secs.forEach(sec => sec.fields.forEach(f => { const si = stages.findIndex(x => x.name === f.stage); if (si > -1 && si < cur) values[f.id] = sampleVal(f.type, f.name); }));
+  const log = [], c = stages[cur], prevSt = stages[cur - 1];
+  if (prevSt) log.push({ icon: '🔔', text: `${c.who} notified: “Your turn — ${c.name}, due ${fmtD(c.due)}”`, at: prevSt.end }, { icon: '✓', text: `${prevSt.who} submitted ${prevSt.name}`, at: prevSt.end });
+  else log.push({ icon: '🔔', text: `${c.who} notified: “Your turn — ${c.name}, due ${fmtD(c.due)}”`, at: START });
+  return { wf, stages, secs, values, rows, cur, lvl: -1, done: false, log, esc: {}, viewer: c.who, missing: false };
+}
+
+class Component extends DCLogic {
+  state = { ...build(this.props.workflow), offset: 0, modal: null, celeb: null, celebKind: null, toast: '' };
+  componentDidMount() { this._m = Date.now(); this._i = setInterval(() => this.forceUpdate(), 30000); if (this.props.viewer) this.setState({ viewer: this.props.viewer }); this.checkOverdue(); this.emitStatus(); }
+  componentDidUpdate(pp) { if (this.props.viewer && this.props.viewer !== pp.viewer && this.props.viewer !== this.state.viewer) this.setState({ viewer: this.props.viewer }); if (this.props.workflow !== pp.workflow && JSON.stringify(this.props.workflow) !== JSON.stringify(pp.workflow)) this.setState({ ...build(this.props.workflow), viewer: this.props.viewer || this.state.viewer, offset: this.state.offset }); this.emitStatus(); }
+  emitStatus() {
+    if (!this.props.onStatus) return; const s = this.state, cur = s.stages[s.cur], now = this.now();
+    const st = { title: `Red Truck · ${s.wf.action}`, project: '2990 Home', stage: cur.name, stageN: s.cur + 1, total: s.stages.length, done: s.done, approving: s.lvl >= 0, actors: this.actors(), doer: cur.who,
+      due: cur.due ? fmtD(cur.due) : '', late: s.done ? 0 : late(now, cur.due), team: [...new Set(s.stages.flatMap(x => [x.who, ...x.levels.flatMap(l => l.people)]).filter(Boolean))] };
+    const j = JSON.stringify(st); if (j !== this._st) { this._st = j; this.props.onStatus(st); }
+  }
+  componentWillUnmount() { clearInterval(this._i); clearTimeout(this._t); }
+  now(off = this.state.offset) { return new Date(BASE_NOW.getTime() + off + (Date.now() - (this._m || Date.now()))); }
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2800); }
+  customUrl() { const w = this.state.wf; if (w.customGif) return w.customGif; try { return localStorage.getItem('wb-celeb-custom'); } catch (_) { return null; } }
+  kind() { let q = null; try { q = new URLSearchParams(location.search).get('celebration'); } catch (_) {} return this.state.celebKind || this.state.wf.celeb || q || this.props.celebration || 'fireworks'; }
+  pending(s = this.state) { if (s.done || s.lvl < 0) return []; const l = s.stages[s.cur].levels[s.lvl]; return l ? l.people.filter(p => !l.ok[p]) : []; }
+  actors(s = this.state) { if (s.done) return []; return s.lvl >= 0 ? this.pending(s) : [s.stages[s.cur].who]; }
+  logs(...items) { const at = this.now(); return [...items.map(x => ({ ...x, at })), ...this.state.log]; }
+  startStage(stages, i, at) { const st = stages[i]; st.start = at; st.due = addWork(at, st.sla); st.end = null; }
+  missingFor(s = this.state) {
+    const cur = s.stages[s.cur], out = s.secs.flatMap(x => x.fields).filter(f => f.stage === cur.name && f.required && !s.values[f.id]);
+    s.secs.filter(x => x.kind === 'table').forEach(sec => { const rs = (s.rows || {})[sec.id] || []; sec.cols.filter(c => c.stage === cur.name && c.required && c.type !== 'Checkbox').forEach(c => { if (!rs.length || rs.some(r => !r[c.id])) out.push({ id: sec.id + c.id, name: `${sec.title} · ${c.name}`, tbl: sec.id, col: c }); }); });
+    return out;
+  }
+  checkOverdue() {
+    const s = this.state; if (s.done) return;
+    const o = s.wf.overdue || DEFAULT_WF.overdue, cur = s.stages[s.cur], lt = late(this.now(), cur.due);
+    if (!lt || lt < o.days) return;
+    const key = o.repeat ? `${s.cur}-${lt}` : `${s.cur}`; if (s.esc[key]) return;
+    const nx = s.stages[s.cur + 1];
+    const who = [...new Set((o.notify || []).map(k => k === 'doer' ? (s.lvl >= 0 ? this.pending().join(' & ') : cur.who) : k === 'mm' ? 'Rachel' : k === 'director' ? 'Mei' : k === 'next' ? (nx ? nx.who || nx.pickedBy : null) : null).filter(Boolean))];
+    const items = [{ icon: '⏰', text: `${cur.name} is ${lt} day${lt > 1 ? 's' : ''} overdue · ${who.join(', ') || 'nobody'} notified` }];
+    if (o.action === 'reassign') items.unshift({ icon: '🧭', text: `Rachel asked to reassign ${cur.name}` });
+    this.setState({ esc: { ...s.esc, [key]: true }, log: this.logs(...items) });
+  }
+  submit(auto) {
+    const s = this.state, st = s.stages[s.cur], miss = this.missingFor();
+    if (miss.length && !auto) { this.setState({ missing: true }); return this.flash(`Fill ${miss.length} required field${miss.length > 1 ? 's' : ''} first: ${miss.map(f => f.name).join(', ')}`); }
+    if (miss.length) { const v = { ...s.values }, rw = JSON.parse(JSON.stringify(s.rows || {})); miss.forEach(f => { if (f.tbl) { if (!rw[f.tbl].length) rw[f.tbl].push({ _id: f.tbl + 'r' + Date.now() }); rw[f.tbl].forEach((row, i) => { if (!row[f.col.id]) row[f.col.id] = /File/.test(f.col.type) ? 'drive.google.com/…/clip-' + (i + 1) : sampleVal(f.col.type, f.col.name); }); } else v[f.id] = sampleVal(f.type, f.name); }); this.setState({ values: v, rows: rw }); }
+    const stages = cloneSt(s.stages), nx = stages[s.cur + 1];
+    if (nx && !nx.who && nx.cands && !st.levels.length) return this.setState({ modal: { kind: 'pick', i: s.cur + 1 } });
+    if (st.levels.length) { const p = st.levels[0].people; this.setState({ stages, lvl: 0, missing: false, log: this.logs({ icon: '🔔', text: `${p.map(nm).join(' & ')} notified: “Please approve ${st.name}”` }, { icon: '✓', text: `${st.who} submitted ${st.name}` }) }); return this.flash(`Submitted · ${p.map(nm).join(' & ')} notified`); }
+    this.advance(stages, [{ icon: '✓', text: `${st.who} submitted ${st.name}` }]);
+  }
+  advance(stages, entries) {
+    const s = this.state, now = this.now(), st = stages[s.cur], nx = stages[s.cur + 1];
+    if (nx && !nx.who && nx.cands) { this._pend = { stages, entries }; return this.setState({ stages, modal: { kind: 'pick', i: s.cur + 1 } }); }
+    st.end = now;
+    if (!nx) {
+      const e = s.wf.end || DEFAULT_WF.end, NT = { all: 'everyone on the task', mm: 'Rachel', pic: 'Carmen (PIC)', req: 'Daniel (requested it)' };
+      this.setState({ stages, done: true, lvl: -1, missing: false, log: this.logs({ icon: '🎉', text: `Task done · ${(e.notify || ['all']).map(k => NT[k]).join(', ')} notified` }, ...entries), celeb: Date.now() }); return;
+    }
+    this.startStage(stages, s.cur + 1, now);
+    this.setState({ stages, cur: s.cur + 1, lvl: -1, missing: false, log: this.logs({ icon: '🔔', text: `${nx.who} notified: “Your turn — ${nx.name}, due ${fmtD(nx.due)}”` }, ...entries) });
+    this.flash(`${nx.who} notified · ${nx.name} is theirs now`);
+  }
+  approve(name) {
+    const s = this.state, stages = cloneSt(s.stages), st = stages[s.cur], l = st.levels[s.lvl];
+    l.ok[name] = true;
+    const e = { icon: '✓', text: `${nm(name)} approved ${st.name}` };
+    const done = l.rule === 'all' ? l.people.every(p => l.ok[p]) : true;
+    if (!done) { const rest = l.people.filter(p => !l.ok[p]); this.setState({ stages, log: this.logs(e) }); return this.flash(`${nm(name)} approved · still waiting for ${rest.map(nm).join(' & ')}`); }
+    if (s.lvl < st.levels.length - 1) { const p = st.levels[s.lvl + 1].people; this.setState({ stages, lvl: s.lvl + 1, log: this.logs({ icon: '🔔', text: `${p.map(nm).join(' & ')} notified: “Please approve ${st.name}”` }, e) }); return this.flash(`Level ${s.lvl + 1} approved · ${p.map(nm).join(' & ')} next`); }
+    this.advance(stages, [e]);
+  }
+  changes(name) {
+    const s = this.state, stages = cloneSt(s.stages), st = stages[s.cur], back = st.back != null && st.back < s.cur ? st.back : s.cur, now = this.now();
+    for (let i = back; i <= s.cur; i++) { stages[i].levels.forEach(l => { l.ok = {}; }); if (i > back) { stages[i].start = null; stages[i].end = null; stages[i].due = null; } }
+    this.startStage(stages, back, now);
+    this.setState({ stages, cur: back, lvl: -1, log: this.logs({ icon: '🔔', text: `${stages[back].who} notified: “Changes requested — back to ${stages[back].name}”` }, { icon: '↩', text: `${nm(name)} requested changes on ${st.name}` }) });
+    this.flash(`Sent back to ${stages[back].name} · ${stages[back].who} notified`);
+  }
+  pick(i, name, mode) {
+    const s = this.state, stages = cloneSt(s.stages), st = stages[i], from = st.who;
+    st.who = name;
+    if (mode === 'pick') {
+      const p = this._pend; this._pend = null;
+      this.setState({ stages, modal: null, log: this.logs({ icon: '🔓', text: `${s.stages[s.cur].who} handed ${st.name} to ${name}` }) }, () => { if (p) { p.stages[i].who = name; this.advance(p.stages, p.entries); } else this.submit(true); });
+      return;
+    }
+    this.setState({ stages, modal: null, log: this.logs({ icon: '🔔', text: `${name} notified: “You’ve been assigned ${st.name}${st.due ? ', due ' + fmtD(st.due) : ''}”` }, { icon: '⇄', text: `Rachel reassigned ${st.name}${from ? ' from ' + from : ''} to ${name}` }) });
+    this.flash(`${st.name} → ${name} · ${name} notified${from ? ', ' + from + ' told' : ''}`);
+  }
+  focusVals(s, cards, secs, v, myNext, act) {
+    const key = `${s.cur}-${s.lvl}-${v}-${s.done}`;
+    const mineLast = (() => { for (let i = s.stages.length - 1; i >= 0; i--) if (s.stages[i].who === v && s.stages[i].end) return i; return -1; })();
+    const def = s.done ? s.stages.length - 1 : act.includes(v) || v === 'Rachel' ? s.cur : myNext > -1 ? myNext : mineLast > -1 ? mineLast : s.cur;
+    const f = s.focus != null && s.focusKey === key ? s.focus : def, st = s.stages[f], name = st.name;
+    const rel = (x, i) => { const sec = s.secs[i]; return sec.kind !== 'req' && (sec.stage === name || sec.fields.some(y => y.stage === name) || (sec.cols || []).some(y => y.stage === name)); };
+    const focusSecs = secs.filter(rel);
+    const c = cards[f], showAll = s.logOpen;
+    const log = s.log.map(l => ({ ...l, time: fmtT(l.at) }));
+    return {
+      strip: cards.map((x, i) => { const on = i === f, isCur = !s.done && i === s.cur, done = s.done || i < s.cur;
+        return { ...x, onFocus: () => this.setState({ focus: i, focusKey: key }), selLine: on ? INK : x.line, selBg: on ? 'rgb(252 250 246)' : '#fff', selShadow: on ? '0 6px 16px rgb(51 36 27 / 0.12)' : 'none',
+          whoShort: x.who, mini: done ? x.dueV === 'On time' ? '✓' : x.dueV : isCur ? x.timeV : s.stages[i].sla + 'd', miniFg: done ? x.dueFg : isCur ? x.timeFg : MUTED }; }),
+      fc: { ...c, n: f + 1, panelLine: !s.done && f === s.cur ? c.line : 'rgb(236 231 224)' },
+      focusSecs, noFocusSecs: !focusSecs.length,
+      reqOpen: !!s.reqOpen, reqCaret: s.reqOpen ? '▲' : '▼', toggleReq: () => this.setState(p => ({ reqOpen: !p.reqOpen })),
+      reqPeek: s.reqOpen ? '' : 'Red Truck Roadshow, 21–23 Nov · bright and playful',
+      logShown: showAll ? log : log.slice(0, 3), logToggle: log.length > 3 ? (showAll ? 'Show less' : `Show all ${log.length}`) : '', toggleLog: () => this.setState(p => ({ logOpen: !p.logOpen })),
+    };
+  }
+  tableVals(sec, s, v, cur) {
+    const rs = (s.rows || {})[sec.id] || [], editStage = !s.done && s.lvl < 0 && cur.who === v ? cur.name : null;
+    const myCols = sec.cols.filter(c => c.stage === editStage), mine = myCols.length > 0;
+    const setCell = (ri, cid, val) => this.setState(p => { const all = { ...(p.rows || {}) }; all[sec.id] = all[sec.id].map((row, j) => j === ri ? { ...row, [cid]: val } : row); return { rows: all }; });
+    const cells = [];
+    rs.forEach((row, ri) => {
+      sec.cols.forEach(c => {
+        const can = c.stage === editStage, val = row[c.id], isCk = c.type === 'Checkbox', bad = can && s.missing && c.required && !val && !isCk;
+        cells.push({ isInput: can && !isCk, isCheck: can && isCk, isText: !can && !(isCk && val), isDel: false,
+          itype: c.type === 'Date' ? 'date' : c.type === 'Number' ? 'number' : 'text', value: val || '', ph: /File/.test(c.type) ? 'Paste link' : 'Type…', line: bad ? 'rgb(200 52 42)' : 'rgb(229 222 211)',
+          onChange: e => setCell(ri, c.id, e.target.value), onToggle: () => setCell(ri, c.id, !val), tick: val ? '✓' : '', boxBg: val ? INK : '#fff', boxLine: val ? INK : 'rgb(200 192 182)',
+          display: val ? (val === true ? '✓' : val) : '—', fg: val ? INK : 'rgb(190 180 170)', bg: can ? 'rgb(255 251 244)' : '#fff' });
+        if (isCk && val && !can) { const last = cells[cells.length - 1]; last.isText = true; last.display = '✓'; last.fg = GREEN; }
+      });
+      cells.push({ isDel: mine && !row._seed, isInput: false, isCheck: false, isText: false, bg: '#fff', onDel: () => this.setState(p => ({ rows: { ...p.rows, [sec.id]: p.rows[sec.id].filter((_, j) => j !== ri) } })) });
+    });
+    const owners = [...new Set(sec.cols.map(c => c.stage).filter(Boolean))];
+    const ac = this.state.addCol, adding = !!(ac && ac.sec === sec.id);
+    const setSecs = fn => this.setState(p => ({ secs: p.secs.map(x => x.id === sec.id ? fn(x) : x) }));
+    const commitCol = () => { const name = (ac && ac.draft || '').trim(); if (!name) return this.setState({ addCol: null }); setSecs(x => ({ ...x, cols: [...x.cols, { id: 'uc' + Date.now(), name, type: ac.type || 'Text', stage: editStage, required: false, pic: false, added: true }] })); this.setState({ addCol: null }); this.flash(`Column “${name}” added · only on this task`); };
+    const colExtra = { canAddCol: mine && !adding, addingCol: adding, colDraft: adding ? ac.draft : '', colType: adding ? ac.type : 'Text', colTypes: ['Text', 'Number', 'Date', 'Checkbox', 'File / link', 'Person'],
+      startCol: () => this.setState({ addCol: { sec: sec.id, draft: '', type: 'Text' } }), cancelCol: () => this.setState({ addCol: null }), commitCol,
+      onColDraft: e => this.setState({ addCol: { ...ac, draft: e.target.value } }), onColType: e => this.setState({ addCol: { ...ac, type: e.target.value } }),
+      onColKey: e => { if (e.key === 'Enter') commitCol(); else if (e.key === 'Escape') this.setState({ addCol: null }); } };
+    return { ...colExtra, isTable: true, mine, cols: sec.cols.map(c => ({ name: c.name, stage: c.stage || 'Any', req: c.required, stageFg: c.stage === editStage ? 'rgb(138 92 10)' : MUTED, canDel: mine && !!c.added, onDel: () => setSecs(x => ({ ...x, cols: x.cols.filter(y => y.id !== c.id) })) })),
+      grid: `repeat(${sec.cols.length}, minmax(120px,1fr)) 36px`, minW: sec.cols.length * 120 + 36, cells,
+      canAdd: mine, addRow: () => this.setState(p => ({ rows: { ...p.rows, [sec.id]: [...(p.rows[sec.id] || []), { _id: sec.id + 'r' + Date.now() }] } })),
+      tableNote: mine ? `${rs.length} row${rs.length === 1 ? '' : 's'} · you fill the highlighted columns` : `${rs.length} row${rs.length === 1 ? '' : 's'} · columns are filled at ${owners.join(', ')}`,
+      tState: owners.includes(cur.name) && !s.done ? `With ${(this.actors()[0] || '')}` : 'Read-only' };
+  }
+  renderVals() {
+    const s = this.state, wf = s.wf, now = this.now(), v = s.viewer, isMM = v === 'Rachel', isPic = v === 'Carmen';
+    const cur = s.stages[s.cur], act = this.actors(), pend = this.pending(), deadline = addWork(START, wf.promise || 10);
+    const proj = s.stages.map(x => x.due); let pd = cur.due || now; for (let i = s.cur + 1; i < s.stages.length; i++) { pd = addWork(pd < now ? now : pd, s.stages[i].sla); proj[i] = pd; }
+    const curLate = !s.done && late(now, cur.due), od = wf.overdue || DEFAULT_WF.overdue, escalate = curLate && curLate >= od.days;
+    const gatesOf = (x, done, isCur) => x.levels.map((l, j) => {
+      const active = isCur && s.lvl === j, passed = done || (isCur && s.lvl > j);
+      return { n: j + 1, rule: l.people.length > 1 ? (l.rule === 'all' ? ' · all' : ' · any') : '', bg: passed ? 'rgb(240 248 242)' : active ? 'rgb(251 243 225)' : '#fff', line: passed ? 'rgb(190 222 199)' : active ? 'rgb(236 214 164)' : 'rgb(236 231 224)',
+        people: l.people.map(p => { const ok = l.ok[p] || (passed && l.rule !== 'all'); return { t: (p === 'Carmen' ? '🔗 PIC' : p) + (l.ok[p] ? ' ✓' : active ? ' …' : ''), fg: l.ok[p] ? GREEN : active ? 'rgb(138 92 10)' : 'rgb(74 64 58)', weight: active && !l.ok[p] ? 600 : 400 }; }) };
+    });
+    const cards = s.stages.map((x, i) => {
+      const done = s.done || i < s.cur, isCur = !s.done && i === s.cur, rev = isCur && s.lvl >= 0;
+      let timeK, timeV, timeFg = INK, timeBg = 'rgb(250 248 244)', dueK, dueV, dueFg = INK, barPct = 0, barFill = 'rgb(90 62 43)';
+      if (done) { const l = late(x.end, x.due); timeK = 'Took'; timeV = dur(x.end - x.start); dueK = `Due ${fmtD(x.due)}`; dueV = l ? `${l}d late` : 'On time'; dueFg = l ? RED : GREEN; timeBg = 'rgb(246 250 247)'; }
+      else if (isCur) { const el = now - x.start, slaMs = x.due - x.start, l = late(now, x.due); timeK = rev ? 'Waiting approval' : 'In stage'; timeV = dur(el); barPct = Math.min(100, el / slaMs * 100); barFill = l ? 'rgb(200 52 42)' : el / slaMs > .75 ? 'rgb(214 152 30)' : 'rgb(90 62 43)'; timeFg = l ? RED : INK; dueK = 'Due'; dueV = `${fmtD(x.due)}${l ? ` · ${l}d overdue` : ''}`; dueFg = l ? RED : INK; timeBg = l ? 'rgb(252 236 233)' : 'rgb(251 243 225)'; }
+      else { timeK = 'Planned'; timeV = `${x.sla}d`; dueK = 'Expected by'; dueV = fmtD(proj[i]); }
+      const lateNow = isCur && late(now, x.due);
+      return { name: x.name, mark: done ? '✓' : String(i + 1), numBg: done ? 'rgb(232 244 235)' : isCur ? INK : 'rgb(246 244 240)', numFg: done ? GREEN : isCur ? '#fff' : INK,
+        who: x.who || `🔓 ${x.pickedBy} picks`, whoSub: x.who ? (PEOPLE[x.who] || [x.group])[0] : (x.cands || []).join(' / '), init: x.who ? x.who[0] : '?', av: x.who ? AVC[x.who] || 'rgb(236 231 224)' : '#fff', avStyle: x.who ? 'solid' : 'dashed',
+        isYou: x.who === v && !done, timeK, timeV, timeFg, timeBg, dueK, dueV, dueFg, hasBar: isCur, barPct, barFill,
+        hasAppr: x.levels.length > 0, gates: gatesOf(x, done, isCur),
+        line: isCur ? (lateNow ? 'rgb(200 52 42)' : 'rgb(236 155 85)') : done ? 'rgb(190 222 199)' : 'rgb(229 222 211)', lineStyle: done || isCur ? 'solid' : 'dashed',
+        shadow: isCur ? '0 6px 18px rgb(51 36 27 / 0.10)' : 'none', topBar: done ? 'rgb(60 150 90)' : isCur ? (lateNow ? 'rgb(200 52 42)' : '#EC9B55') : 'transparent',
+        canReassign: isMM && !done, onReassign: e => { e.stopPropagation(); this.setState({ modal: { kind: 'reassign', i } }); },
+        hasLink: i < s.stages.length - 1, linkColor: done ? 'rgb(60 150 90)' : 'rgb(214 206 196)' };
+    });
+    const after = (wf.end || DEFAULT_WF.end).after;
+    const status = s.done ? { t: after === 'feedback' ? 'Done · PIC feedback open 3 days' : 'Done', bg: 'rgb(232 244 235)', line: 'rgb(190 222 199)', fg: GREEN, dot: 'rgb(60 150 90)' } : curLate ? { t: `${curLate} day${curLate > 1 ? 's' : ''} overdue`, bg: 'rgb(252 236 233)', line: 'rgb(236 190 184)', fg: RED, dot: 'rgb(200 52 42)' } : s.lvl >= 0 ? { t: 'Waiting for approval', bg: 'rgb(251 243 225)', line: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' } : { t: 'On track', bg: 'rgb(232 244 235)', line: 'rgb(190 222 199)', fg: GREEN, dot: 'rgb(60 150 90)' };
+    const btn = (label, onClick, primary) => ({ label, onClick: e => { e.stopPropagation(); onClick(); }, bg: primary ? '#EC9B55' : '#fff', fg: 'rgb(43 31 23)', line: primary ? '#EC9B55' : 'rgb(229 222 211)' });
+    const nxSt = s.stages[s.cur + 1], miss = s.done ? [] : this.missingFor();
+    const nextLvl = s.done ? null : s.lvl < 0 ? cur.levels[0] : cur.levels[s.lvl + 1];
+    let next;
+    if (s.done) next = { title: 'Nothing left', sub: 'Every stage is done', init: '✓', av: 'rgb(232 244 235)', when: 'Sent when the last approval came in', msg: `Everyone on ${wf.action} was told it’s done.` };
+    else if (s.lvl >= 0 && pend.length && cur.levels[s.lvl].rule === 'all' && pend.length < cur.levels[s.lvl].people.length) next = { title: `Waiting for ${pend.map(nm).join(' & ')}`, sub: `Level ${s.lvl + 1} needs everyone`, init: pend[0][0], av: AVC[pend[0]], when: 'Already notified', msg: `“Please approve ${cur.name}.”` };
+    else if (nextLvl) { const p = nextLvl.people; next = { title: `${p.map(nm).join(nextLvl.rule === 'all' ? ' & ' : ' or ')} approve${p.length > 1 ? '' : 's'} ${cur.name}`, sub: `Level ${s.lvl + 2} of ${cur.levels.length}${p.length > 1 ? (nextLvl.rule === 'all' ? ' · all must approve' : ' · any one is enough') : ''}`, init: p[0] === 'Carmen' ? '🔗' : p[0][0], av: AVC[p[0]], when: `Sent the moment ${act.join(' / ')} ${s.lvl < 0 ? 'submits' : 'approves'}`, msg: `“Please approve ${cur.name} on ${wf.action}.”` }; }
+    else if (nxSt) { const p = nxSt.who; next = p ? { title: `${p} · ${nxSt.name}`, sub: `Stage ${s.cur + 2} · expected by ${fmtD(proj[s.cur + 1])}`, init: p[0], av: AVC[p], when: `Sent the moment ${act.join(' / ')} ${s.lvl >= 0 ? 'approves' : 'submits'}`, msg: `“Your turn — ${nxSt.name}, due ${fmtD(addWork(now, nxSt.sla))}.”` } : { title: `${nxSt.pickedBy} picks who does ${nxSt.name}`, sub: `From ${nxSt.cands.join(' / ')} · or Rachel assigns now`, init: '?', av: '#fff', when: `${nxSt.pickedBy} is asked when this stage is done`, msg: `The person picked gets “Your turn — ${nxSt.name}”.` }; }
+    else next = { title: '🏁 Task done', sub: 'This is the last stage', init: '🏁', av: 'rgb(232 244 235)', when: 'When this stage is approved', msg: 'Everyone on the task is told, and the celebration plays.' };
+    const myNext = s.stages.findIndex((x, i) => i > s.cur && (x.who === v || (!x.who && (x.cands || []).includes(v)) || x.levels.some(l => l.people.includes(v))));
+    const tone = { me: ['rgb(251 243 225)', 'rgb(236 214 164)'], late: ['rgb(252 236 233)', 'rgb(236 190 184)'], calm: ['rgb(250 248 244)', 'rgb(236 231 224)'], done: ['rgb(232 244 235)', 'rgb(190 222 199)'] };
+    const mk = (t, icon, title, text, actions = []) => ({ bg: tone[t][0], line: tone[t][1], icon, title, text, actions });
+    let banner;
+    if (s.done) banner = mk('done', '🎉', 'This task is done', `Finished ${fmtD(cur.end)}${late(cur.end, deadline) ? '' : `, before the ${fmtD(deadline)} deadline`}.${after === 'feedback' ? ' PIC can still comment for 3 working days.' : ''}`, [btn('Replay celebration', () => this.setState({ celeb: Date.now() }), true)]);
+    else if (pend.includes(v)) banner = mk('me', '👀', `Your approval · ${cur.name}`, `${cur.who} submitted it. ${cur.levels[s.lvl].people.length > 1 ? (cur.levels[s.lvl].rule === 'all' ? 'Everyone on this level must approve.' : 'Any one approval moves it on.') : 'Approve to move it on, or send it back.'}`, [btn('Request changes', () => this.changes(v)), btn('Approve', () => this.approve(v), true)]);
+    else if (s.lvl < 0 && cur.who === v) banner = mk(curLate ? 'late' : 'me', curLate ? '⏰' : '👉', `Your turn · ${cur.name}${curLate ? ` · ${curLate}d overdue` : ''}`, miss.length ? `Fill ${miss.length} required field${miss.length > 1 ? 's' : ''} below, then submit.` : `Everything required is filled. When you submit, ${nextLvl ? nextLvl.people.map(nm).join(' & ') + ' is notified to approve' : nxSt ? (nxSt.who ? nxSt.who + ' is notified to start ' + nxSt.name : 'you pick who does ' + nxSt.name) : 'the task is done'}.`, [btn(`Submit ${cur.name}`, () => this.submit(), true)]);
+    else if (isMM) banner = escalate && od.action === 'reassign' ? mk('late', '⏰', `${cur.name} is ${curLate}d overdue · reassign it?`, `It has been with ${act.join(' & ')} for ${dur(now - cur.start)}. Your overdue rule asks you to pick someone else.`, [btn(`🔔 Nudge`, () => { this.setState({ log: this.logs({ icon: '🔔', text: `Rachel nudged ${act.join(' & ')}` }) }); this.flash('Nudged'); }), btn('⇄ Reassign now', () => this.setState({ modal: { kind: 'reassign', i: s.cur } }), true)])
+      : mk(curLate ? 'late' : 'calm', '🧭', `You manage this task · now with ${act.join(' & ')}`, `${cur.name} has been there ${dur(now - cur.start)}${curLate ? `, ${curLate} day${curLate > 1 ? 's' : ''} past due` : ''}. Nudge, or reassign any stage that isn’t done.`, [btn('⇄ Reassign current', () => this.setState({ modal: { kind: 'reassign', i: s.cur } })), btn(`🔔 Nudge`, () => { this.setState({ log: this.logs({ icon: '🔔', text: `Rachel nudged ${act.join(' & ')} about ${cur.name}` }) }); this.flash('Nudged'); }, true)]);
+    else if (myNext > -1) { const x = s.stages[myNext], steps = myNext - s.cur; banner = mk('calm', '⏳', `You’re up ${steps === 1 ? 'next' : `in ${steps} stages`} · ${x.name}`, `Expected around ${fmtD(proj[myNext])}. You’ll get a notification when it’s your turn.`); }
+    else { const mine = s.stages.filter(x => x.who === v && x.end).map(x => x.name); banner = mk('calm', '✓', mine.length ? `You finished ${mine.join(' and ')}` : 'You’re not on this task', `It’s now at ${cur.name} with ${act.join(' & ')}. You’ll hear when it’s done.`); }
+    const idxOf = name => s.stages.findIndex(x => x.name === name);
+    const secs = s.secs.map(sec => {
+      const si = sec.stage ? idxOf(sec.stage) : -1, mineNow = !s.done && si === s.cur && s.lvl < 0 && cur.who === v;
+      const fields = sec.fields.map(f => {
+        const fi = f.stage ? idxOf(f.stage) : -1, editable = !s.done && fi === s.cur && s.lvl < 0 && cur.who === v, val = s.values[f.id];
+        const isCheck = f.type === 'Checkbox', empty = !val, bad = editable && s.missing && f.required && empty;
+        const set = x => this.setState(p => ({ values: { ...p.values, [f.id]: x } }));
+        return { name: f.name, req: f.required, editText: editable && !isCheck, editCheck: editable && isCheck, readOnly: !editable,
+          itype: f.type === 'Date' ? 'date' : f.type === 'Number' ? 'number' : 'text', value: val || '', ph: /File/.test(f.type) ? 'Paste a link or drop a file' : f.type === 'Person' ? 'Name' : 'Type here', line: bad ? 'rgb(200 52 42)' : 'rgb(229 222 211)',
+          onChange: e => set(e.target.value), onToggle: () => set(!val), tick: val ? '✓' : '', boxBg: val ? INK : '#fff', boxLine: val ? INK : 'rgb(200 192 182)', checkLabel: val ? 'Yes' : 'Not yet',
+          display: val ? (val === true ? '✓ Yes' : val) : fi < 0 ? '—' : `Filled at ${f.stage}`, roFg: val ? INK : 'rgb(160 150 140)' };
+      });
+      const filled = sec.fields.length && sec.fields.every(f => s.values[f.id] || !f.required);
+      const tv = sec.kind === 'table' ? this.tableVals(sec, s, v, cur) : { isTable: false };
+      return { ...tv, emoji: sec.emoji, title: sec.title, isReq: sec.kind === 'req', fields,
+        badges: [sec.stage && `🎯 ${sec.stage}`, sec.required && '⭐ Required', sec.pic && '👁 PIC sees'].filter(Boolean),
+        state: tv.mine ? 'Your turn · fill in' : sec.kind === 'table' ? tv.tState : mineNow ? 'Your turn · fill in' : si > -1 && (si < s.cur || s.done) ? (filled ? '✓ Done' : 'Done') : si === s.cur && !s.done ? `With ${act.join(' & ')}` : si > s.cur ? `Later · ${sec.stage}` : 'Read-only',
+        stateFg: tv.mine || mineNow ? 'rgb(138 92 10)' : sec.kind === 'table' ? MUTED : si > -1 && (si < s.cur || s.done) ? GREEN : MUTED,
+        line: mineNow || tv.mine ? 'rgb(236 155 85)' : 'rgb(236 231 224)', headBg: mineNow || tv.mine ? 'rgb(251 243 225)' : 'rgb(252 251 249)' };
+    });
+    const picPend = pend.includes('Carmen'), endCfg = wf.end || DEFAULT_WF.end;
+    const pic = {
+      ...(s.done ? { icon: '🎉', title: endCfg.picText || 'It’s ready', text: `Finished ${fmtD(cur.end)}.`, bg: 'rgb(232 244 235)', line: 'rgb(190 222 199)', actions: [] }
+        : picPend ? { icon: '👀', title: 'Your approval is needed', text: `${cur.picText}. Approve, or tell us what to change.`, bg: 'rgb(251 243 225)', line: 'rgb(236 214 164)', actions: [btn('Request changes', () => this.changes('Carmen')), btn('Approve', () => this.approve('Carmen'), true)] }
+        : { icon: '⏳', title: cur.picText, text: `Step ${s.cur + 1} of ${s.stages.length}. We’ll message you when it needs your approval.`, bg: '#fff', line: 'rgb(236 231 224)', actions: [] }),
+      steps: s.stages.map((x, i) => { const d = s.done || i < s.cur, c = !s.done && i === s.cur; return { name: x.name, bar: d ? 'rgb(60 150 90)' : c ? '#EC9B55' : 'rgb(236 231 224)', fg: c ? INK : MUTED, weight: c ? 600 : 400 }; }),
+      eta: s.done ? 'All steps done.' : `Expected by ${fmtD(proj[proj.length - 1])}`,
+      secs: s.secs.filter(x => x.pic).map(sec => ({ ...(sec.kind === 'table' ? (() => { const pc = sec.cols.filter(c => c.pic), rs = (s.rows || {})[sec.id] || []; return { isTable: true, grid: `repeat(${Math.max(1, pc.length)}, minmax(0,1fr))`, cols: pc.map(c => c.name), cells: rs.flatMap(row => pc.map(c => ({ t: row[c.id] ? (row[c.id] === true ? '✓' : row[c.id]) : 'Coming soon', fg: row[c.id] ? INK : 'rgb(160 150 140)' }))) }; })() : { isTable: false }), emoji: sec.emoji, title: sec.title, isReq: sec.kind === 'req', fields: sec.fields.filter(f => f.pic).map(f => { const val = s.values[f.id]; return { name: f.name, display: val ? (val === true ? '✓' : val) : 'Coming soon', fg: val ? INK : 'rgb(160 150 140)' }; }) })),
+    };
+    let modal = { open: false, people: [] };
+    if (s.modal) {
+      const st = s.stages[s.modal.i], pick = s.modal.kind === 'pick';
+      const list = pick ? st.cands : Object.keys(PEOPLE).filter(n => n !== 'Rachel');
+      modal = { open: true, title: pick ? `Who does ${st.name}?` : `Reassign Stage ${s.modal.i + 1} · ${st.name}`,
+        sub: pick ? 'You’re handing off. Pick from the shortlist Rachel set — they’re notified right away.' : `${st.who ? 'Now with ' + st.who + '. ' : ''}The new person is notified${st.who ? '; ' + st.who + ' is told it moved' : ''}.`,
+        people: list.map(n => ({ name: n, init: n[0], av: AVC[n], role: (PEOPLE[n] || [''])[0], load: (PEOPLE[n] || [0, 0])[1], loadFg: (PEOPLE[n] || [0, 0])[1] >= 5 ? RED : MUTED, tick: st.who === n ? '✓' : '', bg: st.who === n ? 'rgb(250 248 244)' : 'transparent', onClick: () => this.pick(s.modal.i, n, s.modal.kind) })) };
+    }
+    const names = [...new Set(s.stages.flatMap(x => [x.who, ...(x.cands || [])]).filter(Boolean))].filter(n => n !== 'Rachel').slice(0, 5);
+    const k = this.kind(), team = [...new Set(s.stages.map(x => x.who).filter(Boolean))]; let mineAct;
+    return {
+      stop: e => e.stopPropagation(), closeModal: () => this.setState({ modal: null }), isPic, notPic: !isPic,
+      title: `Red Truck · ${wf.action}`, tplChip: `${wf.action} · ${wf.tname} v${wf.ver || 1}`, reqText: `Make a ${wf.action.toLowerCase()} for the Red Truck Roadshow (21–23 Nov). Bright, playful, show the truck and the sofa range. Ends with the store address.`,
+      status, nowWith: s.done ? { name: '—', init: '✓', av: 'rgb(232 244 235)' } : { name: act.map(nm).join(' & ') + (s.lvl >= 0 ? ' (approving)' : ''), init: act[0] === 'Carmen' ? '🔗' : (act[0] || '?')[0], av: AVC[act[0]] || '#fff' },
+      inStage: s.done ? '—' : dur(now - cur.start), inStageFg: curLate ? RED : INK,
+      stageDue: s.done ? '—' : fmtD(cur.due) + (curLate ? ` · ${curLate}d overdue` : ''), stageDueFg: curLate ? RED : INK,
+      deadline: `${fmtD(deadline)}${!s.done && proj[proj.length - 1] > deadline ? ' · at risk' : ''}`, deadlineFg: !s.done && proj[proj.length - 1] > deadline ? RED : INK,
+      banner, cards, next, secs, pic, ...this.focusVals(s, cards, secs, v, myNext, mineAct = act), doneCount: s.done ? s.stages.length : s.cur, stageCount: s.stages.length, plannedDays: s.stages.reduce((a, x) => a + x.sla, 0),
+      log: s.log.map(l => ({ ...l, time: fmtT(l.at) })),
+      viewers: [...names, 'Rachel', 'Carmen'].map(n => { const on = v === n; return { label: n === 'Rachel' ? 'Rachel · MM' : n === 'Carmen' ? 'Carmen · PIC link' : n, init: n === 'Carmen' ? '🔗' : n[0], av: AVC[n] || 'rgb(236 231 224)', line: on ? INK : 'rgb(229 222 211)', bg: on ? INK : '#fff', fg: on ? '#fff' : INK, onClick: () => this.setState({ viewer: n, focus: null }) }; }),
+      jump: () => this.setState(p => ({ offset: p.offset + DAY }), () => this.checkOverdue()),
+      autoStep: () => { if (s.done) return this.flash('Already done'); if (s.lvl >= 0) { const a = pend[0]; this.setState({ viewer: a }); this.approve(a); } else { this.setState({ viewer: cur.who }); this.submit(true); } },
+      reset: () => this.setState({ ...build(this.props.workflow), offset: 0, modal: null, celeb: null }, () => this.checkOverdue()),
+      preview: e => { e.stopPropagation(); this.setState({ celeb: Date.now() }); }, celebIcon: CELEB[k] || '🎉',
+      modal,
+      hasCeleb: !!s.celeb, closeCeleb: () => this.setState({ celeb: null }), celebArt: s.celeb ? this.art(k, s.celeb) : null,
+      celebBg: k === 'movie' ? 'rgb(24 18 14 / 0.92)' : k === 'fireworks' ? 'rgb(28 22 40 / 0.9)' : 'rgb(255 252 246 / 0.94)',
+      celebInk: k === 'movie' || k === 'fireworks' ? '#fff' : INK, celebSub: k === 'movie' || k === 'fireworks' ? 'rgb(230 220 210)' : 'rgb(74 64 58)',
+      celebTitle: { fireworks: 'Shipped! 🎆', cheers: 'Cheers, team! 🍻', movie: 'Movie night unlocked 🎬', confetti: 'Done and dusted! 🎉', custom: 'Done! 🎉' }[k] || 'Done! 🎉',
+      celebText: `${wf.action} is done${s.done && cur.end ? ' · finished ' + fmtD(cur.end) : ''}. ${team.join(', ')} each get +60 XP.`,
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+  art(k, key) {
+    const h = React.createElement, rnd = (i, n) => (Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1, r = (i, n) => Math.abs(rnd(i, n));
+    const abs = (st, c, kk) => h('div', { key: kk, style: { position: 'absolute', ...st } }, c);
+    const kids = [];
+    if (k === 'custom') { const u = this.customUrl(); if (u) kids.push(h('img', { key: 'gif', src: u, style: { position: 'absolute', left: '50%', top: '10%', transform: 'translateX(-50%)', maxWidth: 'min(420px, 80%)', maxHeight: '44%', borderRadius: 14, boxShadow: '0 18px 48px rgb(51 36 27 / .25)', animation: 'celebIn .45s ease-out both' } })); return h('div', { key, style: { position: 'absolute', inset: 0, pointerEvents: 'none' } }, kids); }
+    if (k === 'fireworks') {
+      const cols = ['#EC9B55', 'oklch(0.78 0.15 350)', 'oklch(0.82 0.14 95)', 'oklch(0.75 0.13 235)', 'oklch(0.78 0.14 150)'];
+      [[22, 30, 0], [70, 22, 0.5], [48, 40, 1.0], [84, 44, 1.5], [14, 50, 1.9], [60, 18, 2.4]].forEach(([x, y, d], b) => {
+        kids.push(abs({ left: x + '%', top: '100%', width: 3, height: 14, borderRadius: 2, background: cols[b % 5], '--up': `-${100 - y}vh`, animation: `fwUp .55s ease-out ${d}s both` }, null, 'u' + b));
+        for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, R = 80 + r(i, b) * 50; kids.push(abs({ left: x + '%', top: y + '%', width: 6, height: 6, borderRadius: 3, background: cols[(b + i) % 5], boxShadow: `0 0 8px ${cols[(b + i) % 5]}`, '--dx': Math.cos(a) * R + 'px', '--dy': Math.sin(a) * R + 30 + 'px', animation: `fwBurst 1.3s cubic-bezier(.2,.7,.3,1) ${d + 0.5}s infinite` }, null, b + '-' + i)); }
+      });
+    } else if (k === 'confetti') {
+      const cols = ['#EC9B55', 'rgb(90 62 43)', 'oklch(0.78 0.14 350)', 'oklch(0.80 0.13 95)', 'oklch(0.72 0.12 235)', 'oklch(0.76 0.13 150)'];
+      for (let i = 0; i < 90; i++) kids.push(abs({ left: r(i, 1) * 100 + '%', top: 0, width: 7 + r(i, 2) * 6, height: 10 + r(i, 3) * 8, borderRadius: 2, background: cols[i % 6], '--fall': `${60 + r(i, 4) * 50}vh`, '--rot': `${360 + r(i, 5) * 720}deg`, animation: `cfFall ${1.8 + r(i, 6) * 1.6}s cubic-bezier(.3,.6,.5,1) ${r(i, 7) * 0.8}s both` }, null, i));
+      kids.push(abs({ left: '50%', top: '26%', transform: 'translateX(-50%)', fontSize: 96, animation: 'celebIn .5s ease-out both' }, '🎉', 'pop'));
+    } else if (k === 'cheers') {
+      kids.push(abs({ left: 'calc(50% - 120px)', top: '22%', fontSize: 110, animation: 'clinkL 1.6s ease-in-out infinite' }, '🍺', 'l'));
+      kids.push(abs({ left: 'calc(50% + 10px)', top: '22%', fontSize: 110, animation: 'clinkR 1.6s ease-in-out infinite' }, '🍺', 'r'));
+      kids.push(abs({ left: 'calc(50% - 16px)', top: '17%', fontSize: 34, animation: 'celebIn .3s ease-out .7s both' }, '✨', 's'));
+      for (let i = 0; i < 26; i++) kids.push(abs({ left: 30 + r(i, 1) * 40 + '%', top: '44%', width: 6 + r(i, 2) * 10, height: 6 + r(i, 2) * 10, borderRadius: '50%', border: '1.5px solid oklch(0.80 0.12 85)', background: 'oklch(0.95 0.06 90 / .5)', animation: `bubble ${1.6 + r(i, 3) * 1.4}s ease-out ${r(i, 4) * 2}s infinite` }, null, 'b' + i));
+    } else {
+      kids.push(abs({ left: '50%', top: 0, width: 520, height: '62%', transform: 'translateX(-50%)', background: 'radial-gradient(ellipse at top, rgb(255 236 200 / .35), transparent 70%)', animation: 'beam 2.4s ease-in-out infinite' }, null, 'beam'));
+      kids.push(abs({ left: 'calc(50% - 60px)', top: '16%', fontSize: 110, transformOrigin: '20% 30%', animation: 'clap .9s ease-in-out 3' }, '🎬', 'clap'));
+      for (let i = 0; i < 40; i++) kids.push(abs({ left: r(i, 1) * 100 + '%', top: 0, fontSize: 18 + r(i, 2) * 14, '--fall': `${70 + r(i, 3) * 30}vh`, '--rot': `${r(i, 4) * 360}deg`, animation: `cfFall ${2.2 + r(i, 5) * 1.5}s ease-in ${0.6 + r(i, 6) * 1.6}s both` }, '🍿', 'p' + i));
+    }
+    return h('div', { key, style: { position: 'absolute', inset: 0, pointerEvents: 'none' } }, kids);
+  }
+}
+</script>
+</body>
+</html>

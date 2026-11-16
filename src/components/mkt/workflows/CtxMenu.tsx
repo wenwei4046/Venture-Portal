@@ -12,6 +12,8 @@ export interface CtxItem {
   disabled?: boolean
   /** A line above it (the destructive item). */
   sep?: boolean
+  /** A look of its own on top (Projects' armed *Click to confirm*). */
+  className?: string
 }
 
 export default function CtxMenu({ x, y, title, items }: { x: number; y: number; title: string; items: CtxItem[] }) {
@@ -24,7 +26,7 @@ export default function CtxMenu({ x, y, title, items }: { x: number; y: number; 
           type="button"
           role="menuitem"
           disabled={m.disabled}
-          className={`${w.ctxItem}${m.red ? ` ${w.ctxRed}` : ''}${m.sep ? ` ${w.ctxSep}` : ''}`}
+          className={`${w.ctxItem}${m.red ? ` ${w.ctxRed}` : ''}${m.sep ? ` ${w.ctxSep}` : ''}${m.className ? ` ${m.className}` : ''}`}
           onClick={m.onClick}
         >
           <span className={w.ctxIcon}>{m.icon}</span>

@@ -3,7 +3,18 @@
 
 @keyframes ctIn { 0% { transform: translateY(4px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 
+.wrap { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .page { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 100%; color: rgb(var(--mk-ink)); flex: 1; }
+
+/* "Who fills what" (the 2026-11-17 handoff §1.6): a pill per stage under the builder's header. */
+.strip { display: flex; align-items: center; gap: 8px; padding: 10px 24px; border-bottom: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-cell-hover)); flex-wrap: wrap; color: rgb(var(--mk-ink)); }
+.stripLabel { font-size: .72em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); margin-right: 4px; cursor: default; }
+.stripPill { height: 26px; padding: 0 9px; border-radius: 999px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex; align-items: center; gap: 6px; font: inherit; font-size: .84em; color: inherit; cursor: pointer; white-space: nowrap; }
+.stripPill:hover { border-color: rgb(var(--mk-hover-line)); }
+.stripDot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: oklch(0.62 0.11 var(--g-h, 60)); }
+.stripDotNone { background: rgb(var(--mk-dash)); }
+.stripCount { font-family: var(--mk-mono); font-size: 11px; color: rgb(var(--mk-muted)); }
+.stripZero { color: rgb(var(--mk-red-dot)); }
 .main { padding: 22px 28px 60px; min-width: 0; }
 .grow { flex: 1; }
 .muted { color: rgb(var(--mk-faint-2)); font-size: .8em; white-space: nowrap; }
@@ -16,11 +27,14 @@
 .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .title { font-size: 1.35em; font-weight: 600; }
 .ver { font-family: var(--mk-mono); font-size: 11px; padding: 2px 7px; border-radius: 5px; border: 1px solid rgb(var(--mk-line)); }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; padding: 8px 12px; border-radius: 8px; background: rgb(var(--mk-surface)); font-size: .82em; color: rgb(var(--mk-text-2)); }
+/* One faint line of icons; their words on hover (the user, 2026-11-13). */
+.legend { display: flex; align-items: center; gap: 4px; font-size: .8em; color: rgb(var(--mk-faint)); white-space: nowrap; }
+.legendItem { display: inline-flex; align-items: center; gap: 4px; }
 .legendKey { cursor: default; border-radius: 4px; padding: 0 2px; }
 
-.sections { display: flex; flex-direction: column; gap: 18px; margin-top: 22px; }
-.card { position: relative; border-radius: 12px; border: 1.5px solid rgb(var(--mk-line-2)); padding: 14px 16px; background: rgb(var(--mk-white)); transition: border-color .15s; }
+.sections { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+.card { position: relative; border-radius: 12px; border: 1.5px solid rgb(var(--mk-line-2)); padding: 12px 14px; background: rgb(var(--mk-white)); transition: border-color .15s, background-color .4s; scroll-margin-top: 16px; }
+.cardHit { background: rgb(var(--mk-wait-bg)); }
 .card:hover { border-color: rgb(var(--mk-field-hover)); }
 .cardOn, .cardOn:hover { border-color: rgb(var(--mk-brown)); }
 .cardHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -29,8 +43,11 @@
 .cardTitle { font-size: 1.15em; font-weight: 600; }
 .cardTitleInput { flex: 0 1 auto; field-sizing: content; min-width: 60px; max-width: 46%; height: 30px; box-sizing: border-box; border: 1px solid transparent; border-radius: 7px; padding: 0 6px; font: inherit; font-size: 1.15em; font-weight: 600; color: inherit; background: transparent; outline: none; }
 .cardTitleInput:hover, .cardTitleInput:focus { border-color: rgb(var(--mk-line)); background: rgb(var(--mk-white)); }
-.badge { font-size: .74em; padding: 2px 7px; border-radius: 6px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); border: 1px solid rgb(var(--mk-line-2)); white-space: nowrap; }
-.gear { height: 26px; padding: 0 9px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex; align-items: center; gap: 5px; font: inherit; font-size: .82em; cursor: pointer; white-space: nowrap; color: inherit; }
+/* The owning stage, dark; the other marks icons only, their words in the tooltip. */
+.stagePill { height: 22px; padding: 0 8px; border-radius: 999px; background: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); display: flex; align-items: center; gap: 5px; font-size: .76em; font-weight: 500; white-space: nowrap; }
+.stagePillGone { background: rgb(var(--mk-red)); }
+.mark { font-size: 11px; white-space: nowrap; cursor: default; }
+.gear { height: 26px; width: 26px; padding: 0; justify-content: center; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex; align-items: center; font: inherit; font-size: .82em; cursor: pointer; white-space: nowrap; color: inherit; flex: none; }
 .gear:hover, .gearOn { background: rgb(var(--mk-surface-2)); }
 .cardRemove { height: 26px; padding: 0 6px; font: inherit; font-size: .82em; color: rgb(var(--mk-red)); background: none; border: 0; cursor: pointer; white-space: nowrap; }
 .cardRemove:hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -43,22 +60,26 @@
 .iconOpt { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 17px; cursor: pointer; border: 0; background: transparent; padding: 0; }
 .iconOpt:hover { background: rgb(var(--mk-hover)); }
 
-.fields { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.fieldWrap { position: relative; display: flex; flex-direction: column; gap: 6px; }
-.field { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; border: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); cursor: pointer; font: inherit; color: inherit; text-align: left; width: 100%; }
-.field:hover { border-color: rgb(var(--mk-handle)); }
-.fieldOn, .fieldOn:hover { border-color: rgb(var(--mk-brown)); background: rgb(var(--mk-surface)); }
+/* A flat list of fields, 1px separators (the 2026-11-17 handoff §1.6). */
+.fields { display: flex; flex-direction: column; margin-top: 8px; border-top: 1px solid rgb(var(--mk-line-4)); }
+.fieldWrap { position: relative; display: flex; flex-direction: column; }
+.field { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border: 0; border-bottom: 1px solid rgb(var(--mk-line-4)); border-radius: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; text-align: left; width: 100%; }
+.field:hover { background: rgb(var(--mk-surface)); }
+.fieldOn, .fieldOn:hover { background: rgb(var(--mk-surface)); box-shadow: inset 2px 0 0 rgb(var(--mk-brown)); }
 .fieldNote { background: rgb(var(--mk-note-bg)); }
-.fieldName { font-size: .92em; font-weight: 500; }
+.fieldName { font-size: .92em; font-weight: 500; white-space: nowrap; flex: none; }
 .noteText { font-size: .88em; font-style: italic; color: rgb(var(--mk-brown)); flex: 1; min-width: 0; }
-.flags { font-size: .78em; color: rgb(var(--mk-text-3)); white-space: pre; }
-.flagsWarn { color: rgb(var(--mk-red)); }
+/* 🎯 only when the field's stage is not its section's: amber; a stage gone, red. */
+.fieldStage { height: 20px; padding: 0 7px; border-radius: 999px; background: rgb(var(--mk-wait-bg)); border: 1px solid rgb(var(--mk-wait-line)); color: rgb(var(--mk-warn-ink)); display: flex; align-items: center; font-size: .76em; white-space: nowrap; }
+.fieldStageWarn { background: rgb(var(--mk-red-bg)); border-color: rgb(var(--mk-red-line)); color: rgb(var(--mk-red)); }
+.flag { width: 16px; flex: none; text-align: center; font-size: 11px; }
+.flagOff { opacity: 0; }
 .addField { align-self: flex-start; padding: 6px 4px; font: inherit; font-size: .86em; font-weight: 500; color: rgb(var(--mk-brown)); background: none; border: 0; cursor: pointer; }
 .addField:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 2px; }
 .addField:disabled { opacity: .4; cursor: not-allowed; }
 
 /* A table field: its columns (each with its stage) and the grid as the team meets it. */
-.colStrip { margin: -2px 0 0 28px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 10px; overflow-x: auto; }
+.colStrip { margin: 4px 0 6px 28px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 10px; overflow-x: auto; }
 .colRow { display: flex; min-width: max-content; }
 .col { width: 132px; flex: none; padding: 8px 10px; box-sizing: border-box; border: 0; border-right: 1px solid rgb(var(--mk-line-3)); background: rgb(var(--mk-white)); cursor: pointer; display: flex; flex-direction: column; gap: 5px; box-shadow: none; font: inherit; color: inherit; text-align: left; }
 .col:hover { background: rgb(var(--mk-surface-2)); }
@@ -93,10 +114,10 @@
 .addSection { height: 42px; border-radius: 12px; border: 1.5px dashed rgb(var(--mk-field-hover)); display: flex; align-items: center; justify-content: center; color: rgb(var(--mk-muted)); cursor: pointer; font: inherit; font-size: .92em; background: transparent; }
 .addSection:hover:not(:disabled) { background: rgb(var(--mk-surface)); color: rgb(var(--mk-ink)); }
 .addSection:disabled { opacity: .45; cursor: not-allowed; }
-.free { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px; border-radius: 12px; border: 1.5px dashed rgb(var(--mk-field-hover)); background: repeating-linear-gradient(135deg, rgb(var(--mk-surface)) 0 10px, rgb(var(--mk-cv-stripe)) 10px 20px); text-align: center; }
-.freeTop { display: flex; align-items: center; gap: 12px; width: 100%; }
-.freeRule { flex: 1; height: 1px; background: rgb(var(--mk-field-hover)); }
-.freeLabel { font-size: .78em; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: rgb(var(--mk-muted)); }
+/* The Free space: one dashed divider (the 2026-11-17 handoff §1.6). */
+.free { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.freeRule { flex: 1; height: 0; border-top: 1.5px dashed rgb(var(--mk-field-hover)); }
+.freeLabel { font-size: .78em; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: rgb(var(--mk-faint)); white-space: nowrap; cursor: default; }
 
 /* The settings panels. */
 .pop { position: absolute; top: calc(100% + 4px); right: 12px; z-index: 25; width: 330px; max-width: calc(100% - 24px); box-sizing: border-box; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line)); border-radius: 12px; box-shadow: var(--mk-shadow-menu); padding: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; animation: ctIn .12s ease-out; }
@@ -164,13 +185,12 @@
 .segBtn { height: 26px; padding: 0 10px; border-radius: 6px; display: flex; align-items: center; cursor: pointer; background: transparent; border: 0; font: inherit; font-size: 12px; white-space: nowrap; color: inherit; }
 .segOn { background: rgb(var(--mk-white)); box-shadow: var(--mk-shadow-seg); font-weight: 600; }
 .pvCard { margin-top: 12px; background: rgb(var(--mk-white)); border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; min-height: 380px; }
-.pvWho { font-size: 11px; color: rgb(var(--mk-muted)); }
-.pvSelect { height: 22px; border: 1px solid rgb(var(--mk-line)); border-radius: 5px; font: inherit; font-weight: 600; color: rgb(var(--mk-ink)); background: rgb(var(--mk-white)); max-width: 150px; }
+.pvWho { display: flex; align-items: center; gap: 8px; font-size: 11px; color: rgb(var(--mk-muted)); }
+.pvSelect { flex: 1; min-width: 0; height: 28px; border: 1px solid rgb(var(--mk-line)); border-radius: 7px; padding: 0 6px; font: inherit; font-size: 12px; color: rgb(var(--mk-ink)); background: rgb(var(--mk-white)); outline: none; }
 .pvSec { display: flex; flex-direction: column; gap: 6px; }
 .pvFaded { opacity: .55; }
 .pvSecHead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pvSecTitle { font-weight: 600; font-size: 13px; }
-.pvBadge { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-text-3)); }
 .pvCols { display: flex; flex-wrap: wrap; gap: 3px; }
 .pvCol { font-size: 10.5px; padding: 2px 6px; border-radius: 4px; background: rgb(var(--mk-cv-col-off)); color: rgb(var(--mk-cv-col-off-ink)); }
 .pvColMine { background: rgb(var(--mk-brown)); color: rgb(var(--mk-cream)); }

@@ -1,0 +1,139 @@
+/* Projects as a Drive (2026-11-17 — docs/design_handoff_workflow_projects/ › 2; Projects v2.dc.html). */
+
+.root { position: absolute; inset: 0; display: flex; color: rgb(var(--mk-ink-2)); }
+.col { flex: 1; min-width: 0; padding: 28px 32px 48px; overflow: auto; box-sizing: border-box; }
+
+/* The head row. */
+.head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; flex-wrap: wrap; }
+.crumb {
+  font: inherit; font-size: 1.6em; font-weight: 600; letter-spacing: -.01em; color: rgb(var(--mk-ink)); padding: 2px 8px;
+  border-radius: 8px; background: none; border: 0; white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis;
+}
+button.crumb { color: rgb(var(--mk-muted)); cursor: pointer; }
+button.crumb:hover { background: rgb(var(--mk-hover)); }
+.sep { font-size: 1.3em; color: rgb(var(--mk-faint)); padding: 0 2px; }
+.grow { flex: 1; }
+.search { width: 240px; }
+.views { display: flex; gap: 2px; padding: 3px; background: rgb(var(--mk-surface-3)); border-radius: 8px; }
+.viewBtn {
+  width: 32px; height: 28px; border-radius: 6px; border: 0; background: none; cursor: pointer; font-size: 13px;
+  color: rgb(var(--mk-muted)); display: grid; place-items: center;
+}
+.viewOn { background: rgb(var(--mk-white)); box-shadow: var(--mk-shadow-seg); color: rgb(var(--mk-ink)); }
+
+.label {
+  font-size: .78em; font-weight: 500; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted));
+  margin: 18px 0 10px;
+}
+
+/* Folders. */
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.folder {
+  position: relative; height: 56px; box-sizing: border-box; border-radius: 12px; border: 1.5px solid rgb(var(--mk-line-2));
+  background: rgb(var(--mk-white)); display: flex; align-items: center; gap: 10px; padding: 0 10px; cursor: pointer;
+  text-align: left; font: inherit; color: inherit; min-width: 0;
+}
+.folder:hover { border-color: rgb(var(--mk-field-hover)); }
+.folderOn { border-color: rgb(var(--mk-ink)); box-shadow: var(--mk-wb-shadow-card); }
+.tile {
+  position: relative; width: 36px; height: 36px; border-radius: 9px; background: rgb(var(--mk-tone-sand)); flex: none;
+  display: grid; place-items: center; font-size: 17px;
+}
+.tileDot {
+  position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(var(--mk-white));
+}
+.folderText { min-width: 0; flex: 1; }
+.folderName { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { font-size: .8em; color: rgb(var(--mk-faint)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.late {
+  flex: none; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 999px;
+  background: rgb(var(--mk-red-dot)); color: rgb(var(--mk-white)); font-size: 11px; font-weight: 600; display: grid; place-items: center;
+}
+
+/* Files (grid). */
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.card {
+  position: relative; border-radius: 12px; border: 1.5px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white));
+  cursor: pointer; min-width: 0; text-align: left; font: inherit; color: inherit; padding: 0; display: block;
+}
+.card:hover { border-color: rgb(var(--mk-field-hover)); }
+.cardOn { border-color: rgb(var(--mk-ink)); box-shadow: var(--mk-wb-shadow-card); }
+.preview {
+  margin: 6px; height: 112px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: repeating-linear-gradient(135deg, rgb(var(--mk-surface)) 0 10px, rgb(var(--mk-cv-stripe)) 10px 20px);
+}
+.previewEmoji { font-size: 22px; }
+.previewKind { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-muted)); }
+.body { padding: 10px 12px 12px; }
+.cardTitle { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-muted)); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cardFoot { display: flex; align-items: center; gap: 8px; margin-top: 8px; min-width: 0; }
+.whoDue { margin-left: auto; font-size: .8em; color: rgb(var(--mk-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* The hover ✕ (and its armed "Delete?"). */
+.x {
+  position: absolute; top: 8px; right: 8px; z-index: 2; height: 24px; min-width: 24px; padding: 0; box-sizing: border-box;
+  border-radius: 999px; border: 1px solid rgb(var(--mk-line-2)); background: rgb(var(--mk-white)); color: rgb(var(--mk-muted));
+  font: inherit; font-size: 12px; cursor: pointer; display: none; align-items: center; justify-content: center;
+}
+.folder .x { top: 50%; transform: translateY(-50%); }
+.card:hover .x, .folder:hover .x, .cardOn .x, .folderOn .x, .x.armed, .trow:hover .x, .trowOn .x { display: flex; }
+.x:hover { color: rgb(var(--mk-red)); border-color: rgb(var(--mk-red-line)); }
+.x.armed { padding: 0 9px; background: rgb(var(--mk-wb-del)); border-color: rgb(var(--mk-wb-del)); color: rgb(var(--mk-white)); font-weight: 600; }
+.trow .x { position: static; }
+
+/* List view. */
+.trowOn { background: rgb(var(--mk-cv-open)); }
+.trowOn:hover { background: rgb(var(--mk-cv-open)); }
+.icon28 { width: 28px; height: 28px; border-radius: 7px; background: rgb(var(--mk-tone-sand)); display: grid; place-items: center; font-size: 13px; flex: none; }
+.nameCell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.delCell { display: flex; justify-content: flex-end; }
+
+/* Empty. */
+.emptyBox { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 16px; gap: 6px; }
+.emptyIcon { width: 64px; height: 64px; border-radius: 50%; background: rgb(var(--mk-surface)); display: grid; place-items: center; font-size: 28px; margin-bottom: 6px; }
+.emptyTitle { font-weight: 600; color: rgb(var(--mk-ink)); }
+.emptyText { font-size: .9em; color: rgb(var(--mk-muted)); max-width: 320px; }
+
+/* The details pane. */
+.pane {
+  width: 300px; flex: none; box-sizing: border-box; background: rgb(var(--mk-cv-pane)); border-left: 1px solid rgb(var(--mk-line-2));
+  padding: 20px 18px; overflow-x: hidden; overflow-y: auto;
+}
+.paneHead { display: flex; align-items: flex-start; gap: 10px; }
+.icon32 { width: 32px; height: 32px; border-radius: 8px; background: rgb(var(--mk-tone-sand)); display: grid; place-items: center; font-size: 15px; flex: none; }
+.paneTitle { font-weight: 600; color: rgb(var(--mk-ink)); overflow-wrap: anywhere; }
+.close {
+  margin-left: auto; width: 24px; height: 24px; border-radius: 6px; border: 0; background: none; cursor: pointer;
+  color: rgb(var(--mk-muted)); font-size: 16px; flex: none;
+}
+.close:hover { background: rgb(var(--mk-hover)); }
+.paneStatus { margin: 12px 0 10px; display: flex; }
+.facts { border-top: 1px solid rgb(var(--mk-line-4)); }
+.fact { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; padding: 9px 0; border-bottom: 1px solid rgb(var(--mk-line-4)); font-size: .9em; }
+.factKey { color: rgb(var(--mk-muted)); }
+.factVal { color: rgb(var(--mk-ink)); overflow-wrap: anywhere; }
+.openBtn {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 36px; margin-top: 16px; border-radius: 8px; border: 0;
+  background: var(--mk-primary); color: rgb(var(--mk-ink-2)); font: inherit; font-weight: 500; cursor: pointer; text-decoration: none;
+}
+.openBtn:hover { background: var(--mk-primary-hover); }
+.delBtn {
+  width: 100%; height: 34px; margin-top: 8px; border-radius: 8px; border: 1px solid rgb(var(--mk-red-line)); background: rgb(var(--mk-white));
+  color: rgb(var(--mk-red)); font: inherit; font-weight: 500; cursor: pointer;
+}
+.delBtn.armed { background: rgb(var(--mk-wb-del)); border-color: rgb(var(--mk-wb-del)); color: rgb(var(--mk-white)); }
+.delBtn:disabled { opacity: .6; cursor: default; }
+.note { font-size: .8em; color: rgb(var(--mk-muted)); text-align: center; margin-top: 10px; }
+
+/* The right-click menu's armed delete (CtxMenu's item, a look of its own). */
+.ctxArmed { background: rgb(var(--mk-wb-del)); color: rgb(var(--mk-white)); }
+.ctxArmed:hover { background: rgb(var(--mk-wb-del)); }
+
+@media (max-width: 900px) {
+  .col { padding: 20px 16px 40px; }
+  .search { width: 100%; }
+  .pane { position: absolute; right: 0; top: 0; bottom: 0; z-index: 20; box-shadow: var(--mk-shadow-drawer); }
+}
