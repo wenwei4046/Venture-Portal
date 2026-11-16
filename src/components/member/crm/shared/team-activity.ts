@@ -85,6 +85,12 @@ const COLS = "240px repeat(5,minmax(0,1fr))";
 /** v4 8e: the figure strip's Waiting number when any wait is late (on espresso). */
 export const STRIP_LATE = "var(--crm-strip-late)";
 
+/**
+ * Where a lead came from, for its row (the owner, 2026-11-16, of Team activity's leads under a person: "增加广告来源"):
+ * the ad's name as everywhere else (crm_ad_names, else Meta's), or "WhatsApp · no ad" as Ads Performance names those.
+ */
+export const leadSource = (c: Pick<CrmCustomer, "ad" | "adId" | "channel">) =>
+  c.ad || `${c.channel === "messenger" ? "Messenger" : "WhatsApp"} · no ad`;
 /** One lead got: a stint of one customer with one person. */
 export interface Stint {
   key: string; who: string; customer: CrmCustomer; got: string; gotAt: string; by: string | null; from: string | null;
@@ -178,7 +184,7 @@ export function activityVM(x: ActivityIn) {
         const turn = book.turn(id, nowStamp), on = turn.on, open = !!st[openKey][id] || st.who === id, wl = LV(s.waitMax);
         const list = (byWho.get(id) ?? []).slice().reverse().map(l => {
           const w = waitOf(l), status = statusOf(l), SS = ST[status];
-          return { key: l.key, repT: w == null ? fmt(l.reply) : "", waitT: w != null ? fmt(w) : "", got: hm(l.got), gotD: dm(l.got), name: l.customer.name,
+          return { key: l.key, repT: w == null ? fmt(l.reply) : "", waitT: w != null ? fmt(w) : "", got: hm(l.got), gotD: dm(l.got), name: l.customer.name, ad: leadSource(l.customer),
             reply: w != null ? `waiting ${fmt(w)}` : `${fmt(l.reply)} reply`, rc: w != null ? (LV(w)[0] ? LV(w)[1] : "var(--crm-leave-annual-text)") : C.ink,
             go: () => set({ [leadKey]: { id, key: l.key } }), bg: sel && sel.key === l.key ? C.field : "transparent",
             status: w != null ? "" : status, sFg: SS[1] };

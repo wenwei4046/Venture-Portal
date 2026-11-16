@@ -81,7 +81,11 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
           {r.list.map(l => (
             <div key={l.key} {...press(l.go)} style={{ display: "grid", gridTemplateColumns: "42px minmax(0,1fr) auto", columnGap: "10px", alignItems: "center", minHeight: "44px", padding: "0 8px", margin: "0 -8px", borderRadius: "10px", cursor: "pointer", background: l.bg }}>
               <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.15, font: `600 ${fs(12)} ${TIGHT}`, color: "var(--crm-list-sub)" }}><span style={{ font: `500 ${fs(10.5)} ${INTER}`, color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{l.gotD}</span>{l.got}</span>
-              <span style={{ fontSize: fs(13.5), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+              {/* The name, the ad it came from under it (2026-11-16: "增加广告来源"). */}
+              <span style={{ display: "flex", flexDirection: "column", minWidth: 0, lineHeight: 1.2 }}>
+                <span style={{ fontSize: fs(13.5), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+                <span data-act-lead-ad="" style={{ fontSize: fs(11), color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.ad}</span>
+              </span>
               <span style={{ fontSize: fs(12.5), fontWeight: 600, whiteSpace: "nowrap", color: l.rc }}>{l.reply}</span>
             </div>
           ))}

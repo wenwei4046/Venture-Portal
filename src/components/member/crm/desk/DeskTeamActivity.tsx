@@ -123,8 +123,11 @@ export function DeskTeamActivityView({ v, inInsight = true }: { v: ActivityVM; i
             return (
               <div key={l.key} {...press(l.go)} data-act-lead={l.key} style={grid("36px", { font: `400 13.5px ${INTER}`, fontVariantNumeric: "tabular-nums", cursor: "pointer" })}>
                 <span style={{ paddingLeft: "23px", minWidth: 0, fontWeight: sel ? 600 : 500, color: sel ? "var(--crm-rust)" : "var(--crm-ink)", ...CLIP }}>{l.name}</span>
-                <span style={{ paddingLeft: "15px", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{today ? hm(l.got) : `${l.gotD}, ${hm(l.got)}`}</span>
-                <span />
+                {/* When, then the ad it came from (2026-11-16: "增加广告来源"), over the Team and Leads columns, cut with … */}
+                <span title={l.ad} style={{ gridColumn: "span 2", paddingLeft: "15px", minWidth: 0, display: "flex", gap: "8px", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>
+                  <span style={{ flex: "none" }}>{today ? hm(l.got) : `${l.gotD}, ${hm(l.got)}`}</span>
+                  <span data-act-lead-ad="" style={{ minWidth: 0, color: "var(--crm-muted)", ...CLIP }}>{l.ad}</span>
+                </span>
                 <span style={{ textAlign: "right", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{l.repT}</span>
                 <span style={{ textAlign: "center", fontWeight: 600, whiteSpace: "nowrap", color: l.rc }}>{l.waitT}</span>
                 <span style={{ gridColumn: "span 2", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "7px", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>

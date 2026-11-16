@@ -32,4 +32,10 @@ describe("Team activity by ad", () => {
     expect(vm("AD1").tiles.find(t => t.k === "Leads")?.v).toBe("2");
     expect(leads(vm("none"))).toMatchObject({ "Chea Huan": 1, Alvin: 0 });
   });
+  // 2026-11-16 (the owner, of the leads under a person: "增加广告来源"): each lead says the ad it came from.
+  it("names each lead's ad, or its channel with no ad", () => {
+    const list = (who: string) => vm().groups.flatMap(g => g.rows).find(r => r.name === who)!.list.map(l => [l.name, l.ad]);
+    expect(list("Chea Huan").sort()).toEqual([["Cust 1", "Skyline"], ["Cust 4", "WhatsApp · no ad"]]);
+    expect(list("Alvin").sort()).toEqual([["Cust 2", "Astrum"], ["Cust 3", "Skyline"]]);
+  });
 });
