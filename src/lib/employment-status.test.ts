@@ -164,7 +164,8 @@ describe('the chip an active person wears', () => {
   it('names the status — and Active for a reader not shown it', () => {
     expect(statusChip({ status: 'permanent' }, today)).toEqual({ label: 'Permanent', tone: 'ledger' })
     expect(statusChip({ status: 'part_time' }, today)).toEqual({ label: 'Part time', tone: 'info' })
-    expect(statusChip({ status: null }, today)).toMatchObject({ label: NOT_SET, tone: 'plain', title: 'Employment status not set — Probation, Contract, Permanent or Part time, on their page' })
+    expect(statusChip({ status: 'intern' }, today)).toEqual({ label: 'Intern', tone: 'run' })
+    expect(statusChip({ status: null }, today)).toMatchObject({ label: NOT_SET, tone: 'plain', title: 'Employment status not set — Probation, Contract, Permanent, Part time or Intern, on their page' })
     expect(statusChip({ status: undefined }, today)).toEqual({ label: 'Active', tone: 'ledger' })
   })
 
@@ -197,6 +198,7 @@ describe('what a form sends', () => {
   it('a status, and a period only for a probation or a contract — the other’s cleared', () => {
     expect(statusColumns('permanent', '3', '12')).toEqual({ employment_status: 'permanent', probation_months: null, contract_months: null })
     expect(statusColumns('part_time', undefined, undefined)).toEqual({ employment_status: 'part_time', probation_months: null, contract_months: null })
+    expect(statusColumns('intern', '3', '12')).toEqual({ employment_status: 'intern', probation_months: null, contract_months: null })
     expect(statusColumns('probation', '3', '12')).toEqual({ employment_status: 'probation', probation_months: 3, contract_months: null })
     expect(statusColumns(' probation ', 6, null)).toEqual({ employment_status: 'probation', probation_months: 6, contract_months: null })
     expect(statusColumns('contract', '3', '12')).toEqual({ employment_status: 'contract', probation_months: null, contract_months: 12 })
@@ -204,7 +206,7 @@ describe('what a form sends', () => {
   })
 
   it('refuses in words', () => {
-    expect(() => statusColumns('', '3', null)).toThrow('Pick the employment status — Probation, Contract, Permanent or Part time.')
+    expect(() => statusColumns('', '3', null)).toThrow('Pick the employment status — Probation, Contract, Permanent, Part time or Intern.')
     expect(() => statusColumns('freelance', '3', null)).toThrow('Pick the employment status')
     expect(() => statusColumns('probation', '', '12')).toThrow('Pick the probation period.')
     expect(() => statusColumns('probation', '25', null)).toThrow('Pick the probation period.')
@@ -214,10 +216,10 @@ describe('what a form sends', () => {
     expect(() => statusColumns('contract', null, 0)).toThrow('Pick the contract period.')
   })
 
-  it('knows the four the database allows', () => {
-    expect(EMPLOYMENT_STATUSES).toEqual(['probation', 'contract', 'permanent', 'part_time'])
-    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261025013000_people_contract_status.sql'), 'utf8')
-    expect(sql).toContain("employment_status IN ('probation', 'contract', 'permanent', 'part_time')")
+  it('knows the five the database allows', () => {
+    expect(EMPLOYMENT_STATUSES).toEqual(['probation', 'contract', 'permanent', 'part_time', 'intern'])
+    const sql = fs.readFileSync(path.resolve(__dirname, '../../supabase/migrations/20261116180000_people_intern_status.sql'), 'utf8')
+    expect(sql).toContain("employment_status IN ('probation', 'contract', 'permanent', 'part_time', 'intern')")
     expect(employmentStatusOf('contract')).toBe('contract')
     expect(employmentStatusOf('Permanent')).toBeNull()
   })

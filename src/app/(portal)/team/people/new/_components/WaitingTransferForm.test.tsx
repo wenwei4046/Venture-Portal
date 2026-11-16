@@ -134,7 +134,7 @@ describe('WaitingTransferForm', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
     })
     expect(transferFromWaitingList).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Pick the employment status — Probation, Contract, Permanent or Part time.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick the employment status — Probation, Contract, Permanent, Part time or Intern.')
   })
 
   it('cannot be sent at all while it is blocked', () => {

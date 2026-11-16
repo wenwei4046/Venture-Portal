@@ -72,7 +72,7 @@ describe('Add to company', () => {
 
   // 2026-10-23: asked as on Add Staff — Probation, Permanent or Part time, a probation with its period.
   it('asks the employment status, and a probation’s period', () => {
-    expect(transferRefusal({ ...INPUT, employmentStatus: '' })).toBe('Pick the employment status — Probation, Contract, Permanent or Part time.')
+    expect(transferRefusal({ ...INPUT, employmentStatus: '' })).toBe('Pick the employment status — Probation, Contract, Permanent, Part time or Intern.')
     expect(transferRefusal({ ...INPUT, probationMonths: null })).toBe('Pick the probation period.')
     expect(transferRefusal({ ...INPUT, employmentStatus: 'permanent', probationMonths: null })).toBeNull()
     // A contract (2026-10-24) with its period — or refused without one.

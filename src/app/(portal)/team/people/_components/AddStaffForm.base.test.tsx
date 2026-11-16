@@ -173,7 +173,7 @@ describe('Add Staff — the hire date and the employment status', () => {
     setup()
     expect(hire()).toBeRequired()
     expect(status()).toBeRequired()
-    expect(optionsOf(status()).map(o => o.label)).toEqual(['Select...', 'Probation', 'Contract', 'Permanent', 'Part time'])
+    expect(optionsOf(status()).map(o => o.label)).toEqual(['Select...', 'Probation', 'Contract', 'Permanent', 'Part time', 'Intern'])
     expect(screen.queryByLabelText('Probation period')).toBeNull()
   })
 
