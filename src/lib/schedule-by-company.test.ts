@@ -117,7 +117,8 @@ describe('byCompany — who a deal is with, by id (2026-11-15, the user: "按 id
   })
 
   it('puts deals together only when they are with the same one by id', () => {
-    expect(cos.map((c) => c.key)).toEqual(['co:abc', 'fs:f2', 'fs:f3', 'fs:f4', 'loan:l2', 'loan:l3'])
+    // By name (a dash sorts before letters), then by key.
+    expect(cos.map((c) => c.key)).toEqual(['loan:l2', 'loan:l3', 'co:abc', 'fs:f2', 'fs:f3', 'fs:f4'])
     const abc = cos.find((c) => c.key === 'co:abc')!
     expect(abc.both).toBe(true)
     expect(abc.position).toBe(3000)
