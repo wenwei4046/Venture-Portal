@@ -71,6 +71,8 @@ export interface MktProject {
   run: number | null
   /** A deliverable's product project. */
   parent: string | null
+  /** A quick or recurring task's type (`TASK_TYPES`: ads, social, content, brand, other); optional for the older fixtures. */
+  qType?: string | null
   recur: MktRecur | null
   startsOn: string | null
   dueOn: string | null
@@ -282,6 +284,7 @@ export function projectFromRow(p: Record<string, unknown>): MktProject {
     series: strOrNull(p.series),
     run: p.run == null ? null : int(p.run),
     parent: strOrNull(p.parent),
+    qType: strOrNull(p.qType),
     recur: recur(p.recur),
     startsOn: day(p.startsOn),
     dueOn: day(p.dueOn),

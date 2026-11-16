@@ -51,7 +51,7 @@ export default function ApprovalLevel({
   // The role words (MM / AMM / Director) are facts and stay on the option; what 🔗 PIC, 👤 Picked at assignment and ⏭ Next
   // stage's person mean is help — a tooltip on the option (the user, 2026-11-13).
   const role = (id: string) => (special(id) ? '' : roleOf(approvers.find(p => p.id === id)?.title ?? ''))
-  const help = (id: string) => (id === PIC_ID ? 'Client approves through the tracking link' : id === ASSIGN_ID ? 'MM picks the approver per project'
+  const help = (id: string) => (id === PIC_ID ? 'Client approves through the tracking link' : id === ASSIGN_ID ? 'Whoever assigns picks the approver per project'
     : id === NEXT_ID ? 'Whoever does the next stage approves' : '')
   return (
     <div className={w.level}>

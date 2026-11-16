@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:rgb(243 243 241);font-family:Inter,system-ui,sans-serif;color:rgb(51 36 27)}a{color:rgb(90 62 43);text-decoration:none}a:hover{color:rgb(51 36 27)}</style>
+</helmet>
+<div style="position:relative;width:100%;height:100vh;display:flex;background:rgb(243 243 241);font-size:13px;color:rgb(51 36 27);overflow:hidden;line-height:normal">
+
+  <aside style="width:248px;flex:none;display:flex;flex-direction:column;background:rgb(248 245 240);border-right:1px solid rgb(229 222 211);overflow:hidden">
+    <div style="padding:20px 8px 22px 16px;display:flex;align-items:center;gap:8px">
+      <span style="width:32px;height:32px;flex:none;border-radius:9px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;cursor:pointer">H</span>
+      <div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden"><div style="font-size:1.04em;font-weight:500;line-height:1.3">HOUZS Marketing</div><div style="font-size:.85em;color:rgb(117 100 86);line-height:1.4">8 subsidiaries</div></div>
+      <span style="width:28px;height:28px;flex:none;border-radius:50%;background:oklch(0.94 0.03 60);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;cursor:pointer">L</span>
+      <span style="width:20px;height:24px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);font-size:14px;cursor:pointer" style-hover="background:rgb(241 236 228)">«</span>
+    </div>
+    <nav style="flex:1;padding:2px 10px 12px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ navTop }}" as="r" hint-placeholder-count="3">
+        <div style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em;white-space:nowrap" style-hover="background:rgb(241 236 228)">
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:{{ r.tone }}">{{ r.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+          <sc-if value="{{ r.chev }}"><span style="width:16px;height:16px;flex:none;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86)"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></sc-if>
+        </div>
+      </sc-for>
+      <sc-for list="{{ navSubs }}" as="s" hint-placeholder-count="8">
+        <div onClick="{{ s.onClick }}" style="flex:none;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px 0 16px;border-radius:6px;cursor:pointer;font-size:.96em;color:rgb(74 64 58);white-space:nowrap;background:{{ s.bg }};font-weight:{{ s.weight }}" style-hover="background:rgb(241 236 228)">
+          <span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ s.dot }}"></span>
+          <span style="font-size:13px;width:18px;text-align:center;flex:none">{{ s.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+        </div>
+      </sc-for>
+      <div style="flex:none;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px 0 15px;border-radius:6px;cursor:pointer;font-size:.96em;color:rgb(117 100 86);white-space:nowrap" style-hover="background:rgb(241 236 228);color:rgb(51 36 27)"><span style="width:9px;flex:none;text-align:center;font-size:13px">+</span><span>Add subsidiary</span></div>
+      <sc-for list="{{ navMid }}" as="r" hint-placeholder-count="2">
+        <div onClick="{{ r.onClick }}" style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;font-size:1.04em;white-space:nowrap;background:{{ r.bg }};color:{{ r.fg }};font-weight:{{ r.weight }}" style-hover="background:rgb(241 236 228)">
+          <sc-if value="{{ r.on }}"><span style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 2px 2px 0;background:rgb(90 62 43)"></span></sc-if>
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:{{ r.tone }};transform:{{ r.scale }}">{{ r.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+          <sc-if value="{{ r.hasCount }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if>
+        </div>
+      </sc-for>
+      <div style="flex:none;height:1px;margin:10px 6px 4px;background:rgb(229 222 211)"></div>
+      <div style="flex:none;padding:8px 10px 6px;font-size:.81em;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86);white-space:nowrap">Manager tools</div>
+      <sc-for list="{{ navMgr }}" as="r" hint-placeholder-count="7">
+        <a href="{{ r.href }}" style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em;white-space:nowrap" style-hover="background:rgb(241 236 228);color:rgb(74 64 58)">
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:{{ r.tone }}">{{ r.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+        </a>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid rgb(229 222 211);padding:10px;display:flex;flex-direction:column;gap:2px">
+      <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em" style-hover="background:rgb(241 236 228)"><span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:rgb(230 237 241)">🚪</span><span>Meeting Rooms</span></div>
+      <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em" style-hover="background:rgb(241 236 228)"><span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:rgb(239 228 217)">⚙️</span><span>Settings</span></div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:60px;flex:none;box-sizing:border-box;background:#fff;margin:10px 10px 0;border-radius:16px;border:1px solid rgb(229 228 223);padding:0 12px 0 22px;display:flex;align-items:center;gap:20px">
+      <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;color:rgb(43 31 23)"><span style="font-size:15px">{{ crumbEmoji }}</span><span style="font-size:1.04em;font-weight:500">{{ crumbLabel }}</span></div>
+      <div style="flex:0 1 440px;min-width:120px;height:36px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:0 10px 0 12px;background:rgb(246 246 244);border:1px solid rgb(232 225 216);border-radius:8px;color:rgb(117 100 86)" style-hover="border-color:rgb(214 204 190)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.5"></circle><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+        <span style="flex:1;min-width:0;font-size:.96em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Search Track ID, task or person</span>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;border:1px solid rgb(229 222 211);background:#fff;border-radius:4px;padding:2px 5px">⌘K</span>
+      </div>
+      <div style="flex:1;min-width:0"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex:none">
+        <span style="display:flex;margin-right:12px"><span title="Switch workspace view while staying signed in as Principal" style="display:flex;align-items:center;gap:6px;color:rgb(90 78 68)"><span style="width:5px;height:5px;border-radius:50%;background:rgb(150 100 12);flex:none"></span><span style="font-size:13.5px;cursor:pointer;white-space:nowrap">Marketing view</span></span></span>
+        <a href="#" style="height:34px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);font-size:1em;font-weight:500;white-space:nowrap" style-hover="background:#E0893F;color:rgb(43 31 23)"><span style="font-size:15px;line-height:1">+</span><span>New Project</span></a>
+        <span title="Me — attendance, leave, payslips, profile" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 3px;border-radius:16px;border:1px solid rgb(229 228 223);background:#fff;color:rgb(43 31 23);font-size:12.5px;cursor:pointer;white-space:nowrap;box-sizing:border-box"><span style="width:24px;height:24px;border-radius:50%;background:rgb(43 31 23);color:#fff;font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">LK</span><span>Me</span></span>
+        <span title="Memos" style="position:relative;width:34px;height:34px;box-sizing:border-box;border-radius:10px;border:1px solid rgb(229 228 223);color:rgb(51 36 27);display:grid;place-items:center;cursor:pointer;flex:none" style-hover="border-color:#EC9B55"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"></path><path d="M10 20.5a2.2 2.2 0 0 0 4 0"></path></svg></span>
+        <span style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer" style-hover="background:rgb(241 236 228)">🔔</span>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;padding:10px;display:flex;position:relative">
+      <main data-pmain="1" onClick="{{ clearSel }}" onContextMenu="{{ ctxBlock }}" style="flex:1 1 auto;min-width:0;background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);overflow:hidden;position:relative;display:flex">
+        <div style="flex:1;min-width:0;overflow:auto;padding:28px 32px 48px;box-sizing:border-box;color:rgb(43 31 23)">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:4px;min-width:0;flex-wrap:wrap">
+              <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="1"><sc-if value="{{ c.sep }}"><span style="color:rgb(160 150 140);font-size:1.2em;padding:0 2px">›</span></sc-if><span onClick="{{ c.onClick }}" style="font-size:{{ c.size }};font-weight:600;letter-spacing:-.01em;white-space:nowrap;padding:2px 8px;border-radius:8px;cursor:pointer;color:{{ c.fg }}" style-hover="background:rgb(241 236 228)">{{ c.label }}</span></sc-for>
+            </div>
+            <div style="flex:1"></div>
+            <label onClick="{{ stop }}" style="height:34px;width:240px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 10px;border:1px solid rgb(232 225 216);border-radius:8px;background:#fff;color:rgb(117 100 86)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.5"></circle><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+              <input value="{{ q }}" onChange="{{ onQ }}" placeholder="{{ qPh }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:.92em;color:rgb(51 36 27)">
+            </label>
+            <div onClick="{{ stop }}" style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+              <sc-for list="{{ scopes }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="height:28px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;font-size:.92em;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}</div></sc-for>
+            </div>
+            <div onClick="{{ stop }}" style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+              <sc-for list="{{ views }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" title="{{ o.title }}" style="height:28px;width:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;background:{{ o.bg }};box-shadow:{{ o.shadow }}">{{ o.icon }}</div></sc-for>
+            </div>
+          </div>
+
+          <sc-if value="{{ hasFolders }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;gap:10px;margin-top:24px">
+            <span style="font-size:.78em;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86)">{{ folderHead }}</span>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+              <sc-for list="{{ folders }}" as="f" hint-placeholder-count="8"><div onClick="{{ f.onClick }}" onContextMenu="{{ f.onCtx }}" onDoubleClick="{{ f.onOpen }}" onMouseEnter="{{ f.onEnter }}" onMouseLeave="{{ f.onLeave }}" title="Double-click to open" style="height:56px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:0 10px 0 8px;border-radius:12px;border:1.5px solid {{ f.line }};background:{{ f.bg }};cursor:pointer;user-select:none;transition:border-color .15s, background-color .15s" style-hover="border-color:rgb(214 204 190)">
+                <span style="position:relative;width:36px;height:36px;flex:none;border-radius:9px;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:17px">{{ f.emoji }}<span style="position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:{{ f.dot }};border:2px solid #fff"></span></span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span><span style="font-size:.84em;color:{{ f.metaFg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.meta }}</span></div>
+                <sc-if value="{{ f.hasCount }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ f.count }}</span></sc-if>
+                <sc-if value="{{ f.canDel }}"><span onClick="{{ f.onDel }}" onMouseLeave="{{ f.onDelLeave }}" title="{{ f.delTitle }}" style="height:24px;min-width:24px;padding:0 {{ f.delPad }}px;box-sizing:border-box;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;opacity:{{ f.delOp }};color:{{ f.delFg }};background:{{ f.delBg }};transition:opacity .12s" style-hover="filter:brightness(.96)">{{ f.delLabel }}</span></sc-if>
+              </div></sc-for>
+            </div>
+          </div></sc-if>
+
+          <sc-if value="{{ hasFiles }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;gap:10px;margin-top:28px">
+            <span style="font-size:.78em;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86)">{{ fileHead }}</span>
+            <sc-if value="{{ isGrid }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+              <sc-for list="{{ files }}" as="r" hint-placeholder-count="4"><div onClick="{{ r.onClick }}" onContextMenu="{{ r.onCtx }}" onDoubleClick="{{ r.onOpen }}" onMouseEnter="{{ r.onEnter }}" onMouseLeave="{{ r.onLeave }}" style="position:relative;display:flex;flex-direction:column;border-radius:12px;border:1.5px solid {{ r.line }};background:#fff;cursor:pointer;overflow:hidden;user-select:none;box-shadow:{{ r.shadow }};transition:border-color .15s, box-shadow .15s" style-hover="border-color:rgb(214 204 190)">
+                <div style="position:absolute;top:12px;right:12px;z-index:1;display:flex;background:#fff;border-radius:7px;opacity:{{ r.delOp }}"><span onClick="{{ r.onDel }}" onMouseLeave="{{ r.onDelLeave }}" title="{{ r.delTitle }}" style="height:24px;min-width:24px;padding:0 {{ r.delPad }}px;box-sizing:border-box;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;color:{{ r.delFg }};background:{{ r.delBg }};transition:opacity .12s" style-hover="filter:brightness(.96)">{{ r.delLabel }}</span></div>
+                <div style="height:112px;margin:6px 6px 0;border-radius:8px;background:repeating-linear-gradient(135deg, rgb(250 248 244) 0 10px, rgb(253 252 250) 10px 20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+                  <span style="font-size:24px">{{ r.icon }}</span>
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);white-space:nowrap">{{ r.kind }}</span>
+                </div>
+                <div style="padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+                  <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.title }}</span>
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.trackId }}</span>
+                  <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="display:inline-flex;align-items:center;gap:6px;font-size:.86em;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid {{ r.pillLine }};box-sizing:border-box;background:{{ r.pillBg }};color:{{ r.pillFg }}"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ r.pillDot }}"></span>{{ r.label }}</span><span style="flex:1"></span><span style="font-size:.84em;color:rgb(117 100 86);white-space:nowrap">{{ r.whoDue }}</span></div>
+                </div>
+              </div></sc-for>
+            </div></sc-if>
+            <sc-if value="{{ isList }}"><div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+              <div style="display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.3fr) minmax(0,0.9fr) 70px minmax(0,1.2fr) 64px;gap:12px;align-items:center;padding:0 16px;height:36px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-size:.78em;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86)"><span>Name</span><span>Stage</span><span>Now with</span><span>Due</span><span>Status</span><span></span></div>
+              <sc-for list="{{ files }}" as="r" hint-placeholder-count="4"><div onClick="{{ r.onClick }}" onContextMenu="{{ r.onCtx }}" onDoubleClick="{{ r.onOpen }}" onMouseEnter="{{ r.onEnter }}" onMouseLeave="{{ r.onLeave }}" style="display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1.3fr) minmax(0,0.9fr) 70px minmax(0,1.2fr) 64px;gap:12px;align-items:center;padding:0 16px;min-height:52px;border-top:{{ r.sep }};cursor:pointer;user-select:none;background:{{ r.rowBg }}" style-hover="background:rgb(250 248 244)">
+                <div style="min-width:0;display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;flex:none;border-radius:7px;background:rgb(246 244 240);display:flex;align-items:center;justify-content:center;font-size:14px">{{ r.icon }}</span><div style="min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.title }}</div><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.trackId }} · {{ r.kind }}</div></div></div>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58);font-size:.94em;min-width:0">{{ r.stage }}</span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58);font-size:.94em;min-width:0">{{ r.who }}</span>
+                <span style="white-space:nowrap;color:rgb(74 64 58);font-size:.94em">{{ r.due }}</span>
+                <span style="display:flex;min-width:0"><span style="display:inline-flex;align-items:center;gap:6px;font-size:.86em;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid {{ r.pillLine }};box-sizing:border-box;background:{{ r.pillBg }};color:{{ r.pillFg }}"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ r.pillDot }}"></span>{{ r.label }}</span></span>
+                <span style="display:flex;justify-content:flex-end"><span onClick="{{ r.onDel }}" onMouseLeave="{{ r.onDelLeave }}" title="{{ r.delTitle }}" style="height:24px;min-width:24px;padding:0 {{ r.delPad }}px;box-sizing:border-box;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;opacity:{{ r.delOp }};color:{{ r.delFg }};background:{{ r.delBg }};transition:opacity .12s" style-hover="filter:brightness(.96)">{{ r.delLabel }}</span></span>
+              </div></sc-for>
+            </div></sc-if>
+          </div></sc-if>
+
+          <sc-if value="{{ isEmpty }}"><div style="margin-top:48px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;color:rgb(117 100 86)"><span style="width:64px;height:64px;border-radius:50%;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:28px">{{ emptyEmoji }}</span><span style="font-weight:600;color:rgb(51 36 27);font-size:1.04em">{{ emptyTitle }}</span><span>{{ emptySub }}</span></div></sc-if>
+        </div>
+
+        <sc-if value="{{ hasSel }}"><aside onClick="{{ stop }}" style="width:300px;flex:none;border-left:1px solid rgb(236 231 224);background:rgb(250 249 247);overflow-y:auto;overflow-x:hidden;padding:20px 18px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:flex-start;gap:10px"><span style="width:32px;height:32px;flex:none;border-radius:8px;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:15px">{{ d.icon }}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:1.04em;text-wrap:pretty">{{ d.title }}</div><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:3px">{{ d.trackId }}</div></div><span onClick="{{ clearSel }}" style="width:24px;height:24px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer;font-size:16px" style-hover="background:rgb(241 236 228)">×</span></div>
+          <div><span style="display:inline-flex;align-items:center;gap:6px;font-size:.86em;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid {{ d.pillLine }};box-sizing:border-box;background:{{ d.pillBg }};color:{{ d.pillFg }}"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ d.pillDot }}"></span>{{ d.label }}</span></div>
+          <div style="display:flex;flex-direction:column;border-top:1px solid rgb(236 231 224)">
+            <sc-for list="{{ d.facts }}" as="x" hint-placeholder-count="5"><div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid rgb(244 241 236);font-size:.92em"><span style="width:84px;flex:none;color:rgb(117 100 86)">{{ x.k }}</span><span style="flex:1;min-width:0;text-wrap:pretty">{{ x.v }}</span></div></sc-for>
+          </div>
+          <a href="#" style="height:36px;flex:none;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-weight:500;white-space:nowrap" style-hover="background:#E0893F;color:rgb(43 31 23)">{{ d.openLabel }}</a>
+          <span onClick="{{ d.onDel }}" style="height:34px;flex:none;border-radius:8px;border:1px solid {{ d.delLine }};background:{{ d.delBg }};color:{{ d.delFg }};display:flex;align-items:center;justify-content:center;font-weight:500;cursor:pointer;white-space:nowrap" style-hover="filter:brightness(.97)">{{ d.delLabel }}</span>
+          <span style="font-size:.84em;color:rgb(117 100 86);text-align:center;text-wrap:pretty">{{ d.delNote }}</span>
+        </aside></sc-if>
+        <sc-if value="{{ ctxOn }}"><div onClick="{{ stop }}" style="position:absolute;left:{{ ctxX }}px;top:{{ ctxY }}px;z-index:40;width:210px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.18);padding:5px;display:flex;flex-direction:column">
+          <span style="font-size:0.76em;color:rgb(117 100 86);padding:5px 9px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ctxTitle }}</span>
+          <sc-for list="{{ ctxItems }}" as="m" hint-placeholder-count="2"><div onClick="{{ m.onClick }}" style="height:32px;padding:0 9px;border-radius:7px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:0.9em;white-space:nowrap;color:{{ m.fg }};background:{{ m.bg }};border-top:{{ m.sep }}" style-hover="background:rgb(246 244 240)"><span style="width:16px;text-align:center;font-size:12px">{{ m.icon }}</span>{{ m.label }}</div></sc-for>
+        </div></sc-if>
+        <sc-if value="{{ hasToast }}"><div onClick="{{ stop }}" style="position:absolute;left:50%;bottom:24px;transform:translateX(-50%);z-index:30;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:14px">{{ toast }}<sc-if value="{{ hasUndo }}"><span onClick="{{ undo }}" style="font-weight:600;color:#EC9B55;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Undo</span></sc-if></div></sc-if>
+      </main>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const SUBS = [
+  ['CAR', 'Carres', '🛋️', 'oklch(0.66 0.12 235)'], ['2990', '2990', '🏠', 'oklch(0.62 0.13 295)'], ['HC', 'HOUZS Century', '🏛️', 'oklch(0.48 0.06 50)'],
+  ['HKK', 'Hookka', '🪴', 'oklch(0.68 0.13 350)'], ['OHN', 'Ohana', '🛏️', 'oklch(0.62 0.10 185)'], ['DC', 'Dream Crafter', '✨', 'oklch(0.52 0.13 270)'],
+  ['CMI', 'CMI', '🔩', 'oklch(0.58 0.02 250)'], ['TC', 'The Cont', '🚚', 'oklch(0.60 0.12 320)'],
+].map(([code, name, emoji, dot]) => ({ code, name, emoji, dot }));
+const TONE = {
+  waiting: ['rgb(251 243 225)', 'rgb(236 214 164)', 'rgb(138 92 10)', 'rgb(214 152 30)'],
+  red: ['rgb(252 236 233)', 'rgb(236 190 184)', 'rgb(176 40 34)', 'rgb(200 52 42)'],
+  done: ['rgb(232 244 235)', 'rgb(190 222 199)', 'rgb(40 110 64)', 'rgb(60 150 90)'],
+  draft: ['rgb(243 242 239)', 'rgb(226 223 217)', 'rgb(98 92 86)', 'rgb(160 154 146)'],
+};
+const ROWS = [
+  { id: 'MKT-CAR-2611-001', title: 'Carres · XXX testing Package · Nov 2026', trackId: 'MKT-CAR-2611-001', kind: 'Project', sub: 'CAR', stage: 'Before the plan', who: '—', due: '—', tone: 'draft', label: 'Minutes', open: true },
+  { id: 'TSK-CAR-2611-002', title: 'TESTING xxx VIDEO', trackId: 'TSK-CAR-2611-002', kind: 'Quick Task', icon: '🎞️', sub: 'CAR', stage: 'Stage 1/1 · TESTING xxx VIDEO', who: 'IZZUL', due: '19 Nov', tone: 'waiting', label: 'In progress', open: true },
+  { id: 'TSK-CAR-2611-004', title: 'TESTING xxx VIDEO × 1', trackId: 'TSK-CAR-2611-004', kind: 'Quick Task', icon: '🎞️', sub: 'CAR', stage: 'Stage 1/1 · TESTING xxx VIDEO × 1', who: 'IZZUL', due: '19 Nov', tone: 'waiting', label: 'In progress', open: true },
+  { id: 'TSK-CAR-2611-003', title: 'Image post * 5 × 1', trackId: 'TSK-CAR-2611-003', kind: 'Quick Task', icon: '🖼️', sub: 'CAR', stage: 'Stage 1/1 · Image post * 5 × 1', who: 'JOSIAH', due: '3 Dec', tone: 'waiting', label: 'In progress', open: true },
+  { id: 'TSK-CAR-2611-005', title: 'Meta Ads × 1', trackId: 'TSK-CAR-2611-005', kind: 'Quick Task', icon: '📈', sub: 'CAR', stage: 'Stage 1/1 · Meta Ads × 1', who: 'JOSIAH', due: '20 Nov', tone: 'waiting', label: 'In progress', open: true },
+];
+const T = { sand: 'rgb(239 228 217)', mist: 'rgb(230 237 241)', peach: 'rgb(249 231 216)', cream: 'rgb(246 238 222)' };
+
+class Component extends DCLogic {
+  state = { scope: 'open', path: [], q: '', view: 'grid', sel: null, rows: ROWS.map(r => ({ ...r })), hover: null, arm: null, toast: '' };
+  componentWillUnmount() { clearTimeout(this._t); }
+  remove(id) {
+    const s = this.state, r = s.rows.find(x => x.id === id); if (!r) return;
+    this._undo = s.rows;
+    const gone = s.rows.filter(x => x.id !== id && x.parent !== id);
+    this.setState({ rows: gone, sel: null, arm: null, path: s.path[1] === id ? [s.path[0]] : s.path, toast: `Deleted “${r.title}”`, undoOn: true });
+    clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '', undoOn: false }), 6000);
+  }
+  go(path) { this.setState({ path, sel: null }); }
+  renderVals() {
+    const s = this.state, q = s.q.trim().toLowerCase(), [subCode, projId] = s.path;
+    const inScope = (r, scope) => scope === 'all' || (scope === 'open' ? r.open : !r.open);
+    const hit = r => !q || (r.title + ' ' + r.trackId + ' ' + r.who).toLowerCase().includes(q);
+    const picked = subCode ? SUBS.find(x => x.code === subCode) : null, proj = projId ? s.rows.find(r => r.id === projId) : null;
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / .14)' : 'none', weight: on ? 600 : 400 });
+    const subOf = c => SUBS.find(x => x.code === c);
+    const pillOf = r => { const t = TONE[r.tone]; return { pillBg: t[0], pillLine: t[1], pillFg: t[2], pillDot: t[3] }; };
+    const sel = (id) => e => { e.stopPropagation(); this.setState({ sel: id }); };
+    // what lives at this level
+    let folders = [], files = [], scoped = k => 0;
+    if (q && !proj) {
+      const all = s.rows.filter(r => (!picked || r.sub === subCode));
+      scoped = k => all.filter(r => inScope(r, k) && hit(r)).length;
+      files = all.filter(r => inScope(r, s.scope) && hit(r));
+    } else if (!picked) {
+      scoped = k => s.rows.filter(r => inScope(r, k)).length;
+      folders = SUBS.map(x => { const rs = s.rows.filter(r => r.sub === x.code && inScope(r, s.scope)), red = rs.filter(r => r.tone === 'red').length;
+        return { key: x.code, name: x.name, emoji: x.emoji, dot: x.dot, meta: rs.length ? `${rs.length} item${rs.length === 1 ? '' : 's'}` : 'Empty', metaFg: rs.length ? 'rgb(117 100 86)' : 'rgb(160 150 140)', count: red, hasCount: red > 0, open: () => this.go([x.code]) }; });
+    } else if (!proj) {
+      const rs = s.rows.filter(r => r.sub === subCode);
+      scoped = k => rs.filter(r => inScope(r, k)).length;
+      folders = rs.filter(r => r.kind === 'Project' && inScope(r, s.scope)).map(r => ({ key: r.id, name: r.title.replace(picked.name + ' · ', ''), emoji: '📁', dot: TONE[r.tone][3], meta: `${r.label} · 0 tasks`, metaFg: 'rgb(117 100 86)', count: 0, hasCount: false, open: () => this.go([subCode, r.id]), row: r }));
+      files = rs.filter(r => r.kind !== 'Project' && inScope(r, s.scope));
+    } else { scoped = () => 0; }
+    const del = id => ({
+      canDel: true, delOp: s.hover === id || s.arm === id || s.sel === id ? 1 : 0,
+      delLabel: s.arm === id ? 'Delete?' : '✕', delTitle: s.arm === id ? 'Click again to delete' : 'Delete', delPad: s.arm === id ? 8 : 0,
+      delFg: s.arm === id ? '#fff' : 'rgb(176 40 34)', delBg: s.arm === id ? 'rgb(190 50 40)' : 'transparent',
+      onDel: e => { e.stopPropagation(); if (s.arm === id) this.remove(id); else this.setState({ arm: id }); },
+      onDelLeave: () => s.arm === id && this.setState({ arm: null }),
+      onEnter: () => s.hover !== id && this.setState({ hover: id }), onLeave: () => this.setState(p => ({ hover: p.hover === id ? null : p.hover })),
+    });
+    const ctxOpen = id => e => {
+      e.preventDefault(); e.stopPropagation();
+      const box = e.currentTarget.closest('[data-pmain]'); if (!box) return;
+      const rc = box.getBoundingClientRect(), k = rc.width / box.offsetWidth || 1;
+      const x = Math.min((e.clientX - rc.left) / k, box.offsetWidth - 220), y = Math.min((e.clientY - rc.top) / k, box.offsetHeight - 120);
+      this.setState({ ctx: { id, x, y, confirm: false }, arm: null });
+    };
+    const view = s.view;
+    const selRow = s.sel ? s.rows.find(r => r.id === s.sel) : null;
+    folders = folders.map(f => { const on = s.sel === f.key; return { ...(f.row ? del(f.key) : { canDel: false, onEnter: () => {}, onLeave: () => {} }), onCtx: f.row ? ctxOpen(f.key) : e => e.preventDefault(), ...f, line: on ? 'rgb(51 36 27)' : 'rgb(236 231 224)', bg: on ? 'rgb(250 248 244)' : '#fff', onClick: f.row ? sel(f.key) : e => { e.stopPropagation(); f.open(); }, onOpen: e => { e.stopPropagation(); f.open(); } }; });
+    files = files.map((r, i) => { const on = s.sel === r.id; return { ...r, ...del(r.id), onCtx: ctxOpen(r.id), icon: r.icon || '📁', ...pillOf(r), whoDue: r.who === '—' ? '' : `${r.who} · ${r.due}`, sep: i ? '1px solid rgb(244 241 236)' : '0', rowBg: on ? 'rgb(250 244 236)' : '#fff', line: on ? 'rgb(51 36 27)' : 'rgb(236 231 224)', shadow: on ? '0 8px 20px rgb(51 36 27 / .12)' : 'none', onClick: sel(r.id), onOpen: e => { e.stopPropagation(); } }; });
+    const crumbs = [{ label: 'Projects', on: () => this.go([]) }, picked && { label: picked.name, on: () => this.go([subCode]) }, proj && { label: proj.title.replace(picked.name + ' · ', ''), on: () => {} }].filter(Boolean)
+      .map((c, i, a) => ({ label: c.label, sep: i > 0, onClick: e => { e.stopPropagation(); c.on(); }, size: '1.6em', fg: i === a.length - 1 ? 'rgb(43 31 23)' : 'rgb(117 100 86)' }));
+    const empty = !folders.length && !files.length;
+    return {
+      navTop: [{ emoji: '🏠', label: 'My Space', tone: T.sand }, { emoji: '📅', label: 'Calendar', tone: T.mist }, { emoji: '🏢', label: 'Subsidiaries', tone: T.peach, chev: true }],
+      navSubs: SUBS.map(x => ({ ...x, bg: subCode === x.code ? 'rgb(236 229 219)' : 'transparent', weight: subCode === x.code ? 500 : 400, onClick: () => this.go([x.code]) })),
+      navMid: [['📁', 'Projects', T.sand, 1, true], ['📚', 'Library', T.mist, 0, false]].map(([emoji, label, tone, count, on]) => ({ emoji, label, tone, count, hasCount: count > 0, on, bg: on ? 'rgb(236 229 219)' : 'transparent', fg: on ? 'rgb(51 36 27)' : 'rgb(74 64 58)', weight: on ? 500 : 400, scale: on ? 'scale(1.06)' : 'none', onClick: () => on && this.go([]) })),
+      navMgr: [['📊', 'Tracking Dashboard', T.sand, '#'], ['🧩', 'Workflow Builder', T.mist, 'Workflow Builder.dc.html'], ['📦', 'Product Builder', T.peach, '#'], ['📝', 'Minutes Builder', T.cream, '#'], ['🔁', 'Replace Person', T.mist, '#'], ['💰', 'Billing', T.peach, '#'], ['🏦', 'Pool', T.sand, '#']].map(([emoji, label, tone, href]) => ({ emoji, label, tone, href })),
+      crumbEmoji: picked ? picked.emoji : '📁', crumbLabel: picked ? picked.name : 'Projects',
+      crumbs, stop: e => e.stopPropagation(), clearSel: () => (s.sel || s.arm || s.ctx) && this.setState({ sel: null, arm: null, ctx: null }),
+      ctxBlock: e => { e.preventDefault(); if (s.ctx) this.setState({ ctx: null }); },
+      ...(() => { const c = s.ctx, r = c && s.rows.find(x => x.id === c.id); if (!r) return { ctxOn: false, ctxItems: [], ctxX: 0, ctxY: 0, ctxTitle: '' };
+        const base = m => ({ fg: 'rgb(51 36 27)', bg: 'transparent', sep: 'none', ...m });
+        return { ctxOn: true, ctxX: c.x, ctxY: c.y, ctxTitle: r.trackId + ' · ' + r.kind, ctxItems: [
+          { icon: '↗', label: r.kind === 'Project' ? 'Open project' : 'Open task', onClick: () => { this.setState({ ctx: null }); if (r.kind === 'Project') this.go([r.sub, r.id]); } },
+          c.confirm
+            ? { icon: '✕', label: r.kind === 'Project' ? 'Click to confirm · deletes its tasks' : 'Click to confirm', fg: '#fff', bg: 'rgb(190 50 40)', sep: '1px solid rgb(244 241 236)', onClick: () => { this.setState({ ctx: null }); this.remove(r.id); } }
+            : { icon: '✕', label: 'Delete…', fg: 'rgb(176 40 34)', sep: '1px solid rgb(244 241 236)', onClick: () => this.setState({ ctx: { ...c, confirm: true } }) },
+        ].map(base) }; })(),
+      q: s.q, onQ: e => this.setState({ q: e.target.value }), qPh: picked ? `Search in ${picked.name}` : 'Track ID, title or person',
+      scopes: [['open', 'Open'], ['done', 'Done'], ['all', 'All']].map(([k, l]) => ({ label: `${l} · ${scoped(k)}`, ...seg(s.scope === k), onClick: () => this.setState({ scope: k, sel: null }) })),
+      views: [['grid', '▦', 'Grid'], ['list', '☰', 'List']].map(([k, icon, title]) => ({ icon, title, ...seg(view === k), onClick: () => this.setState({ view: k }) })),
+      folders, hasFolders: folders.length > 0, folderHead: picked ? 'Projects' : 'Subsidiaries',
+      files, hasFiles: files.length > 0, fileHead: q ? `Results · ${files.length}` : 'Quick Tasks', isGrid: view === 'grid', isList: view === 'list',
+      isEmpty: empty, emptyEmoji: proj ? '🗂️' : q ? '🔍' : '📂',
+      emptyTitle: proj ? 'No tasks yet' : q ? 'Nothing matches' : 'Nothing here yet',
+      emptySub: proj ? 'Tasks appear here once the minutes are turned into a plan.' : q ? 'Try a Track ID or a person\'s name.' : 'New projects for this subsidiary will show up here.',
+      hasSel: !!selRow, hasToast: !!s.toast, toast: s.toast, hasUndo: !!s.undoOn && !!this._undo,
+      undo: () => { if (!this._undo) return; this.setState({ rows: this._undo, toast: 'Restored', undoOn: false }); this._undo = null; clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2000); },
+      d: selRow ? { ...selRow, icon: selRow.icon || '📁', ...pillOf(selRow), openLabel: selRow.kind === 'Project' ? 'Open project' : 'Open task',
+        onDel: () => { if (s.arm === 'pane:' + selRow.id) this.remove(selRow.id); else this.setState({ arm: 'pane:' + selRow.id }); },
+        delLabel: s.arm === 'pane:' + selRow.id ? 'Click again to delete' : 'Delete', delFg: s.arm === 'pane:' + selRow.id ? '#fff' : 'rgb(176 40 34)', delBg: s.arm === 'pane:' + selRow.id ? 'rgb(190 50 40)' : '#fff', delLine: s.arm === 'pane:' + selRow.id ? 'rgb(190 50 40)' : 'rgb(236 190 184)',
+        delNote: selRow.kind === 'Project' ? 'Deletes the project and every task inside it. You can undo for 6 seconds.' : 'You can undo for 6 seconds.',
+        facts: [['Subsidiary', subOf(selRow.sub).name], ['Kind', selRow.kind], ['Stage', selRow.stage], ['Now with', selRow.who], ['Due', selRow.due]].map(([k, v]) => ({ k, v })) } : { facts: [] },
+    };
+  }
+}
+</script>
+</body>
+</html>

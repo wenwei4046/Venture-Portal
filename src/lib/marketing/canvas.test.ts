@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   canvasForStages, canvasFromRow, canvasPayload, canvasProblems, duplicateStageSections, ensureStageSections, fieldFlags, newCanvasSection,
-  picView, renameStageSection, stageFillCount, stageNameOf, staffView, withType, type CanvasField, type WfCanvas,
+  fillsText, picView, renameStageSection, stageFillCount, stageFills, stageNameOf, stageSectionId, staffView, withType, type CanvasField, type WfCanvas,
 } from './canvas'
 
 // A template's canvas (Workflow Builder 2a, 2026-11-13): the only place fields are defined — every field and table
@@ -60,6 +60,29 @@ describe('the stages change, the canvas follows', () => {
   it('counts what a stage fills in, and names a stage by its key', () => {
     expect([stageFillCount(CANVAS, 'sscript'), stageFillCount(CANVAS, 'sedit00'), stageFillCount(CANVAS, 'sfinal0')]).toEqual([2, 1, 1])
     expect([stageNameOf(STAGES, 'sedit00'), stageNameOf(STAGES, null), stageNameOf(STAGES, 'sgone00')]).toEqual(['Edit', '—', 'Removed stage'])
+  })
+  it('lists what a stage fills in — its fields, a column in another stage’s table — with where, ⭐ and 👁 (handoff 2026-11-17 §1.2)', () => {
+    expect(stageFills(CANVAS, 'sscript')).toEqual([
+      { id: 'f1', name: 'Body', glyph: 'Aa', where: 'Script', req: true, pic: true },
+      { id: 'ft', name: 'Shots', glyph: '▤', where: 'Script', req: false, pic: true },
+    ])
+    // The column's "(internal)" is the prototype's note, not its name; 👁 needs the section shown too.
+    expect(stageFills(CANVAS, 'sedit00')).toEqual([{ id: 'ft:k2', name: 'Edit notes', glyph: 'Aa', where: 'Shots', req: false, pic: false }])
+    expect(stageFills(CANVAS, 'sfinal0')).toEqual([{ id: 'fn', name: 'Notes', glyph: 'Aa', where: 'Notes', req: true, pic: false }])
+    expect(stageFills(CANVAS, 'snone00')).toEqual([])
+    const note: WfCanvas = { ...CANVAS, sections: [{ ...CANVAS.sections[1], fields: [field({ id: 'fz', type: 'Note', req: true, stage: 'sfinal0' })] }] }
+    expect(stageFills(note, 'sfinal0')[0].req).toBe(false)
+  })
+  it('a card’s FILLS IN words', () => {
+    expect(fillsText(stageFills(CANVAS, 'sscript'))).toBe('2 fields · 1 required')
+    expect(fillsText(stageFills(CANVAS, 'sedit00'))).toBe('1 field')
+    expect(fillsText([])).toBe('Nothing to fill')
+  })
+  it('the section Who fills what jumps to: the stage’s own, else the first holding its fields', () => {
+    expect(stageSectionId(CANVAS, 'sscript')).toBe('xs')
+    expect(stageSectionId(CANVAS, 'sedit00')).toBe('xs')
+    expect(stageSectionId(CANVAS, 'sfinal0')).toBe('xn')
+    expect(stageSectionId(CANVAS, 'snone00')).toBeNull()
   })
 })
 

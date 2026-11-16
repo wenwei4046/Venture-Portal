@@ -26,6 +26,12 @@ export interface ProjectRow {
   label: string
   open: boolean
   updatedAt: string
+  /** A deliverable's product project (Projects' folders, 2026-11-17). */
+  parent: string | null
+  /** A recurring run's series. */
+  series: string | null
+  /** A task's type key (ads, social, content, brand, other), else null. */
+  qType: string | null
 }
 
 const KIND_LABEL: Record<MktProjectKind, string> = { product: 'Project', quick: 'Quick Task', recurring: 'Recurring', deliverable: 'Deliverable' }
@@ -103,6 +109,9 @@ export function projectRows(board: MktBoard): ProjectRow[] {
       label,
       open,
       updatedAt: p.updatedAt,
+      parent: p.parent,
+      series: p.series,
+      qType: p.qType ?? null,
     }
   }
 }

@@ -60,11 +60,11 @@ describe('what the cards and sections say', () => {
     expect(apprSummary(s.appr, nameOf)).toBe('Rachel & Daniel → 🔗 PIC')
     expect(apprSummary([], nameOf)).toBe('No approval')
   })
-  it('who does it, the lock turning a handoff into MM assigns', () => {
+  it('who does it, the lock turning a handoff into Anyone can assign', () => {
     const h = st('sc00001', { who: { mode: 'prev', cands: [SITI] } })
     expect(whoSummary(h, 2, false, nameOf)).toBe("🔓 Stage 2's person picks · Siti")
     expect(whoSummary({ ...h, who: { mode: 'prev', cands: [] } }, 2, false, nameOf)).toBe('🔓 Handoff · shortlist empty')
-    expect(whoSummary(h, 2, true, nameOf)).toBe('👤 MM assigns when planning')
+    expect(whoSummary(h, 2, true, nameOf)).toBe('👤 Anyone can assign')
   })
   it('after approval: the next stage, or the task done; Done when reads the last stage', () => {
     const two = [s, st('sd00001', { name: 'Final' })]
@@ -88,11 +88,11 @@ describe('warnings and what publishing refuses', () => {
     const pic = (sid: string) => st(sid, { appr: [{ ids: ['pic'], rule: 'any' }] })
     expect(wfWarnings([pic('sg00001'), pic('sg00002'), pic('sg00003')], false, null).map(x => [x.text, x.fix])).toEqual([['PIC approves 3+ times', { section: 'appr', at: 2 }]])
   })
-  it('locked: the handoffs run as MM assigns, so no shortlist warning', () => {
+  it('locked: the handoffs run as Anyone can assign, so no shortlist warning', () => {
     expect(wfWarnings([st('sh00001', { appr: [{ ids: [RACHEL], rule: 'any' }] }), handoff], true, null)).toEqual([])
     expect(asRun([handoff, st('si00001', { split: true })], true).map(x => [x.who.mode, x.split])).toEqual([['assign', false], ['assign', false]])
     expect(lockNote([handoff, st('si00001', { split: true }), st('sj00001')])).toBe(
-      'MM assigns every stage when planning. Handoffs and subtasks are off on 2 stages — their settings come back if you switch to “Handoffs allowed”.')
+      'Every stage is assigned when planning · anyone can assign. Handoffs and subtasks are off on 2 stages — their settings come back if you switch to “Handoffs allowed”.')
   })
   it('refuses only the basics (2026-11-13): a stage, every stage named', () => {
     expect(wfProblems([], false)).toEqual(['Add a stage'])
@@ -107,13 +107,13 @@ describe('warnings and what publishing refuses', () => {
     const f = publishFixups([st('sk00001', { appr: [{ ids: [], rule: 'any' }, { ids: [SITI], rule: 'any' }] }), st('sk00002', { who: { mode: 'prev', cands: [DANIEL, SITI] } })], false, team, approvers, canvas)
     expect([...f].sort()).toEqual(['An approval level with nobody on it is left out', 'An approver who left the team is left out',
       'Somebody who left the team comes off a shortlist', 'Canvas: unfinished fields are tidied on publish'].sort())
-    expect(publishFixups([st('sl00001', { who: { mode: 'prev', cands: [SITI] } })], false, team, approvers, EMPTY_CANVAS)).toEqual(['Stage 1 runs as MM assigns — no stage before it'])
+    expect(publishFixups([st('sl00001', { who: { mode: 'prev', cands: [SITI] } })], false, team, approvers, EMPTY_CANVAS)).toEqual(['Stage 1 runs as Anyone can assign — no stage before it'])
     // ⏭ The next stage's person (2026-11-14): kept on a stage with one after it, left out on the last.
     expect(publishFixups([st('sn00001', { appr: [{ ids: ['next'], rule: 'any' }] }), st('sn00002')], false, team, approvers, EMPTY_CANVAS)).toEqual([])
     expect(publishFixups([st('sn00003'), st('sn00004', { appr: [{ ids: ['next'], rule: 'any' }] })], false, team, approvers, EMPTY_CANVAS))
       .toEqual(['The last stage has no next stage — “Next stage’s person” is left out there'])
     expect(publishFixups([st('sn00001'), st('sn00002', { who: { mode: 'prev', cands: [DANIEL] } })], false, team, approvers, EMPTY_CANVAS))
-      .toEqual(['A 🔓 handoff whose shortlist has left the team runs as MM assigns'])
+      .toEqual(['A 🔓 handoff whose shortlist has left the team runs as Anyone can assign'])
   })
 })
 
@@ -132,7 +132,7 @@ describe('the publish review', () => {
     expect(publishDiff(base, now, nameOf, groups).map(c => [c.icon, c.text, c.tone])).toEqual([
       ['✎', 'Renamed “Edit” → “Editing”', 'ink'],
       ['⏱', 'Editing: 1 → 3 working days', 'ink'],
-      ['👤', 'Editing: MM assigns → handoff (Siti)', 'ink'],
+      ['👤', 'Editing: Anyone can assign → handoff (Siti)', 'ink'],
       ['✓', 'Editing approval: no approval → Rachel', 'ink'],
       ['●', 'Editing: group Content → Design', 'ink'],
       ['🔗', 'Editing: PIC now sees “Editing now”', 'ink'],

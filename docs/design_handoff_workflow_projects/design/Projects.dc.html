@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Chivo+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:rgb(243 243 241);font-family:Inter,system-ui,sans-serif;color:rgb(51 36 27)}a{color:rgb(90 62 43);text-decoration:none}a:hover{color:rgb(51 36 27)}</style>
+</helmet>
+<div style="position:relative;width:100%;height:100vh;display:flex;background:rgb(243 243 241);font-size:13px;color:rgb(51 36 27);overflow:hidden;line-height:normal">
+
+  <aside style="width:248px;flex:none;display:flex;flex-direction:column;background:rgb(248 245 240);border-right:1px solid rgb(229 222 211);overflow:hidden">
+    <div style="padding:20px 8px 22px 16px;display:flex;align-items:center;gap:8px">
+      <span style="width:32px;height:32px;flex:none;border-radius:9px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;cursor:pointer">H</span>
+      <div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden"><div style="font-size:1.04em;font-weight:500;line-height:1.3">HOUZS Marketing</div><div style="font-size:.85em;color:rgb(117 100 86);line-height:1.4">8 subsidiaries</div></div>
+      <span style="width:28px;height:28px;flex:none;border-radius:50%;background:oklch(0.94 0.03 60);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;cursor:pointer">L</span>
+      <span style="width:20px;height:24px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);font-size:14px;cursor:pointer" style-hover="background:rgb(241 236 228)">«</span>
+    </div>
+    <nav style="flex:1;padding:2px 10px 12px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ navTop }}" as="r" hint-placeholder-count="3">
+        <div style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em;white-space:nowrap" style-hover="background:rgb(241 236 228)">
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:{{ r.tone }}">{{ r.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+          <sc-if value="{{ r.chev }}"><span style="width:16px;height:16px;flex:none;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86)"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></sc-if>
+        </div>
+      </sc-for>
+      <sc-for list="{{ navSubs }}" as="s" hint-placeholder-count="8">
+        <div onClick="{{ s.onClick }}" style="flex:none;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px 0 16px;border-radius:6px;cursor:pointer;font-size:.96em;color:rgb(74 64 58);white-space:nowrap;background:{{ s.bg }};font-weight:{{ s.weight }}" style-hover="background:rgb(241 236 228)">
+          <span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ s.dot }}"></span>
+          <span style="font-size:13px;width:18px;text-align:center;flex:none">{{ s.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span>
+        </div>
+      </sc-for>
+      <div style="flex:none;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px 0 15px;border-radius:6px;cursor:pointer;font-size:.96em;color:rgb(117 100 86);white-space:nowrap" style-hover="background:rgb(241 236 228);color:rgb(51 36 27)"><span style="width:9px;flex:none;text-align:center;font-size:13px">+</span><span>Add subsidiary</span></div>
+      <sc-for list="{{ navMid }}" as="r" hint-placeholder-count="2">
+        <div onClick="{{ r.onClick }}" style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;font-size:1.04em;white-space:nowrap;background:{{ r.bg }};color:{{ r.fg }};font-weight:{{ r.weight }}" style-hover="background:rgb(241 236 228)">
+          <sc-if value="{{ r.on }}"><span style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 2px 2px 0;background:rgb(90 62 43)"></span></sc-if>
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:{{ r.tone }};transform:{{ r.scale }}">{{ r.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+          <sc-if value="{{ r.hasCount }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if>
+        </div>
+      </sc-for>
+      <div style="flex:none;height:1px;margin:10px 6px 4px;background:rgb(229 222 211)"></div>
+      <div style="flex:none;padding:8px 10px 6px;font-size:.81em;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86);white-space:nowrap">Manager tools</div>
+      <sc-for list="{{ navMgr }}" as="r" hint-placeholder-count="7">
+        <a href="{{ r.href }}" style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em;white-space:nowrap" style-hover="background:rgb(241 236 228);color:rgb(74 64 58)">
+          <span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:{{ r.tone }}">{{ r.emoji }}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">{{ r.label }}</span>
+        </a>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid rgb(229 222 211);padding:10px;display:flex;flex-direction:column;gap:2px">
+      <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em" style-hover="background:rgb(241 236 228)"><span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:rgb(230 237 241)">🚪</span><span>Meeting Rooms</span></div>
+      <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;cursor:pointer;color:rgb(74 64 58);font-size:1.04em" style-hover="background:rgb(241 236 228)"><span style="width:28px;height:28px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:rgb(239 228 217)">⚙️</span><span>Settings</span></div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="height:60px;flex:none;box-sizing:border-box;background:#fff;margin:10px 10px 0;border-radius:16px;border:1px solid rgb(229 228 223);padding:0 12px 0 22px;display:flex;align-items:center;gap:20px">
+      <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;color:rgb(43 31 23)"><span style="font-size:15px">{{ crumbEmoji }}</span><span style="font-size:1.04em;font-weight:500">{{ crumbLabel }}</span></div>
+      <div style="flex:0 1 440px;min-width:120px;height:36px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:0 10px 0 12px;background:rgb(246 246 244);border:1px solid rgb(232 225 216);border-radius:8px;color:rgb(117 100 86)" style-hover="border-color:rgb(214 204 190)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.5"></circle><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+        <span style="flex:1;min-width:0;font-size:.96em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Search Track ID, task or person</span>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;border:1px solid rgb(229 222 211);background:#fff;border-radius:4px;padding:2px 5px">⌘K</span>
+      </div>
+      <div style="flex:1;min-width:0"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex:none">
+        <span style="display:flex;margin-right:12px"><span title="Switch workspace view while staying signed in as Principal" style="display:flex;align-items:center;gap:6px;color:rgb(90 78 68)"><span style="width:5px;height:5px;border-radius:50%;background:rgb(150 100 12);flex:none"></span><span style="font-size:13.5px;cursor:pointer;white-space:nowrap">Marketing view</span></span></span>
+        <a href="#" style="height:34px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);font-size:1em;font-weight:500;white-space:nowrap" style-hover="background:#E0893F;color:rgb(43 31 23)"><span style="font-size:15px;line-height:1">+</span><span>New Project</span></a>
+        <span title="Me — attendance, leave, payslips, profile" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 3px;border-radius:16px;border:1px solid rgb(229 228 223);background:#fff;color:rgb(43 31 23);font-size:12.5px;cursor:pointer;white-space:nowrap;box-sizing:border-box"><span style="width:24px;height:24px;border-radius:50%;background:rgb(43 31 23);color:#fff;font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center">LK</span><span>Me</span></span>
+        <span title="Memos" style="position:relative;width:34px;height:34px;box-sizing:border-box;border-radius:10px;border:1px solid rgb(229 228 223);color:rgb(51 36 27);display:grid;place-items:center;cursor:pointer;flex:none" style-hover="border-color:#EC9B55"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"></path><path d="M10 20.5a2.2 2.2 0 0 0 4 0"></path></svg></span>
+        <span style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer" style-hover="background:rgb(241 236 228)">🔔</span>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;padding:10px;display:flex;position:relative">
+      <main style="flex:1 1 auto;min-width:0;background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);overflow:auto;position:relative">
+        <div style="padding:36px 40px 48px;box-sizing:border-box;color:rgb(43 31 23)">
+          <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+            <div style="min-width:0;display:flex;align-items:center;gap:12px"><span style="font-size:1.85em;font-weight:600;letter-spacing:-.01em;white-space:nowrap">{{ pageTitle }}</span></div>
+            <div style="flex:1"></div>
+            <label style="height:34px;width:260px;box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:0 10px;border:1px solid rgb(232 225 216);border-radius:8px;background:#fff;color:rgb(117 100 86)" style-focus-within="border-color:rgb(214 204 190)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.5"></circle><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+              <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Track ID or title" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:.92em;color:rgb(51 36 27)">
+            </label>
+            <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+              <sc-for list="{{ scopes }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="height:28px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;font-size:.92em;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}</div></sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:20px 0 10px">
+            <sc-for list="{{ chips }}" as="c" hint-placeholder-count="9"><div onClick="{{ c.onClick }}" style="height:30px;display:flex;align-items:center;gap:6px;padding:0 11px;border-radius:999px;border:1px solid {{ c.line }};background:{{ c.bg }};cursor:pointer;font-size:.88em;font-weight:{{ c.weight }};white-space:nowrap"><sc-if value="{{ c.hasDot }}"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ c.dot }}"></span></sc-if><span>{{ c.name }}</span></div></sc-for>
+          </div>
+          <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,0.9fr) 70px minmax(0,1.4fr);gap:12px;align-items:center;padding:0 16px;height:36px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-size:.78em;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86)">
+              <span>Project</span><span>Subsidiary</span><span>Stage</span><span>Now with</span><span>Due</span><span>Status</span>
+            </div>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+              <a href="#" style="display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,0.9fr) 70px minmax(0,1.4fr);gap:12px;align-items:center;padding:0 16px;min-height:54px;border-top:{{ r.sep }};cursor:pointer;color:rgb(43 31 23);background:{{ r.bg }}" style-hover="background:rgb(250 248 244);color:rgb(43 31 23)">
+                <div style="min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.title }}</div><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.trackId }} · {{ r.kind }}</div></div>
+                <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-size:.94em;min-width:0"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ r.dot }}"></span>{{ r.sub }}</span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58);font-size:.94em;min-width:0">{{ r.stage }}</span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58);font-size:.94em;min-width:0">{{ r.who }}</span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58);font-size:.94em;min-width:0">{{ r.due }}</span>
+                <span style="display:flex;min-width:0"><span style="display:inline-flex;align-items:center;gap:6px;font-size:.86em;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid {{ r.pillLine }};max-width:100%;box-sizing:border-box;background:{{ r.pillBg }};color:{{ r.pillFg }}"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ r.pillDot }}"></span>{{ r.label }}</span></span>
+              </a>
+            </sc-for>
+            <sc-if value="{{ empty }}"><div style="padding:48px;text-align:center;color:rgb(117 100 86)">Nothing matches.</div></sc-if>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const SUBS = [
+  ['CAR', 'Carres', '🛋️', 'oklch(0.66 0.12 235)'], ['2990', '2990', '🏠', 'oklch(0.62 0.13 295)'], ['HC', 'HOUZS Century', '🏛️', 'oklch(0.48 0.06 50)'],
+  ['HKK', 'Hookka', '🪴', 'oklch(0.68 0.13 350)'], ['OHN', 'Ohana', '🛏️', 'oklch(0.62 0.10 185)'], ['DC', 'Dream Crafter', '✨', 'oklch(0.52 0.13 270)'],
+  ['CMI', 'CMI', '🔩', 'oklch(0.58 0.02 250)'], ['TC', 'The Cont', '🚚', 'oklch(0.60 0.12 320)'],
+].map(([code, name, emoji, dot]) => ({ code, name, emoji, dot }));
+const TONE = {
+  waiting: ['rgb(251 243 225)', 'rgb(236 214 164)', 'rgb(138 92 10)', 'rgb(214 152 30)'],
+  red: ['rgb(252 236 233)', 'rgb(236 190 184)', 'rgb(176 40 34)', 'rgb(200 52 42)'],
+  done: ['rgb(232 244 235)', 'rgb(190 222 199)', 'rgb(40 110 64)', 'rgb(60 150 90)'],
+  draft: ['rgb(243 242 239)', 'rgb(226 223 217)', 'rgb(98 92 86)', 'rgb(160 154 146)'],
+};
+const ROWS = [
+  { title: 'TESTING xxx VIDEO', trackId: 'TSK-CAR-2611-002', kind: 'Quick Task', sub: 'CAR', stage: 'Stage 1/1 · TESTING xxx VIDEO', who: 'IZZUL', due: '19 Nov', tone: 'waiting', label: 'In progress', open: true },
+  { title: 'TESTING xxx VIDEO × 1', trackId: 'TSK-CAR-2611-004', kind: 'Quick Task', sub: 'CAR', stage: 'Stage 1/1 · TESTING xxx VIDEO × 1', who: 'IZZUL', due: '19 Nov', tone: 'waiting', label: 'In progress', open: true },
+  { title: 'Image post * 5 × 1', trackId: 'TSK-CAR-2611-003', kind: 'Quick Task', sub: 'CAR', stage: 'Stage 1/1 · Image post * 5 × 1', who: 'JOSIAH', due: '3 Dec', tone: 'waiting', label: 'In progress', open: true },
+  { title: 'Meta Ads × 1', trackId: 'TSK-CAR-2611-005', kind: 'Quick Task', sub: 'CAR', stage: 'Stage 1/1 · Meta Ads × 1', who: 'JOSIAH', due: '20 Nov', tone: 'waiting', label: 'In progress', open: true },
+  { title: 'Carres · XXX testing Package · Nov 2026', trackId: 'MKT-CAR-2611-001', kind: 'Project', sub: 'CAR', stage: 'Before the plan', who: '—', due: '—', tone: 'draft', label: 'Minutes', open: true },
+];
+const T = { sand: 'rgb(239 228 217)', mist: 'rgb(230 237 241)', peach: 'rgb(249 231 216)', cream: 'rgb(246 238 222)' };
+
+class Component extends DCLogic {
+  state = { scope: 'open', sub: null, q: '' };
+  renderVals() {
+    const s = this.state, q = s.q.trim().toLowerCase();
+    const match = (r, scope) => (scope === 'all' || (scope === 'open' ? r.open : !r.open)) && (!s.sub || r.sub === s.sub) && (!q || (r.title + ' ' + r.trackId).toLowerCase().includes(q));
+    const shown = ROWS.filter(r => match(r, s.scope));
+    const picked = s.sub ? SUBS.find(x => x.code === s.sub) : null;
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / .14)' : 'none', weight: on ? 600 : 400 });
+    const subOf = c => SUBS.find(x => x.code === c);
+    return {
+      navTop: [{ emoji: '🏠', label: 'My Space', tone: T.sand }, { emoji: '📅', label: 'Calendar', tone: T.mist }, { emoji: '🏢', label: 'Subsidiaries', tone: T.peach, chev: true }],
+      navSubs: SUBS.map(x => ({ ...x, bg: s.sub === x.code ? 'rgb(236 229 219)' : 'transparent', weight: s.sub === x.code ? 500 : 400, onClick: () => this.setState({ sub: x.code }) })),
+      navMid: [['📁', 'Projects', T.sand, 1, true], ['📚', 'Library', T.mist, 0, false]].map(([emoji, label, tone, count, on]) => ({ emoji, label, tone, count, hasCount: count > 0, on, bg: on ? 'rgb(236 229 219)' : 'transparent', fg: on ? 'rgb(51 36 27)' : 'rgb(74 64 58)', weight: on ? 500 : 400, scale: on ? 'scale(1.06)' : 'none', onClick: () => on && this.setState({ sub: null }) })),
+      navMgr: [['📊', 'Tracking Dashboard', T.sand, '#'], ['🧩', 'Workflow Builder', T.mist, 'Workflow Builder.dc.html'], ['📦', 'Product Builder', T.peach, '#'], ['📝', 'Minutes Builder', T.cream, '#'], ['🔁', 'Replace Person', T.mist, '#'], ['💰', 'Billing', T.peach, '#'], ['🏦', 'Pool', T.sand, '#']].map(([emoji, label, tone, href]) => ({ emoji, label, tone, href })),
+      crumbEmoji: picked ? picked.emoji : '📁', crumbLabel: picked ? picked.name : 'Projects',
+      pageTitle: picked ? `${picked.emoji} ${picked.name}` : 'Projects',
+      q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      scopes: [['open', 'Open'], ['done', 'Done'], ['all', 'All']].map(([k, l]) => ({ label: `${l} · ${ROWS.filter(r => match(r, k)).length}`, ...seg(s.scope === k), onClick: () => this.setState({ scope: k }) })),
+      chips: [{ name: 'All subsidiaries', hasDot: false, on: !s.sub, onClick: () => this.setState({ sub: null }) }, ...SUBS.map(x => ({ name: x.name, dot: x.dot, hasDot: true, on: s.sub === x.code, onClick: () => this.setState({ sub: x.code }) }))]
+        .map(c => ({ ...c, bg: c.on ? 'rgb(236 229 219)' : '#fff', line: c.on ? 'rgb(214 190 160)' : 'rgb(229 222 211)', weight: c.on ? 500 : 400 })),
+      rows: shown.map((r, i) => { const t = TONE[r.tone], sb = subOf(r.sub); return { ...r, sub: sb.name, dot: sb.dot, sep: i ? '1px solid rgb(244 241 236)' : '0', bg: r.tone === 'red' ? 'rgb(255 247 245)' : '#fff', pillBg: t[0], pillLine: t[1], pillFg: t[2], pillDot: t[3] }; }),
+      empty: !shown.length,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -16,11 +16,14 @@ import w from './workflows.module.css'
 
 // The Stage Settings panel (`Stage Settings.dc.html`, layout="accordion"): the number, the name, ◀ ▶ to move it and
 // Remove; then four sections, one open at a time, each with a one-line summary — Basics (name, group chips with
-// "+ New group", how long as "day a–b", subtasks), Who does it (👤 MM assigns or 🔓 a handoff from the stage before,
+// "+ New group", how long as "day a–b", subtasks), Who does it (👤 Anyone can assign — the whole team with each one's load — or 🔓 a handoff from the stage before,
 // with its shortlist and each person's load), Approval (Doer submits → up to three levels → what follows; where
 // changes go back to) and PIC & form (what the PIC reads; the fields are the Canvas template's — a link card).
 
 export type Section = 'basics' | 'who' | 'appr' | 'pic' | ''
+
+/** Five or more tasks open: shown in red on the team list (the 2026-11-17 handoff §1.4). */
+export const BUSY_AT = 5
 
 export default function TemplateSettings({
   stage,
@@ -167,7 +170,7 @@ export default function TemplateSettings({
               on={stage.split}
               disabled={locked}
               title="Can be split into subtasks"
-              sub={locked ? 'Off while “MM assigns every stage” is on' : 'The doer can open subtasks for other people; checked internally only'}
+              sub={locked ? 'Off while “Assign every stage” is on' : 'The doer can open subtasks for other people; checked internally only'}
               subWait={locked}
               onChange={split => onPatch({ split })}
             />
@@ -177,7 +180,7 @@ export default function TemplateSettings({
         {acc('who', 'Who does it', whoSummary(stage, at, locked, nameOf), isPrev && !cands.length)}
         {section === 'who' ? (
           <div className={`${w.accBody} ${w.accBodyWho}`} role="radiogroup" aria-label="Who does it">
-            <RadioCard big on={mode === 'assign'} title="👤 MM assigns" text="MM picks the person when planning each project."
+            <RadioCard big on={mode === 'assign'} title="👤 Anyone can assign" text="Whoever plans the project picks the person. Anyone on the team can assign or reassign."
               onPick={() => onPatch({ who: { mode: 'assign', cands } })} />
             <RadioCard
               big
@@ -185,9 +188,27 @@ export default function TemplateSettings({
               off={prevOff}
               title="🔓 Handoff from the previous stage"
               text={at === 0 ? 'The person on the stage before picks who does this one.' : `When Stage ${at} · ${stages[at - 1]?.name || ''} is done, that person picks who does this one from a shortlist.`}
-              why={at === 0 ? 'Not available on the first stage' : locked ? 'Off while “MM assigns every stage” is on' : undefined}
+              why={at === 0 ? 'Not available on the first stage' : locked ? 'Off while “Assign every stage” is on' : undefined}
               onPick={() => onPatch({ who: { mode: 'prev', cands } })}
             />
+            {!isPrev ? (
+              <div className={w.shortlist} aria-label="Can be assigned">
+                <Tip text="Whoever plans the project picks one of them. Busy people (5+ active) are shown in red.">
+                  <div className={w.shortHead} tabIndex={0}>
+                    Can be assigned <span className={w.shortHint}>· everyone on the team · {people.length} {people.length === 1 ? 'person' : 'people'}</span>
+                  </div>
+                </Tip>
+                <div className={w.chips}>
+                  {people.map(p => (
+                    <span key={p.id} className={`${w.person} ${w.personStatic}`} title={p.title ? `${p.first} · ${p.title}` : p.first}>
+                      <span className={w.personAv} style={{ background: personBg({ group: p.title }) }}>{p.first.charAt(0).toUpperCase()}</span>
+                      {p.first}
+                      <span className={`${w.personLoad}${p.load >= BUSY_AT ? ` ${w.personLoadHigh}` : ''}`}>{p.load} active</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {isPrev ? (
               <div className={w.shortlist}>
                 <div className={w.shortHead}>

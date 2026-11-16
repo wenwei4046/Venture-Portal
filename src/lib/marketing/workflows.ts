@@ -1,6 +1,6 @@
 // Marketing's Workflow Builder 2a (2026-11-13 — `docs/design_handoff_workflow_builder/`, mig 20261113200000): the
 // templates under their categories, and a template's stages as the builder edits them — each stage a stable key
-// (`sid`), its group (one of Marketing's — mkt_groups), who does it (MM assigns, or 🔓 a handoff from the stage
+// (`sid`), its group (one of Marketing's — mkt_groups), who does it (anyone can assign, or 🔓 a handoff from the stage
 // before to one of a shortlist), its working days, up to three approval levels of one or more people (any one of them,
 // or everyone — flow.ts's ApprLevel), subtasks, where changes go back to, what the PIC reads. The fields live on the
 // canvas (canvas.ts). The template-wide overdue rule and finish are flow.ts's. Then what the builder draws from them:
@@ -21,7 +21,7 @@ export interface WfStage {
   name: string
   /** Its group's key ('' = none). */
   dept: string
-  /** assign: MM picks when planning each project; prev: 🔓 the stage before hands it to one of `cands`. */
+  /** assign: anyone can assign — whoever plans each project picks; prev: 🔓 the stage before hands it to one of `cands`. */
   who: { mode: 'assign' | 'prev'; cands: string[] }
   sla: number
   appr: ApprLevel[]
@@ -219,7 +219,7 @@ export const apprSummary = (appr: readonly ApprLevel[], nameOf: (id: string) => 
 
 /** The Who section's summary. */
 export function whoSummary(stage: WfStage, at: number, locked: boolean, nameOf: (id: string) => string): string {
-  if (locked || stage.who.mode !== 'prev') return '👤 MM assigns when planning'
+  if (locked || stage.who.mode !== 'prev') return '👤 Anyone can assign'
   return stage.who.cands.length ? `🔓 Stage ${at}'s person picks · ${stage.who.cands.map(nameOf).join(' / ')}` : '🔓 Handoff · shortlist empty'
 }
 
@@ -265,9 +265,9 @@ export function wfProblems(stages: readonly WfStage[], locked: boolean): string[
 export function publishFixups(stages: readonly WfStage[], locked: boolean, team: ReadonlySet<string>, approvers: ReadonlySet<string>, canvas: WfCanvas): string[] {
   const run = asRun(stages, locked)
   const out: string[] = []
-  if (run[0]?.who.mode === 'prev') out.push('Stage 1 runs as MM assigns — no stage before it')
+  if (run[0]?.who.mode === 'prev') out.push('Stage 1 runs as Anyone can assign — no stage before it')
   if (run.some((s, i) => i > 0 && s.who.mode === 'prev' && s.who.cands.length > 0 && s.who.cands.every(c => !team.has(c))))
-    out.push('A 🔓 handoff whose shortlist has left the team runs as MM assigns')
+    out.push('A 🔓 handoff whose shortlist has left the team runs as Anyone can assign')
   else if (run.some(s => s.who.mode === 'prev' && s.who.cands.some(c => !team.has(c)))) out.push('Somebody who left the team comes off a shortlist')
   if (run.some(s => s.appr.some(l => !l.ids.length))) out.push('An approval level with nobody on it is left out')
   const persons = run.flatMap(s => s.appr.flatMap(l => l.ids.filter(id => id !== PIC_ID && id !== ASSIGN_ID && id !== NEXT_ID)))
@@ -277,10 +277,10 @@ export function publishFixups(stages: readonly WfStage[], locked: boolean, team:
   return out
 }
 
-/** The lock's grey note: what MM assigning every stage turns off (their settings come back when unlocked). */
+/** The lock's grey note: what assigning every stage turns off (their settings come back when unlocked). */
 export function lockNote(stages: readonly WfStage[]): string {
   const n = stages.filter(s => s.who.mode === 'prev' || s.split).length
-  return `MM assigns every stage when planning.${n ? ` Handoffs and subtasks are off on ${n} stage${n === 1 ? '' : 's'} — their settings come back if you switch to “Handoffs allowed”.` : ''}`
+  return `Every stage is assigned when planning · anyone can assign.${n ? ` Handoffs and subtasks are off on ${n} stage${n === 1 ? '' : 's'} — their settings come back if you switch to “Handoffs allowed”.` : ''}`
 }
 
 // ── The time bar, the end ────────────────────────────────────────────────────────
@@ -348,7 +348,7 @@ export function publishDiff(
   const before = base?.stages ?? []
   const bMap = new Map(before.map(s => [s.sid, s]))
   const cMap = new Map(now.stages.map(s => [s.sid, s]))
-  const whoT = (x: WfStage) => (x.who.mode === 'prev' ? `handoff (${x.who.cands.map(nameOf).join(' / ') || 'no shortlist'})` : 'MM assigns')
+  const whoT = (x: WfStage) => (x.who.mode === 'prev' ? `handoff (${x.who.cands.map(nameOf).join(' / ') || 'no shortlist'})` : 'Anyone can assign')
   const apprT = (x: WfStage) => (x.appr.length ? apprText(x.appr, nameOf) : 'no approval')
   const out: WfChange[] = []
   const add = (icon: string, text: string, tone: WfChange['tone'] = 'ink') => out.push({ icon, text, tone })
@@ -383,7 +383,7 @@ export const activeNote = (version: number, live: number) => (version ? `${live}
 
 // ── New stages and templates ─────────────────────────────────────────────────────
 
-/** A stage added beside another (the prototype's): "New stage", that stage's group, MM assigns, a day, no approval. */
+/** A stage added beside another (the prototype's): "New stage", that stage's group, anyone can assign, a day, no approval. */
 export function newWfStage(beside?: Pick<WfStage, 'dept'>): WfStage {
   return { sid: newSid(), name: 'New stage', dept: beside?.dept ?? 'design', who: { mode: 'assign', cands: [] }, sla: 1, appr: [], split: false, back: null, picText: '' }
 }
@@ -430,7 +430,7 @@ export const gifPath = (fileName: string, uuid: string) => {
 /** A copy of a stage: a key of its own, "… copy". */
 export const duplicateStage = (s: WfStage): WfStage => ({ ...s, sid: newSid(), name: `${s.name} copy`.slice(0, 80), who: { ...s.who, cands: [...s.who.cands] }, appr: s.appr.map(l => ({ ...l, ids: [...l.ids] })) })
 
-/** A new template's one stage (the prototype's + Template): named for its category, Design, MM assigns, two days, the
+/** A new template's one stage (the prototype's + Template): named for its category, Design, anyone can assign, two days, the
  * PIC approves. */
 export function firstWfStage(category: string): WfStage {
   return { ...newWfStage(undefined), name: category.trim().slice(0, 80) || 'Stage 1', sla: 2, appr: [{ ids: [PIC_ID], rule: 'any' }] }
