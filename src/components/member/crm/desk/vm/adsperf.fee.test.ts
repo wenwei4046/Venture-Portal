@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ALL, feeMonths, feeTier, feeWorking, marketingFee } from "./adsperf";
+import { ALL, feeMonths, feeTier, feeWorking, marketingFee, runSplit } from "./adsperf";
+import type { CrmCustomer } from "@/lib/member/crm-data";
 
 describe("the Revenue Team's marketing fee", () => {
   it("is the owner's three samples", () => {
@@ -36,5 +37,26 @@ describe("the Revenue Team's marketing fee", () => {
     const keys = ALL.map(m => m[0]);
     expect(keys).not.toContain("mktfee");
     expect(keys).not.toContain("totalcost");
+  });
+});
+
+// 2026-11-16 (the owner, Total cost RM 7,142 beside Spent RM 1,151 with Running picked: hovering Spent shows the running ads'
+// spend and the paused ads'; "leads 也是"): the two parts add up to Total cost's spend, and the running leads to the list's.
+describe("Spent's and Leads' running / paused parts", () => {
+  const cs = (n: number) => Array.from({ length: n }, () => ({}) as CrmCustomer);
+  const ads = [{ id: "111111", cs: cs(14) }, { id: "222222", cs: cs(5) }, { id: "333333", cs: cs(3) }];
+  const status = (id: string) => (id === "333333" ? "Paused" : "Running");
+  const SPEND: Record<string, number> = { "111111": 700, "222222": 451.17, "333333": 3_491.11 };
+  const spendOf = (ids: string[]) => ids.reduce((n, id) => n + (SPEND[id] ?? 0), 0);
+  const leadsOf = (c: CrmCustomer[]) => c.length;
+  it("splits the month's spend of every ad and the list's leads by Running", () => {
+    const s = runSplit(ads, status, Object.keys(SPEND), [[0, 1]], 0, 1, spendOf, leadsOf);
+    expect(s.spend!.running).toBeCloseTo(1_151.17, 2);
+    expect(s.spend!.paused).toBeCloseTo(3_491.11, 2);
+    expect(s.spend!.running + s.spend!.paused).toBeCloseTo(4_642.28, 2); // Total cost's spend
+    expect(s.leads).toEqual({ running: 19, paused: 3 });
+  });
+  it("says nothing of the spend until every month is read", () => {
+    expect(runSplit(ads, status, Object.keys(SPEND), [[0, 1]], 0, 1, () => null, leadsOf).spend).toBeNull();
   });
 });

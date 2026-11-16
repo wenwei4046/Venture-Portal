@@ -140,6 +140,26 @@ export function feeWorking(spend: number): string {
   return `25% × ${rm(FEE_STEP)} + 20% × ${rm(spend - FEE_STEP)} = ${rm(FEE_STEP * FEE_LOW)} + ${rm((spend - FEE_STEP) * FEE_HIGH)} = ${rm(marketingFee(spend) ?? 0)}`;
 }
 /**
+ * Spent's and Leads' hover on the figure strip (the owner, 2026-11-16: "增加指向 spent 要出现 running ads fee, & pause ads
+ * fee", "leads 也是"): the running ads' part and the rest (paused, or Meta says nothing yet). Spend is the fee's months over
+ * every ad of the source (`feeIds`, hidden ones too — Total cost's own spend, so the two parts add up to it); null until
+ * every month is read. Leads are the range's over the ads the list shows (`listAds`), so with Running picked the running
+ * part is the Leads figure.
+ */
+export function runSplit<A extends { id: string; cs: CrmCustomer[] }>(listAds: A[], status: (id: string) => string | null,
+  feeIds: string[], feeRanges: [number, number][], ra: number, rb: number,
+  spendOf: (ids: string[], a: number, b: number) => number | null, leadsOf: (cs: CrmCustomer[], a: number, b: number) => number) {
+  const isRun = (id: string) => status(id) === "Running";
+  const runIds = feeIds.filter(id => isRun(id)), restIds = feeIds.filter(id => !isRun(id));
+  const known = feeRanges.length > 0 && feeRanges.every(([a, b]) => spendOf(feeIds, a, b) != null);
+  const sum = (ids: string[]) => feeRanges.reduce((n, [a, b]) => n + (ids.length ? spendOf(ids, a, b) ?? 0 : 0), 0);
+  const leads = (ads: A[]) => leadsOf(ads.flatMap(x => x.cs), ra, rb);
+  return {
+    spend: known ? { running: sum(runIds), paused: sum(restIds) } : null,
+    leads: { running: leads(listAds.filter(x => isRun(x.id))), paused: leads(listAds.filter(x => !isRun(x.id))) },
+  };
+}
+/**
  * The calendar months a range touches, each whole from its 1st to its last day — or to today for the month still running.
  * The fee is billed by the month (the owner, 2026-11-12: "Marketing fee 是以一个月去计算的"), so a week or a day shows
  * its month's fee, and a range over two months the two months' fees.
@@ -348,8 +368,22 @@ export function adsPerfVM(ctx: DeskCtx) {
       ].join("\n"),
     };
   };
+  // Spent's and Leads' hover (the owner, 2026-11-16, Total cost RM 7,142 beside Spent RM 1,151 with Running picked: "增加指向
+  // spent 要出现 running ads fee, & pause ads fee", then "leads 也是"): the running ads' part and the paused ads' part.
+  const split = runSplit(ads, status, feeIds, feeRanges, ra, rb, (ids, a, b) => metaFigures(metaOf(ids, a, b), {}).spend ?? null, (cs, a, b) => crmFigures(cs, ctx, a, b).leads ?? 0);
+  const spendHint = (): { sub?: string[]; title?: string } => {
+    const s = split.spend;
+    if (!s) return {};
+    const r2 = (v: number) => `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, mon = feeRanges.map(([a]) => MON[new Date(a).getMonth()].slice(0, 3)).join(" + ");
+    return { sub: [`Running ads ${r2(s.running)}`, `Paused ads ${r2(s.paused)}`, `${mon} all ads ${r2(s.running + s.paused)} · in Total cost`] };
+  };
+  const leadsHint = (): { sub?: string[]; title?: string } => {
+    const l = split.leads;
+    return { sub: [`Running ads ${l.running}`, `Paused ads ${l.paused}`, `All ads ${l.running + l.paused}`] };
+  };
+  const hintOf = (k: string) => (k === "cpl" ? cplHint() : k === "spend" ? spendHint() : k === "leads" ? leadsHint() : {});
   const picked = slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
-    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...(k === "cpl" ? cplHint() : {}) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
+    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...hintOf(k) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
   // The Revenue Team's marketing fee and the whole cost (the owner, 2026-11-12: the spend alone is not the whole cost; "mkt
   // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
   // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after
