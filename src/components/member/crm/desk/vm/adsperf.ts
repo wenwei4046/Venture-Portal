@@ -135,7 +135,9 @@ export function feeTier(spend: number): { tier: (typeof FEE_TIERS)[number]; toNe
 export function feeWorking(spend: number): string {
   const rm = (v: number) => `RM ${Math.round(v).toLocaleString("en-MY")}`;
   if (spend <= 0) return "No spend, no fee";
-  if (spend < FEE_MIN_UNTIL) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}, under the minimum → ${rm(FEE_MIN)}`;
+  // Under RM 10,000 the month pays the minimum, which its Tier 1 line already says (the owner, 2026-11-16, crossing out
+  // "25% × RM 4,642 = RM 1,161, under the minimum → RM 2,500"): no working line.
+  if (spend < FEE_MIN_UNTIL) return "";
   if (spend <= FEE_STEP) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}`;
   return `25% × ${rm(FEE_STEP)} + 20% × ${rm(spend - FEE_STEP)} = ${rm(FEE_STEP * FEE_LOW)} + ${rm((spend - FEE_STEP) * FEE_HIGH)} = ${rm(marketingFee(spend) ?? 0)}`;
 }
@@ -363,8 +365,7 @@ export function adsPerfVM(ctx: DeskCtx) {
       title: [
         "Per lead = (Spent + marketing fee) ÷ Leads",
         `(${r2(spent)} + ${r2(share)}) ÷ ${n} = ${r2((spent + share) / n)}`,
-        `Marketing fee here = Spent × ${(rate * 100).toFixed(1)}% (the month's fee ÷ the month's spend)`,
-        `Spent ÷ Leads = ${r2(spent)} ÷ ${n} = ${r2(spent / n)}`,
+        // The fee's share line and Spent ÷ Leads again went (the owner, 2026-11-16, circling them): the first line says it.
       ].join("\n"),
     };
   };
@@ -399,7 +400,7 @@ export function adsPerfVM(ctx: DeskCtx) {
   const feeSub = !feeKnown ? [] : one ? [one.line, one.next] : [feeMon.map(m => `${monName(m.a)} T${tierOf(m).t.tier.n}`).join(" · "), "Each month billed alone"];
   const feeTitle = [
     ...FEE_TIERS.map(t => `Tier ${t.n}: ${t.rule}`), "",
-    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`, feeWorking(m.s ?? 0)]) : []),
+    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`, feeWorking(m.s ?? 0)].filter(Boolean)) : []),
   ].join("\n");
   const feeItems = [
     { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle },

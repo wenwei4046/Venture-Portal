@@ -29,7 +29,7 @@ describe("the Revenue Team's marketing fee", () => {
     expect(feeMonths(d(2025, 12, 20), d(2026, 1, 5), today)).toEqual([[d(2025, 12, 1), d(2025, 12, 31)], [d(2026, 1, 1), d(2026, 1, 31)]]);
   });
   it("writes its working out", () => {
-    expect(feeWorking(3_192)).toBe("25% × RM 3,192 = RM 798, under the minimum → RM 2,500");
+    expect(feeWorking(3_192)).toBe(""); // under the minimum: its Tier 1 line says it (2026-11-16)
     expect(feeWorking(20_000)).toBe("25% × RM 20,000 = RM 5,000");
     expect(feeWorking(50_000)).toBe("25% × RM 30,000 + 20% × RM 20,000 = RM 7,500 + RM 4,000 = RM 11,500");
   });
