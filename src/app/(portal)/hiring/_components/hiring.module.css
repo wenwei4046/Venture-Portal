@@ -1051,6 +1051,77 @@
 .shareCost { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12px; min-width: 70px; text-align: right; }
 .shareTrack { height: 6px; border-radius: 3px; background: rgb(var(--hv-panel-3)); overflow: hidden; }
 .shareFill { display: block; height: 100%; background: rgb(var(--hv-slate)); }
+/* ── Insights › Open roles (2026-11-16): every request open today, whatever the period; a row opens in place onto
+   its facts, its candidates at their stages and its newest step. The head band and the frame are Every request's. ── */
+.orCount { margin-left: 6px; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12px; font-weight: 400; color: rgb(var(--hv-brown)); }
+.orTable { border: 1px solid rgb(var(--hv-frame)); border-radius: 10px; overflow: hidden; }
+.orCols {
+  display: grid;
+  grid-template-columns: 18px minmax(200px, 1.5fr) minmax(110px, 0.8fr) minmax(220px, 2fr) 72px 76px 136px;
+  column-gap: 12px;
+  align-items: center;
+}
+.orHead {
+  padding: 10px 14px;
+  background: rgb(var(--hv-head));
+  border-bottom: 1px solid rgb(var(--hv-head-rule));
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.orList { list-style: none; margin: 0; padding: 0; }
+.orItem { border-bottom: 1px solid rgb(var(--hv-hairline)); }
+.orItem:last-child { border-bottom: 0; }
+.orRow {
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: rgb(255 255 255);
+  font: inherit;
+  font-size: 13px;
+  line-height: normal;
+  color: rgb(var(--hv-ink));
+  text-align: left;
+  cursor: pointer;
+}
+.orRow:hover { background: rgb(var(--hv-row-hover-soft)); }
+.orRow:focus-visible { outline: 2px solid rgb(var(--hv-accent)); outline-offset: -2px; }
+.orItem[data-open='true'] > .orRow { background: rgb(var(--hv-panel)); }
+.orCaret { display: grid; place-items: center; width: 18px; height: 18px; color: rgb(var(--hv-brown)); transition: transform 0.15s; }
+.orItem[data-open='true'] .orCaret { transform: rotate(90deg); }
+.orPos { min-width: 0; }
+.orOwner { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orStages { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.orNone { font-size: 12px; color: rgb(var(--hv-empty-text)); }
+.orHired[data-all='true'] { color: rgb(var(--hv-ledger)); font-weight: 600; }
+.stageN { font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 600; }
+/* The Hired and Open-for cells' own words: the head band says them on a desktop, the cells on a phone. */
+.orCellLabel { display: none; }
+.orMore { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px 44px; background: rgb(var(--hv-panel)); border-top: 1px solid rgb(var(--hv-hairline)); }
+.orFacts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 16px; }
+.orFactLabel { font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--hv-brown)); }
+.orFactValue { margin-top: 3px; font-size: 13.5px; color: rgb(var(--hv-ink)); overflow-wrap: anywhere; }
+.orCands { display: flex; flex-direction: column; border: 1px solid rgb(var(--hv-hairline)); border-radius: 8px; background: rgb(255 255 255); }
+.orCand {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 150px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgb(var(--hv-panel-3));
+  font-size: 13px;
+}
+.orCand:last-child { border-bottom: 0; }
+.orCand[data-out='true'] { background: rgb(var(--hv-panel-2)); }
+.orCandName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.orCand[data-out='true'] .orCandName { font-weight: 500; color: rgb(var(--hv-body-2)); }
+.orCandMore { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.orFoot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.orLatest { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font-size: 12.5px; }
+.orLatestWhat { font-weight: 500; }
+.orLatestWhen { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11.5px; color: rgb(var(--hv-brown)); }
+.orLatestNote { color: rgb(var(--hv-graphite)); }
 .everyHead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
 .everyTable { border: 1px solid rgb(var(--hv-frame)); border-radius: 10px; overflow-x: auto; }
 .everyInner { min-width: max-content; }
@@ -1243,10 +1314,30 @@
   /* The month picker opens leftwards from its button's right edge: pinned to the left it ran off a phone's
      screen and six months could not be picked (the parity audit, 2026-10-11). */
   .monthPop { left: auto; right: 0; }
+  /* Open roles folds (a table of 5+ columns): the position and its status, the candidates under them, then the
+     owner, Hired and Open, each cell naming itself. A wrapping line, not a grid: a grid's columns let the status
+     chip's width squeeze the owner to "LI S…" (seen at 390px). The section's card is the only frame. */
+  .orTable { border: 0; border-radius: 0; }
+  .orHead { display: none; }
+  .orList { border-top: 1px solid rgb(var(--hv-hairline)); }
+  .orRow.orCols { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 6px; padding: 10px 6px; }
+  .orCaret { order: 0; }
+  .orPos { order: 1; flex: 1 1 0; }
+  .orPos .everyPos, .orPos .everySub { white-space: normal; }
+  .orStatus { order: 2; }
+  .orStages { order: 3; flex: 1 0 100%; padding-left: 28px; }
+  .orOwner { order: 4; flex: 1 1 0; padding-left: 28px; font-size: 12px; }
+  .orHired { order: 5; }
+  .orDays { order: 6; }
+  .orCellLabel { display: inline; font-family: var(--font-sans), Inter, var(--font-cjk), system-ui, sans-serif; font-size: 11.5px; color: rgb(var(--hv-brown)); }
+  .orMore { padding: 12px 10px 14px; }
+  .orFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .orCand { grid-template-columns: minmax(0, 1fr) auto; }
+  .orCandMore { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .menu, .monthPop, .treeKids, .talCtx { animation: none; }
-  .treeCaret { transition: none; }
+  .treeCaret, .orCaret { transition: none; }
   .track, .knob { transition: none; }
 }

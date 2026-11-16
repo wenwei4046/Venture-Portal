@@ -25,12 +25,14 @@ export const STAGE_COLOURS: Readonly<Record<CandidateStage, { bg: string; border
   rejected: { bg: 'rgb(var(--hv-danger-bg))', border: 'rgb(var(--hv-danger-border))', fg: 'rgb(var(--hv-danger))' },
 }
 
-export function StageChip({ stage }: { stage: CandidateStage }) {
+/** A candidate's stage — with `n`, how many stand at it (Insights › Open roles). */
+export function StageChip({ stage, n }: { stage: CandidateStage; n?: number }) {
   const c = STAGE_COLOURS[stage]
   return (
     <span className={s.stageChip} style={{ borderColor: c.border, background: c.bg, color: c.fg }}>
       <span className={s.stageDot} style={{ background: c.fg }} aria-hidden="true" />
       {STAGE[stage].label}
+      {n === undefined ? null : <span className={s.stageN}> {n}</span>}
     </span>
   )
 }

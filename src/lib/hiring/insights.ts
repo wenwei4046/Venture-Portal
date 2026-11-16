@@ -1,10 +1,12 @@
-import type { HiringRequest, HiringStatus } from './types'
-import { answerOf, budgetText, dayKey, dayLabel, requestTitle } from './view'
+import { reasonLabel } from './reasons'
+import type { CandidateStage, HiringBoard, HiringRequest, HiringStatus } from './types'
+import { answerOf, budgetText, candidateInfo, candidateMeta, dayKey, dayLabel, headcountOf, requestTitle } from './view'
 
 // Hiring › Insights (2026-10-11, README §12; the handoff's insVals): how long
 // each request takes, from submitted to acknowledged to filled, what it cost
 // and through which source — for this month, a month of the last twelve, or
 // all time. Pure: the page hands in the board's requests and the office's today.
+// Open roles (2026-11-16) stands apart from the period: what is being hired today.
 
 /** 'this' (the office's month), 'all', or a month 'm:2026-09'. */
 export type InsightsPeriod = 'this' | 'all' | `m:${string}`
@@ -198,15 +200,20 @@ export function insightsOf(
     .sort((a, b) => b.paxN - a.paxN)
     .map(s => ({ name: s.name, pax: s.pax, share: s.share, cost: s.cost }))
 
+  // A department's "N open" is what was still open as the period closed — today's while the period runs (this month,
+  // all time), a month gone by's at its end (2026-11-16: it counted the period's own requests alone, so on 16 Nov every
+  // department read "0 open" while eight requests from October were being hired; Open roles lists them).
+  const close = Math.min(range[1], utc(today) + DAY)
+  const openAtClose = all.filter(x => utc(x.sub) < close && (x.open || (!!x.end && utc(x.end) >= close)))
   const deptOf = (r: HiringRequest) => answerOf(r, 'dept').split(' · ')[0]
-  const deptNames = [...departments, ...rows.map(x => deptOf(x.r)).filter(d => d && !departments.includes(d))]
+  const deptNames = [...departments, ...[...rows, ...openAtClose].map(x => deptOf(x.r)).filter(d => d && !departments.includes(d))]
   const departmentsOut = [...new Set(deptNames)].map(name => {
     const mine = rows.filter(x => deptOf(x.r) === name)
     const f = filled.filter(x => deptOf(x.r) === name)
     const a = avg(f.map(x => x.toFill as number))
     return {
       name,
-      mix: `${mine.filter(x => x.open).length} open · ${f.reduce((s, x) => s + x.pax, 0)} hired`,
+      mix: `${openAtClose.filter(x => deptOf(x.r) === name).length} open · ${f.reduce((s, x) => s + x.pax, 0)} hired`,
       share: Math.round((mine.length / Math.max(1, rows.length)) * 100),
       avg: a === null ? 'No fills' : `${a} days to fill`,
     }
@@ -242,6 +249,93 @@ export function insightsOf(
       status: x.r.status,
     })),
   }
+}
+
+/** A candidate of an open role, as its row lists them once opened. */
+export interface OpenRoleCandidate {
+  id: string
+  name: string
+  stage: CandidateStage
+  /** Where they came from and how to reach them: "Applied · 016-221 0457". */
+  meta: string
+  /** Their candidate fields: Expected salary RM 3,000, Available from 1 Nov 2026 … */
+  info: Array<{ label: string; value: string }>
+  /** Not selected: why the Talent Bank keeps them ("Failed interview"). */
+  why: string
+}
+
+export interface OpenRole {
+  id: string
+  position: string
+  /** "HR-203 · Revenue · Fair" — a guest's company before its department: "HR-206 · Carres · Sales". */
+  where: string
+  owner: string
+  ownerSet: boolean
+  status: HiringStatus
+  /** How many of its candidates stand at each stage — the stages that have any, in the pipeline's order. */
+  stages: Array<{ stage: CandidateStage; n: number }>
+  /** "1 / 3": its candidates at Hired, of the headcount. */
+  hired: string
+  /** Everybody it asked for is at Hired — what is left is Mark filled. */
+  hiredAll: boolean
+  /** "24 d": office days since it was submitted. */
+  openFor: string
+  /** The ones in the running as they were added, then the not selected. */
+  candidates: OpenRoleCandidate[]
+  facts: Array<{ label: string; value: string }>
+  /** The newest step of its trail. */
+  latest: { what: string; when: string; who: string; note: string } | null
+}
+
+const PILL_STAGES: readonly CandidateStage[] = ['shortlisted', 'appointment', 'offered', 'hired', 'rejected']
+
+/**
+ * Open roles (2026-11-16, the user: "我想看到 ongoing 正在招的人的 status，还有现阶段到底有什么职位在招人，能及时展开看"):
+ * every request open today — Pending, More info needed, Acknowledged — whatever the period, the longest open first.
+ */
+export function openRoles(
+  board: Pick<HiringBoard, 'requests' | 'candidateFields' | 'talents' | 'talentReasons'>,
+  today: string,
+  ownerName: (id: string | null) => string,
+): OpenRole[] {
+  return board.requests
+    .filter(r => OPEN_NOW.has(r.status))
+    .sort((a, b) => Date.parse(a.submittedAt) - Date.parse(b.submittedAt) || a.id.localeCompare(b.id, 'en', { numeric: true }))
+    .map(r => {
+      const count = (stage: CandidateStage) => r.candidates.filter(c => c.stage === stage).length
+      const company = r.requesterCompany
+      const last = r.events.length ? r.events[r.events.length - 1] : null
+      const running = r.candidates.filter(c => c.stage !== 'rejected')
+      const out = r.candidates.filter(c => c.stage === 'rejected')
+      return {
+        id: r.id,
+        position: requestTitle(r),
+        where: [r.id, company, answerOf(r, 'dept')].filter(Boolean).join(' · '),
+        owner: r.ownerId ? ownerName(r.ownerId) || '—' : 'Unassigned',
+        ownerSet: !!r.ownerId,
+        status: r.status,
+        stages: PILL_STAGES.map(stage => ({ stage, n: count(stage) })).filter(x => x.n > 0),
+        hired: `${count('hired')} / ${headcountOf(r)}`,
+        hiredAll: count('hired') >= headcountOf(r),
+        openFor: `${days(dayKey(r.submittedAt), today)} d`,
+        candidates: [...running, ...out].map(c => ({
+          id: c.id,
+          name: c.name,
+          stage: c.stage,
+          meta: candidateMeta(c),
+          info: candidateInfo(c, board.candidateFields),
+          why: c.stage === 'rejected' ? reasonLabel(board.talentReasons, board.talents.find(t => t.id === c.talentId)?.reason) : '',
+        })),
+        facts: [
+          { label: 'Requested by', value: r.requesterName + (company ? ' · ' + company : '') },
+          { label: 'Budget / month', value: budgetText(answerOf(r, 'budget')) },
+          { label: 'Expected start', value: answerOf(r, 'start') || '—' },
+          { label: 'Submitted', value: dayLabel(r.submittedAt) },
+          { label: 'Acknowledged', value: r.acknowledgedAt ? dayLabel(r.acknowledgedAt) : '—' },
+        ],
+        latest: last ? { what: last.what, when: dayLabel(last.at), who: last.who, note: last.note } : null,
+      }
+    })
 }
 
 /** The side panel's facts for one request (the handoff's `is.tiles`). */

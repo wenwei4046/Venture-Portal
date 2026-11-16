@@ -33,6 +33,47 @@ describe('Hiring › Insights', () => {
     expect(screen.getByRole('button', { name: /Aug 2026/, pressed: true })).toBeInTheDocument()
   })
 
+  // 2026-11-16, the user: "我想看到 ongoing 正在招的人的 status，还有现阶段到底有什么职位在招人，能及时展开看".
+  it('Open roles: what is being hired today, whatever the period; a row opens onto its candidates and its newest step', () => {
+    render(<HiringInsightsView board={HIRING_BOARD} today="2026-11-16" />)
+    const roles = screen.getByRole('region', { name: 'Open roles' })
+    expect(within(roles).getByText('As of 16 Nov 2026')).toBeInTheDocument()
+    // November has no request of its own; Open roles still lists the three being hired.
+    expect(screen.getByText('No requests in this period.')).toBeInTheDocument()
+    expect(within(roles).getAllByRole('button', { expanded: false })).toHaveLength(3)
+    const row = (name: RegExp) => within(roles).getByRole('button', { name })
+    expect(row(/Revenue Specialist × 2/)).toHaveTextContent('HR-203 · Revenue · Fair')
+    expect(row(/Revenue Specialist × 2/)).toHaveTextContent('Shortlisted 1')
+    expect(row(/Revenue Specialist × 2/)).toHaveTextContent('Hired 0 / 2')
+    expect(row(/Revenue Specialist × 2/)).toHaveTextContent('49 d')
+    expect(row(/Account Executive/)).toHaveTextContent('No candidates yet')
+    expect(row(/Account Executive/)).toHaveTextContent('Unassigned')
+
+    fireEvent.click(row(/Revenue Specialist × 2/))
+    expect(row(/Revenue Specialist × 2/)).toHaveAttribute('aria-expanded', 'true')
+    const more = within(roles).getByRole('region', { name: 'HR-203 · Revenue Specialist × 2' })
+    expect(within(more).getByText('Daniel Lee')).toBeInTheDocument()
+    expect(within(more).getByText('Done appointment')).toBeInTheDocument()
+    expect(within(more).getByText('Interview booked')).toBeInTheDocument()
+    expect(within(more).getByText('Within 1 month')).toBeInTheDocument()
+    fireEvent.click(within(more).getByRole('button', { name: 'View full →' }))
+    expect(push).toHaveBeenCalledWith('/hiring/requests/HR-203')
+
+    // A month gone by: Open roles is still today's.
+    fireEvent.click(screen.getByRole('button', { name: /Pick a month/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aug 2026' }))
+    expect(within(roles).getAllByRole('button', { name: /HR-20[345] · / })).toHaveLength(3)
+    // Pressed again, the row closes.
+    fireEvent.click(row(/Revenue Specialist × 2/))
+    expect(within(roles).queryByRole('region')).toBeNull()
+  })
+
+  it('no request open: Open roles says so', () => {
+    const board = { ...HIRING_BOARD, requests: HIRING_BOARD.requests.filter(r => !['submitted', 'needs_info', 'acknowledged'].includes(r.status)) }
+    render(<HiringInsightsView board={board} today="2026-11-16" />)
+    expect(within(screen.getByRole('region', { name: 'Open roles' })).getByText('No open roles')).toBeInTheDocument()
+  })
+
   it('a row opens its facts and trail; View full goes to its page', () => {
     render(<HiringInsightsView board={HIRING_BOARD} today="2026-10-11" />)
     fireEvent.click(screen.getByRole('button', { name: 'All time' }))
