@@ -179,11 +179,13 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
     // Actual (the default): what came in this month — HC 11,200 and HD 5,000.
     expect(card('Received · Oct')).toHaveTextContent('RM 16,200.00')
     expect(card('Paid · Oct')).toBeInTheDocument()
-    expect(card('Interest profit · Oct')).toBeInTheDocument()
+    // Actual counts a penalty paid with the interest, and says so (2026-11-15).
+    expect(card('Interest + penalty · Oct')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Done so far' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'By right' }))
     expect(card('To collect · Oct')).toBeInTheDocument()
     expect(card('Settled so far · Oct')).toBeInTheDocument()
+    expect(card('Interest profit · Oct')).toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Received · Oct' })).toBeNull()
   })
 
