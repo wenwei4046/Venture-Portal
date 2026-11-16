@@ -24,6 +24,8 @@ import { deskChatMenu } from "./chat-menu";
 import { FB_BLOCKED, FB_BLOCKED_CATEGORY } from "../../shared/fb-blocked";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
+/** The Inbox's Status picker's Unread (2026-11-16): kept in ui.inbF beside the statuses. */
+export const UNREAD = "Unread";
 
 /** Inbox's Status picks (v4 D5a): ui.inbF as a list of the known statuses ("All", or one or more joined by ","). */
 export function stPicked(inbF: string | null | undefined, known: string[]): string[] {
@@ -96,8 +98,14 @@ export function inboxVM(ctx: DeskCtx) {
         ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false], [FB_BLOCKED_CATEGORY, isBlocked, false]];
       // v4 D5a (notes/24, phone 2c): Status is several at once — ui.inbF holds the picked ones joined by "," ("All" = none),
       // so every "back to All" elsewhere still clears it; People is ui.whoSel (teams and people, several at once).
-      const stSel = stPicked(ui.inbF, T4.map(t => t[0]));
-      const stF = (x: ChatRow) => !stSel.length || stSel.some(l => T4.find(t => t[0] === l)![1](x));
+      // Unread (2026-11-16; the owner: "inbox 的 status 加 unread"): chats with the red count (crm_contacts.unread), or one
+      // marked unread from its ⋮ menu (its dot). Not a status of its own but a narrowing: picked with statuses it keeps
+      // the unread chats among them (Unread + Follow up = the unread Follow-up chats); alone, every unread chat.
+      const isUnread = (x: ChatRow) => x.c.unread > 0 || !!pref(x.id)?.markedUnread;
+      const stSel = stPicked(ui.inbF, [...T4.map(t => t[0]), UNREAD]);
+      const stOk = (st: string[]) => { const only = st.filter(l => l !== UNREAD), un = st.includes(UNREAD);
+        return (x: ChatRow) => (!un || isUnread(x)) && (!only.length || only.some(l => !!T4.find(t => t[0] === l)?.[1](x))); };
+      const stF = stOk(stSel);
       const cur: [string, (x: ChatRow) => boolean, boolean] = ["", stF, false];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
       const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q) || !!saidInChat(x.c, q);
@@ -114,10 +122,10 @@ export function inboxVM(ctx: DeskCtx) {
         const k = teams.findIndex(t => (id && (t.id === id || t.people.some(p => p.id === id))) || (!id && (x.teamId === t.id || x.team === t.name)));
         return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
       const STATUS_DOT: Record<string, string> = { New: STATUS.New.dot, Attention: STATUS.Attention.dot, "Follow up": STATUS["Follow up"].dot, Appointment: STATUS.Appointment.dot,
-        Won: STATUS.Won.dot, Lost: STATUS.Lost.dot, "Cold leads": STATUS["Cold leads"].dot, [FB_BLOCKED_CATEGORY]: STATUS.Blocked.dot };
+        Won: STATUS.Won.dot, Lost: STATUS.Lost.dot, "Cold leads": STATUS["Cold leads"].dot, [FB_BLOCKED_CATEGORY]: STATUS.Blocked.dot, [UNREAD]: "var(--crm-rust)" };
       // People: what one person / a whole team matches (ui.whoSel's own rule); a draft is counted before it is applied.
       const countFor = (who: string[], st: string[]) => all.filter(x => !who.length || who.some(w => match1(w, x)))
-        .filter(x => !st.length || st.some(l => T4.find(t => t[0] === l)?.[1](x))).filter(hasLab).filter(hit).length;
+        .filter(stOk(st)).filter(hasLab).filter(hit).length;
       const teamOpts = [...(ctx.directors.length ? [{ key: "dir", val: null as string | null, label: DIRECTOR_TEAM, dot: DIRECTOR_C[0], people: ctx.directors }] : []),
         ...teams.map((t, k) => ({ key: t.id, val: `team:${t.id}` as string | null, label: t.name, dot: teamColours(k)[0], people: t.people }))];
       const visitWord = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", timeZone: "Asia/Kuala_Lumpur" })} ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: t.getMinutes() ? "2-digit" : undefined, timeZone: "Asia/Kuala_Lumpur" }).toLowerCase()}`;
@@ -131,7 +139,8 @@ export function inboxVM(ctx: DeskCtx) {
           peopleN: whoSel.length, statusN: stSel.length, who: whoSel, st: stSel,
           teams: teamOpts.map(t => ({ key: t.key, val: t.val, label: t.label, dot: t.dot, n: t.val ? all.filter(x => match1(t.val!, x)).length : all.filter(x => ctx.directors.some(d => d.id === x.ownerId)).length,
             people: t.people.map(p => ({ id: p.id, label: p.name, n: all.filter(x => x.ownerId === p.id).length })) })),
-          statuses: T4.filter(t => t[0] !== "All").map(([label, f, hot]) => ({ label, dot: STATUS_DOT[label] ?? "var(--crm-faint-2)", n: shown.filter(f).filter(hasLab).length, hot })),
+          statuses: [{ label: UNREAD, dot: STATUS_DOT[UNREAD], n: shown.filter(isUnread).filter(hasLab).length, hot: true },
+            ...T4.filter(t => t[0] !== "All").map(([label, f, hot]) => ({ label, dot: STATUS_DOT[label] ?? "var(--crm-faint-2)", n: shown.filter(f).filter(hasLab).length, hot }))],
           chips: [...whoSel.map(w => ({ key: w, label: whoName(w), dot: w.startsWith("team:") ? teamColours(teams.findIndex(t => t.id === w.slice(5)))[0] : dotOf({ ownerId: w } as ChatRow), round: true,
             remove: () => set(u => ({ ...u, whoSel: u.whoSel.filter(x => x !== w) })) })),
             ...stSel.map(l => ({ key: `st:${l}`, label: l, dot: STATUS_DOT[l] ?? "var(--crm-faint-2)", round: false, remove: () => patch({ inbF: joinPicked(stSel.filter(x => x !== l)) }) }))],
