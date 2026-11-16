@@ -194,7 +194,9 @@ describe('open roles', () => {
       ],
     }
     const r = rolesOf(withRequests([moved]))[0]
-    expect(r.hired).toBe('1 / 2')
+    expect([r.hired, r.hiredAll]).toEqual(['1 / 2', false])
+    const both: HiringRequest = { ...moved, candidates: moved.candidates.map(c => (c.id === 'C-9' ? { ...c, stage: 'hired' as const } : c)) }
+    expect(rolesOf(withRequests([both]))[0]).toMatchObject({ hired: '2 / 2', hiredAll: true })
     expect(r.stages).toEqual([{ stage: 'offered', n: 1 }, { stage: 'rejected', n: 1 }])
     expect(r.candidates.map(c => [c.name, c.stage, c.why])).toEqual([
       ['Daniel Lee', 'hired', ''],

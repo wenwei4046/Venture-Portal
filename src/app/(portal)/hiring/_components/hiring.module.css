@@ -1094,6 +1094,7 @@
 .orOwner { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .orStages { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
 .orNone { font-size: 12px; color: rgb(var(--hv-empty-text)); }
+.orHired[data-all='true'] { color: rgb(var(--hv-ledger)); font-weight: 600; }
 .stageN { font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 600; }
 /* The Hired and Open-for cells' own words: the head band says them on a desktop, the cells on a phone. */
 .orCellLabel { display: none; }

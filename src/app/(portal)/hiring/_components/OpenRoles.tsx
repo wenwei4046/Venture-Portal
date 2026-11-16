@@ -62,7 +62,7 @@ export default function OpenRoles({ roles, asOf }: { roles: readonly OpenRole[];
                     <span className={s.orStages}>
                       {r.stages.length ? r.stages.map(x => <StageChip key={x.stage} stage={x.stage} n={x.n} />) : <span className={s.orNone}>No candidates yet</span>}
                     </span>
-                    <span className={`${s.orHired} ${s.r} ${s.monoCell}`}>
+                    <span className={`${s.orHired} ${s.r} ${s.monoCell}`} data-all={r.hiredAll ? 'true' : undefined}>
                       <span className={s.orCellLabel}>Hired </span>
                       {r.hired}
                     </span>

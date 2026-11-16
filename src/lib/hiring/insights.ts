@@ -276,6 +276,8 @@ export interface OpenRole {
   stages: Array<{ stage: CandidateStage; n: number }>
   /** "1 / 3": its candidates at Hired, of the headcount. */
   hired: string
+  /** Everybody it asked for is at Hired — what is left is Mark filled. */
+  hiredAll: boolean
   /** "24 d": office days since it was submitted. */
   openFor: string
   /** The ones in the running as they were added, then the not selected. */
@@ -314,6 +316,7 @@ export function openRoles(
         status: r.status,
         stages: PILL_STAGES.map(stage => ({ stage, n: count(stage) })).filter(x => x.n > 0),
         hired: `${count('hired')} / ${headcountOf(r)}`,
+        hiredAll: count('hired') >= headcountOf(r),
         openFor: `${days(dayKey(r.submittedAt), today)} d`,
         candidates: [...running, ...out].map(c => ({
           id: c.id,
