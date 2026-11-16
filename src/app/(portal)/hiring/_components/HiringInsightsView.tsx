@@ -5,18 +5,20 @@ import { useRouter } from 'next/navigation'
 import { HvPage, PageHead, SecLabel } from '@/components/hrv/kit'
 import { CardIcon } from '@/components/hrv/icons'
 import { Drawer } from '@/components/hrv/overlay'
-import { departmentNames, personName, requestTitle, answerOf } from '@/lib/hiring/view'
-import { insightFacts, insightsOf, lastTwelveMonths, type InsightsPeriod } from '@/lib/hiring/insights'
+import { dayLabel, departmentNames, personName, requestTitle, answerOf } from '@/lib/hiring/view'
+import { insightFacts, insightsOf, lastTwelveMonths, openRoles, type InsightsPeriod } from '@/lib/hiring/insights'
 import type { HiringBoard } from '@/lib/hiring/types'
 import { StatusChip, Trail } from './bits'
+import OpenRoles from './OpenRoles'
 import s from './hiring.module.css'
 
 /**
  * Hiring › Insights (README §12, portal-34): how long each request takes,
  * from submitted to acknowledged to filled, for this month, a month of the
  * last twelve, or all time — six cards with their change on the month
- * before, the days each fill took, by source and by department, and every
- * request sideways. A row opens its facts and trail in the 440px panel.
+ * before, the roles open today (2026-11-16, whatever the period), the days
+ * each fill took, by source and by department, and every request sideways.
+ * A row opens its facts and trail in the 440px panel.
  */
 export default function HiringInsightsView({ board, today }: { board: HiringBoard; today: string }) {
   const router = useRouter()
@@ -28,6 +30,7 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
     () => insightsOf(board.requests, period, today, id => personName(board, id), departmentNames(board)),
     [board, period, today],
   )
+  const roles = useMemo(() => openRoles(board, today, id => personName(board, id)), [board, today])
   const picked = board.requests.find(r => r.id === sel) ?? null
   const monthLabel = period.startsWith('m:') ? months.find(m => m.value === period)?.label ?? 'Pick a month' : 'Pick a month'
 
@@ -114,6 +117,7 @@ export default function HiringInsightsView({ board, today }: { board: HiringBoar
       </section>
 
       <div className={s.insB}>
+        <OpenRoles roles={roles} asOf={dayLabel(today)} />
         <section className={s.insSec} aria-label="Days from submitted to filled">
           <div className={s.insSecHead}>
             <span className={s.insSecTitle}>Days from submitted to filled</span>
