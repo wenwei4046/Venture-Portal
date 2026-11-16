@@ -1315,22 +1315,22 @@
      screen and six months could not be picked (the parity audit, 2026-10-11). */
   .monthPop { left: auto; right: 0; }
   /* Open roles folds (a table of 5+ columns): the position and its status, the candidates under them, then the
-     owner, Hired and Open, each cell naming itself. */
+     owner, Hired and Open, each cell naming itself. A wrapping line, not a grid: a grid's columns let the status
+     chip's width squeeze the owner to "LI S…" (seen at 390px). The section's card is the only frame. */
+  .orTable { border: 0; border-radius: 0; }
   .orHead { display: none; }
-  .orRow.orCols {
-    grid-template-columns: 18px minmax(0, 1fr) auto auto;
-    grid-template-areas: 'caret pos pos status' '. stages stages stages' '. owner hired days';
-    row-gap: 7px;
-  }
-  .orCaret { grid-area: caret; }
-  .orPos { grid-area: pos; }
-  .orStatus { grid-area: status; }
-  .orStages { grid-area: stages; }
-  .orOwner { grid-area: owner; font-size: 12px; }
-  .orHired { grid-area: hired; }
-  .orDays { grid-area: days; }
+  .orList { border-top: 1px solid rgb(var(--hv-hairline)); }
+  .orRow.orCols { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 6px; padding: 10px 6px; }
+  .orCaret { order: 0; }
+  .orPos { order: 1; flex: 1 1 0; }
+  .orPos .everyPos, .orPos .everySub { white-space: normal; }
+  .orStatus { order: 2; }
+  .orStages { order: 3; flex: 1 0 100%; padding-left: 28px; }
+  .orOwner { order: 4; flex: 1 1 0; padding-left: 28px; font-size: 12px; }
+  .orHired { order: 5; }
+  .orDays { order: 6; }
   .orCellLabel { display: inline; font-family: var(--font-sans), Inter, var(--font-cjk), system-ui, sans-serif; font-size: 11.5px; color: rgb(var(--hv-brown)); }
-  .orMore { padding: 12px 14px 14px; }
+  .orMore { padding: 12px 10px 14px; }
   .orFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .orCand { grid-template-columns: minmax(0, 1fr) auto; }
   .orCandMore { grid-column: 1 / -1; }
