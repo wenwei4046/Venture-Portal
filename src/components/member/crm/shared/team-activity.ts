@@ -4,6 +4,7 @@
  * The prototype's renderVals() with the same names, on real data:
  *   - a LEAD GOT is one time a customer was given to somebody (crm_events `assigned`) inside the period; the next time the
  *     same customer is given to somebody else ends it — "Handed away" for the one who had it, "from NAME" for the next;
+ *     a customer counts as ONE lead, the last holder's in the period (2026-11-16, "改成只算一次");
  *   - FIRST REPLY is the first message of ours, not an auto-reply, after the lead was got and before it was handed on;
  *   - WAITING is a lead still with them that has no first reply yet, measured to now, coloured by the CRM's own reply
  *     lines (Settings › General: 3 h Reply soon · 6 h Urgent · 9 h Overdue);
@@ -161,19 +162,26 @@ export function activityVM(x: ActivityIn) {
   const adOf = (s: Stint) => s.customer.adId || "none";
   const adSel = st.ad && st.ad !== "all" ? st.ad : "all";
   const stints = adSel === "all" ? stints0 : stints0.filter(s => adOf(s) === adSel);
-  const adN = new Map<string, number>(); stints0.forEach(s => adN.set(adOf(s), (adN.get(adOf(s)) ?? 0) + 1));
+  // A customer is ONE lead however often it was handed on (the owner, 2026-11-16, Team activity's 155 beside Ads
+  // Performance's 129 — 25 hand-overs counted again: "改成只算一次"): it counts for whoever had it last in the period;
+  // the earlier stints stay in their people's lists as "Handed away", with their reply times, but are no lead, appt or
+  // show-up of theirs.
+  const lastKey = new Map<string, string>(); stints0.forEach(s => lastKey.set(s.customer.id, s.key));
+  const counted = (s: Stint) => lastKey.get(s.customer.id) === s.key;
+  const adN = new Map<string, number>(); stints0.filter(counted).forEach(s => adN.set(adOf(s), (adN.get(adOf(s)) ?? 0) + 1));
   if (adSel !== "all" && !adN.has(adSel)) adN.set(adSel, 0);
   const adName = (id: string) => id === "none" ? "No ad" : d.adNames?.[id]?.name ?? stints0.find(s => s.customer.adId === id)?.customer.ad ?? `Ad ${id}`;
-  const ads = [{ value: "all", name: "All ads", n: stints0.length, label: `All ads · ${stints0.length}` },
+  const nAll = stints0.filter(counted).length;
+  const ads = [{ value: "all", name: "All ads", n: nAll, label: `All ads · ${nAll}` },
     ...[...adN].sort((a, b) => (a[0] === "none" ? 1 : b[0] === "none" ? -1 : b[1] - a[1])).map(([id, n]) => ({ value: id, name: adName(id), n, label: `${adName(id)} · ${n}` }))];
   const byWho = new Map<string, Stint[]>();
   stints.forEach(s => { const l = byWho.get(s.who) ?? []; l.push(s); byWho.set(s.who, l); });
   const statusOf = (s: Stint) => (s.end ? "Handed away" : s.appt ? "Appointment" : s.customer.status === "follow_up" ? "Follow up" : s.customer.status === "appointment" ? "Appointment" : "New");
   const waitOf = (s: Stint) => (s.reply == null && !s.end ? mins(s.gotAt, nowIso) : null);
   const stat = (id: string) => {
-    const ls = byWho.get(id) ?? [], rep = ls.filter(l => l.reply != null), w = ls.map(waitOf).filter((m): m is number => m != null);
-    return { leads: ls.length, avg: rep.length ? Math.round(rep.reduce((a, l) => a + (l.reply ?? 0), 0) / rep.length) : null,
-      waitN: w.length, waitMax: w.length ? Math.max(...w) : 0, appt: ls.filter(l => l.appt).length, show: ls.filter(l => l.show).length };
+    const ls = byWho.get(id) ?? [], mine = ls.filter(counted), rep = ls.filter(l => l.reply != null), w = ls.map(waitOf).filter((m): m is number => m != null);
+    return { leads: mine.length, avg: rep.length ? Math.round(rep.reduce((a, l) => a + (l.reply ?? 0), 0) / rep.length) : null,
+      waitN: w.length, waitMax: w.length ? Math.max(...w) : 0, appt: mine.filter(l => l.appt).length, show: mine.filter(l => l.show).length };
   };
   const teams = book.groups;
   const groups = (openKey: "open" | "pOpen", leadKey: "lead" | "pLead") => {

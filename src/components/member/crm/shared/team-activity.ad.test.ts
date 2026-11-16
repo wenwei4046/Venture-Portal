@@ -32,6 +32,20 @@ describe("Team activity by ad", () => {
     expect(vm("AD1").tiles.find(t => t.k === "Leads")?.v).toBe("2");
     expect(leads(vm("none"))).toMatchObject({ "Chea Huan": 1, Alvin: 0 });
   });
+  // 2026-11-16 (the owner, Team activity's 155 leads beside Ads Performance's 129, 25 of them hand-overs: "改成只算一次"):
+  // a customer handed on is one lead, the last holder's; the earlier stint stays listed as Handed away.
+  it("counts a customer handed on once, for whoever has it now", () => {
+    const moved = activityVM({ data: d, book: peopleBook(d, [{ id: "tl", name: "Team Stanley", tl: people[0], people: people.slice(1) }], []),
+      rows: [...rows, { contact_id: "1", actor: "tl", data: { from: "a", to: "b" }, at: at("12:00") }], now: new Date(at("18:00")),
+      ui: { team: "all", who: null, menu: false, per: "Today", from: "2026-11-06", to: "2026-11-06", open: {}, lead: null, sort: null, pMenu: false, pOpen: {}, pLead: null } as ActivityUi,
+      set: () => {}, nameOf: id => people.find(p => p.id === id)?.name ?? "", roleOf: () => "", openChat: () => {} });
+    const by = Object.fromEntries(moved.groups.flatMap(g => g.rows).map(r => [r.name, r]));
+    expect(by["Chea Huan"].leads).toBe(1); // only Cust 4 now
+    expect(by.Alvin.leads).toBe(3); // Cust 1 joins Cust 2 and 3
+    expect(moved.tiles.find(t => t.k === "Leads")?.v).toBe("4"); // four customers, not five hand-overs
+    expect(moved.ads[0].label).toBe("All ads · 4");
+    expect(by["Chea Huan"].list.find(l => l.name === "Cust 1")?.status).toBe("Handed away");
+  });
   // 2026-11-16 (the owner, of the leads under a person: "增加广告来源"): each lead says the ad it came from.
   it("names each lead's ad, or its channel with no ad", () => {
     const list = (who: string) => vm().groups.flatMap(g => g.rows).find(r => r.name === who)!.list.map(l => [l.name, l.ad]);
