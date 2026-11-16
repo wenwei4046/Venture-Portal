@@ -2,7 +2,7 @@
 // from Product List items and packages; their sums (as the database's mkt_quote_subtotal); versions sent and the one
 // accepted; the internal pricing sheet's CSV; the tasks an accepted quotation turns into. Pure.
 
-import { catalogItemFromRow, columnFromRow, extraText, norm, type CatalogItem, type ExtraValue, type ItemColumn } from './catalog'
+import { catalogItemFromRow, columnFromRow, extraText, listPrefsFromRow, norm, type CatalogItem, type ExtraValue, type ItemColumn, type ListPrefs } from './catalog'
 import type { ProductKind } from './products'
 
 // ── Money, days ─────────────────────────────────────────────────────────────
@@ -29,10 +29,12 @@ export const numOf = (typed: string): number | null => {
 /** An item's values of the manager's own columns as a quotation shows them — the Product List's now while it is edited,
  * frozen with each version sent (mkt_quote_with_extras): its name, what it holds, its value, whether the client sees it. */
 export interface LineExtra { name: string; kind: string; value: ExtraValue; client: boolean }
-export interface PackageItem { name: string; group: string; base: number; qty: number; unit: number; extra?: LineExtra[] }
+export interface PackageItem { name: string; group: string; base: number; qty: number; unit: number; extra?: LineExtra[]; internal?: boolean }
 export interface ItemLine {
   key: string; kind: 'item'; item: string; name: string; cat: string; list: number; cost: number | null; days: number | null
   qty: number; price: number | null; eta: string | null; remark: string; extra?: LineExtra[]
+  /** The item is internal (v2): off the client's PDF, still in every sum. The Product List's now; frozen when sent. */
+  internal?: boolean
 }
 export interface PackageLine {
   key: string; kind: 'package'; product: string; name: string; code: string; pkind: ProductKind; version: number; list: number
@@ -54,12 +56,18 @@ export interface QuoteTask {
 export interface Quote extends QuoteCore {
   id: string; no: string; status: QuoteStatus; acceptedOn: string | null; tasks: QuoteTask[] | null; assignedOn: string | null; rev: number
   history: QuoteVersion[]
+  /** Archived (v2): off the list, nothing else changes. */
+  archivedAt: string | null
+  /** What a deletion on the Product List or in Packages took out of this draft ("Removed: …"). */
+  removed: string[]
 }
 export interface QuotePackage { id: string; code: string; name: string; kind: ProductKind; version: number; price: number; cost: number | null; groups: { name: string; items: { name: string; qty: number; price: number | null }[] }[] }
 export interface QuoteClient { id: string; code: string; name: string; dot: string; group: boolean; ar: string | null }
 export interface QuotePerson { id: string; name: string; full: string; title: string | null }
 export interface QuoteBook {
   today: string; items: CatalogItem[]; columns: ItemColumn[]; packages: QuotePackage[]; quotes: Quote[]; clients: QuoteClient[]; arOther: string | null; people: QuotePerson[]
+  /** The Product List's own settings: catalogue icons, the built-in columns internal / hidden (v2). */
+  prefs: ListPrefs
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -97,10 +105,37 @@ export function withExtras<T extends Pick<QuoteCore, 'lines'>>(q: T, items: read
   const named = (n: string) => items.find(x => x.name && norm(x.name) === norm(n)) ?? null
   return {
     ...q,
-    lines: q.lines.map(l => (l.kind === 'item'
-      ? { ...l, extra: lineExtrasOf(items.find(x => x.id === l.item) ?? null, columns) }
-      : { ...l, items: l.items.map(it => ({ ...it, extra: lineExtrasOf(named(it.name), columns) })) })),
+    lines: q.lines.map(l => {
+      if (l.kind === 'item') {
+        const it = items.find(x => x.id === l.item) ?? null
+        return { ...l, extra: lineExtrasOf(it, columns), internal: it?.internal ?? false }
+      }
+      return { ...l, items: l.items.map(it => { const x = named(it.name); return { ...it, extra: lineExtrasOf(x, columns), internal: x?.internal ?? false } }) }
+    }),
   }
+}
+
+/** What the client's PDF draws of the built-in columns (v2): a remark and an est. delivery unless set internal. */
+export interface ClientShows { remark: boolean; eta: boolean }
+export const clientShows = (prefs: Pick<ListPrefs, 'columns'> | null | undefined): ClientShows => ({
+  remark: !(prefs?.columns.remarks.internal || prefs?.columns.remarks.hidden),
+  eta: !(prefs?.columns.days.internal || prefs?.columns.days.hidden),
+})
+
+/**
+ * The quotation as the client's PDF draws it (the user, 2026-11-16: "Internal 只代表内部可见，客户 PDF 不显示，但照常计入总价
+ * / 成本 / margin"): an internal item's line left out, a package's internal items left out of what it includes, a remark
+ * or est. delivery left off when that column is internal. Every sum stays the whole line's: `line` is the line as it is
+ * (its term and amount), `shown` only what the client reads of it (`includedOf(shown)`, its remark, its est. delivery);
+ * the totals are `quoteTotals` of the whole quotation.
+ */
+export function clientLines(lines: readonly QuoteLine[], shows: ClientShows): { line: QuoteLine; shown: QuoteLine }[] {
+  return lines.flatMap(l => {
+    if (l.kind === 'item' && l.internal) return []
+    const base = { ...l, remark: shows.remark ? l.remark : '', eta: shows.eta ? l.eta : null }
+    const shown: QuoteLine = l.kind === 'item' ? base : { ...(base as PackageLine), items: l.items.filter(it => !it.internal) }
+    return [{ line: l, shown }]
+  })
 }
 
 /** A line's column values on a document: an item's own; a package's per item ("Image post — Platform: Instagram"). */
@@ -124,13 +159,13 @@ export function lineFromRow(v: unknown): QuoteLine | null {
   if (!isObj(v)) return null
   const base = { key: str(v.key), name: str(v.name), eta: day(v.eta), remark: str(v.remark) }
   if (v.kind === 'item') {
-    return { ...base, kind: 'item', item: str(v.item), cat: str(v.cat), list: num(v.list) ?? 0, cost: num(v.cost), days: num(v.days), qty: Math.max(1, int(v.qty, 1)), price: num(v.price), ...extrasFromRow(v.extra) }
+    return { ...base, kind: 'item', item: str(v.item), cat: str(v.cat), list: num(v.list) ?? 0, cost: num(v.cost), days: num(v.days), qty: Math.max(1, int(v.qty, 1)), price: num(v.price), ...extrasFromRow(v.extra), ...(v.internal === true ? { internal: true } : {}) }
   }
   if (v.kind === 'package') {
     return {
       ...base, kind: 'package', product: str(v.product), code: str(v.code), pkind: v.pkind === 'recurring' ? 'recurring' : 'one', version: int(v.version),
       list: num(v.list) ?? 0, cost: num(v.cost), months: Math.max(1, int(v.months, 1)), price: num(v.price),
-      items: (Array.isArray(v.items) ? v.items : []).filter(isObj).map(it => ({ name: str(it.name), group: str(it.group), base: int(it.base), qty: int(it.qty), unit: num(it.unit) ?? 0, ...extrasFromRow(it.extra) })),
+      items: (Array.isArray(v.items) ? v.items : []).filter(isObj).map(it => ({ name: str(it.name), group: str(it.group), base: int(it.base), qty: int(it.qty), unit: num(it.unit) ?? 0, ...extrasFromRow(it.extra), ...(it.internal === true ? { internal: true } : {}) })),
     }
   }
   return null
@@ -148,7 +183,8 @@ export function quoteFromRow(v: unknown): Quote {
   return {
     ...coreFromRow(r),
     id: str(r.id), no: str(r.no), status: r.status === 'sent' || r.status === 'accepted' ? r.status : 'draft', acceptedOn: day(r.acceptedOn),
-    assignedOn: day(r.assignedOn), rev: int(r.rev, 1),
+    assignedOn: day(r.assignedOn), rev: int(r.rev, 1), archivedAt: strOrNull(r.archivedAt),
+    removed: Array.isArray(r.removed) ? r.removed.filter((x): x is string => typeof x === 'string' && !!x) : [],
     tasks: Array.isArray(r.tasks)
       ? r.tasks.filter(isObj).map((t, i) => ({
           key: `t${i}`, name: str(t.name), from: str(t.from), cat: '', team: TEAMS.includes(t.team as Team) ? (t.team as Team) : 'Manager',
@@ -182,6 +218,7 @@ export function quoteBookFromRow(v: unknown): QuoteBook {
     })),
     arOther: strOrNull(r.arOther),
     people: (Array.isArray(r.people) ? r.people : []).filter(isObj).map(p => ({ id: str(p.id), name: str(p.name), full: str(p.full), title: strOrNull(p.title) })),
+    prefs: listPrefsFromRow(r.prefs),
   }
 }
 
@@ -284,7 +321,7 @@ function canon(v: unknown): unknown {
     const out: Record<string, unknown> = {}
     for (const k of Object.keys(v).sort()) {
       const x = typeof v[k] === 'string' ? (v[k] as string).trim() : v[k]
-      if (x === null || x === undefined || x === '' || k === 'extra') continue
+      if (x === null || x === undefined || x === '' || k === 'extra' || k === 'internal') continue
       out[k] = canon(x)
     }
     return out

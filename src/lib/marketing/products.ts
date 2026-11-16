@@ -5,6 +5,8 @@
 // does), and only what changed, for the save. Prices and costs are the manager's alone. Its revenue account (2026-10-26,
 // ②b-2h — Finance's chart, set once; the import posts its lines there) is set at once, never a new version. Pure.
 
+import { itemsCost, type CatalogItem } from './catalog'
+
 export type ProductKind = 'one' | 'recurring'
 export type ProductStatus = 'draft' | 'active' | 'retired'
 
@@ -45,6 +47,8 @@ export interface Product {
   /** The revenue account its billing posts to (Finance's chart) — none until the manager picks one. */
   account: string | null
   effectiveFrom: string | null
+  /** The day it stops being on sale (v2); null = never. */
+  effectiveTo: string | null
   status: ProductStatus
   retiredOn: string | null
   rev: number
@@ -53,6 +57,8 @@ export interface Product {
   /** Projects running on it, whatever their version. */
   live: number
   history: ProductVersionLine[]
+  /** The version last published, as it was — what Publish compares the draft with (`productDiff`). */
+  last: { version: number; groups: ProductGroup[]; price: number | null; cost: number | null } | null
 }
 
 /** A workflow template the action picker offers. */
@@ -125,6 +131,7 @@ export function productBookFromRow(v: unknown): ProductBook {
     cost: money(p.cost),
     account: strOrNull(p.account),
     effectiveFrom: strOrNull(p.effectiveFrom),
+    effectiveTo: strOrNull(p.effectiveTo),
     status: p.status === 'active' || p.status === 'retired' ? p.status : 'draft',
     retiredOn: strOrNull(p.retiredOn),
     rev: int(p.rev) ?? 1,
@@ -132,6 +139,7 @@ export function productBookFromRow(v: unknown): ProductBook {
     changed: p.changed !== false,
     live: int(p.live) ?? 0,
     history: (Array.isArray(p.history) ? p.history : []).filter(isObj).map(h => ({ version: int(h.version) ?? 0, at: strOrNull(h.at), note: str(h.note), by: strOrNull(h.by) })),
+    last: isObj(p.last) ? { version: int(p.last.version) ?? 0, groups: groupsFromRow(p.last.groups), price: money(p.last.price), cost: money(p.last.cost) } : null,
   }))
   const workflows = (Array.isArray(r.workflows) ? r.workflows : []).filter(isObj).map(w => ({
     id: str(w.id), action: str(w.action), tname: str(w.tname), version: int(w.version) ?? 0, stages: int(w.stages) ?? 0, days: int(w.days) ?? 0, pic: int(w.pic) ?? 0,
@@ -167,12 +175,12 @@ export function margin(price: number | null, cost: number | null): number | null
 }
 
 /** The editor's five sections, each ticked once it is complete (the handoff's `filled`). */
-export function productSections(p: Pick<Product, 'name' | 'code' | 'groups' | 'intake' | 'price' | 'effectiveFrom'>): { label: string; done: boolean }[] {
+export function productSections(p: Pick<Product, 'name' | 'code' | 'description' | 'groups' | 'intake' | 'price' | 'effectiveFrom'>): { label: string; done: boolean }[] {
   const items = p.groups.flatMap(g => g.items)
   return [
-    { label: 'Basics', done: !!p.name.trim() && !!p.code },
+    { label: 'Basics', done: !!p.name.trim() && !!p.code && !!p.description.trim() },
     { label: 'Items', done: items.some(it => it.qty > 0 && !!it.name.trim()) },
-    { label: 'Linked templates', done: !!p.intake && items.length > 0 },
+    { label: 'Intake template', done: !!p.intake },
     { label: 'Pricing', done: (p.price ?? 0) > 0 },
     { label: 'Publish', done: !!p.effectiveFrom },
   ]
@@ -192,6 +200,7 @@ export function productProblems(p: Product, book: Pick<ProductBook, 'workflows' 
   else if ((book.minutes.find(t => t.id === p.intake)?.version ?? 0) === 0) out.push('Its intake minutes template is not published yet')
   if ((p.price ?? 0) <= 0) out.push('Set its list price')
   if (!p.effectiveFrom) out.push('Pick the day it takes effect')
+  else if (p.effectiveTo && p.effectiveTo < p.effectiveFrom) out.push('It ends before it takes effect')
   return out
 }
 
@@ -213,10 +222,11 @@ export interface ProductEdit {
   price: number | null
   cost: number | null
   effectiveFrom: string | null
+  effectiveTo: string | null
 }
 
 export const editOfProduct = (p: Product): ProductEdit => ({
-  name: p.name, description: p.description, kind: p.kind, groups: p.groups, intake: p.intake, price: p.price, cost: p.cost, effectiveFrom: p.effectiveFrom,
+  name: p.name, description: p.description, kind: p.kind, groups: p.groups, intake: p.intake, price: p.price, cost: p.cost, effectiveFrom: p.effectiveFrom, effectiveTo: p.effectiveTo,
 })
 
 /** The parts of `now` not as `saved` had them; null when nothing changed. */
@@ -230,6 +240,7 @@ export function productPatch(saved: ProductEdit, now: ProductEdit): Record<strin
   if (now.price !== saved.price) patch.price = now.price
   if (now.cost !== saved.cost) patch.cost = now.cost
   if (now.effectiveFrom !== saved.effectiveFrom) patch.effectiveFrom = now.effectiveFrom
+  if (now.effectiveTo !== saved.effectiveTo) patch.effectiveTo = now.effectiveTo
   return Object.keys(patch).length ? patch : null
 }
 
@@ -250,4 +261,72 @@ export function workflowAbove(groups: ProductGroup[], gi: number, ii: number): s
     for (let i = (g === gi ? ii : its.length) - 1; i >= 0; i--) if (its[i]?.workflow) return its[i].workflow
   }
   return null
+}
+
+// ── v2 (2026-11-16): the list price and cost follow the items; Publish shows what changed ────────────────────────────
+/** One item's line in the publish diff: its quantity in the version published and in the draft; its tag when changed. */
+export interface DiffItem { name: string; from: number | null; to: number | null; tag: 'added' | 'removed' | 'qty' | null }
+export interface DiffMoney { from: number | null; to: number | null; better: boolean | null }
+export interface ProductDiff {
+  from: number
+  to: number
+  items: DiffItem[]
+  price: DiffMoney
+  cost: DiffMoney
+  margin: DiffMoney
+  /** Nothing differs — Publish stays off (as before). */
+  same: boolean
+}
+
+/** Each item's quantity by name (case-blind), in the order first met; a name in two categories counts once, summed. */
+function qtyByName(groups: readonly ProductGroup[]): Map<string, { name: string; qty: number }> {
+  const out = new Map<string, { name: string; qty: number }>()
+  for (const it of groups.flatMap(g => g.items)) {
+    const name = it.name.trim()
+    if (!name || it.qty <= 0) continue
+    const k = name.toLowerCase()
+    const cur = out.get(k)
+    out.set(k, { name: cur?.name ?? name, qty: (cur?.qty ?? 0) + it.qty })
+  }
+  return out
+}
+
+/**
+ * The draft against the version last published (the v2 Publish dialog): every item with its quantity before and after —
+ * Added, Removed or Qty when it changed — and the list price, internal cost and margin before and after. `better`: a
+ * higher price or margin, a lower cost. A product never published compares with nothing (every item Added).
+ */
+export function productDiff(p: Pick<Product, 'groups' | 'price' | 'cost' | 'version' | 'last' | 'changed'>): ProductDiff {
+  const before = qtyByName(p.last?.groups ?? [])
+  const after = qtyByName(p.groups)
+  const items: DiffItem[] = []
+  for (const [k, a] of after) {
+    const b = before.get(k)
+    items.push({ name: a.name, from: b?.qty ?? null, to: a.qty, tag: !b ? 'added' : b.qty !== a.qty ? 'qty' : null })
+  }
+  for (const [k, b] of before) if (!after.has(k)) items.push({ name: b.name, from: b.qty, to: null, tag: 'removed' })
+  const cmp = (from: number | null, to: number | null, higher: boolean): DiffMoney =>
+    ({ from, to, better: from == null || to == null || from === to ? null : higher ? to > from : to < from })
+  const price = cmp(p.last?.price ?? null, p.price, true)
+  const cost = cmp(p.last?.cost ?? null, p.cost, false)
+  const mg = cmp(p.last ? margin(p.last.price, p.last.cost) : null, margin(p.price, p.cost), true)
+  const same = !!p.last && !p.changed && items.every(i => !i.tag) && price.from === price.to && cost.from === cost.to
+  return { from: p.version, to: p.version + 1, items, price, cost, margin: mg, same }
+}
+
+/** "4 image posts + 1 banner + 2 reels" — the Items header's live summary. */
+export function itemsSummary(groups: readonly ProductGroup[]): string {
+  return [...qtyByName(groups).values()].map(x => `${x.qty} ${x.name.toLowerCase()}`).join(' + ')
+}
+
+/**
+ * A package's list price and internal cost from its items (v2 §3 — no longer typed): the price Σ unit price × qty (none
+ * while it is 0), the cost Σ the Product List's cost × qty (none while no item has a cost there); `missing` counts
+ * the items with a quantity and no cost on the list.
+ */
+export function pricedOf(groups: readonly ProductGroup[], items: readonly CatalogItem[]): { price: number | null; cost: number | null; missing: number } {
+  const price = itemsSum(groups)
+  const c = itemsCost(groups, items)
+  const counted = groups.flatMap(g => g.items).filter(it => it.qty > 0 && it.name.trim()).length
+  return { price: price > 0 ? price : null, cost: counted > c.missing ? c.cost : null, missing: c.missing }
 }

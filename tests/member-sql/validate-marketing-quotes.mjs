@@ -452,4 +452,90 @@ check((await j(`SELECT public.mkt_quote_delete($1, $2)`, [gone.id, gone.rev])).n
 check(await peek1(`SELECT count(*)::integer FROM public.mkt_quotes WHERE id = $1`, [gone.id]), 0, '…gone')
 await refuses(`SELECT public.mkt_quote_delete($1, 1)`, [gone.id], /not there any more/, 'twice: not there')
 
+// ── The Product Builder v2 (mig 20261116200000, 2026-11-16) ─────────────────────────────────────────────────────────
+// An internal item (off the client's PDF, in every sum — the user's answer), every item and package deleted out of
+// drafts only, a version's end day, a quotation archived, the Product List's own settings.
+await asSystem()
+const v2mig = await sql('20261116200000_marketing_product_builder_v2.sql')
+await db.exec(v2mig)
+await db.exec(v2mig) // twice: nothing changes, nothing breaks
+const row = async (sql, params = []) => (await peek(sql, params))[0]
+await as(U.josiah, MANAGER)
+for (const fn of ['mkt_item_internal(uuid, boolean)', 'mkt_list_prefs_save(text, jsonb)', 'mkt_quote_archive(uuid, boolean)', 'mkt_item_delete(uuid)']) {
+  check([await may('anon', fn), await may('authenticated', fn)], [false, true], `${fn}: signed in only`)
+}
+await as(U.mei, STAFF)
+await refuses(`SELECT public.mkt_item_internal($1, true)`, [reel.id], /manager/, 'the staff set nothing internal')
+await refuses(`SELECT public.mkt_quote_archive($1, true)`, [q3.id], /manager/, 'the staff archive nothing')
+await refuses(`SELECT public.mkt_list_prefs_save('icons', '{"Video":"🎬"}')`, [], /manager/, 'the staff keep no settings')
+await as(U.josiah, MANAGER)
+
+// Internal: frozen with a version sent; "edited since" ignores it.
+await q(`SELECT public.mkt_item_internal($1, true)`, [reel.id])
+check((await j(`SELECT public.mkt_quote_book()`)).items.find(i => i.id === reel.id).internal, true, 'an item set internal')
+let q4 = await j(`SELECT public.mkt_quote_save(NULL, NULL, $1)`, [JSON.stringify({ sub: car, lines: [{ ...lines[0], name: 'Reels video' }] })])
+q4 = await j(`SELECT public.mkt_quote_send($1, $2)`, [q4.id, q4.rev])
+check(q4.history[0].snap.lines[0].internal, true, 'sent: the item’s internal frozen with it')
+await q(`SELECT public.mkt_item_internal($1, false)`, [reel.id])
+await refuses(`SELECT public.mkt_quote_send($1, $2)`, [q4.id, q4.rev], /Nothing has changed since v1/, 'internal changed on the list is no edit of the quote')
+
+// Every item may go: out of drafts only.
+const q5 = await j(`SELECT public.mkt_quote_save(NULL, NULL, $1)`, [JSON.stringify({ sub: car, lines: [{ ...lines[0], name: 'Reels video' }] })])
+const draftsBefore = await peek1(`SELECT count(*)::integer FROM public.mkt_products WHERE groups::text ILIKE '%reels video%'`)
+const itemGone = await j(`SELECT public.mkt_item_delete($1)`, [reel.id])
+check([itemGone.products, itemGone.drafts.includes(q5.no), itemGone.drafts.includes(q4.no)], [draftsBefore, true, false],
+  'an item used is deleted: the products’ drafts and the draft quotations that held it')
+const q5row = await row(`SELECT lines, removed, rev FROM public.mkt_quotes WHERE id = $1`, [q5.id])
+check([q5row.lines.length, q5row.removed, q5row.rev], [0, ['Reels video'], q5.rev + 1], 'the draft quotation lost its line, says what went, moved its count')
+check((await row(`SELECT lines FROM public.mkt_quotes WHERE id = $1`, [q4.id])).lines.length, 1, 'a quotation sent keeps it')
+check(await peek1(`SELECT count(*)::integer FROM public.mkt_products WHERE groups::text ILIKE '%reels video%'`), 0, 'the products’ drafts lost it')
+check(await peek1(`SELECT count(*)::integer FROM public.mkt_product_versions WHERE groups::text ILIKE '%reel%'`) > 0, true, 'a version published keeps it')
+
+// A version's end day.
+await refuses(`SELECT public.mkt_product_save($1, $2, '{"effectiveFrom":"2027-01-10","effectiveTo":"2027-01-01"}')`,
+  [dup.id, await peek1(`SELECT draft_rev FROM public.mkt_products WHERE id = $1`, [dup.id])], /ends before it takes effect/, 'never ends before it starts')
+await q(`SELECT public.mkt_product_save($1, $2, '{"effectiveTo":"2027-06-30"}')`, [dup.id, await peek1(`SELECT draft_rev FROM public.mkt_products WHERE id = $1`, [dup.id])])
+check((await j(`SELECT public.mkt_products()`)).products.find(p => p.id === dup.id).effectiveTo, '2027-06-30', 'its end day kept on the draft')
+const prodRow = await row(`SELECT draft_rev, status FROM public.mkt_products WHERE id = $1`, [prod.id])
+check([prodRow.status, await peek1(`SELECT public.mkt_product_in_effect($1)`, [prod.id])], ['active', 1], 'on sale: its version in effect')
+await asSystem()
+await q(`UPDATE public.mkt_product_versions SET effective_from = ($2::date - 10), effective_to = ($2::date - 1) WHERE product_id = $1 AND version = 1`, [prod.id, TODAY])
+await as(U.josiah, MANAGER)
+check([await peek1(`SELECT public.mkt_product_in_effect($1)`, [prod.id]), (await j(`SELECT public.mkt_quote_book()`)).packages.length], [null, 0],
+  'a version past its end: not on sale, no package')
+await asSystem()
+await q(`UPDATE public.mkt_product_versions SET effective_to = NULL WHERE product_id = $1`, [prod.id])
+
+// A published package deleted: soft — off every list, out of draft quotations; its versions stay.
+await as(U.josiah, MANAGER)
+const q6 = await j(`SELECT public.mkt_quote_save(NULL, NULL, '{}')`)
+await asSystem()
+await q(`UPDATE public.mkt_quotes SET lines = $2::jsonb WHERE id = $1`, [q6.id, JSON.stringify([lines[1]])])
+await as(U.josiah, MANAGER)
+await refuses(`SELECT public.mkt_product_delete($1, $2)`, [prod.id, prodRow.draft_rev - 1], /changed this product since you opened it/, 'never over a newer save')
+await q(`SELECT public.mkt_product_delete($1, $2)`, [prod.id, prodRow.draft_rev])
+const softRow = await row(`SELECT deleted_at IS NOT NULL AS gone, version FROM public.mkt_products WHERE id = $1`, [prod.id])
+check([softRow.gone, softRow.version], [true, 1], 'published: soft-deleted, its versions kept')
+check([(await j(`SELECT public.mkt_products()`)).products.some(p => p.id === prod.id), (await j(`SELECT public.mkt_quote_book()`)).packages.length,
+  await peek1(`SELECT public.mkt_product_in_effect($1)`, [prod.id])], [false, 0, null], 'off the Packages list, the packages and the pickers')
+const q6row = await row(`SELECT lines, removed FROM public.mkt_quotes WHERE id = $1`, [q6.id])
+check([q6row.lines.length, q6row.removed], [0, ['Social Starter']], 'out of the draft quotation, named on it')
+await refuses(`SELECT public.mkt_product_save($1, 1, '{"name":"x"}')`, [prod.id], /not there any more/, 'a deleted package takes no save')
+await refuses(`SELECT public.mkt_product_delete($1, 1)`, [prod.id], /not there any more/, 'twice: not there')
+const dupRev = await peek1(`SELECT draft_rev FROM public.mkt_products WHERE id = $1`, [dup.id])
+await q(`SELECT public.mkt_product_delete($1, $2)`, [dup.id, dupRev])
+check(await peek1(`SELECT count(*)::integer FROM public.mkt_products WHERE id = $1`, [dup.id]), 0, 'never published: deleted outright, as before')
+
+// A quotation archived, any status — nothing else changes.
+const arch = await j(`SELECT public.mkt_quote_archive($1, true)`, [q3.id])
+check([!!arch.archivedAt, arch.status, arch.rev], [true, 'accepted', q3.rev], 'archived: off the list, its status and count untouched')
+check((await j(`SELECT public.mkt_quote_archive($1, false)`, [q3.id])).archivedAt, null, 'back on the list')
+
+// The Product List's own settings.
+check(await j(`SELECT public.mkt_list_prefs_save('icons', '{"Video":"🎤"}')`), { Video: '🎤' }, 'a catalogue’s icon')
+check(await j(`SELECT public.mkt_list_prefs_save('columns', '{"remarks":{"internal":true}}')`), { remarks: { internal: true, hidden: false } }, 'a column set internal')
+await refuses(`SELECT public.mkt_list_prefs_save('columns', '{"price":{"hidden":true}}')`, [], /always as it is/, 'Price is never hidden')
+await refuses(`SELECT public.mkt_list_prefs_save('icons', '{"Video":""}')`, [], /one emoji/, 'an icon is something')
+check((await j(`SELECT public.mkt_quote_book()`)).prefs, { icons: { Video: '🎤' }, columns: { remarks: { internal: true, hidden: false } } }, 'the book reads them')
+
 console.log(`validate-marketing-quotes: ${checks} checks passed`)

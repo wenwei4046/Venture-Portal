@@ -8,11 +8,17 @@
 .lbl { display: inline-flex; flex-direction: column; align-items: center; }
 .lbl::after { content: attr(data-t); font-weight: 600; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; user-select: none; }
 
-/* ── The three tabs ── */
-.appTabs { display: flex; gap: 2px; padding: 3px; background: rgb(var(--mk-surface-3)); border-radius: 8px; width: max-content; max-width: 100%; margin-bottom: 20px; }
-.appTab { height: 30px; padding: 0 14px; border-radius: 6px; border: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font: inherit; font-size: .92em; white-space: nowrap; background: transparent; color: inherit; font-weight: 400; }
-.appTabOn { background: rgb(var(--mk-white)); box-shadow: var(--mk-shadow-seg); font-weight: 600; }
-.n { font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-muted)); font-weight: 400; }
+/* ── The three tabs (v2): underline tabs in a header strip ── */
+.appTabs { display: flex; gap: 4px; padding: 0 28px; border-bottom: 1px solid rgb(var(--mk-line-2)); overflow-x: auto; scrollbar-width: none; }
+.appTab { position: relative; height: 48px; padding: 0 12px; border: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font: inherit; font-size: .98em; white-space: nowrap; background: transparent; color: rgb(var(--mk-muted)); font-weight: 500; }
+.appTab:hover { color: rgb(var(--mk-ink)); }
+.appTabOn { color: rgb(var(--mk-ink)); font-weight: 600; }
+.appTabOn::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 2px; background: rgb(var(--mk-brown)); }
+.n { min-width: 20px; height: 18px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-family: var(--mk-mono); font-size: 10.5px; color: rgb(var(--mk-text-2)); font-weight: 500; background: rgb(var(--mk-surface-2)); }
+.appTabOn .n { background: rgb(var(--mk-active)); color: rgb(var(--mk-ink)); }
+.body { padding: 20px 28px 56px; }
+/* A lock: "Internal only · not shown to the client" on hover (v2 §7). */
+.lock { cursor: help; }
 
 /* ── A head row (Product List, Quotations) ── */
 .head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -87,7 +93,7 @@
 /* ── Status pills ── */
 .pill { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: .78em; font-weight: 600; white-space: nowrap; border: 1px solid; }
 .pillDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.stDraft { background: rgb(var(--mk-draft-bg)); border-color: rgb(var(--mk-draft-line)); color: rgb(var(--mk-draft)); }
+.stDraft { background: var(--mk-meet-bg); border-color: var(--mk-meet-line); color: var(--mk-meet); }
 .stSent { background: rgb(var(--mk-wait-bg)); border-color: rgb(var(--mk-wait-line)); color: rgb(var(--mk-wait)); }
 .stAccepted { background: rgb(var(--mk-done-bg)); border-color: rgb(var(--mk-done-line)); color: rgb(var(--mk-done)); }
 

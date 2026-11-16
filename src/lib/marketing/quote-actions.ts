@@ -81,14 +81,49 @@ export async function orderMktItemColumns(ids: string[]): Promise<Done> {
   return { ok: true }
 }
 
-/** An item nothing uses, deleted — refused while a product or a quotation holds it. */
-export async function deleteMktItem(id: string): Promise<Done> {
+/** An item deleted, whoever uses it (v2, 2026-11-16): taken out of every product's draft and every draft quotation;
+ * versions published and quotations sent or accepted keep it. Both books come back, as the drafts changed. */
+export async function deleteMktItem(id: string): Promise<Done<{ drafts: string[]; products: number; book: QuoteBook | null; productBook: ProductBook | null }>> {
   await requireActionOn('/marketing/products', 'marketing', 'manage')
-  if (!isId(id)) return { ok: true }
-  const { error } = await (await client()).rpc('mkt_item_delete', { p_id: id })
+  if (!isId(id)) return { ok: true, drafts: [], products: 0, book: null, productBook: null }
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_item_delete', { p_id: id })
   if (error) return { ok: false, reason: words(error, 'The item could not be removed. Please try again.') }
   revalidatePath(PAGE)
+  const r = (data ?? {}) as { drafts?: unknown; products?: unknown }
+  const drafts = Array.isArray(r.drafts) ? r.drafts.filter((x): x is string => typeof x === 'string') : []
+  const products = typeof r.products === 'number' ? r.products : 0
+  return { ok: true, drafts, products, book: await freshQuotes(db), productBook: products ? await freshProducts(db) : null }
+}
+
+/** An item set internal (seen by the team only — off the client's PDF, still in every sum), or back. */
+export async function setMktItemInternal(id: string, on: boolean): Promise<Done> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That item is not on the Product List any more.' }
+  const { error } = await (await client()).rpc('mkt_item_internal', { p_id: id, p_on: on === true })
+  if (error) return { ok: false, reason: words(error, 'The item could not be changed. Please try again.') }
+  revalidatePath(PAGE)
   return { ok: true }
+}
+
+/** The Product List's own settings saved whole — the catalogues' icons, or the built-in columns' internal / hidden. */
+export async function saveMktListPrefs(key: 'icons' | 'columns', value: Record<string, unknown>): Promise<Done> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if ((key !== 'icons' && key !== 'columns') || !value || typeof value !== 'object' || Array.isArray(value)) return { ok: false, reason: 'Nothing to save.' }
+  const { error } = await (await client()).rpc('mkt_list_prefs_save', { p_key: key, p_value: value })
+  if (error) return { ok: false, reason: words(error, 'The Product List could not be saved. Please try again.') }
+  revalidatePath(PAGE)
+  return { ok: true }
+}
+
+/** A quotation archived (off the list; nothing else changes — any status) or brought back. */
+export async function archiveMktQuote(id: string, on: boolean): Promise<Done<{ quote: Quote }>> {
+  await requireActionOn('/marketing/products', 'marketing', 'manage')
+  if (!isId(id)) return { ok: false, reason: 'That quotation is not there any more.' }
+  const { data, error } = await (await client()).rpc('mkt_quote_archive', { p_id: id, p_on: on === true })
+  if (error) return { ok: false, reason: words(error, 'The quotation could not be archived. Please try again.') }
+  revalidatePath(PAGE)
+  return { ok: true, quote: quoteFromRow(data) }
 }
 
 /** A catalogue renamed for every item in it. */

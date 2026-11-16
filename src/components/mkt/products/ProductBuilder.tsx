@@ -2,19 +2,25 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductAccount, setMktProductStatus } from '@/lib/marketing/actions'
+import { deleteMktProduct, publishMktProduct, saveMktProduct, saveMktWorkflow, setMktProductStatus } from '@/lib/marketing/actions'
 import { duplicateMktProduct, setMktProductStatusTo } from '@/lib/marketing/quote-actions'
-import { extrasOf, itemNamed, itemsCost, norm, pickerGroups, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
+import { extrasOf, itemNamed, norm, pickerGroups, type CatalogItem, type ItemColumn, type ItemFacts } from '@/lib/marketing/catalog'
 import {
-  accountLabel, editOfProduct, groupSum, includedText, itemsSum, margin, newGroup, newItem, productPatch, productProblems, productSections, workflowAbove,
+  editOfProduct, groupSum, itemsSum, itemsSummary, margin, newGroup, newItem, pricedOf, productDiff, productPatch, productProblems, productSections, workflowAbove,
   type Product, type ProductBook, type ProductEdit, type ProductGroup, type ProductItem, type ProductStatus, type ProductWorkflowOption,
 } from '@/lib/marketing/products'
 import { dmy, rm } from '@/lib/marketing/quotes'
 import { firstWfStage, wfStagesPayload } from '@/lib/marketing/workflows'
-import DeleteDraft from '../builder/DeleteDraft'
 import DaysCell from './DaysCell'
+import DeletePackage from './DeletePackage'
+import Lock from './Lock'
+import PackageCard, { MARGIN_LOW, StatusPill } from './PackageCard'
+import PackageMenu from './PackageMenu'
+import { menuAt, type MenuAt } from './PopMenu'
+import v2 from './v2.module.css'
 import ExtraCell from './ExtraCell'
 import MoneyInput from './MoneyInput'
+import PublishDiff from './PublishDiff'
 import pb from './products.module.css'
 import { pickDate } from './pick-date'
 import qs from './quotes.module.css'
@@ -31,21 +37,12 @@ type SaveState = { state: 'saved' } | { state: 'saving' } | { state: 'error'; re
 type Filter = 'all' | ProductStatus
 
 const STATUS_LABEL: Record<ProductStatus, string> = { draft: 'Draft', active: 'Active', retired: 'Retired' }
-const STATUS_TONE: Record<ProductStatus, string> = { draft: pb.stDraft, active: pb.stActive, retired: pb.stRetired }
-const STATUS_DOT: Record<ProductStatus, string> = { draft: pb.dotDraft, active: pb.dotActive, retired: pb.dotRetired }
-const STATUS_HINT: Record<ProductStatus, string> = {
-  active: 'Can be picked for new projects and quotations',
-  draft: 'Hidden from quotations while you work on it',
-  retired: 'No new projects · running ones keep their version',
-}
-const MARGIN_LOW = 20
-const per = (kind: Product['kind'], short = false) => (kind === 'recurring' ? (short ? '/mo' : ' / month') : '')
 const wfLabel = (w: ProductWorkflowOption) => `${w.action} · ${w.tname} · ${w.version ? `v${w.version}` : 'draft'}`
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 
 interface PickRect { left: number; top: number | null; bottom: number | null; max: number }
 
-export default function ProductBuilder({ book, setBook, first, onOpen, items, columns = [], onAddItem, onItemFacts = () => {}, onQuote, onPublished, flash }: {
+export default function ProductBuilder({ book, setBook, first, onOpen, items, columns = [], onAddItem, onItemFacts = () => {}, onQuote, onPublished, draftQuotesWith = () => 0, flash }: {
   book: ProductBook
   setBook: Dispatch<SetStateAction<ProductBook>>
   /** The product open when the tab mounts. */
@@ -63,6 +60,8 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   onQuote: (p: Product) => void
   /** A product published or its status changed — Quotations' packages follow. */
   onPublished: () => void
+  /** How many draft quotations hold a package — what deleting it takes them out of. */
+  draftQuotesWith?: (productId: string) => number
   flash: (words: string) => void
 }) {
   const start = (first ? book.products.find(p => p.id === first) : undefined) ?? null
@@ -71,13 +70,15 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   const [edit, setEdit] = useState<ProductEdit | null>(start ? editOfProduct(start) : null)
   const [save, setSave] = useState<SaveState>({ state: 'saved' })
   const [busy, setBusy] = useState(false)
-  const [acctBusy, setAcctBusy] = useState(false)
+  const [untilOn, setUntilOn] = useState(false)
+  const [diffOpen, setDiffOpen] = useState(false)
   const [catDraft, setCatDraft] = useState('')
   // An item row just added by "+ Add item": its name box takes the focus, which opens the Product List.
   const [focusKey, setFocusKey] = useState<string | null>(null)
   const newCatRef = useRef<HTMLInputElement | null>(null)
-  const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null)
-  const [ctxDelete, setCtxDelete] = useState(false)
+  const [ctx, setCtx] = useState<{ id: string; at: MenuAt; fromButton: boolean } | null>(null)
+  const [delFor, setDelFor] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [mustPublish, setMustPublish] = useState<string | null>(null)
   const [pickFor, setPickFor] = useState<string | null>(null)
   const [pickRect, setPickRect] = useState<PickRect | null>(null)
@@ -197,6 +198,8 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     setSave({ state: 'saved' })
     setCatDraft('')
     setPickFor(null)
+    setUntilOn(false)
+    setDiffOpen(false)
     onOpen(p?.id ?? null)
     scrollTop()
   }
@@ -301,12 +304,26 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     return true
   }
 
+  /** The draft takes the items' sums when they differ from what it holds. */
+  const syncPricing = () => {
+    const cur = editRef.current
+    if (!cur || ro) return
+    const p = pricedOf(cur.groups, items)
+    if (p.price !== cur.price || p.cost !== cur.cost) change({ price: p.price, cost: p.cost })
+  }
+  /** Publish v(n+1) opens the diff (v2 §3) once the draft, its sums with it, is saved. */
+  const askPublish = async () => {
+    if (!sel || !edit || busy) return
+    syncPricing()
+    if (!(await flush())) return
+    setDiffOpen(true)
+  }
   const publish = async () => {
     if (!sel || !edit || busy) return
     setBusy(true)
     try {
       if (!(await flush())) return
-      await publishProduct({ ...sel, ...edit }, revRef.current)
+      if (await publishProduct({ ...sel, ...(editRef.current ?? edit) }, revRef.current)) setDiffOpen(false)
     } finally {
       setBusy(false)
     }
@@ -326,41 +343,12 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     }
   }
   const saveDraft = async () => {
+    syncPricing()
     if (await flush()) flash('Draft saved')
   }
-  /** Its revenue account, saved the moment it is picked — apart from the draft, no new version. */
-  const setAccount = async (code: string) => {
-    if (!sel || acctBusy) return
-    setAcctBusy(true)
-    try {
-      const r = await setMktProductAccount(sel.id, code || null)
-      if (!r.ok) return flash(r.reason)
-      setBook(b => ({ ...b, products: b.products.map(p => (p.id === sel.id ? { ...p, account: r.account } : p)) }))
-      flash(r.account ? `Revenue account saved · ${accountLabel(r.account, book.accounts)}` : 'Revenue account cleared')
-    } finally {
-      setAcctBusy(false)
-    }
-  }
-  /** A product still a draft, deleted (the user's answer 8) — back to the list. */
-  const remove = async () => {
-    if (!sel || busy) return
-    setBusy(true)
-    try {
-      if (!(await flush())) return
-      const r = await deleteMktProduct(sel.id, revRef.current)
-      if (!r.ok) return flash(r.reason)
-      const products = r.book?.products ?? book.products.filter(p => p.id !== sel.id)
-      setBook(b => r.book ?? { ...b, products })
-      await open(null, products)
-      flash(`Deleted ${sel.name.trim() || sel.code}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  /** Delete from the right-click menu (the user, 2026-11-13: "product 点右键可以删除"): a product never published, asked
-   * first; one published once is retired instead (answer 8 — its projects keep their version), so the row says so. */
-  const removeFromMenu = async (p: Product) => {
+  /** Delete package (v2 §4) — from the menu or the editor, every package, after its dialog: one never published is gone,
+   * one published soft-deleted (its versions stay for the projects and quotations on them); draft quotations lose it. */
+  const removePackage = async (p: Product) => {
     if (busy) return
     setBusy(true)
     try {
@@ -370,58 +358,35 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
       if (!r.ok) return flash(r.reason)
       const products = r.book?.products ?? book.products.filter(x => x.id !== p.id)
       setBook(b => r.book ?? { ...b, products })
+      setDelFor(null)
       if (isOpen) await open(null, products)
+      onPublished()
       flash(`Deleted ${p.name.trim() || p.code}`)
     } finally {
       setBusy(false)
-      setCtx(null)
-      setCtxDelete(false)
     }
   }
 
   // ── The right-click menu and the "publish it first" window, over the list and the editor alike ──
   const ctxP = ctx ? book.products.find(p => p.id === ctx.id) ?? null : null
+  const delP = delFor ? book.products.find(p => p.id === delFor) ?? null : null
   const mustP = mustPublish ? book.products.find(p => p.id === mustPublish) ?? null : null
   const overlays = (
     <>
       {ctxP && ctx ? (
-        <>
-          <div className={pb.ctxScrim} onClick={() => { setCtx(null); setCtxDelete(false) }} onContextMenu={e => { e.preventDefault(); setCtx(null); setCtxDelete(false) }} />
-          <div className={pb.ctx} style={{ left: ctx.x, top: ctx.y }} role="menu" aria-label={ctxP.name || 'New product'}>
-            <div className={pb.ctxName}>{ctxP.name || 'New product'}</div>
-            <div className={pb.ctxSect}>Status</div>
-            {(['active', 'draft', 'retired'] as const).map(k => {
-              const on = ctxP.status === k
-              return (
-                <button key={k} type="button" role="menuitemradio" aria-checked={on} title={STATUS_HINT[k]} className={`${pb.ctxRow}${on ? ` ${pb.ctxOn}` : ''}`} onClick={() => void setStatusTo(ctxP, k)}>
-                  <span className={`${pb.ctxDot} ${STATUS_DOT[k]}`} />
-                  <span className={pb.grow}>{STATUS_LABEL[k]}</span>
-                  <span className={pb.ctxTick}>{on ? '✓' : ''}</span>
-                </button>
-              )
-            })}
-            <div className={pb.ctxLine} />
-            <button type="button" role="menuitem" className={pb.ctxRow} onClick={() => { setCtx(null); void open(ctxP.id) }}>Open</button>
-            <button type="button" role="menuitem" className={pb.ctxRow} onClick={() => { setCtx(null); void duplicate(ctxP) }}>⧉ Duplicate</button>
-            <div className={pb.ctxLine} />
-            {ctxP.version > 0 ? (
-              <button type="button" role="menuitem" className={`${pb.ctxRow} ${pb.ctxOff}`} disabled
-                title="A product once on sale is retired, not deleted — its projects keep their version">
-                <span className={pb.grow}>Delete</span><span className={pb.ctxHint}>Retire instead</span>
-              </button>
-            ) : ctxDelete ? (
-              <div className={pb.ctxAsk}>
-                <span className={pb.ctxAskText}>Delete “{ctxP.name.trim() || ctxP.code}”? This cannot be undone.</span>
-                <span className={pb.ctxAskBtns}>
-                  <button type="button" className={pb.ctxDanger} disabled={busy} onClick={() => void removeFromMenu(ctxP)}>Delete</button>
-                  <button type="button" className={pb.ctxKeep} onClick={() => setCtxDelete(false)}>Keep</button>
-                </span>
-              </div>
-            ) : (
-              <button type="button" role="menuitem" className={`${pb.ctxRow} ${pb.ctxDel}`} onClick={() => setCtxDelete(true)}>Delete</button>
-            )}
-          </div>
-        </>
+        <PackageMenu
+          p={ctxP}
+          at={ctx.at}
+          fromButton={ctx.fromButton}
+          onClose={() => setCtx(null)}
+          onStatus={k => void setStatusTo(ctxP, k)}
+          onOpen={() => { setCtx(null); void open(ctxP.id) }}
+          onDuplicate={() => { setCtx(null); void duplicate(ctxP) }}
+          onDelete={() => { setCtx(null); setDelFor(ctxP.id) }}
+        />
+      ) : null}
+      {delP ? (
+        <DeletePackage p={delP} drafts={draftQuotesWith(delP.id)} busy={busy} onKeep={() => setDelFor(null)} onDelete={() => void removePackage(delP)} />
       ) : null}
       {mustP ? (
         <PublishFirst
@@ -446,106 +411,104 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
   )
   const onMenu = (p: Product) => (e: React.MouseEvent) => {
     e.preventDefault()
-    setCtxDelete(false)
-    setCtx({ id: p.id, x: Math.min(e.clientX, window.innerWidth - 240), y: Math.min(e.clientY, window.innerHeight - 330) })
+    setCtx({ id: p.id, at: menuAt(e), fromButton: false })
   }
 
-  // The internal cost follows the items (the user, 2026-11-13: "加了物品后，internal cost 没自动跳出"): when the items
-  // change, a cost left empty — or still the items' cost from before — becomes the Product List's cost × quantity. A cost
-  // typed by hand stays; "Use cost of items" offers the sum. Opening a product changes nothing.
-  const costOfItems = edit ? itemsCost(edit.groups, items) : null
-  const lastCost = useRef<number | undefined>(undefined)
+  // List price and internal cost follow the items (v2 §3): price = Σ unit price × qty, cost = Σ the Product List's cost ×
+  // qty (none while no item has a cost there). The draft takes them whenever the items change, and before a publish —
+  // never on opening a package alone.
+  const pricing = edit ? pricedOf(edit.groups, items) : null
+  const lastPricing = useRef<string | undefined>(undefined)
   useEffect(() => {
-    lastCost.current = undefined
+    lastPricing.current = undefined
   }, [selId])
   useEffect(() => {
-    if (!costOfItems) return
-    const prev = lastCost.current
-    lastCost.current = costOfItems.cost
-    if (prev === undefined || prev === costOfItems.cost || ro) return
-    const cur = editRef.current?.cost ?? null
-    if (cur === null || cur === prev) change({ cost: costOfItems.cost > 0 ? costOfItems.cost : null })
-    // Only a change of the items' cost moves it.
+    if (!pricing) return
+    const key = `${pricing.price}|${pricing.cost}`
+    const prev = lastPricing.current
+    lastPricing.current = key
+    if (prev === undefined || prev === key || ro) return
+    syncPricing()
+    // Only a change of the items' sums moves them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [costOfItems?.cost])
+  }, [pricing?.price, pricing?.cost])
 
   // ── The list ──
   if (!sel || !edit) {
     const counts: Record<Filter, number> = { all: book.products.length, active: 0, draft: 0, retired: 0 }
     for (const p of book.products) counts[p.status]++
     const order: Record<ProductStatus, number> = { active: 0, draft: 1, retired: 2 }
-    const shown = book.products.filter(p => filter === 'all' || p.status === filter).sort((a, b) => order[a.status] - order[b.status])
+    const q = norm(search)
+    const shown = book.products
+      .filter(p => (filter === 'all' || p.status === filter) && (!q || norm(`${p.name} ${p.code}`).includes(q)))
+      .sort((a, b) => order[a.status] - order[b.status])
+    const SEG_DOT: Record<Filter, string> = { all: v2.sdotAll, active: v2.sdotActive, draft: v2.sdotDraft, retired: v2.sdotRetired }
     return (
       <div>
-        <div className={pb.head}>
-          <span className={pb.headIcon} aria-hidden="true">📦</span>
-          <span className={pb.title}>Product Builder</span>
-          <div className={pb.seg} role="tablist" aria-label="Products by status">
+        <div className={v2.toolbar}>
+          <div className={v2.seg} role="tablist" aria-label="Packages by status">
             {(['all', 'active', 'draft', 'retired'] as const).map(k => {
               const label = k === 'all' ? 'All' : STATUS_LABEL[k]
               return (
-                <button key={k} type="button" role="tab" aria-selected={filter === k} className={`${pb.segBtn}${filter === k ? ` ${pb.segOn}` : ''}`} onClick={() => setFilter(k)}>
-                  <span className={qs.lbl} data-t={label}>{label}</span><span className={pb.segN}>{counts[k]}</span>
+                <button key={k} type="button" role="tab" aria-selected={filter === k} className={`${v2.segBtn}${filter === k ? ` ${v2.segOn}` : ''}`} onClick={() => setFilter(k)}>
+                  <span className={`${v2.sdot} ${SEG_DOT[k]}`} />
+                  <span className={qs.lbl} data-t={label}>{label}</span><span className={v2.segN}>{counts[k]}</span>
                 </button>
               )
             })}
           </div>
-          <span className={pb.grow} />
-          <button type="button" className={pb.primary} disabled={busy} onClick={() => void newProduct()}>+ New product</button>
+          <span className={v2.searchWrap}>
+            <input type="search" className={v2.search} placeholder="Search products or codes" aria-label="Search packages" value={search} onChange={e => setSearch(e.target.value)} />
+          </span>
+          <span className={v2.grow} />
+          <button type="button" className={v2.primary} disabled={busy} onClick={() => void newProduct()}>+ New package</button>
         </div>
-        <div className={pb.cards}>
+        <div className={v2.cards}>
           {shown.map(p => (
-            <div
+            <PackageCard
               key={p.id}
-              role="button"
-              tabIndex={0}
-              className={`${pb.card}${p.status === 'retired' ? ` ${pb.cardRetired}` : ''}`}
-              onClick={() => void open(p.id)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void open(p.id) } }}
-              onContextMenu={onMenu(p)}
-            >
-              <span className={pb.cardTop}>
-                <span className={pb.code}>{p.code}</span>
-                <span className={pb.grow} />
-                <button type="button" title="Duplicate" className={pb.dupBtn} disabled={busy} onClick={e => { e.stopPropagation(); void duplicate(p) }}>⧉ Duplicate</button>
-                <span className={`${pb.status} ${STATUS_TONE[p.status]}`}><span className={pb.dot} />{STATUS_LABEL[p.status]}</span>
-              </span>
-              <span className={pb.cardName}>{p.name || 'New product'}</span>
-              <span className={pb.cardIncl}>{includedText(p.groups)}{p.groups.some(g => g.items.some(it => it.qty > 0)) ? per(p.kind) : ''}</span>
-              <span className={pb.cardFoot}>
-                <span className={pb.kind}>{p.kind === 'recurring' ? 'Recurring monthly' : 'One-time project'}</span>
-                <span className={pb.ver}>v{p.version || '—'}</span>
-                <span className={pb.grow} />
-                <span className={pb.price}>🔒 {p.price != null ? `${rm(p.price)}${per(p.kind, true)}` : '—'}</span>
-              </span>
-              {p.status === 'retired' ? <span className={pb.cardNote}>Retired {dmy(p.retiredOn)} · {plural(p.live, 'project')} still running on v{p.version}</span> : null}
-            </div>
+              p={p}
+              menuOn={ctx?.id === p.id}
+              onOpen={() => void open(p.id)}
+              onMenu={onMenu(p)}
+              onMore={e => setCtx({ id: p.id, at: menuAt(e, true), fromButton: true })}
+            />
           ))}
-          {shown.length === 0 ? <div className={pb.empty}>{book.products.length ? 'None here' : 'No products yet'}</div> : null}
+          {shown.length === 0 ? <div className={v2.empty}>{book.products.length ? 'None here' : 'No packages yet'}</div> : null}
         </div>
         {overlays}
       </div>
     )
   }
 
-  // ── The editor ──
+  // ── The editor (v2, variant B) ──
   const sections = productSections({ ...edit, code: sel.code })
-  const draftProduct: Product = { ...sel, ...edit }
+  // List price and internal cost follow the items (v2 §3): what the page shows is always the items' sums.
+  const priced: ProductEdit = { ...edit, price: pricing?.price ?? null, cost: pricing?.cost ?? null }
+  const draftProduct: Product = { ...sel, ...priced }
   const problems = productProblems(draftProduct, book)
   const sum = itemsSum(groups)
-  const m = margin(edit.price, edit.cost)
+  const m = margin(priced.price, priced.cost)
   const nextVer = sel.version + 1
   const changed = sel.changed || save.state === 'saving'
   const canPublish = !ro && changed && problems.length === 0 && save.state !== 'error' && !busy
-  const intake = book.minutes.find(t => t.id === edit.intake) ?? null
   const perShort = edit.kind === 'recurring' ? '/ mo' : ''
   // The manager's own columns that follow products: after Days, the Product List's values — edited here too (110px each).
   const pcols = columns.filter(c => c.inProducts)
   const igrid = pcols.length
-    ? { gridTemplateColumns: `minmax(170px, 1.3fr) minmax(260px, 1.6fr) 52px ${pcols.map(() => '110px').join(' ')} 92px 112px 96px 28px`, minWidth: 880 + pcols.length * 120 }
+    ? { gridTemplateColumns: `minmax(180px, 1.3fr) minmax(240px, 1.5fr) 56px ${pcols.map(() => '110px').join(' ')} 100px 108px 96px 28px`, minWidth: 880 + pcols.length * 120 }
     : undefined
-  const ispan = pcols.length ? { gridColumn: `1 / span ${5 + pcols.length}` } : undefined
-  const incl = `${includedText(groups)}${groups.some(g => g.items.some(it => it.qty > 0)) ? per(edit.kind) : ''}`
+  const ispan = pcols.length ? { gridColumn: `1 / span ${5 + pcols.length}` } : { gridColumn: '1 / span 5' }
+  const summary = itemsSummary(groups)
+  const allItems = groups.flatMap(g => g.items).filter(it => it.name.trim() && it.qty > 0)
+  const checklist: [string, boolean][] = [
+    ['Name and description', !!edit.name.trim() && !!edit.description.trim()],
+    [`${plural(allItems.length, 'item')}${allItems.length && allItems.every(it => it.workflow) ? ', all with a workflow' : ''}`,
+      allItems.length > 0 && !problems.includes('A linked workflow is not published yet') && !problems.includes('Name each category and item')],
+    ['Intake template linked', !!edit.intake],
+    ['Price and cost set', (priced.price ?? 0) > 0 && priced.cost != null],
+  ]
+  const untilDate = untilOn || edit.effectiveTo != null
 
   /** The floating Product List under an item's name: placed under it, or above when there is no room below. */
   const openPicker = (key: string, el: HTMLElement) => {
@@ -572,101 +535,104 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
     setPickFor(null)
   }
   const newCatMenu = pickFor === NEW_CAT && !ro ? pickerGroups(items, '', catDraft) : null
+  const sectionId = ['pb-basics', 'pb-items', 'pb-intake', 'pb-pricing', 'pb-publish']
 
   return (
     <div>
-      <div className={pb.crumbs}>
-        <button type="button" className={pb.crumbLink} onClick={() => void open(null)}>← Products</button>
-        <span>/</span>
-        <span>{edit.name.trim() || 'New product'}</span>
-      </div>
-      <div className={pb.titleRow}>
-        <span className={pb.bigName}>{edit.name.trim() || 'New product'}</span>
-        <span className={`${pb.status} ${STATUS_TONE[sel.status]}`}><span className={pb.dot} />{STATUS_LABEL[sel.status]}</span>
-        <span className={pb.verChip}>{sel.version ? `Live v${sel.version}` : 'Not published yet'}</span>
+      <div className={v2.topbar}>
+        <button type="button" className={v2.back} onClick={() => void open(null)}>← Packages</button>
+        <span className={v2.topName}>{edit.name.trim() || 'New package'}</span>
+        <StatusPill status={sel.status} />
+        <span className={v2.chip}>{sel.code} · {sel.version ? `Live v${sel.version}` : 'Not published'}</span>
         {save.state === 'error' ? (
-          <span className={pb.notSaved} role="alert">
+          <span className={v2.notSaved} role="alert">
             Not saved · {save.reason}
-            {save.stale ? <button type="button" className={pb.reload} onClick={() => window.location.reload()}>Reload</button> : null}
+            {save.stale ? <button type="button" className={v2.reload} onClick={() => window.location.reload()}>Reload</button> : null}
           </span>
         ) : ro ? null : (
-          <span className={qs.saved}>{save.state === 'saving' ? 'Saving…' : 'Saved'}</span>
+          <span className={v2.saved}><span className={v2.savedDot} />{save.state === 'saving' ? 'Saving…' : 'Saved'}</span>
         )}
-        <span className={pb.grow} />
-        <div className={pb.titleBtns}>
-          <button type="button" className={pb.ghost} disabled={busy} onClick={() => void duplicate(draftProduct)}>⧉ Duplicate</button>
-          {sel.status === 'active' ? <button type="button" className={pb.ghost} onClick={() => onQuote(sel)}>📄 New quotation</button> : null}
-        </div>
+        <span className={v2.grow} />
+        <span className={v2.topBtns}>
+          {sel.status === 'active' ? <button type="button" className={v2.ghost} onClick={() => onQuote(sel)}>📄 New quotation</button> : null}
+          <button type="button" className={v2.ghost} disabled={busy} onClick={() => void duplicate(draftProduct)}>⧉ Duplicate</button>
+        </span>
       </div>
       {ro ? (
-        <div className={pb.retiredBanner}>
+        <div className={v2.banner}>
           <span><strong>Retired on {dmy(sel.retiredOn)}.</strong> It can&apos;t be picked for new projects. {plural(sel.live, 'project')} already running keep v{sel.version} until they finish.</span>
-          <button type="button" className={pb.ghost} disabled={busy} onClick={() => void setStatus('reactivate')}>Reactivate</button>
+          <button type="button" className={v2.ghost} disabled={busy} onClick={() => void setStatus('reactivate')}>Reactivate</button>
         </div>
       ) : null}
 
-      <div className={pb.editor}>
-        <nav className={pb.nav} aria-label="Sections">
-          {sections.map((s, i) => (
-            <a key={s.label} href={`#pb-${i + 1}`} className={pb.navRow}>
-              <span className={`${pb.navMark}${s.done ? ` ${pb.navDone}` : ''}`}>{s.done ? '✓' : i + 1}</span>
-              {s.label}
-            </a>
-          ))}
-        </nav>
+      <nav className={v2.chips} aria-label="Sections">
+        {sections.map((s, i) => (
+          <a key={s.label} href={`#${sectionId[i]}`} className={v2.secChip}>
+            <span className={`${v2.secMark}${s.done ? ` ${v2.secDone}` : ''}`}>{s.done ? '✓' : i + 1}</span>
+            {s.label}{i >= 2 ? <Lock /> : null}
+          </a>
+        ))}
+      </nav>
 
-        <div className={`${pb.form}${ro ? ` ${pb.formRo}` : ''}`}>
-          <section id="pb-1" className={pb.section}>
-            <div className={pb.secHead}>1 · Basics</div>
-            <div className={pb.secBody}>
-              <label className={pb.field}>
-                <span className={pb.label}>Name</span>
-                <input className={pb.input} value={edit.name} maxLength={80} disabled={ro} onChange={e => change({ name: e.target.value })} />
-              </label>
-              <div className={pb.field}>
-                <span className={pb.label}>Code <span className={pb.muted}>· auto-generated</span></span>
-                <div className={pb.codeBox}><span className={pb.code}>{sel.code}</span><span aria-hidden="true">🔒</span></div>
+      <div className={v2.edGrid}>
+        <div className={v2.edMain} style={ro ? { opacity: 0.85 } : undefined}>
+          <section id="pb-basics" className={v2.box}>
+            <div className={v2.boxHead}>Basics</div>
+            <div className={v2.boxBody}>
+              <div className={v2.basicsGrid}>
+                <label className={v2.field}>
+                  <span className={v2.label}>Name</span>
+                  <input className={v2.input} value={edit.name} maxLength={80} disabled={ro} onChange={e => change({ name: e.target.value })} />
+                </label>
+                <div className={v2.field}>
+                  <span className={v2.label}>Code <Lock /></span>
+                  <div className={v2.codeBox}>{sel.code}</div>
+                </div>
               </div>
-              <div className={pb.field}>
-                <span className={pb.label}>Type</span>
-                <div className={pb.kinds} role="radiogroup" aria-label="Type">
+              <div className={v2.field}>
+                <span className={v2.label}>Type</span>
+                <div className={v2.kinds} role="radiogroup" aria-label="Type">
                   {([['recurring', 'Recurring monthly', 'Opens a new task every month for the same team'], ['one', 'One-time project', 'One project, closes when delivered']] as const).map(([k, label, hint]) => (
-                    <button key={k} type="button" role="radio" aria-checked={edit.kind === k} title={hint} disabled={ro} className={`${pb.kindCard}${edit.kind === k ? ` ${pb.kindOn}` : ''}`} onClick={() => change({ kind: k })}>
-                      <span className={`${pb.radio}${edit.kind === k ? ` ${pb.radioOn}` : ''}`} />
-                      <span className={pb.kindName}>{label}</span>
+                    <button key={k} type="button" role="radio" aria-checked={edit.kind === k} title={hint} disabled={ro} className={`${v2.kindCard}${edit.kind === k ? ` ${v2.kindOn}` : ''}`} onClick={() => change({ kind: k })}>
+                      <span className={`${v2.radio}${edit.kind === k ? ` ${v2.radioOn}` : ''}`} />
+                      {label}
                     </button>
                   ))}
                 </div>
               </div>
-              <label className={pb.field}>
-                <span className={pb.label}>Description</span>
-                <textarea className={pb.textarea} rows={3} value={edit.description} maxLength={600} disabled={ro} onChange={e => change({ description: e.target.value })} />
+              <label className={v2.field}>
+                <span className={v2.label}>Description <span className={v2.counter}>{edit.description.length}/600</span></span>
+                <textarea className={v2.textarea} rows={2} value={edit.description} maxLength={600} disabled={ro} onChange={e => change({ description: e.target.value })} />
               </label>
             </div>
           </section>
 
-          <section id="pb-2" className={`${pb.section} ${pb.sectionClip}`}>
-            <div className={pb.secHead}>
-              <span className={pb.nowrap}>2 · Items</span>
-              <span className={pb.grow} />
-              <span className={`${pb.secSum} ${pb.right}`}>{incl}</span>
+          <section id="pb-items" className={`${v2.box} ${v2.boxClip}`}>
+            <div className={v2.boxHead}>
+              <span className={v2.nowrap}>Items</span>
+              <span className={v2.boxHeadSub}>{summary}{summary && edit.kind === 'recurring' ? ' / month' : ''}</span>
+              <span className={v2.grow} />
+              {ro ? null : (
+                <button type="button" className={`${v2.ghost} ${v2.ghostSm}`} style={{ color: 'rgb(var(--mk-brown))' }} onClick={() => newCatRef.current?.focus()}>+ Add from Product List</button>
+              )}
             </div>
-            <div className={pb.itemsWrap}>
-              <div className={`${pb.iRow} ${pb.iHead}`} style={igrid}>
-                <span className={pb.pl8}>Item</span><span className={pb.pl8}>Workflow</span><span className={pb.right}>Days</span>
-                {pcols.map(c => <span key={c.id} className={pb.iExtraHead} title="The Product List’s — set here, it changes there too">{c.name}</span>)}
-                <span className={pb.center}>Qty {perShort}</span><span className={`${pb.right} ${pb.pr8}`}>Unit price</span><span className={pb.right}>Total</span><span />
+            <div className={v2.itemsWrap}>
+              <div className={`${v2.iGrid} ${v2.iHead}`} style={igrid}>
+                <span>Item</span><span>Workflow</span><span className={pb.right}>Days</span>
+                {pcols.map(c => <span key={c.id} title="The Product List’s — set here, it changes there too">{c.name}</span>)}
+                <span className={pb.center}>Qty {perShort}</span><span className={pb.right}>Unit price</span><span className={pb.right}>Total</span><span />
               </div>
               {groups.map((g, gi) => (
                 <div key={g.key}>
-                  <div className={`${pb.iRow} ${pb.iCat}`} style={igrid}>
-                    <span className={pb.iCatName} style={ispan}>
-                      <input className={pb.catInput} value={g.name} maxLength={60} disabled={ro} placeholder="Category, e.g. Graphic design" aria-label="Category"
+                  <div className={`${v2.iGrid} ${v2.iCat}`} style={igrid}>
+                    <span className={v2.iCatName} style={ispan}>
+                      <span className={v2.caret} aria-hidden="true">▾</span>
+                      <input className={v2.catIn} value={g.name} maxLength={60} disabled={ro} placeholder="Category" aria-label="Category"
                         onChange={e => setGroup(gi, x => ({ ...x, name: e.target.value }))} />
-                      <span className={pb.iCount}>{plural(g.items.length, 'item')}</span>
+                      <span className={v2.iCount}>{plural(g.items.length, 'item')}</span>
                     </span>
-                    <span className={pb.iCatTotal}>{rm(groupSum(g))}</span>
-                    {ro ? <span /> : <button type="button" className={pb.iX} title="Remove category" aria-label="Remove category" onClick={() => setGroups(gs => gs.filter((_, i) => i !== gi))}>×</button>}
+                    <span className={v2.iCatTotal}>{rm(groupSum(g))}</span>
+                    {ro ? <span /> : <button type="button" className={v2.iX} title="Remove category" aria-label="Remove category" onClick={() => setGroups(gs => gs.filter((_, i) => i !== gi))}>×</button>}
                   </div>
                   {g.items.map((it, ii) => {
                     const hit = itemNamed(items, it.name)
@@ -678,10 +644,10 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                     const menu = menuOn ? pickerGroups(items, g.name, it.name) : null
                     const typed = norm(it.name)
                     return (
-                      <div key={it.key} className={`${pb.iRow} ${pb.iItem}`} style={igrid}>
-                        <span className={pb.iName}>
+                      <div key={it.key} className={`${v2.iGrid} ${v2.iItem}`} style={igrid}>
+                        <span className={v2.iName}>
                           <input
-                            className={pb.iNameIn}
+                            className={v2.iNameIn}
                             value={it.name}
                             maxLength={60}
                             disabled={ro}
@@ -701,6 +667,7 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                               if (name.trim() && !itemNamed(items, name)) onAddItem(name.trim(), g.name.trim() || 'Other', it.price, it.workflow)
                             }}
                           />
+                          {hit?.desc ? <span className={v2.iDesc} title={hit.desc}>{hit.desc}</span> : null}
                           {menuOn && menu && pickRect ? (
                             <div
                               ref={menuRef}
@@ -746,28 +713,32 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                             </div>
                           ) : null}
                         </span>
-                        <span className={pb.iWf}>
-                          <span className={pb.iWfCol}>
-                            <select
-                              className={qs.cellSel}
-                              value={it.workflow ?? ''}
-                              disabled={ro}
-                              aria-label="Workflow"
-                              title={wf ? wfLabel(wf) : undefined}
-                              onChange={e => {
-                                const v = e.target.value
-                                if (v === '__new') void newWorkflowFor(gi, ii)
-                                else setItem(gi, ii, { workflow: v === '__above' ? above : v || null })
-                              }}
-                            >
-                              <option value="">{it.workflow ? 'No workflow' : 'Link a workflow…'}</option>
-                              {aboveWf && aboveWf.id !== it.workflow ? <option value="__above">↑ Same as above · {wfLabel(aboveWf)}</option> : null}
-                              {book.workflows.map(w => <option key={w.id} value={w.id}>{wfLabel(w)}</option>)}
-                              <option value="__new">+ New workflow</option>
-                            </select>
-                            {hit?.wf && it.workflow && hit.wf !== it.workflow ? <span className={pb.wfNote}>Not the Product List’s workflow</span> : null}
+                        <span className={v2.wfCell}>
+                          <span className={v2.wfCol}>
+                            <span className={v2.wfChip}>
+                              <select
+                                className={`${v2.wfSel}${wf ? '' : ` ${v2.wfNone}`}`}
+                                value={it.workflow ?? ''}
+                                disabled={ro}
+                                aria-label="Workflow"
+                                title={wf ? wfLabel(wf) : undefined}
+                                onChange={e => {
+                                  const v = e.target.value
+                                  if (v === '__new') void newWorkflowFor(gi, ii)
+                                  else setItem(gi, ii, { workflow: v === '__above' ? above : v || null })
+                                }}
+                              >
+                                <option value="">{it.workflow ? 'No workflow' : 'Link a workflow…'}</option>
+                                {aboveWf && aboveWf.id !== it.workflow ? <option value="__above">↑ Same as above · {wfLabel(aboveWf)}</option> : null}
+                                {book.workflows.map(w => <option key={w.id} value={w.id}>{wfLabel(w)}</option>)}
+                                <option value="__new">+ New workflow</option>
+                              </select>
+                              {wf ? <span className={v2.wfVer}>{wf.version ? `v${wf.version}` : 'draft'}</span> : null}
+                              <span className={v2.wfCaret} aria-hidden="true">▾</span>
+                            </span>
+                            {hit?.wf && it.workflow && hit.wf !== it.workflow ? <span className={v2.wfNote}>Not the Product List’s workflow</span> : null}
                           </span>
-                          {wf ? <Link className={pb.iOpen} href={`/marketing/workflows?w=${wf.id}`} title="Open in Workflow Builder" aria-label="Open in Workflow Builder">↗</Link> : null}
+                          {wf ? <Link className={v2.wfOpen} href={`/marketing/workflows?w=${wf.id}`} title="Open in Workflow Builder" aria-label="Open in Workflow Builder">↗</Link> : null}
                         </span>
                         {/* The item's est. days and the manager's columns are the Product List's own: set here, they are set
                             there — and every product and quotation with the item follows (the user, 2026-11-12: "两者联动"). */}
@@ -786,23 +757,23 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                             />
                           </span>
                         ))}
-                        <span className={pb.iQty}>
-                          <button type="button" className={pb.sq} disabled={ro} aria-label="One less" onClick={() => setItem(gi, ii, { qty: Math.max(0, it.qty - 1) })}>−</button>
-                          <span className={pb.iQtyN}>{it.qty}</span>
-                          <button type="button" className={pb.sq} disabled={ro} aria-label="One more" onClick={() => setItem(gi, ii, { qty: Math.min(999, it.qty + 1) })}>+</button>
+                        <span className={v2.qty}>
+                          <button type="button" className={v2.qtyBtn} disabled={ro} aria-label="One less" onClick={() => setItem(gi, ii, { qty: Math.max(0, it.qty - 1) })}>−</button>
+                          <span className={v2.qtyN}>{it.qty}</span>
+                          <button type="button" className={v2.qtyBtn} disabled={ro} aria-label="One more" onClick={() => setItem(gi, ii, { qty: Math.min(999, it.qty + 1) })}>+</button>
                         </span>
-                        <span className={pb.iPrice}>
-                          <span className={pb.iRm}>RM</span>
-                          <MoneyInput className={pb.iPriceIn} value={it.price} placeholder="0" label="Unit price" disabled={ro} onChange={v => setItem(gi, ii, { price: v })} />
+                        <span className={v2.price}>
+                          <span className={v2.rmTag}>RM</span>
+                          <MoneyInput className={v2.priceIn} value={it.price} placeholder="0" label="Unit price" disabled={ro} onChange={v => setItem(gi, ii, { price: v })} />
                         </span>
-                        <span className={pb.iTotal}>{rm((it.price ?? 0) * it.qty)}</span>
-                        {ro ? <span /> : <button type="button" className={`${pb.iX} ${pb.iXItem}`} title="Remove item" aria-label="Remove item" onClick={() => setGroup(gi, x => ({ ...x, items: x.items.filter((_, j) => j !== ii) }))}>×</button>}
+                        <span className={v2.total}>{rm((it.price ?? 0) * it.qty)}</span>
+                        {ro ? <span /> : <button type="button" className={v2.iX} title="Remove item" aria-label="Remove item" onClick={() => setGroup(gi, x => ({ ...x, items: x.items.filter((_, j) => j !== ii) }))}>×</button>}
                       </div>
                     )
                   })}
                   {ro ? null : (
-                    <div className={pb.iAddRow} style={igrid ? { minWidth: igrid.minWidth } : undefined}>
-                      <button type="button" className={pb.iAdd} onClick={() => {
+                    <div className={v2.iAddRow} style={igrid ? { minWidth: igrid.minWidth } : undefined}>
+                      <button type="button" className={v2.iAdd} onClick={() => {
                         // The new row opens the Product List at once (its name box is focused).
                         const fresh = newItem()
                         setGroup(gi, x => ({ ...x, items: [...x.items, fresh] }))
@@ -814,17 +785,17 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
               ))}
               {ro ? null : (
                 <div
-                  className={pb.iNewCat}
-                  style={igrid ? { minWidth: igrid.minWidth + 32 } : undefined}
+                  className={v2.iNewCat}
+                  style={igrid ? { minWidth: igrid.minWidth } : undefined}
                   onClick={e => { if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.plus) newCatRef.current?.focus() }}
                 >
-                  <span className={pb.iPlus} data-plus="1">+</span>
+                  <span className={v2.iPlus} data-plus="1">+</span>
                   <input
                     ref={newCatRef}
-                    className={pb.iNewCatIn}
+                    className={v2.iNewCatIn}
                     value={catDraft}
                     maxLength={60}
-                    placeholder="Pick from the Product List, or type a new category and press Enter"
+                    placeholder="New category"
                     aria-label="New category"
                     onFocus={e => openPicker(NEW_CAT, e.currentTarget)}
                     onBlur={() => setTimeout(() => setPickFor(k => (k === NEW_CAT ? null : k)), 120)}
@@ -838,17 +809,9 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                       }
                     }}
                   />
-                  <button
-                    type="button"
-                    className={`${pb.iNewCatBtn}${catDraft.trim() ? '' : ` ${qs.faded}`}`}
-                    onClick={() => {
-                      if (!catDraft.trim()) return
-                      setGroups(gs => [...gs, newGroup(catDraft)])
-                      setCatDraft('')
-                    }}
-                  >
-                    Add category
-                  </button>
+                  {catDraft.trim() ? (
+                    <button type="button" className={`${v2.ghost} ${v2.ghostSm}`} onClick={() => { setGroups(gs => [...gs, newGroup(catDraft)]); setCatDraft('') }}>Add category</button>
+                  ) : null}
                   {newCatMenu && pickRect ? (
                     <div
                       ref={menuRef}
@@ -880,134 +843,121 @@ export default function ProductBuilder({ book, setBook, first, onOpen, items, co
                   ) : null}
                 </div>
               )}
-              <div className={`${pb.iRow} ${pb.iSum}`} style={igrid}>
-                <span className={pb.iSumLbl} style={ispan}>Sum of all items <span className={pb.muted}>{edit.kind === 'recurring' ? '· per month' : ''}</span></span>
-                <span className={pb.iSumV}>{rm(sum)}</span>
+              <div className={`${v2.iGrid} ${v2.iSum}`} style={igrid}>
+                <span className={v2.iSumLbl} style={ispan}>Sum of all items <span className={v2.eqPill}>= List price</span></span>
+                <span className={v2.iSumV}>{rm(sum)}</span>
                 <span />
               </div>
             </div>
           </section>
 
-          <div className={pb.divider}>
-            <span className={pb.divLine} />
-            <span className={pb.divWords}>🔒 Internal only · not shown to the client</span>
-            <span className={pb.divLine} />
-          </div>
-
-          <section id="pb-3" className={pb.section}>
-            <div className={pb.secHead}><span>3 · Intake template</span><span className={pb.lockChip}>🔒 Internal only</span></div>
-            <div className={pb.secBody}>
-              <label className={pb.field}>
-                <span className={pb.label}>Intake template <span className={pb.muted}>· used in meeting minutes</span></span>
+          <section id="pb-intake" className={v2.box}>
+            <div className={v2.boxHead}><span>Intake template</span><Lock /></div>
+            <div className={v2.boxBody}>
+              <label className={v2.field}>
+                <span className={v2.label}>Minutes template its first meeting fills in</span>
                 <select className={pb.select} value={edit.intake ?? ''} disabled={ro} onChange={e => change({ intake: e.target.value || null })}>
                   <option value="">Pick a minutes template…</option>
                   {book.minutes.map(t => <option key={t.id} value={t.id}>{t.name}{t.version ? ` · v${t.version}` : ' · draft'}</option>)}
                 </select>
-                {intake ? <span className={pb.meta}>{intake.version ? `v${intake.version}` : 'Not published yet'} · {plural(intake.fields, 'field')}</span> : null}
               </label>
             </div>
           </section>
 
-          <section id="pb-4" className={pb.section}>
-            <div className={pb.secHead}><span>4 · Pricing</span><span className={pb.lockChip}>🔒 Internal only · Manager</span></div>
-            <div className={`${pb.secBody} ${pb.pricing}`}>
-              <div className={pb.field}>
-                <span className={pb.label}>List price</span>
-                <span className={pb.moneyBig}>
-                  <span className={pb.rm}>RM</span>
-                  <MoneyInput className={pb.moneyInput} value={edit.price} label="List price" disabled={ro} onChange={v => change({ price: v })} />
-                  <span className={pb.muted}>{edit.kind === 'recurring' ? '/ month' : '/ project'}</span>
-                </span>
-                {!ro && sum > 0 && sum !== edit.price ? (
-                  <button type="button" className={pb.link} onClick={() => change({ price: sum })}>Use sum of items ({rm(sum)}{per(edit.kind)})</button>
-                ) : null}
-              </div>
-              <div className={pb.field}>
-                <span className={pb.label}>Internal cost <span className={pb.muted}>· optional</span></span>
-                <span className={pb.moneyBig}>
-                  <span className={pb.rm}>RM</span>
-                  <MoneyInput className={pb.moneyInput} value={edit.cost} placeholder="—" label="Internal cost" disabled={ro} onChange={v => change({ cost: v })} />
-                </span>
-                {!ro && costOfItems && costOfItems.cost > 0 && costOfItems.cost !== edit.cost ? (
-                  <button type="button" className={pb.link} onClick={() => change({ cost: costOfItems.cost })}>
-                    Use cost of items ({rm(costOfItems.cost)}{per(edit.kind)})
-                  </button>
-                ) : null}
-                {costOfItems?.missing ? (
-                  <span className={pb.muted}>{costOfItems.missing} item{costOfItems.missing === 1 ? ' has' : 's have'} no cost on the Product List</span>
-                ) : null}
-              </div>
-              <div className={pb.field}>
-                <span className={pb.label}>Margin</span>
-                <span className={pb.marginRow}>
-                  <span className={`${pb.margin}${m !== null && m < MARGIN_LOW ? ` ${pb.marginLow}` : ''}`}>{m === null ? '—' : `${m}%`}</span>
-                  {m !== null && edit.price != null && edit.cost != null ? (
-                    <span className={pb.muted}>{rm(edit.price - edit.cost)} {edit.kind === 'recurring' ? 'per month' : 'per project'}{m < MARGIN_LOW ? ` · below ${MARGIN_LOW}%` : ''}</span>
-                  ) : null}
-                </span>
-              </div>
-              <label className={pb.field}>
-                <span className={pb.label}>Revenue account</span>
-                <select className={pb.select} value={sel.account ?? ''} disabled={acctBusy} onChange={e => void setAccount(e.target.value)}>
-                  <option value="">Pick an account…</option>
-                  {sel.account && !book.accounts.some(a => a.code === sel.account) ? (
-                    <option value={sel.account}>{accountLabel(sel.account, book.accounts)}</option>
-                  ) : null}
-                  {book.accounts.map(a => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}
-                </select>
-              </label>
+          <section className={v2.box}>
+            <div className={v2.boxHead}>Version history</div>
+            <div className={v2.boxBody} style={{ gap: 0 }}>
+              {sel.history.length ? sel.history.map(h => (
+                <div key={h.version} className={v2.hRow}>
+                  <span className={v2.mono} style={{ fontWeight: 600 }}>v{h.version}</span>
+                  <span className={v2.muted}>{h.at ? dmy(h.at.slice(0, 10)) : ''}</span>
+                  <span>{h.note}</span>
+                </div>
+              )) : <span className={v2.muted} style={{ fontSize: '.88em' }}>Not published yet</span>}
             </div>
-          </section>
-
-          <section id="pb-5" className={pb.section}>
-            <div className={pb.secHead}><span>5 · Publish</span><span className={pb.lockChip}>🔒 Internal only</span></div>
-            <div className={pb.secBody}>
-              <div className={pb.pubGrid}>
-                <div className={pb.field}>
-                  <span className={pb.label}>Version</span>
-                  <span className={pb.pubVal}>v{nextVer} <span className={pb.muted}>{sel.version ? `replaces v${sel.version}` : 'first version'}</span></span>
-                </div>
-                <label className={pb.field}>
-                  <span className={pb.label}>Effective from</span>
-                  <input className={`${qs.date}`} type="date" onClick={pickDate} value={edit.effectiveFrom ?? ''} disabled={ro} onChange={e => change({ effectiveFrom: e.target.value || null })} />
-                </label>
-                <div className={pb.field}>
-                  <span className={pb.label}>Projects on current version</span>
-                  <span className={pb.pubVal}>{sel.live} active · stay on v{sel.version || '—'}</span>
-                </div>
-              </div>
-              {sel.history.length ? (
-                <div className={pb.history}>
-                  <div className={pb.label}>Version history</div>
-                  {sel.history.map(h => (
-                    <div key={h.version} className={pb.histRow}>
-                      <span className={pb.mono}>v{h.version}</span>
-                      <span className={pb.muted}>{h.at ? dmy(h.at.slice(0, 10)) : ''}</span>
-                      <span>{h.note}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <div className={pb.pubFoot}>
-                {sel.status === 'active' ? <button type="button" className={pb.danger} disabled={busy} onClick={() => void setStatus('retire')}>Retire product</button> : null}
-                {sel.status === 'draft' && sel.version === 0 ? <DeleteDraft key={sel.id} what="product" busy={busy} onDelete={() => void remove()} /> : null}
-                <span className={pb.grow} />
-                {ro ? null : (
-                  <span className={problems.length ? pb.pubNoteBad : pb.pubNote}>
-                    {problems.length ? problems[0] : `New projects from ${dmy(edit.effectiveFrom)} use v${nextVer}. ${plural(sel.live, 'running project')} stay on v${sel.version || '—'}.`}
-                  </span>
-                )}
-                {ro ? null : <button type="button" className={pb.ghost} disabled={busy} onClick={() => void saveDraft()}>Save draft</button>}
-                {ro ? null : (
-                  <button type="button" className={pb.primary} disabled={!canPublish} title={!changed ? `Nothing has changed since v${sel.version}` : problems[0]} onClick={() => void publish()}>
-                    Publish v{nextVer}
-                  </button>
-                )}
-              </div>
+            <div className={v2.hFoot}>
+              <button type="button" className={v2.redText} disabled={busy} onClick={() => setDelFor(sel.id)}>Delete package</button>
+              <span className={v2.grow} />
+              {sel.status === 'active' ? <button type="button" className={v2.redOutline} disabled={busy} onClick={() => void setStatus('retire')}>Retire product</button> : null}
             </div>
           </section>
         </div>
+
+        <aside className={v2.aside}>
+          <section id="pb-pricing" className={v2.box}>
+            <div className={v2.boxHead}><span>Pricing</span><span className={v2.lockChip}><Lock /> Manager</span></div>
+            <div className={v2.boxBody}>
+              <div className={v2.kv}><span className={v2.kvK}>List price{edit.kind === 'recurring' ? ' / month' : ''}</span><span className={v2.kvV}>{rm(priced.price)}</span></div>
+              <div className={v2.kv}><span className={v2.kvK}>Internal cost <Lock /></span><span className={v2.kvV}>{priced.cost == null ? '—' : rm(priced.cost)}</span></div>
+              {pricing?.missing ? <span className={v2.small}>{pricing.missing} item{pricing.missing === 1 ? ' has' : 's have'} no cost on the Product List</span> : null}
+              <div className={v2.field}>
+                <span className={v2.label}>Margin</span>
+                <span className={`${v2.marginBig}${m != null && m < MARGIN_LOW ? ` ${v2.red}` : ` ${v2.green}`}`}>{m == null ? '—' : `${m}%`}</span>
+                <span className={v2.bar} aria-hidden="true">
+                  <span className={`${v2.barFill}${m != null && m < MARGIN_LOW ? ` ${v2.barFillLow}` : ''}`} style={{ width: `${Math.max(0, Math.min(100, m ?? 0))}%` }} />
+                  <span className={v2.barTick} />
+                </span>
+                {m != null && priced.price != null && priced.cost != null ? (
+                  <span className={v2.small}>{rm(priced.price - priced.cost)} / {edit.kind === 'recurring' ? 'month' : 'project'}</span>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section id="pb-publish" className={v2.box}>
+            <div className={v2.boxHead}>
+              <span className={v2.nowrap}>Publish v{nextVer}</span>
+              {ro ? null : problems.length
+                ? <span className={`${v2.boxHeadSub} ${v2.red}`} style={{ marginLeft: 'auto' }} title={problems[0]}>{problems[0]}</span>
+                : <span className={`${v2.boxHeadSub} ${v2.green}`} style={{ marginLeft: 'auto' }}>Ready to publish</span>}
+            </div>
+            <div className={v2.boxBody}>
+              {checklist.map(([label, ok]) => (
+                <span key={label} className={v2.check}><span className={`${v2.checkMark}${ok ? ` ${v2.checkOk}` : ''}`}>✓</span>{label}</span>
+              ))}
+              <div className={v2.pubBox}>
+                <label className={v2.pubRow}>
+                  <span className={v2.pubK}>Effective from</span>
+                  <input className={v2.date} type="date" onClick={pickDate} value={edit.effectiveFrom ?? ''} disabled={ro} onChange={e => change({ effectiveFrom: e.target.value || null })} />
+                </label>
+                <div className={v2.pubRow}>
+                  <span className={v2.pubK}>Until</span>
+                  <span className={v2.until} role="radiogroup" aria-label="Until">
+                    <button type="button" role="radio" aria-checked={!untilDate} disabled={ro} className={`${v2.untilBtn}${!untilDate ? ` ${v2.untilOn}` : ''}`}
+                      onClick={() => { setUntilOn(false); if (edit.effectiveTo) change({ effectiveTo: null }) }}>Never</button>
+                    <button type="button" role="radio" aria-checked={untilDate} disabled={ro} className={`${v2.untilBtn}${untilDate ? ` ${v2.untilOn}` : ''}`}
+                      onClick={() => setUntilOn(true)}>On a date</button>
+                  </span>
+                </div>
+                <label className={`${v2.pubRow}${untilDate ? '' : ` ${v2.faded}`}`}>
+                  <span className={v2.pubK}>End date</span>
+                  <input className={v2.date} type="date" onClick={pickDate} value={edit.effectiveTo ?? ''} min={edit.effectiveFrom ?? undefined} disabled={ro || !untilDate}
+                    tabIndex={untilDate ? undefined : -1} aria-label="End date" onChange={e => change({ effectiveTo: e.target.value || null })} />
+                </label>
+              </div>
+              <span className={v2.small}>New version: v{nextVer}{sel.version ? ` replaces v${sel.version}` : ' · the first'}</span>
+              {sel.version ? <span className={v2.small}>Running on v{sel.version}: {plural(sel.live, 'project')} · stay</span> : null}
+              {ro ? null : (
+                <div className={v2.pubBtns}>
+                  <button type="button" className={v2.ghost} disabled={busy} onClick={() => void saveDraft()}>Save draft</button>
+                  <button type="button" className={v2.primary} disabled={!canPublish} title={!changed ? `Nothing has changed since v${sel.version}` : problems[0]} onClick={() => void askPublish()}>
+                    Publish v{nextVer}
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        </aside>
       </div>
+      {diffOpen ? (
+        <PublishDiff
+          diff={productDiff({ ...sel, ...priced })}
+          recurring={edit.kind === 'recurring'}
+          busy={busy}
+          onCancel={() => setDiffOpen(false)}
+          onPublish={() => void publish()}
+        />
+      ) : null}
       {overlays}
     </div>
   )
