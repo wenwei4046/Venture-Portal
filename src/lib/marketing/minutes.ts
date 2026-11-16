@@ -10,24 +10,24 @@ export type MinutesType = (typeof MINUTES_TYPES)[number]
  * "在 field 加一个 Title, 放到这个位置" · "title 就是一个句子 … 最多放 description") is a fixed sentence that heads the minutes, with an
  * optional description under it (its `help`): nothing to fill in, never required. */
 export const TYPE_CARDS: readonly { type: MinutesType; glyph: string; desc: string }[] = [
-  { type: 'Title', glyph: 'T', desc: 'A sentence at the top · once per template' },
-  { type: 'Short text', glyph: 'Aa', desc: 'One-line answer' },
-  { type: 'Long text', glyph: '¶', desc: 'Notes, objectives, decisions' },
-  { type: 'Date', glyph: '▦', desc: 'A single day' },
-  { type: 'Campaign period', glyph: '↔', desc: 'From and to dates · once per template' },
-  { type: 'Number', glyph: '#', desc: 'Budget, targets, counts' },
-  { type: 'People', glyph: '◎', desc: 'Pick from the attendees' },
-  { type: 'Project link', glyph: '↗', desc: 'Pulls in the project · once per template' },
-  { type: 'Free space', glyph: '⊞', desc: 'Open grid shaped in the meeting' },
-  { type: 'Table', glyph: '▤', desc: 'Fixed, typed columns' },
-  { type: 'Signature', glyph: '✍', desc: 'Each attendee signs · once per template' },
+  { type: 'Title', glyph: '📌', desc: 'A sentence at the top · once per template' },
+  { type: 'Short text', glyph: '✏️', desc: 'One-line answer' },
+  { type: 'Long text', glyph: '📝', desc: 'Notes, objectives, decisions' },
+  { type: 'Date', glyph: '📅', desc: 'A single day' },
+  { type: 'Campaign period', glyph: '🗓️', desc: 'From and to dates · once per template' },
+  { type: 'Number', glyph: '🔢', desc: 'Budget, targets, counts' },
+  { type: 'People', glyph: '👥', desc: 'Pick from the attendees' },
+  { type: 'Project link', glyph: '🔗', desc: 'Pulls in the project · once per template' },
+  { type: 'Free space', glyph: '🧩', desc: 'Open grid shaped in the meeting' },
+  { type: 'Table', glyph: '📊', desc: 'Fixed, typed columns' },
+  { type: 'Signature', glyph: '✍️', desc: 'Each attendee signs · once per template' },
 ]
 export const TYPE_GLYPH = Object.fromEntries(TYPE_CARDS.map(c => [c.type, c.glyph])) as Record<MinutesType, string>
 /** The kinds a template keeps once: the project it is for, a campaign's run period (answer 13), the signatures, its title. */
 export const ONCE_TYPES: readonly MinutesType[] = ['Project link', 'Campaign period', 'Signature', 'Title']
 export const MINUTES_COL_TYPES = ['Text', 'Number', 'Date', 'Person'] as const
 export type MinutesColType = (typeof MINUTES_COL_TYPES)[number]
-export const COL_GLYPH: Record<MinutesColType, string> = { Text: 'Aa', Number: '#', Date: '▦', Person: '◎' }
+export const COL_GLYPH: Record<MinutesColType, string> = { Text: '✏️', Number: '🔢', Date: '📅', Person: '👤' }
 export const MAX_COLS = 8
 export const MAX_ROWS = 50
 export const MAX_HELP = 120
