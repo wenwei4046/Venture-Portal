@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL, feeMonths, feeTier, feeWorking, marketingFee, runSplit } from "./adsperf";
+import { ALL, feeMonths, feeTier, feeWorking, marketingFee, noAdRepeats, runSplit } from "./adsperf";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 
 describe("the Revenue Team's marketing fee", () => {
@@ -58,5 +58,22 @@ describe("Spent's and Leads' running / paused parts", () => {
   });
   it("says nothing of the spend until every month is read", () => {
     expect(runSplit(ads, status, Object.keys(SPEND), [[0, 1]], 0, 1, () => null, leadsOf).spend).toBeNull();
+  });
+});
+
+// 2026-11-16 (the owner, of November's 17 "no ad" leads, 6 the same people as Instant Form leads: "他们的聊天室不动，但是 ads
+// performance 的数字要更动，不然数据会不准"): such a customer is not counted a second time.
+describe("a no-ad customer who is already an ad's lead", () => {
+  const c = (id: string, adId: string | null, phone: string, name: string, at: string) => ({ id, adId, phone, name, createdAt: at });
+  const rows = [
+    c("form1", "ad1", "+600123451100", "Andrew Wong", "2026-11-15T04:51:00Z"), c("wa1", null, "+60123451100", "Andrew Wong", "2026-11-15T05:02:00Z"), // "+60 0…"
+    c("form2", "ad1", "+600123458728", "Jollene", "2026-11-15T07:09:00Z"), c("wa2", null, "+60123458728", "Ka Xin", "2026-11-15T14:36:00Z"), // same phone, other name
+    c("form3", "ad2", "+60123456976", "Ng Stanley", "2026-11-13T14:17:00Z"), c("ms3", null, "", "Ng Stanley", "2026-11-13T14:17:30Z"), // its Messenger chat
+    c("ms4", null, "", "Katherine Chee", "2026-11-01T11:26:00Z"), // nobody's else
+    c("ms5", null, "", "Ng Stanley", "2026-11-14T14:17:00Z"), // the same name a day later: somebody else
+    c("wa6", null, "+60129990000", "Lim", "2026-11-16T02:01:00Z"),
+  ];
+  it("is the same phone, or the same name within 10 minutes, as an ad's customer", () => {
+    expect([...noAdRepeats(rows)].sort()).toEqual(["ms3", "wa1", "wa2"]);
   });
 });
