@@ -99,7 +99,14 @@ export interface Figures {
   interestIn: number
   interestOut: number
   profit: number
+  /** Still owed from months before, both sides together (the "Earlier unpaid" filter). */
   earlier: number
+  /** By right, each side split (2026-11-16 — the user: "要如何区分这个月钱是之前overdue 的呢还是这个本来就该收的？" → C):
+   *  this month's own instalments, and what is overdue from months before. now + earlier = the side's by-right figure. */
+  nowCollect: number
+  earlierCollect: number
+  nowPay: number
+  earlierPay: number
   gotCollect: number
   gotPay: number
 }
@@ -229,6 +236,10 @@ export function figuresOf(deals: CoDeal[], basis: Basis): Figures {
     interestOut,
     profit: r2(interestIn - interestOut),
     earlier: r2(deals.reduce((s, d) => s + d.earlier, 0)),
+    nowCollect: r2(sum('collect', 'due') - sum('collect', 'earlier')),
+    earlierCollect: sum('collect', 'earlier'),
+    nowPay: r2(sum('pay', 'due') - sum('pay', 'earlier')),
+    earlierPay: sum('pay', 'earlier'),
     gotCollect: sum('collect', 'got'),
     gotPay: sum('pay', 'got'),
   }
