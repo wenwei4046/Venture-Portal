@@ -16,26 +16,30 @@
  *
  * Either one's end — a TERM's — is reminded twice: 30 days before, then 15 (REMINDER_DAYS).
  *
+ * Intern (2026-11-16 — the user: "employee status 可以加多一个option Intern吗？"): a fifth, with no period — as Part time
+ * (mig 20261116180000).
+ *
  * Pure, so the roster, the person's window and page, the bell and both forms read one set of rules.
  */
 import dayjs from 'dayjs'
 import type { ChipTone } from '@/components/hrv/kit'
 import { officeDay } from '@/lib/office-time'
 
-export type EmploymentStatus = 'probation' | 'contract' | 'permanent' | 'part_time'
+export type EmploymentStatus = 'probation' | 'contract' | 'permanent' | 'part_time' | 'intern'
 
 /** In the order the forms offer them — a new hire is most often on probation; a contract is the other with an end. */
-export const EMPLOYMENT_STATUSES: readonly EmploymentStatus[] = ['probation', 'contract', 'permanent', 'part_time']
+export const EMPLOYMENT_STATUSES: readonly EmploymentStatus[] = ['probation', 'contract', 'permanent', 'part_time', 'intern']
 
 export const EMPLOYMENT_STATUS_LABEL: Readonly<Record<EmploymentStatus, string>> = {
   probation: 'Probation',
   contract: 'Contract',
   permanent: 'Permanent',
   part_time: 'Part time',
+  intern: 'Intern',
 }
 
-/** The four as a sentence says them — a refusal, a chip's hint. */
-const STATUS_WORDS = 'Probation, Contract, Permanent or Part time'
+/** The five as a sentence says them — a refusal, a chip's hint. */
+const STATUS_WORDS = 'Probation, Contract, Permanent, Part time or Intern'
 
 /** A record filed before employment status existed, until HR sets it. */
 export const NOT_SET = 'Not set'
@@ -226,6 +230,7 @@ export function statusChip(f: StatusFacts, today: string): StatusChip {
   if (f.status === null) return { label: NOT_SET, tone: 'plain', title: `Employment status not set — ${STATUS_WORDS}, on their page` }
   if (f.status === 'permanent') return { label: EMPLOYMENT_STATUS_LABEL.permanent, tone: 'ledger' }
   if (f.status === 'part_time') return { label: EMPLOYMENT_STATUS_LABEL.part_time, tone: 'info' }
+  if (f.status === 'intern') return { label: EMPLOYMENT_STATUS_LABEL.intern, tone: 'run' }
   const label = EMPLOYMENT_STATUS_LABEL[f.status]
   const tone: ChipTone = f.status === 'contract' ? 'runOn' : 'alert'
   const endsOn = (f.status === 'contract' ? f.contractEnd : f.probationEnd) ?? null

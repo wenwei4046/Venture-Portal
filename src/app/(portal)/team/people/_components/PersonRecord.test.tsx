@@ -198,7 +198,7 @@ describe('Employment Status', () => {
     openEditor()
     const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
     expect(status).toHaveValue('permanent')
-    expect(Array.from(status.options).map(o => o.text)).toEqual(['Probation', 'Contract', 'Permanent', 'Part time'])
+    expect(Array.from(status.options).map(o => o.text)).toEqual(['Probation', 'Contract', 'Permanent', 'Part time', 'Intern'])
     expect(screen.queryByLabelText('Probation period')).toBeNull()
     fireEvent.change(status, { target: { value: 'probation' } })
     expect(screen.getByLabelText('Probation period')).toHaveValue('3')
