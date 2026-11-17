@@ -33,6 +33,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'account_invite_states',
   // Sub-departments per person (mig 20261016180000): STABLE — the caller's reach, a person's window.
   'my_sub_department_reach', 'person_sub_department_reach',
+  // The CRM's brands per person (mig 20261117160000): STABLE — a person's window.
+  'person_crm_brands',
   'ar_account_code_for', 'ar_account_for_invoice', 'audit_changes', 'audit_overview', 'bank_gl_codes', 'bridge_mirror_slices',
   'bridge_ref_flags', 'build_hr_cost_submission_payload', 'calculate_dept_np', 'claim_payment_queue', 'comm_home_sub_department',
   'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people', 'crm_up_next',

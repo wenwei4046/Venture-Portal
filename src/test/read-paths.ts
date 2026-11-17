@@ -610,6 +610,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Sub-departments per person (mig 20261016180000): the caller's own reach; a person's, to whoever reads their
   // boxes; their ticks, by whoever manages permissions.
   'my_sub_department_reach', 'person_sub_department_reach', 'permission_user_reach_set',
+  // The CRM's brands per person (mig 20261117160000): a person's, to whoever reads their boxes; set by whoever
+  // manages permissions.
+  'person_crm_brands', 'permission_user_crm_brands_set',
   // A person's own Salary / NRIC / Bank (mig 20261016210000): by whoever manages permissions.
   'permission_user_sensitive_set',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_batch_commission_split', 'payroll_cancel_topup',
