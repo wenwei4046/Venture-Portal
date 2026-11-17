@@ -57,3 +57,11 @@ export function adPageInSource(pageId: string | null | undefined, pick: SourcePi
   const b = brandOf(pageId);
   return !!b && pick.split(":")[0] === b;
 }
+
+/**
+ * The brand a Revenue app view opens the CRM on (2026-11-17 — the owner: "Dream Crafter view 默认打开 dream crafter 的数据，
+ * 聊天室等"): the Dream Crafter sub-department (code DC) holds the CRM to Dream Crafter's customers; every other view, every brand.
+ */
+export function crmBrandOfView(subCode: string | null | undefined): SourceBrand | null {
+  return (subCode ?? "").trim().toUpperCase() === "DC" ? "dc" : null;
+}

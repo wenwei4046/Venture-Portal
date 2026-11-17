@@ -25,6 +25,8 @@ import { shellVM } from "./sales/vm/header";
 import { byTeam, downlineOf, jobTitle } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import DeskScreens from "./desk/DeskScreens";
+import { inBrand } from "./desk/vm/insight";
+import type { SourceBrand } from "@/lib/member/crm-source";
 import type { DeskApp as DeskAppFrame } from "./desk/vm/ctx";
 import D from "./desk/desk.module.css";
 import { makePanelActions } from "./panel/actions";
@@ -65,7 +67,7 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, brand = null }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brand (Dream Crafter's view → "dc"); null = every brand. */ brand?: SourceBrand | null }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
   setUrgencyThresholds(data?.settings);
@@ -281,34 +283,37 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   onScreenChat.current = null;
   panelShown.current = false;
   if (!data) return notice(problem || "Loading your customers…");
-  const me = personOf(data.viewerId, data.people);
-  if (!me) return notice(data.setup === "no_role"
+  // The Revenue app's view picks the brand (2026-11-17 — the owner: "Dream Crafter view 默认打开 dream crafter 的数据，聊天室等"):
+  // in Dream Crafter's view every screen holds Dream Crafter's customers, their chats, visits and journey alone.
+  const shownData = brand ? inBrand(data, brand) : data;
+  const me = personOf(shownData.viewerId, shownData.people);
+  if (!me) return notice(shownData.setup === "no_role"
     ? "Your job title has no role in the CRM. The CRM is for the Revenue team; if you should be in it, ask your administrator to check your title in People."
     : "Your login is not linked to your employee record in People yet. Once your administrator links them, your customers appear here.");
 
   // Whoever holds CRM · View at All sees everyone: the Control panel, and anyone's own CRM from it
   // (2026-10-10: the permission matrix decides — the Principal and the Revenue Director by their templates).
-  const full = data.can.viewAll;
+  const full = shownData.can.viewAll;
   // Everybody in the CRM has their own CRM beside the Control panel — the Principal too since 2026-10-13 (the user:
   // "Principal 也要有 mine 的功能"): Mine is the customers given to the CEO's own record, answered and booked there.
   const sells = true;
   // A leader (STL / TL / TA with a downline, rev 1011): the Control panel scoped to their whole downline — the database
   // already gives them only their line — beside their own CRM.
-  const leads = !full && data.people.some(p => p.uplineId === me.id);
+  const leads = !full && shownData.people.some(p => p.uplineId === me.id);
   // On a computer a leader opens on their Team side's desktop, as the Director does (2026-10-26); on a phone, their own CRM.
   // A Revenue Specialist too opens on a desktop of their own (the owner, 2026-10-29: "revenue specialist 也要做") — the same
   // screens on their own customers, none of CRM · Manage's pages.
   const mode = hodMode ?? (full || (desk && !!deskApp) ? "panel" : "crm");
   // View as's cross-team viewers (2026-11-12 — the owner: "不能view as" Josiah and Wei Jie, Marketing's managers given
   // CRM · View): never in data.people; opened on their own Team side, read-only, with their own cells.
-  const viewers = full ? data.viewers ?? [] : [];
+  const viewers = full ? shownData.viewers ?? [] : [];
   const viewerOf = (id: string | null | undefined) => (id ? viewers.find(v => v.id === id) : undefined);
   const viewerPerson = (id: string): CrmPerson | undefined => {
     const v = viewerOf(id);
     return v ? { id: v.id, name: v.name, role: "boss", uplineId: null, fullTime: false, title: v.title, login: true } : undefined;
   };
   const viewerList = viewers.map(v => viewerPerson(v.id)!);
-  const nameOf = (id: string | null | undefined) => personOf(id, data.people)?.name ?? "—";
+  const nameOf = (id: string | null | undefined) => personOf(id, shownData.people)?.name ?? "—";
   const openCrmOf = (staffId: string, customerId?: string) => {
     if (viewerOf(staffId)) { setViewing(staffId); setTeamAs(staffId); setPanelUi(u => ({ ...u, tab: "overview", lead: null })); return; }
     setTeamAs(null);
@@ -317,31 +322,31 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   };
   // Who has a Team side: the Director, and anyone with somebody below them (rev 1011).
   // Whose CRM may be on screen: one's own, or someone below (View my team) — anyone, for the Principal and the Director.
-  const below = full ? data.people.filter(p => p.id !== me.id && ["hod", "stl", "tl", "ta", "rs"].includes(p.role)).map(p => p.id) : downlineOf(me.id, data.people);
-  const switchList = byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people);
-  const hasTeamSide = (p: { id: string; role: string }) => p.role === "hod" || data.people.some(q => q.uplineId === p.id);
-  const viewed = viewing ? personOf(viewing, data.people) ?? viewerPerson(viewing) : undefined;
+  const below = full ? shownData.people.filter(p => p.id !== me.id && ["hod", "stl", "tl", "ta", "rs"].includes(p.role)).map(p => p.id) : downlineOf(me.id, shownData.people);
+  const switchList = byTeam(below.map(id => personOf(id, shownData.people)!).filter(Boolean), shownData.people);
+  const hasTeamSide = (p: { id: string; role: string }) => p.role === "hod" || shownData.people.some(q => q.uplineId === p.id);
+  const viewed = viewing ? personOf(viewing, shownData.people) ?? viewerPerson(viewing) : undefined;
   const panelFor = viewed && teamAs === viewed.id ? viewed : !viewing && (full || leads || (desk && !!deskApp)) && (!sells || mode === "panel") ? me : undefined;
   if (panelFor) {
     // Their own view: the Director (or whoever holds View at All) every team; a leader their own line.
     const vw = panelFor.id === me.id ? undefined : viewerOf(panelFor.id);
     const wide = panelFor.id === me.id ? full : vw ? vw.can.viewAll : panelFor.role === "hod";
-    const mine = new Set([panelFor.id, ...downlineOf(panelFor.id, data.people)]);
+    const mine = new Set([panelFor.id, ...downlineOf(panelFor.id, shownData.people)]);
     // Viewing a leader's Team: only what THEIR session would read — their line's customers and visits — and their own
     // cells, as the database gives them when they sign in (user 2026-10-11: View as showed the whole company).
     // A cross-team viewer: what their own cells give — everybody's at View · All, else nobody's (no line, nothing given
     // to them); never the signed-in account's Edit or Manage.
-    const pdata: CrmData = vw ? { ...data, viewerId: vw.id, can: vw.can, ...(vw.can.viewAll ? {} : { customers: [], visits: [] }) }
-      : panelFor.id === me.id || wide ? data : (() => {
-      const shared = new Set(data.shares.filter(s => mine.has(s.staffId)).map(s => s.customerId));
-      const customers = data.customers.filter(c => (c.assignedTo && mine.has(c.assignedTo)) || (c.teamId && mine.has(c.teamId)) || shared.has(c.id));
+    const pdata: CrmData = vw ? { ...shownData, viewerId: vw.id, can: vw.can, ...(vw.can.viewAll ? {} : { customers: [], visits: [] }) }
+      : panelFor.id === me.id || wide ? shownData : (() => {
+      const shared = new Set(shownData.shares.filter(s => mine.has(s.staffId)).map(s => s.customerId));
+      const customers = shownData.customers.filter(c => (c.assignedTo && mine.has(c.assignedTo)) || (c.teamId && mine.has(c.teamId)) || shared.has(c.id));
       const ids = new Set(customers.map(c => c.id));
-      return { ...data, viewerId: panelFor.id, can: canFromRole(panelFor.role), customers, visits: data.visits.filter(v => ids.has(v.customerId)) };
+      return { ...shownData, viewerId: panelFor.id, can: canFromRole(panelFor.role), customers, visits: shownData.visits.filter(v => ids.has(v.customerId)) };
     })();
     const teams = wide ? teamsOf(pdata) : teamsOf(pdata).filter(t => mine.has(t.id) || t.people.some(p => p.id === panelFor.id));
     const pctx: PanelCtx = {
       data: pdata, me: panelFor, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
-      directors: wide ? data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
+      directors: wide ? shownData.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
       openCrmOf, viewingAs: panelFor.id !== me.id, viewers: panelFor.id === me.id ? viewerList : [], wideView: panelFor.id !== me.id && wide,
       // Mine: one's own CRM — or, viewing somebody, back to theirs — on `tab` (the phone's button: Mine's Inbox), else the
@@ -351,7 +356,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       exitApp: onExit, openQuoteSettings: onQuoteSettings, slotCounts, recents,
       // A chat's ⋮ Assign to, by what the SIGNED-IN account may do (2026-10-23, Mine's rule): CRM · Manage gives anyone,
       // whoever's Team is on screen; a TL / STL / TA on their own Team side, their own people; else none.
-      assign: vw ? undefined : data.can.manage ? "any" : panelFor.id === me.id && ["tl", "stl", "ta"].includes(me.role) ? "team" : undefined,
+      assign: vw ? undefined : shownData.can.manage ? "any" : panelFor.id === me.id && ["tl", "stl", "ta"].includes(me.role) ? "team" : undefined,
     };
     // On a computer, whoever holds View at All (the Principal and the Director — user 2026-10-12) gets the desktop
     // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes. A leader too
@@ -366,7 +371,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
         <DeskScreens key={panelFor.id} data={pdata} me={panelFor} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
           nameOf={nameOf} app={deskApp} exit={onExit} toMine={own && (full || leads) ? pctx.toMyCrm : undefined} problem={problem} actToast={panelUi.toast}
           viewAs={own ? { people: [...switchList, ...viewerList].map(p => ({ id: p.id, name: p.name, title: jobTitle(p) })),
-            open: id => { const p = personOf(id, data.people) ?? viewerPerson(id); setViewing(id); setTeamAs(p ? id : null); setUi(u => ({ ...initialSalesUi(), toast: u.toast })); } } : undefined}
+            open: id => { const p = personOf(id, shownData.people) ?? viewerPerson(id); setViewing(id); setTeamAs(p ? id : null); setUi(u => ({ ...initialSalesUi(), toast: u.toast })); } } : undefined}
           viewing={own ? undefined : { id: panelFor.id, name: panelFor.name, exit: () => { setTeamAs(null); setViewing(null); },
             people: [...switchList, ...viewerList].map(p => ({ id: p.id, name: p.name, title: jobTitle(p) })),
             switchTo: id => { setViewing(id); setTeamAs(id); setUi(u => ({ ...initialSalesUi(), toast: u.toast })); } }} />
@@ -375,10 +380,10 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     // Viewing somebody's Team: the same "Viewing X's CRM · Switch · Exit" banner their own CRM has (user 2026-10-11).
     // Switch stays on the Team side when the next person has one; Exit is back to one's own panel.
     const banner = panelFor.id !== me.id ? shellVM({
-      ui, set: setUi, owner: panelFor, viewingOther: true, data,
+      ui, set: setUi, owner: panelFor, viewingOther: true, data: shownData,
       embedded: {
         rdMode: false, switchList: [...switchList, ...viewerList],
-        onSwitch: (id: string) => { const p = personOf(id, data.people); setViewing(id); setTeamAs(viewerOf(id) || (p && hasTeamSide(p)) ? id : null); },
+        onSwitch: (id: string) => { const p = personOf(id, shownData.people); setViewing(id); setTeamAs(viewerOf(id) || (p && hasTeamSide(p)) ? id : null); },
         exitAs: () => { setTeamAs(null); setViewing(null); },
       },
     } as unknown as SalesCtx) : null;
@@ -391,14 +396,14 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     </>, H.panel);
   }
 
-  const owner = (viewing && below.includes(viewing) ? personOf(viewing, data.people) : undefined) ?? me;
-  const hidden = (id: string) => !!(data.prefs[id]?.hidden);
-  const shared = new Set(data.shares.filter(s => s.staffId === owner.id).map(s => s.customerId));
-  const mine = data.customers.filter(c => (c.assignedTo === owner.id || shared.has(c.id)) && (owner.id !== me.id || !hidden(c.id)))
+  const owner = (viewing && below.includes(viewing) ? personOf(viewing, shownData.people) : undefined) ?? me;
+  const hidden = (id: string) => !!(shownData.prefs[id]?.hidden);
+  const shared = new Set(shownData.shares.filter(s => s.staffId === owner.id).map(s => s.customerId));
+  const mine = shownData.customers.filter(c => (c.assignedTo === owner.id || shared.has(c.id)) && (owner.id !== me.id || !hidden(c.id)))
     .sort((a, b) => lastAt(b) - lastAt(a));
   const patch = (p: Partial<SalesUi>) => setUi(u => ({ ...u, ...p }));
   const ctx: SalesCtx = {
-    data, me, owner, viewingOther: owner.id !== me.id, now, live, ui, set: setUi, patch, act, refs, slotCounts, mine, recents,
+    data: shownData, me, owner, viewingOther: owner.id !== me.id, now, live, ui, set: setUi, patch, act, refs, slotCounts, mine, recents,
     nameOf,
     embedded: {
       // The Director's own CRM carries Control panel | My CRM.
@@ -412,7 +417,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
         : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: "inbox", lead: null })); } : undefined,
       switchList,
       // Assign to somebody: assignment is CRM · Manage's.
-      assignTo: data.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
+      assignTo: shownData.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
       onSwitch: id => { setViewing(id); setUi(u => ({ ...u, tab: "inbox", chat: null, filter: null, profSub: null })); },
       // Leaving someone's CRM goes back where it was opened: the Control panel, or one's own Profile.
       exitAs: () => { setViewing(null); setUi(u => ({ ...u, tab: full ? "inbox" : "profile", chat: null, filter: null })); },
