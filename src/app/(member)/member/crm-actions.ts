@@ -613,6 +613,24 @@ export async function sendCrmTemplate(contactId: string, template: { name: strin
   }
 }
 
+/**
+ * Whether a file can go to this customer now (IR Quote's Send to CRM chat, 2026-11-17): who they are, their channel, and
+ * Meta's window — "shut" means WhatsApp takes only a template (Messenger nothing), so the quote is not sent from there.
+ */
+export async function crmReplyWindow(contactId: string): Promise<{ ok: true; name: string; phone: string; channel: "whatsapp" | "messenger"; window: "open" | "human_agent" | "shut" } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    const [, { contact, window }, { data: who }] = await Promise.all([
+      requireCrm("edit"), reachable(db, contactId, true),
+      db.from("crm_contacts").select("name, phone").eq("id", contactId).maybeSingle(),
+    ]);
+    const w = who as { name: string | null; phone: string | null } | null;
+    return { ok: true, name: w?.name ?? "", phone: w?.phone ?? "", channel: contact.channel, window };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The customer's chat could not be checked.") };
+  }
+}
+
 /** A photo or document from the chat's + sheet. */
 /**
  * Send a photo, video, voice note or document (2026-10-13). The browser has put the file in the private bucket crm-media

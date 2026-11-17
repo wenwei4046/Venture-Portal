@@ -2755,6 +2755,102 @@ export function renderQuote(v: DcVals, C: DcComponents) {
           {"\n    "}
         </>) : null}
         {"\n    "}
+        {(v["crmSend"]) ? (<>
+          {"\n      "}
+          <div onClick={v["crmSend"]?.["close"]} style={{"position":"fixed","inset":"0","zIndex":"220","background":"rgba(20,20,18,.4)","display":"grid","placeItems":"center","padding":"24px","animation":"rvFade .15s ease"}}>
+            {"\n        "}
+            <div onClick={v["stopProp"]} style={{"width":"min(100%,360px)","maxHeight":"calc(100% - 24px)","overflow":"auto","padding":"22px 18px 16px","borderRadius":"20px","background":"var(--irq-c-ffffff)","display":"flex","flexDirection":"column","gap":"10px","boxSizing":"border-box"}}>
+              {"\n          "}
+              <span style={{"fontFamily":"var(--font-space-grotesk),var(--font-manrope),sans-serif","fontSize":"19px","fontWeight":"700"}}>
+                {dcText(v["crmSend"]?.["title"])}
+              </span>
+              {"\n          "}
+              <span style={{"fontSize":"13.5px","lineHeight":"1.45","color":"var(--irq-c-6b6b66)"}}>
+                {dcText(v["crmSend"]?.["sub"])}
+              </span>
+              {"\n          "}
+              {(v["crmSend"]?.["pick"]) ? (<>
+                {"\n            "}
+                <input value={dcValue(v["crmSend"]?.["q"])} onChange={v["crmSend"]?.["onQ"]} placeholder={"Search the CRM by name or phone"} type={"text"} style={{"width":"100%","height":"44px","padding":"0 12px","borderRadius":"12px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"14px","boxSizing":"border-box"}} />
+                {"\n            "}
+                <div style={{"display":"flex","flexDirection":"column","gap":"1px"}}>
+                  {"\n              "}
+                  {dcList(v["crmSend"]?.["hits"]).map((L_ch_15, L_ch_15_i) => (
+                    <Fragment key={L_ch_15_i}>
+                      {"\n                "}
+                      <button onClick={L_ch_15?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"10px","minHeight":"48px","padding":"6px 10px","border":"0","borderRadius":"10px","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)"}} className={"irq-p1"}>
+                        {"\n                  "}
+                        <span style={{"flex":"0 0 32px","display":"grid","placeItems":"center","width":"32px","height":"32px","borderRadius":"50%","background":"var(--irq-c-eeeeea)","fontSize":"11.5px","fontWeight":"700"}}>
+                          {dcText(L_ch_15?.["initials"])}
+                        </span>
+                        {"\n                  "}
+                        <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column"}}>
+                          <span style={{"fontSize":"14px","fontWeight":"600"}}>
+                            {dcText(L_ch_15?.["name"])}
+                          </span>
+                          <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
+                            {dcText(L_ch_15?.["sub"])}
+                          </span>
+                        </span>
+                        {"\n                "}
+                      </button>
+                      {"\n              "}
+                    </Fragment>
+                  ))}
+                  {"\n              "}
+                  {(v["crmSend"]?.["none"]) ? (<>
+                    <span style={{"padding":"10px 12px","fontSize":"13px","color":"var(--irq-c-6b6b66)"}}>
+                      {dcText(v["crmSend"]?.["none"])}
+                    </span>
+                  </>) : null}
+                  {"\n            "}
+                </div>
+                {"\n          "}
+              </>) : null}
+              {"\n          "}
+              {(v["crmSend"]?.["who"]) ? (<>
+                {"\n            "}
+                <div style={{"display":"flex","alignItems":"center","gap":"10px","padding":"10px 12px","borderRadius":"12px","background":"var(--irq-c-f2f2ef)"}}>
+                  {"\n              "}
+                  <span style={{"flex":"0 0 36px","display":"grid","placeItems":"center","width":"36px","height":"36px","borderRadius":"50%","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-d96e0b)","fontSize":"12px","fontWeight":"700"}}>
+                    {dcText(v["crmSend"]?.["who"]?.["initials"])}
+                  </span>
+                  {"\n              "}
+                  <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column"}}>
+                    <span style={{"fontSize":"14.5px","fontWeight":"650"}}>
+                      {dcText(v["crmSend"]?.["who"]?.["name"])}
+                    </span>
+                    <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
+                      {dcText(v["crmSend"]?.["who"]?.["sub"])}
+                    </span>
+                  </span>
+                  {"\n            "}
+                </div>
+                {"\n          "}
+              </>) : null}
+              {"\n          "}
+              {(v["crmSend"]?.["note"]) ? (<>
+                <span style={{"padding":"10px 12px","borderRadius":"12px","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-1f1f1c)","fontSize":"13px","lineHeight":"1.45"}}>
+                  {dcText(v["crmSend"]?.["note"])}
+                </span>
+              </>) : null}
+              {"\n          "}
+              {(v["crmSend"]?.["ok"]) ? (<>
+                <button onClick={v["crmSend"]?.["act"]} style={dcCss(`width:100%;height:46px;margin-top:4px;border-radius:12px;border:0;background:var(--irq-c-111111);color:var(--irq-c-ffffff);font-size:15px;font-weight:700;opacity:${dcS(v["crmSend"]?.["op"])}`)}>
+                  {dcText(v["crmSend"]?.["ok"])}
+                </button>
+              </>) : null}
+              {"\n          "}
+              <button onClick={v["crmSend"]?.["close"]} style={{"width":"100%","height":"44px","borderRadius":"12px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"14.5px","fontWeight":"650"}}>
+                {dcText(v["crmSend"]?.["closeLabel"])}
+              </button>
+              {"\n        "}
+            </div>
+            {"\n      "}
+          </div>
+          {"\n    "}
+        </>) : null}
+        {"\n    "}
         {(v["shareSheet"]) ? (<>
           {"\n      "}
           <div onClick={v["shareSheet"]?.["close"]} style={{"position":"fixed","inset":"0","zIndex":"220","background":"rgba(20,20,18,.4)","display":"flex","alignItems":"flex-end","animation":"rvFade .15s ease"}}>
@@ -2769,19 +2865,19 @@ export function renderQuote(v: DcVals, C: DcComponents) {
               {"\n          "}
               <div style={{"display":"grid","gridTemplateColumns":"repeat(4,1fr)","gap":"8px"}}>
                 {"\n            "}
-                {dcList(v["shareSheet"]?.["apps"]).map((L_sa_15, L_sa_15_i) => (
-                  <Fragment key={L_sa_15_i}>
+                {dcList(v["shareSheet"]?.["apps"]).map((L_sa_16, L_sa_16_i) => (
+                  <Fragment key={L_sa_16_i}>
                     {"\n              "}
-                    <button onClick={L_sa_15?.["run"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"6px","padding":"6px 0","border":"0","background":"transparent","color":"var(--irq-c-1f1f1c)"}}>
+                    <button onClick={L_sa_16?.["run"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"6px","padding":"6px 0","border":"0","background":"transparent","color":"var(--irq-c-1f1f1c)"}}>
                       {"\n                "}
-                      <span style={dcCss(`display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:${dcS(L_sa_15?.["bg"])};color:${dcS(L_sa_15?.["ink"])}`)}>
+                      <span style={dcCss(`display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:${dcS(L_sa_16?.["bg"])};color:${dcS(L_sa_16?.["ink"])}`)}>
                         <svg width={"24"} height={"24"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.9"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                          <path d={L_sa_15?.["d"]} />
+                          <path d={L_sa_16?.["d"]} />
                         </svg>
                       </span>
                       {"\n                "}
                       <span style={{"fontSize":"12px","fontWeight":"600"}}>
-                        {dcText(L_sa_15?.["label"])}
+                        {dcText(L_sa_16?.["label"])}
                       </span>
                       {"\n              "}
                     </button>

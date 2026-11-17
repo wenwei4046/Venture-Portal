@@ -139,7 +139,7 @@ export class QuoteLogic extends DcLogic {
   pdfReady() { const key = this.docHtml(false); return this._pdf && this._pdf.key === key && this._pdf.blob ? this._pdf.blob : null; }
   pdfFile(blob) { return new File([blob], this.fileBase() + ".pdf", { type: "application/pdf" }); }
   saveFile(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
-  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); clearTimeout(this._pdfT); }
+  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); clearTimeout(this._pdfT); clearTimeout(this._csT); }
 
   load(pid, data = this.state.data, keep = false) {
     const p = data.packages.find(x => x.id === pid);
@@ -453,6 +453,84 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   }
   async copy() { if (!this.checkReq()) return; try { await navigator.clipboard.writeText(this.shareText()); this.flash("Copied"); } catch (e) { this.flash("Could not copy"); } }
 
+  // ── Send to CRM chat (the user, 2026-11-17: "press send, 是否可以直接 select from CRM contact" → "这个要") ──
+  // The quotation's PDF goes into the customer's own chat in the CRM (WhatsApp / Messenger), kept there as any file
+  // sent from the chat: step 1's CRM customer, else one searched here. Meta's window is asked first — past it WhatsApp
+  // takes only an approved template (Messenger nothing), so the quote is not sent and the chat is offered instead.
+  /** The PDF's words beside it in the chat: the quotation's place, its package and its total. */
+  crmCaption() {
+    const { pkg, total } = this.calc(), c = this.state.cust, where = [c.building, c.unit].filter(Boolean).join(" ");
+    return [where ? `Quotation · ${where}` : "Quotation", this.lib.packageName(this.state.data?.packages, pkg), `Total: ${rm(total)}`].filter(Boolean).join("\n");
+  }
+  sendCrm() {
+    if (!this.checkReq() || !this.props.sendToCrm) return;
+    this.setState({ shareOpen: false });
+    const c = this.state.crmId ? this.state.crmPick || { id: this.state.crmId, name: this.state.cust.att } : null;
+    if (c) this.crmCheck(c); else this.setState({ crmSend: { step: "pick", q: "", hits: [] } });
+  }
+  crmSendFind(q) {
+    this.setState(s => ({ crmSend: s.crmSend && { ...s.crmSend, q } }));
+    clearTimeout(this._csT);
+    const t = q.trim(), ask = this.props.searchCrm;
+    if (t.length < 2 || !ask) { this.setState(s => ({ crmSend: s.crmSend && { ...s.crmSend, hits: [] } })); return; }
+    this._csT = setTimeout(() => ask(t).then(hits => { const cs = this.state.crmSend; if (cs && cs.step === "pick" && cs.q.trim() === t) this.setState({ crmSend: { ...cs, hits, asked: t } }); }).catch(() => {}), 220);
+  }
+  crmCheck(c) {
+    this.setState({ crmSend: { step: "check", c } });
+    const mine = () => this.state.crmSend && this.state.crmSend.c === c;
+    this.props.crmReach(c.id).then(r => {
+      if (!mine()) return;
+      if (!r.ok) { this.setState({ crmSend: { step: "error", c, error: r.error } }); return; }
+      const who = { ...c, name: r.name || c.name, phone: r.phone || c.phone, channel: r.channel };
+      this.setState({ crmSend: { step: r.window === "shut" ? "shut" : "ready", c: who } });
+      if (r.window !== "shut") this.pdfFor().catch(() => {}); // made while they read the box
+    }, () => { if (mine()) this.setState({ crmSend: { step: "error", c, error: "The CRM could not be reached. Check the connection and try again." } }); });
+  }
+  async crmSendGo() {
+    const cs = this.state.crmSend;
+    if (!cs || cs.step !== "ready") return;
+    if (this.props.readOnly) { this.flash("Read-only while viewing as"); return; }
+    this.setState({ crmSend: { ...cs, step: "sending" } });
+    const failed = error => { if (this.state.crmSend && this.state.crmSend.c === cs.c) this.setState({ crmSend: { ...cs, step: "error", error } }); };
+    let file;
+    try { file = this.pdfFile(await this.pdfFor()); } catch (e) { failed("Could not make the PDF. Check the connection and try again."); return; }
+    let r;
+    try { r = await this.props.sendToCrm(cs.c.id, file, this.crmCaption()); } catch (e) { r = { ok: false, error: "The quotation could not be sent. Check the connection and try again." }; }
+    if (!r.ok) { failed(r.error); return; }
+    const app = cs.c.channel === "messenger" ? "Messenger" : "WhatsApp";
+    this.setState({ crmSend: null, confirm: { title: "Sent to " + cs.c.name, sub: `The quotation PDF is in their ${app} chat in the CRM.` } });
+  }
+  /** The customer's chat in the CRM (the address a CRM notice opens), the quote saved as a draft first. */
+  openCrmChat(id) {
+    this.saveDraft();
+    window.location.href = "/member?page=account&view=crm&chat=" + encodeURIComponent(id);
+  }
+  crmSendBox() {
+    const cs = this.state.crmSend;
+    if (!cs) return false;
+    const ini = n => String(n || "?").split(/\s+/).filter(Boolean).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+    const close = () => { clearTimeout(this._csT); this.setState({ crmSend: null }); };
+    const c = cs.c, app = c && c.channel === "messenger" ? "Messenger" : c && c.channel === "whatsapp" ? "WhatsApp" : "";
+    const who = c ? { name: c.name, initials: ini(c.name), sub: [app, c.phone].filter(Boolean).join(" · ") } : false;
+    const base = { title: "Send to CRM chat", sub: "", pick: false, q: "", onQ: () => {}, hits: [], none: "", who, note: "", ok: "", act: () => {}, op: 1, closeLabel: "Cancel", close };
+    if (cs.step === "pick") {
+      const q = (cs.q || "").trim();
+      return { ...base, sub: "Pick the customer. The quotation PDF goes into their chat in the CRM.", pick: true, q: cs.q || "", onQ: e => this.crmSendFind(e.target.value),
+        hits: (cs.hits || []).map(h => ({ name: h.name, initials: ini(h.name), sub: [h.phone, h.usize, h.uloc].filter(Boolean).join(" · "), pick: () => this.crmCheck(h) })),
+        none: q.length < 2 ? "Type at least 2 letters or digits." : cs.asked === q && !(cs.hits || []).length ? "No customer in your CRM matches." : "" };
+    }
+    if (cs.step === "check") return { ...base, sub: "Checking the customer's chat…" };
+    if (cs.step === "shut") return { ...base, sub: "This quotation was not sent.",
+      note: c.channel === "messenger"
+        ? `More than 24 hours since ${c.name}'s last message, so Messenger does not allow a message now. Once they write again, send the quotation from here.`
+        : `More than 24 hours since ${c.name}'s last message, so WhatsApp only allows an approved template now. Send a template from their chat in the CRM; once they reply, send the quotation from here.`,
+      ok: "Open chat in CRM", act: () => this.openCrmChat(c.id), closeLabel: "Close" };
+    if (cs.step === "error") return { ...base, sub: "This quotation was not sent.", note: cs.error, ok: "Try again", act: () => this.crmCheck(c), closeLabel: "Close" };
+    const sending = cs.step === "sending";
+    return { ...base, sub: `The quotation PDF goes into their ${app} chat, with its total beside it.`, note: this.props.readOnly ? "Read-only while viewing as — nothing is sent." : "",
+      ok: sending ? "Sending…" : "Send PDF", op: sending ? 0.6 : 1, act: () => this.crmSendGo() };
+  }
+
   renderVals() {
     const st = this.state;
     const vp = this.props.viewport ?? "auto";
@@ -576,9 +654,13 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
       doPdfC: () => this.exportPdf(), // every device downloads the PDF itself (exportPdf), no print screen
       confirmBox: st.confirm ? { ...st.confirm, ok: st.confirm.ok || "OK", close: () => this.setState({ confirm: null }), act: () => { const run = st.confirm.run; this.setState({ confirm: null }); if (run) run(); } } : false,
-      openShare: () => { if (!this.checkReq()) return; if (this.touch() && navigator.canShare) { this.share(); return; } this.setState({ shareOpen: true }); }, // a phone: the PDF, through its own share sheet
+      openShare: () => { if (!this.checkReq()) return; if (this.touch() && navigator.canShare && !this.props.sendToCrm) { this.share(); return; } this.setState({ shareOpen: true }); }, // a phone: CRM chat, or the PDF through its own share sheet (2026-11-17)
+      crmSend: this.crmSendBox(),
       shareSheet: st.shareOpen ? { close: () => this.setState({ shareOpen: false }), apps: (() => { const t = () => encodeURIComponent(this.shareText()), done = () => this.setState({ shareOpen: false });
-        return [
+        const crm = this.props.sendToCrm ? [{ label: "CRM chat", bg: "#FFEBD9", ink: "#D96E0B", d: "M4 5h16v11H8l-4 4zM8 9h8M8 12h5", run: () => { done(); this.sendCrm(); } }] : [];
+        // A phone shares the PDF through its own sheet (WhatsApp, email … are there), so beside the CRM it needs only that.
+        if (this.touch() && navigator.canShare) return [...crm, { label: "Other apps", bg: "#F2F2EF", ink: "#1F1F1C", d: "M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13", run: () => { done(); this.share(); } }];
+        return [...crm,
           { label: "WhatsApp", bg: "#E5F7EC", ink: "#1E9E55", d: "M3 21l1.6-4.7A8.5 8.5 0 1 1 7.8 19.6ZM9 8.5c0 3.5 2.5 6.5 6.5 6.5l1-1.5-2-1-1 1c-1.2-.5-2.2-1.5-2.7-2.7l1-1-1-2Z", run: () => { window.open("https://wa.me/?text=" + t(), "_blank"); done(); } },
           { label: "Email", bg: "#EAF0FB", ink: "#2D5788", d: "M3 5h18v14H3zM3 6l9 7 9-7", run: () => { window.location.href = "mailto:?subject=" + encodeURIComponent("Quotation") + "&body=" + t(); done(); } },
           { label: "Telegram", bg: "#E6F3FA", ink: "#2A8BC7", d: "M21 4 3 11l6 2 2 6 3-4 5 4Z", run: () => { window.open("https://t.me/share/url?text=" + t(), "_blank"); done(); } },
@@ -684,6 +766,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         { label: "Save draft", sub: "", d: ICON.doc, run: () => this.saveDraft() },
         { label: "Download PDF", sub: "A4 · company letterhead", d: ICON.doc, run: () => this.exportPdf() },
         { label: "Excel", sub: "", d: ICON.download, run: () => this.exportExcel() },
+        ...(this.props.sendToCrm ? [{ label: "Send to CRM chat", sub: "The PDF, into the customer's chat", d: ICON.chat, run: () => this.sendCrm() }] : []),
         { label: "Share", sub: "WhatsApp or email summary", d: ICON.chat, run: () => this.share() },
         { label: "Copy text", sub: "", d: ICON.copy, run: () => this.copy() }
       ],

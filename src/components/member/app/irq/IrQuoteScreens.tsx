@@ -16,6 +16,27 @@ import { renderSettings } from "./tpl/SettingsTpl";
 import { renderSettingsMobile } from "./tpl/SettingsMobileTpl";
 import { CRM_CUSTOMERS } from "./lib/quote-doc";
 import { searchIrQuoteCustomers, type IrqCrmCustomer } from "@/app/(member)/member/ir-quote-actions";
+import { crmReplyWindow, sendCrmMedia } from "@/app/(member)/member/crm-actions";
+import { mediaPath } from "@/lib/member/crm-media";
+import { createClient } from "@/lib/supabase/client";
+
+/**
+ * Send to CRM chat (2026-11-17): Meta's window for the customer first, then the quotation's PDF into the CRM's own
+ * bucket under the member's session and out through the CRM's own send — the same checks as a file sent from the chat.
+ */
+async function crmReach(id: string) {
+  const r = await crmReplyWindow(id);
+  return r.ok ? { ok: true, name: r.name, phone: r.phone, channel: r.channel, window: r.window } : { ok: false, error: r.error };
+}
+async function sendQuoteToCrm(id: string, file: File, caption: string) {
+  const mime = "application/pdf", path = mediaPath(id, file.name, mime);
+  const up = await createClient().storage.from("crm-media").upload(path, file, { contentType: mime, upsert: false });
+  if (up.error) return { ok: false, error: "The PDF could not be uploaded. Check the connection and try again." };
+  const r = await sendCrmMedia({ contact: id, path, name: file.name, mime, caption });
+  if (!r.ok) return { ok: false, error: r.error };
+  // Past the window the CRM keeps it in the chat, marked not sent (crm_record_unsent).
+  return r.message.status === "failed" ? { ok: false, error: r.message.error || "It is kept in the chat but was not sent." } : { ok: true };
+}
 
 
 /** A CRM customer as the prototype's step 1 reads one (its own names beside the CRM form's). */
@@ -101,6 +122,11 @@ export function IrQuoteScreen(p: {
       searchCrm: p.offline
         ? async (q: string) => CRM_CUSTOMERS.filter(c => (c.name + " " + c.phone).toLowerCase().includes(q.toLowerCase())).map(c => ({ ...c, type: c.ptype, size: c.usize, loc: c.uloc }))
         : async (q: string) => { const r = await searchIrQuoteCustomers(q); return r.ok ? r.data.map(asCustomer) : []; },
+      // The demo and the design preview send nothing: an open chat that "sends" after a moment.
+      crmReach: p.offline
+        ? async (id: string) => { const c = CRM_CUSTOMERS.find(x => x.id === id); return { ok: true, name: c?.name ?? "", phone: c?.phone ?? "", channel: "whatsapp", window: "open" }; }
+        : crmReach,
+      sendToCrm: p.offline ? async () => { await new Promise(r => setTimeout(r, 600)); return { ok: true }; } : sendQuoteToCrm,
       showItemPrices: false, markup: 1.3, viewport: "auto",
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
