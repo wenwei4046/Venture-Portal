@@ -333,13 +333,15 @@ EXCEPTION WHEN insufficient_privilege THEN
 END
 $fn$;
 
--- A file put in but never filed is its sender's to take back.
+-- A file put in but never filed is its sender's to take back. plpgsql: a row policy calls it (CLAUDE.md › Do NOT).
 CREATE OR REPLACE FUNCTION public.rev_lib_unfiled(p_name text)
 RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public
 AS $fn$
-  SELECT NOT EXISTS (SELECT 1 FROM public.rev_lib_items i WHERE i.path = p_name);
+BEGIN
+  RETURN NOT EXISTS (SELECT 1 FROM public.rev_lib_items i WHERE i.path = p_name);
+END
 $fn$;
 
 REVOKE ALL ON FUNCTION public.rev_training_sub(), public.rev_training_staff(), public.rev_training_reader(text),
@@ -347,18 +349,26 @@ REVOKE ALL ON FUNCTION public.rev_training_sub(), public.rev_training_staff(), p
 REVOKE ALL ON FUNCTION public.rev_lib_file_readable(text), public.rev_lib_unfiled(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.rev_lib_file_readable(text), public.rev_lib_unfiled(text) TO authenticated;
 
-DROP POLICY IF EXISTS rev_library_files_read ON public.file_objects;
-CREATE POLICY rev_library_files_read ON public.file_objects FOR SELECT TO authenticated
-  USING ((bucket_id = 'rev-library'::text) AND ((SELECT public.has_any_action(ARRAY['rev_training.view'::text]))
-    OR public.rev_lib_file_readable(name) OR ((owner_id = ((SELECT auth.uid()))::text) AND public.rev_lib_unfiled(name))));
-DROP POLICY IF EXISTS rev_library_files_upload ON public.file_objects;
-CREATE POLICY rev_library_files_upload ON public.file_objects FOR INSERT TO authenticated
-  WITH CHECK ((bucket_id = 'rev-library'::text) AND ((storage.foldername(name))[1] = 'library'::text)
-    AND (SELECT public.has_any_action(ARRAY['rev_training.create'::text])));
-DROP POLICY IF EXISTS rev_library_files_delete ON public.file_objects;
-CREATE POLICY rev_library_files_delete ON public.file_objects FOR DELETE TO authenticated
-  USING ((bucket_id = 'rev-library'::text) AND ((SELECT public.has_any_action(ARRAY['rev_training.edit'::text]))
-    OR ((owner_id = ((SELECT auth.uid()))::text) AND public.rev_lib_unfiled(name))));
+-- Made only when missing (no DROP: the database's own tooling refuses one), so a second run changes nothing.
+DO $do$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'file_objects' AND policyname = 'rev_library_files_read') THEN
+    CREATE POLICY rev_library_files_read ON public.file_objects FOR SELECT TO authenticated
+      USING ((bucket_id = 'rev-library'::text) AND ((SELECT public.has_any_action(ARRAY['rev_training.view'::text]))
+        OR public.rev_lib_file_readable(name) OR ((owner_id = ((SELECT auth.uid()))::text) AND public.rev_lib_unfiled(name))));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'file_objects' AND policyname = 'rev_library_files_upload') THEN
+    CREATE POLICY rev_library_files_upload ON public.file_objects FOR INSERT TO authenticated
+      WITH CHECK ((bucket_id = 'rev-library'::text) AND ((storage.foldername(name))[1] = 'library'::text)
+        AND (SELECT public.has_any_action(ARRAY['rev_training.create'::text])));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'file_objects' AND policyname = 'rev_library_files_delete') THEN
+    CREATE POLICY rev_library_files_delete ON public.file_objects FOR DELETE TO authenticated
+      USING ((bucket_id = 'rev-library'::text) AND ((SELECT public.has_any_action(ARRAY['rev_training.edit'::text]))
+        OR ((owner_id = ((SELECT auth.uid()))::text) AND public.rev_lib_unfiled(name))));
+  END IF;
+END
+$do$;
 
 -- ── 6. Free test — taking one ──────────────────────────────────────────────────
 
