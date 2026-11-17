@@ -282,6 +282,7 @@ kChat
 kClist
 kForm
 kInfo
+kInsOv
 kInsight
 kList
 kMetrics
@@ -344,6 +345,7 @@ opSub
 openAdsPerf
 openInfoChat
 openTpl
+overview
 pChats
 pNoChats
 pagePad
@@ -466,6 +468,7 @@ srTabs
 srTimeModes
 srWkFg
 srWkNote
+src4
 sysLines
 teamName
 teamPeople

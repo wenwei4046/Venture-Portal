@@ -276,7 +276,9 @@ module.exports = function desk4a(body) {
     const head = body.lastIndexOf("{!!(v.kInsight) && (<>", a), close = body.indexOf("{!!(v.kCh) && (<>", b);
     if (head < 0 || close < b) throw new Error("desk-4a: insight block");
     // Insight › Up next (docs/design_handoff_crm_up_next): its own component, a third tab beside the two above.
-    body = body.slice(0, head) + "{!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              {!!(v.kUpNext && v.upNextProps) && (<DeskUpNext4a {...v.upNextProps!} />)}\n              " + body.slice(close);
+    // Insight › Overview (2026-11-17, the owner: "我想在 insight 加 Overview，主要是整合 ads performance + team performance"):
+    // Insight's first tab, its own component (DeskOverview.tsx, vm/overview.ts), with Insight's brand switch.
+    body = body.slice(0, head) + "{!!(v.kInsOv && v.overview) && (<DeskOverview o={v.overview!} src={v.src4} />)}\n              {!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              {!!(v.kUpNext && v.upNextProps) && (<DeskUpNext4a {...v.upNextProps!} />)}\n              " + body.slice(close);
   }
   // v4 notes/21: Customise metrics (the pane Ads performance's Columns and its figure strip's + open) is a component of its
   // own, DeskMetricPicker.tsx, drawn exactly as before, so Reports' Columns (notes/25) can use the same picker.
