@@ -284,6 +284,11 @@
 .table thead :is(.stickyFirst, .stickyTotal) { z-index: 4; background: rgb(var(--work-table-head)); }
 .table tfoot :is(td, th) { background: rgb(var(--accent-bg)); font-weight: 600; border-top: 1px solid rgb(var(--work-table-rule)); border-bottom: 0; }
 .table tfoot :is(.stickyFirst, .stickyTotal) { background: rgb(var(--accent-bg)); }
+/* A middle column's header moves it: dragged onto another header (2026-11-17). */
+.table thead .movableHead { cursor: grab; user-select: none; }
+.table thead .movableHead:active { cursor: grabbing; }
+.table thead .headDragging { opacity: 0.45; }
+.table thead .headDropTarget { box-shadow: inset 3px 0 0 rgb(var(--accent)); background: rgb(var(--accent-bg)); }
 .tableFooter { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 11px 14px; border-top: 1px solid rgb(var(--work-table-border)); background: #fbfbfa; font-size: 11px; }
 .footerTotal { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; margin-left: auto; padding: 15px 0 10px; font-variant-numeric: tabular-nums; }
 .tableFooter .footerTotal { padding: 0; }
