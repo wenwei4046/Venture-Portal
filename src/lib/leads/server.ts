@@ -13,6 +13,8 @@ import type { DataFolder } from './data-center'
 import type { QuickReply } from './quick'
 import type { LeadPage, StaffLeave } from './pages'
 import type { LeadOutlet } from './outlets'
+import type { LeadVisit } from './visits'
+import type { OverviewData } from './overview'
 import type { StaffDirectory, TeamMember } from './team'
 import type { AuditChange, AuditTableLine } from '@/lib/audit/changes'
 import { AUDIT_TABLES } from './audit'
@@ -199,6 +201,16 @@ export function loadAdPosts(): Promise<Read<Array<{ adId: string; postUrl: strin
 /** Every brand's outlets (mig 20261110200000). Not ok before the migration: the screens then read as if no outlet were set. */
 export function loadOutlets(): Promise<Read<LeadOutlet[]>> {
   return rpc<LeadOutlet[]>('lead_outlets', undefined, 'The outlets')
+}
+
+/** Leads › Showroom visits (mig 20261117200000): the visits made or bought in [from, to], both days included. */
+export function loadVisits(from: string, to: string): Promise<Read<LeadVisit[]>> {
+  return rpc<LeadVisit[]>('lead_visits', { p_from: from, p_to: to }, 'The showroom visits')
+}
+
+/** Insight › Overview (mig 20261117200000): the figures by outlet for [from, to], both days included. */
+export function loadOverview(from: string, to: string): Promise<Read<OverviewData>> {
+  return rpc<OverviewData>('lead_overview', { p_from: from, p_to: to }, 'Overview')
 }
 
 /** Settings › Team (mig 20261110220100): the Team, each with where they stand. */

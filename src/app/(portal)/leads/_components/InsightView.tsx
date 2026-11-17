@@ -6,6 +6,7 @@ import { INSIGHT_RANGES, adRowsOf, byReplyOf, dropOf, funnelOf, rate, trendLabel
 import type { LeadFlow } from '@/lib/leads/flow'
 import type { LeadContact } from '@/lib/leads/types'
 import { LeadIcon, type LeadIconName } from '@/components/layout/lead-icons'
+import InsightViews from './InsightViews'
 import s from './insight.module.css'
 
 /**
@@ -90,6 +91,7 @@ export default function InsightView({ contacts, onlyTests, range, today, brands,
   return (
     <div className={s.wrap}>
       <div className={s.bar}>
+        <InsightViews view="funnel" />
         <div className={s.brands} role="group" aria-label="Brand">
           <button type="button" className={s.brand} aria-pressed={brand === 'all'} onClick={() => { setBrand('all'); setAdKey(null) }}>All brands</button>
           {brands.map(b => <button key={b.id} type="button" className={s.brand} aria-pressed={brand === b.id} onClick={() => { setBrand(b.id); setAdKey(null) }}>{b.name}</button>)}

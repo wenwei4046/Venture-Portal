@@ -272,3 +272,6 @@
 .lose { cursor: pointer; height: 36px; padding: 0 10px; border: none; background: transparent; color: rgb(var(--lv-fg-3)); font-family: inherit; font-size: 14px; }
 .lose:hover { color: rgb(var(--lv-accent)); }
 .lose:disabled { cursor: default; opacity: 0.6; }
+
+/* Leads | Showroom visits (2026-11-17) */
+.views { flex: none; display: flex; padding: 0 4px 12px; }

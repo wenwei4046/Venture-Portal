@@ -28,6 +28,8 @@ import type { LibraryItem, ReplyRules, TemplateStep } from './template'
 import type { LeadContact, LeadThread, Appt, LeadCardFields, Shown } from './types'
 import type { LeadOutlet } from './outlets'
 import type { TeamMember, TeamRole } from './team'
+import { visitPayload, visitProblem, type LeadVisit, type VisitDraft } from './visits'
+import { keepAdSpend } from './ad-spend-keep'
 
 /**
  * Lead View's writes (2026-10-16). Each stands behind the Lead View cell it is (mig 20261016300000), named on
@@ -773,4 +775,33 @@ export async function fetchAdNames(adIds: string[]): Promise<LeadOutcome<{ named
   if (meta.ads.length === 0) return { ok: true, data: { named: 0, refused: meta.refused } }
   const kept = await call<number>('lead_save_meta_ads', { p_rows: meta.ads }, 'What Meta said was not kept.')
   return kept.ok ? { ok: true, data: { named: kept.data, refused: meta.refused } } : kept
+}
+
+// ── Showroom visits and Overview (mig 20261117200000) ───────────────────────
+
+/** Leads › Showroom visits: add (id null) or change one visit. */
+export async function saveVisit(id: string | null, draft: VisitDraft): Promise<LeadOutcome<LeadVisit>> {
+  await requireActionOn('/leads/list', 'leads', 'edit')
+  const problem = visitProblem(draft)
+  if (problem) return { ok: false, reason: problem }
+  return call<LeadVisit>('lead_save_visit', { p_id: id, p: visitPayload(draft) }, 'The visit was not saved.')
+}
+
+/** Leads › Showroom visits: remove one. */
+export async function deleteVisit(id: string): Promise<LeadOutcome<null>> {
+  await requireActionOn('/leads/list', 'leads', 'edit')
+  return call<null>('lead_delete_visit', { p_id: id }, 'The visit was not removed.')
+}
+
+/** Insight › Overview: an ad account's outlet (null = none). */
+export async function setAdAccountOutlet(accountId: string, outletId: string | null): Promise<LeadOutcome<null>> {
+  await requireActionOn('/leads/insight', 'leads', 'manage')
+  return call<null>('lead_set_ad_account_outlet', { p_account: accountId, p_outlet: outletId }, 'The ad account’s outlet was not saved.')
+}
+
+/** Insight › Overview › Refresh from Meta: read the range's spend again and keep it. */
+export async function refreshAdSpend(from: string, to: string): Promise<LeadOutcome<{ accounts: number; refused: string[] }>> {
+  await requireActionOn('/leads/insight', 'leads', 'manage')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return { ok: false, reason: 'Which days?' }
+  return keepAdSpend(from, to)
 }

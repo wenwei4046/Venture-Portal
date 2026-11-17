@@ -3,7 +3,8 @@ import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { officeToday } from '@/lib/office-time'
 import { isRangeId, rangeDays } from '@/lib/leads/stage'
-import { loadLeadConfig, loadLeads, loadOutlets, loadThread } from '@/lib/leads/server'
+import { NOT_SET_UP, loadLeadConfig, loadLeads, loadOutlets, loadThread, loadVisits } from '@/lib/leads/server'
+import VisitsView from '../_components/VisitsView'
 import LeadsView from '../_components/LeadsView'
 
 export const dynamic = 'force-dynamic'
@@ -13,10 +14,11 @@ export const dynamic = 'force-dynamic'
  * ?r=today|yest|week|month|last|all|custom (This month by default), a custom one's ?from= ?to= inclusive; ?lead= opens one.
  * Lead View · View reads it.
  */
-export default async function Page({ searchParams }: { searchParams: Promise<{ r?: string; from?: string; to?: string; lead?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ v?: string; m?: string; r?: string; from?: string; to?: string; lead?: string }> }) {
   await requirePage('/leads/list')
   const user = await requirePermission('leads')
   const sp = await searchParams
+  if (sp.v === 'visits') return visitsPage(sp.m, canDo(user, 'leads', 'edit'))
   const range = isRangeId(sp.r) ? sp.r : 'month'
   const today = officeToday()
   const days = rangeDays(range, today, sp.from, sp.to)
@@ -52,5 +54,29 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       canEdit={canDo(user, 'leads', 'edit')}
       outlets={outlets.ok ? outlets.data : []}
     />
+  )
+}
+
+/**
+ * ?v=visits (2026-11-17, mig 20261117200000): Showroom visits, a month at a time (?m=YYYY-MM, this month by default, never
+ * past it) — the visits made or bought in it.
+ */
+async function visitsPage(m: string | undefined, canEdit: boolean) {
+  const today = officeToday()
+  const month = m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m) && m <= today.slice(0, 7) ? m : today.slice(0, 7)
+  const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10)
+  const [config, visits, outlets] = await Promise.all([loadLeadConfig(), loadVisits(`${month}-01`, last), loadOutlets()])
+  if (!config.ok || !visits.ok) {
+    const reason = !config.ok ? config.reason : !visits.ok ? visits.reason : ''
+    return (
+      <HvPage>
+        <PageHead eyebrow="Lead View" title="Leads" />
+        <div className="sheet-danger">{reason === NOT_SET_UP ? 'Showroom visits are waiting for their database update.' : reason}</div>
+      </HvPage>
+    )
+  }
+  return (
+    <VisitsView visits={visits.data} outlets={outlets.ok ? outlets.data : []} brands={config.data.brands.map(b => ({ id: b.id, name: b.name }))}
+      month={month} today={today} canEdit={canEdit} />
   )
 }
