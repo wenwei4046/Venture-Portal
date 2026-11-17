@@ -194,7 +194,7 @@ describe('Marketing’s two templates keep their ticks (mig 20261023214000)', ()
 it('counts a view the way the rail does', () => {
   // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme); seventeen
   // since 2026-10-20 (IT requests — the desk of IT support).
-  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 17 })
+  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 20 })
 })
 
 describe('what the Permissions tab and a person’s window work with', () => {
@@ -328,13 +328,13 @@ describe('Select all, the New template window and the boxes that open nothing ye
 
   it('Select all over a column ticks that box on every tab that has it, View with it — again, none', () => {
     const none = new Set<string>()
-    expect(columnTally(none, 'rev', 'create')).toEqual({ tally: 'none', boxes: 4 })
+    expect(columnTally(none, 'rev', 'create')).toEqual({ tally: 'none', boxes: 5 })
     const creates = toggleColumn(none, 'rev', 'create')
-    expect([...creates].sort()).toEqual([...rev(['quote.create', 'quote.view', 'requests.create', 'requests.view', 'rooms.create', 'rooms.view', 'track.create', 'track.view'])].sort())
+    expect([...creates].sort()).toEqual([...rev(['quote.create', 'quote.view', 'requests.create', 'requests.view', 'rooms.create', 'rooms.view', 'track.create', 'track.view', 'training.create', 'training.view'])].sort())
     expect(columnTally(creates, 'rev', 'create').tally).toBe('all')
     expect(columnTally(creates, 'rev', 'view').tally).toBe('some')
     // All ticked: the click unticks the column, and only it.
-    expect([...toggleColumn(creates, 'rev', 'create')].sort()).toEqual([...rev(['quote.view', 'requests.view', 'rooms.view', 'track.view'])].sort())
+    expect([...toggleColumn(creates, 'rev', 'create')].sort()).toEqual([...rev(['quote.view', 'requests.view', 'rooms.view', 'track.view', 'training.view'])].sort())
     // Unticking View takes each tab with it.
     expect(toggleColumn(toggleColumn(creates, 'rev', 'view'), 'rev', 'view').size).toBe(0)
     // The Revenue app has no Approve box at all.

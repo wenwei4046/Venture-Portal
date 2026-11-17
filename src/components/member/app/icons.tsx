@@ -22,6 +22,8 @@ export const ICON = {
   /* Book a room and Documentation (the HR revamp's second package, 2026-10-11): the handoff's `calendar` and `doc` */
   room: "M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM16 3v4M8 3v4M3 10h18",
   doc: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8ZM14 3v5h5M9 13h6M9 17h4",
+  // The Library (2026-11-16): an open book.
+  book: "M3 5.5C5.5 4.2 8.8 4 12 6c3.2-2 6.5-1.8 9-.5V19c-2.5-1.3-5.8-1.5-9 .5-3.2-2-6.5-1.8-9-.5V5.5ZM12 6v13.5",
   /* Waiting list & replacements (the HR revamp's handoff, 2026-10-10) */
   queue: "M4 6h16M4 12h16M4 18h10M21 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z",
   install: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm4 5v7m-3-3 3 3 3-3m-4 7h2",

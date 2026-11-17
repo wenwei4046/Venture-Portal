@@ -54,9 +54,9 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     expect(screen.queryByText(/From title/)).toBeNull()
     expect(screen.queryByText(/A red dot marks/)).toBeNull()
     expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveAttribute('aria-selected', 'true')
-    // 16 Revenue app tabs since the rest of Profile got its boxes (2026-10-11), 17 with IT requests (2026-10-20); the
-    // Revenue Team sees 13.
-    expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('13/17')
+    // 16 Revenue app tabs since the rest of Profile got its boxes (2026-10-11), 17 with IT requests (2026-10-20), 20 with
+    // Free test, Library and their writers' tab (2026-11-16); the Revenue Team sees 15 (the two Profile pages are theirs).
+    expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('15/20')
     fireEvent.click(box('Quote · Create'))
     expect(box('Quote · Create')).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByLabelText('changed for this person')).toBeInTheDocument()
@@ -123,22 +123,27 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
 
   it('Select all takes a whole column for them alone, each box with its red dot', async () => {
     render(<PersonAccess access={access()} canEdit personName="Anthony" />)
-    // Every Create box of the view is ticked on the title: one click unticks the column.
+    // Every Create box of the view is ticked on the title but Free test & Library's (2026-11-16, its writers'): the first
+    // click ticks that one too (its View with it), the second unticks the column.
+    expect(box('Select all · Create')).toHaveAttribute('aria-checked', 'mixed')
+    fireEvent.click(box('Select all · Create'))
     expect(box('Select all · Create')).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(box('Select all · Create'))
     expect(box('Quote · Create')).toHaveAttribute('aria-checked', 'false')
     expect(box('Select all · Create')).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(4)
+    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(5)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({
-      userId: USER, templateId: 't', sensitive: [],
-      boxes: ['rev.quote', 'rev.requests', 'rev.rooms', 'rev.track'].sort().map(tab => ({ tab, action: 'create', granted: false })),
-    })
+    const sent = mocks.setPersonTabs.mock.calls.at(-1)?.[0] as { boxes: { tab: string; action: string; granted: boolean }[] }
+    expect(sent).toMatchObject({ userId: USER, templateId: 't', sensitive: [] })
+    expect([...sent.boxes].sort((a, b) => `${a.tab}.${a.action}`.localeCompare(`${b.tab}.${b.action}`))).toEqual([
+      ...['rev.quote', 'rev.requests', 'rev.rooms', 'rev.track'].map(tab => ({ tab, action: 'create', granted: false })),
+      { tab: 'rev.training', action: 'view', granted: true },
+    ].sort((a, b) => `${a.tab}.${a.action}`.localeCompare(`${b.tab}.${b.action}`)))
   })
 
   it('counts the tabs they see for the tab badge', () => {
-    expect(accessCount(access())).toBe(13)
-    expect(accessCount(access({ boxes: [{ tab: 'rev.today', action: 'view', granted: false }] }))).toBe(12)
+    expect(accessCount(access())).toBe(15)
+    expect(accessCount(access({ boxes: [{ tab: 'rev.today', action: 'view', granted: false }] }))).toBe(14)
     expect(accessCount({ kind: 'legacy', userId: USER, source: 'the finance role', rows: [
       { key: 'reports', label: 'Reports', section: 'Reports', inherited: true, override: false },
       { key: 'treasury', label: 'Treasury', section: 'Daily', inherited: true, override: null },

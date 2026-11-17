@@ -35,6 +35,8 @@ export const AUDIT_READ_KEYS = [
   'meeting_rooms_manage',
   // People › Documentation (mig 20261011070000).
   'documentation',
+  // The Revenue app's Free test and Library (mig 20261117010000): whoever writes them.
+  'rev_training',
   // The guest link and its subsidiaries (2026-10-11).
   'guest_link',
   // HR › Attendance's settings, days, requests and balances (2026-10-15).

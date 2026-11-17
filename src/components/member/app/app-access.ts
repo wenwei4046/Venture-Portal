@@ -18,6 +18,7 @@ export function pageOfRoute(route: Pick<Route, "screen" | "pf">): AppPage | null
     case "account":
       if (route.pf === "income" || route.pf === "incOrders") return "income";
       return route.pf === "requests" || route.pf === "track" || route.pf === "team" || route.pf === "rooms" || route.pf === "docs"
+        || route.pf === "tests" || route.pf === "library"
         || route.pf === "honours" || route.pf === "brandWeeks" ? route.pf : null;
     default: return null;
   }
