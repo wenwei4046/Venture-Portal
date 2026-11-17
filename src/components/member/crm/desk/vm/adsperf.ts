@@ -271,8 +271,15 @@ export function adsPerfVM(ctx: DeskCtx) {
     const spent = ms.reduce((n: number, s) => n + (s ?? 0), 0), fee = ms.reduce((n: number, s) => n + (marketingFee(s) ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
-  const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => {
+  // Every lead of the period in the source picked — Overview's Leads: an ad's, a "no ad" chat, one that came back; not a
+  // hidden ad's unless they are shown, whatever the Running / Paused filter (the owner, 2026-11-17: "ads performance 的 per
+  // lead 也一起改" — Per lead ÷ total leads, as Overview's).
+  const day0 = (iso: string) => { const d = new Date(iso); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
+  const totalLeads = (a: number, b: number) => data.customers.filter(c => inSource(c, src) && (ui.apShowHidden || !(c.adId && data.adNames?.[c.adId]?.hidden)) && day0(c.createdAt) >= a && day0(c.createdAt) <= b).length;
+  const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number, whole = false): number | null => {
     const crm = crmFigures(cs, ctx, a, b);
+    // The whole (the strip and the Total row): (ads spend + the fee's share) ÷ every lead of the period, not the ads' alone.
+    if (k === "cpl" && whole) { const spend = metaFigures(metaOf(ids, a, b), crm).spend, rate = feeRate(a, b), n = totalLeads(a, b); return spend == null || rate == null || !n ? null : (spend * (1 + rate)) / n; }
     // Per lead is the whole cost a lead (the owner, 2026-11-12: "per lead 的价钱是 total cost / leads"): the spend with its
     // share of the month's marketing fee, ÷ leads — for the overview, every ad's row and the total; the month on screen
     // gives exactly the Total cost figure divided by Leads.
@@ -280,9 +287,9 @@ export function adsPerfVM(ctx: DeskCtx) {
     return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
   const cell = (cs: CrmCustomer[], m: (typeof ALL)[number], isTotal: boolean, adId: string, ids: string[]) => {
     if (m[0] === "delivery") return { v: isTotal ? "" : status(adId) ?? "—", cv: "", d: "", dc: "", db: "" };
-    const v = val(cs, ids, m[0], ra, rb);
+    const v = val(cs, ids, m[0], ra, rb, isTotal);
     if (!cmp) return { v: fmt(v, m[3]), cv: "", d: "", dc: "", db: "" };
-    const pv = val(cs, ids, m[0], ca, cb); let dd = "—", dc = "var(--crm-muted)", db = "var(--crm-field)";
+    const pv = val(cs, ids, m[0], ca, cb, isTotal); let dd = "—", dc = "var(--crm-muted)", db = "var(--crm-field)";
     if (v != null && pv) { const p = ((v - pv) / pv) * 100, good = p > 0 !== COSTY.test(m[0]); dd = Math.abs(p) < 0.5 ? "0%" : `${p > 0 ? "▲ " : "▼ "}${Math.abs(p).toFixed(0)}%`;
       if (Math.abs(p) >= 0.5) { dc = good ? "var(--crm-brown)" : "var(--crm-oxblood)"; db = good ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)"; } }
     else if (v && !pv) { dd = "New"; dc = "var(--crm-brown)"; db = "var(--crm-tint-follow)"; }
@@ -356,7 +363,7 @@ export function adsPerfVM(ctx: DeskCtx) {
   const keepFigures = (figures: string[], open: boolean) => ctx.deskAct.saveUiPref("adsFigures", { figures, open } satisfies AdsFigures);
   const days = daysOf(ra, rb);
   const series = dailySeries(chosen, days, allCs, data.visits, metaIds.map(id => daily[id]));
-  const total = (k: string) => val(allCs, AD.map(x => x.id), k, ra, rb);
+  const total = (k: string) => val(allCs, AD.map(x => x.id), k, ra, rb, true);
   const setSlot = (i: number, k: string | null) => set(u => { const s = [...(u.apChart ?? CHART_DEF)]; while (s.length <= i) s.push(null); s[i] = k; return { ...u, apChart: s }; });
   const apChartV = {
     shut: !chartOpen, fold: () => keepFigures(chosen, !chartOpen), plain: true,
@@ -383,13 +390,13 @@ export function adsPerfVM(ctx: DeskCtx) {
   // Per lead's hover (the owner, 2026-11-12: "鼠标指向它是 spent / leads", "记得写出他的算法"): how the figure is made, in
   // the period's own numbers, then the ads' spend alone ÷ leads.
   const cplHint = (): { sub?: string[]; title?: string } => {
-    const crm = crmFigures(allCs, ctx, ra, rb), spent = metaFigures(metaOf(AD.map(x => x.id), ra, rb), crm).spend, rate = feeRate(ra, rb), n = crm.leads;
+    const crm = crmFigures(allCs, ctx, ra, rb), spent = metaFigures(metaOf(AD.map(x => x.id), ra, rb), crm).spend, rate = feeRate(ra, rb), n = totalLeads(ra, rb);
     if (spent == null || rate == null || !n) return {};
     const r2 = (v: number) => `RM ${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, share = spent * rate;
     return {
-      sub: [`Spent ÷ leads: ${r2(spent / n)}`, "Ads only, without the marketing fee"],
+      sub: [`Spent ÷ total leads: ${r2(spent / n)}`, "Ads only, without the marketing fee"],
       title: [
-        "Per lead = (Spent + marketing fee) ÷ Leads",
+        "Per lead = (Spent + marketing fee) ÷ Total leads",
         `(${r2(spent)} + ${r2(share)}) ÷ ${n} = ${r2((spent + share) / n)}`,
         // The fee's share line and Spent ÷ Leads again went (the owner, 2026-11-16, circling them): the first line says it.
       ].join("\n"),
