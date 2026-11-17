@@ -80,7 +80,8 @@ const PATCHES = {
      '<label title="{{ xvc.tip }}" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:{{ xvc.cursor }}">{{ xvc.imgEmpty }}<sc-if value="{{ xvc.canUpload }}" hint-placeholder-val="{{ false }}"><input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></sc-if></label>'],
     // Send to CRM chat (the user, 2026-11-17: "press send, 是否可以直接 select from CRM contact" → "这个要"): the PDF into the
     // customer's own chat in the CRM — step 1's customer, else one searched here — or why it cannot go now (Meta's 24 h).
-    // Drawn as the confirm box, its search as step 1's CRM results.
+    // Drawn as the confirm box, its search as step 1's CRM results. The customers are listed at once and the list
+    // scrolls in the box (the user, 2026-11-17: "除了搜寻，也连接 contact 下拉式 + 搜寻（例如打M，可以看到M的客户）").
     ['    <sc-if value="{{ shareSheet }}" hint-placeholder-val="{{ false }}">\n',
      `    <sc-if value="{{ crmSend }}" hint-placeholder-val="{{ false }}">
       <div onClick="{{ crmSend.close }}" style="position:fixed;inset:0;z-index:220;background:rgba(20,20,18,.4);display:grid;place-items:center;padding:24px;animation:rvFade .15s ease">
@@ -88,8 +89,8 @@ const PATCHES = {
           <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700">{{ crmSend.title }}</span>
           <span style="font-size:13.5px;line-height:1.45;color:#6B6B66">{{ crmSend.sub }}</span>
           <sc-if value="{{ crmSend.pick }}" hint-placeholder-val="{{ false }}">
-            <input value="{{ crmSend.q }}" onChange="{{ crmSend.onQ }}" placeholder="Search the CRM by name or phone" type="text" style="width:100%;height:44px;padding:0 12px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C;font-size:14px;box-sizing:border-box">
-            <div style="display:flex;flex-direction:column;gap:1px">
+            <input value="{{ crmSend.q }}" onChange="{{ crmSend.onQ }}" placeholder="Type a name or phone, or pick below" type="text" style="width:100%;height:44px;padding:0 12px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C;font-size:14px;box-sizing:border-box">
+            <div style="display:flex;flex-direction:column;gap:1px;max-height:min(44vh,340px);overflow-y:auto;overscroll-behavior:contain;margin:0 -6px;padding:0 6px">
               <sc-for list="{{ crmSend.hits }}" as="ch" hint-placeholder-count="3">
                 <button onClick="{{ ch.pick }}" style="display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 10px;border:0;border-radius:10px;background:transparent;text-align:left;color:#1F1F1C" style-hover="background:#F2F2EF">
                   <span style="flex:0 0 32px;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#EEEEEA;font-size:11.5px;font-weight:700">{{ ch.initials }}</span>

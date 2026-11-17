@@ -6,6 +6,7 @@ import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { appClosed, SEND_REFUSED } from "@/lib/member/app-pages";
+import { irqCustomerFilter } from "@/lib/member/irq-customer-search";
 import type { User } from "@/types";
 
 /**
@@ -124,18 +125,15 @@ export async function saveIrQuoteDraft(id: string, draft: unknown): Promise<Outc
  */
 export async function searchIrQuoteCustomers(q: string): Promise<Outcome<IrqCrmCustomer[]>> {
   try {
-    const term = String(q ?? "").trim();
-    if (term.length < 2) return { ok: true, data: [] };
+    // Nothing typed: the latest customers; one letter: names starting with it, A–Z; more: as before (irq-customer-search.ts).
+    const { or, limit, byName } = irqCustomerFilter(q);
     const { db } = await session("read");
-    const digits = term.replace(/\D/g, "").replace(/^(60|0)/, "");
-    const like = term.replace(/[%_,()]/g, " ");
-    const or = [`name.ilike.%${like}%`, ...(digits.length >= 3 ? [`phone.ilike.%${digits}%`] : [])].join(",");
-    const { data, error } = await db
+    let read = db
       .from("crm_contacts")
-      .select("id, name, phone, property_type, unit_size, unit_location, requirement, budget, extra")
-      .or(or)
-      .order("last_customer_at", { ascending: false, nullsFirst: false })
-      .limit(8);
+      .select("id, name, phone, property_type, unit_size, unit_location, requirement, budget, extra");
+    if (or) read = read.or(or);
+    const { data, error } = await (byName ? read.order("name", { ascending: true }) : read.order("last_customer_at", { ascending: false, nullsFirst: false }))
+      .limit(limit);
     if (error) return { ok: false, error: words(error, "The CRM could not be searched.") };
     type Row = { id: string; name: string | null; phone: string | null; property_type: string | null; unit_size: string | null; unit_location: string | null; requirement: string | null; budget: string | null; extra: Record<string, string> | null };
     return {
