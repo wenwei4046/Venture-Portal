@@ -1272,11 +1272,12 @@ const adsShown = (c: AdsCell, id: string) => (/%$/.test(c.v) ? (id === "showrate
 
 /**
  * A figure's hover card (Ads Performance's figure strip, 2026-11-12; Insight › Overview's tiles too, 2026-11-17): the first
- * line bold, the rest muted, `title`'s lines faint under a rule — placed under the figure, the strip unmoved.
+ * line bold, the rest muted, `title`'s lines faint under a rule.
+ * Directly under the figure, from its tile's left edge (the owner, 2026-11-17: "鼠标指向，出现在数据下方" — never to the
+ * side); the right-most tile's card is right-aligned instead so it stays inside the window.
  */
-export function DeskFigureTip({ sub, title, at = "18px", side }: { sub: string[]; title?: string; at?: string; side?: "left" | "right" }) {
-  // Under the figure (the ads strip, one row), or beside it (Overview's tiles, several rows: never over the row below).
-  const where: CSSProperties = side ? { top: "-6px", ...(side === "right" ? { left: "calc(100% - 6px)" } : { right: "calc(100% - 6px)" }) } : { top: `calc(100% + ${at})`, left: "50%", transform: "translateX(-50%)" };
+export function DeskFigureTip({ sub, title, at = "18px", last = false }: { sub: string[]; title?: string; at?: string; last?: boolean }) {
+  const where: CSSProperties = { top: `calc(100% + ${at})`, ...(last ? { right: 0 } : { left: 0 }) };
   return (
     <span data-ads-figure-sub="" role="tooltip" style={{ position: "absolute", ...where, zIndex: 20, display: "flex", flexDirection: "column", gap: "2px",
       padding: "10px 12px", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", font: "500 11px/1.4 Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", pointerEvents: "none" }}>
@@ -1311,7 +1312,7 @@ export function DeskAdsStrip({ S }: { S: AdsStripBits }) {
             {/* A figure's notes (the marketing fee's tier, the way to the next, the three tiers) only while the pointer is on it
                 (the owner, 2026-11-12: "mkt 下面的提示改成鼠标指向 mkt fee 才出现") — a card under the figure, the strip unmoved. */}
             {!!f.sub?.length && hov === f.key && (
-              <DeskFigureTip sub={f.sub} title={f.title} />
+              <DeskFigureTip sub={f.sub} title={f.title} last={i === S.items.length - 1} />
             )}
             {f.remove && (
               <button type="button" onClick={f.remove} aria-label={`Remove ${f.label}`} title={`Remove ${f.label}`} style={{ ...BTN, position: "absolute", top: "-14px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center",

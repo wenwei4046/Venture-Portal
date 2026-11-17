@@ -35,14 +35,15 @@ export function deskChatMenu(ctx: DeskCtx, c: DeskCtx["data"]["customers"][numbe
     it("Share", ICON.share, "var(--crm-tint-attention)", "var(--crm-rust)", () => patch({ menu: false, kind: "share" }), "Invite a teammate"),
     ...(o.move ? [it("Move", ICON.assign, "var(--crm-tint-cold)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "move" }), o.moveSub)] : []),
     it("Customer info", ICON.info, "var(--crm-tint-follow)", "var(--crm-brown)", () => patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: false })),
-    // The customer's Audit log (the owner, 2026-11-17: "增加 audit log"): Customer info opened on its log — the one log per
-    // customer (shared/customer-audit.ts: given / moved / shared, status, visits, Won with its amount, notes — who and when).
-    it("Audit log", ICON.audit, "var(--crm-field)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: true }), "Who did what, and when"),
     it("Appointment", ICON.appt, "var(--crm-cream)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "book", book: null })),
     it("Label", LABEL_ICON, "var(--crm-tint-appt)", "var(--crm-text-appt)", () => patch({ menu: false, labPop: { view: "labels", form: null } }), labelSub(data, c.id)),
     // Kept on the desktop past the phone's list (the owner, 2026-11-10, asked whether they should stay reachable: "要"):
     // Mark as unread · Mute · Pin, as before v4 — the Inbox list shows each.
     ...prefItems(ctx, c, it),
+    // The customer's Audit log (the owner, 2026-11-17: "增加 audit log", then "audit log 在 block 的上面"): the last item before
+    // Block — Customer info opened on its log, the one log per customer (shared/customer-audit.ts: given / moved / shared,
+    // status, visits, Won with its amount, notes — who and when).
+    it("Audit log", ICON.audit, "var(--crm-field)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: true }), "Who did what, and when"),
     // Block: off one's Inbox and Contacts — the customer stays in the CRM, WhatsApp / Messenger are not told (the Inbox's More).
     it(`Block ${c.name}`, ICON.block, "var(--crm-tint-attention)", "var(--crm-oxblood)", () => {
       const name = c.name;

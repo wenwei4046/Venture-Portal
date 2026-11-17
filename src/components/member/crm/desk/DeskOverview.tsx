@@ -95,9 +95,9 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
             <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: t.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)", whiteSpace: "nowrap" }}>
               {t.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{o.vs}</span>{t.sub && <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {t.sub}</span>}
             </span>
-            {/* How the figure is worked out and what it is compared with, on hover — Ads Performance's card (2026-11-17), beside
-                the tile, not under it, so it never sits over the next row (the owner: "位置很奇怪"). */}
-            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} side={i % 4 === 3 || i === o.tiles.length - 1 ? "left" : "right"} />}
+            {/* How the figure is worked out and what it is compared with, on hover — Ads Performance's card, directly under the
+                figure from the tile's left edge (the owner, 2026-11-17: "鼠标指向，出现在数据下方"); the row's last tile right-aligned. */}
+            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} at="8px" last={i % 4 === 3 || i === o.tiles.length - 1} />}
           </div>
         ))}
       </div>
