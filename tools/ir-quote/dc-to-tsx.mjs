@@ -78,6 +78,40 @@ const PATCHES = {
     // …and a table section's picture cell, the same.
     ['<label title="Upload image" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:pointer">{{ xvc.imgEmpty }}<input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></label>',
      '<label title="{{ xvc.tip }}" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:{{ xvc.cursor }}">{{ xvc.imgEmpty }}<sc-if value="{{ xvc.canUpload }}" hint-placeholder-val="{{ false }}"><input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></sc-if></label>'],
+    // Send to CRM chat (the user, 2026-11-17: "press send, 是否可以直接 select from CRM contact" → "这个要"): the PDF into the
+    // customer's own chat in the CRM — step 1's customer, else one searched here — or why it cannot go now (Meta's 24 h).
+    // Drawn as the confirm box, its search as step 1's CRM results.
+    ['    <sc-if value="{{ shareSheet }}" hint-placeholder-val="{{ false }}">\n',
+     `    <sc-if value="{{ crmSend }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ crmSend.close }}" style="position:fixed;inset:0;z-index:220;background:rgba(20,20,18,.4);display:grid;place-items:center;padding:24px;animation:rvFade .15s ease">
+        <div onClick="{{ stopProp }}" style="width:min(100%,360px);max-height:calc(100% - 24px);overflow:auto;padding:22px 18px 16px;border-radius:20px;background:#FFFFFF;display:flex;flex-direction:column;gap:10px;box-sizing:border-box">
+          <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700">{{ crmSend.title }}</span>
+          <span style="font-size:13.5px;line-height:1.45;color:#6B6B66">{{ crmSend.sub }}</span>
+          <sc-if value="{{ crmSend.pick }}" hint-placeholder-val="{{ false }}">
+            <input value="{{ crmSend.q }}" onChange="{{ crmSend.onQ }}" placeholder="Search the CRM by name or phone" type="text" style="width:100%;height:44px;padding:0 12px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C;font-size:14px;box-sizing:border-box">
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <sc-for list="{{ crmSend.hits }}" as="ch" hint-placeholder-count="3">
+                <button onClick="{{ ch.pick }}" style="display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 10px;border:0;border-radius:10px;background:transparent;text-align:left;color:#1F1F1C" style-hover="background:#F2F2EF">
+                  <span style="flex:0 0 32px;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#EEEEEA;font-size:11.5px;font-weight:700">{{ ch.initials }}</span>
+                  <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:14px;font-weight:600">{{ ch.name }}</span><span style="font-size:12px;color:#6B6B66">{{ ch.sub }}</span></span>
+                </button>
+              </sc-for>
+              <sc-if value="{{ crmSend.none }}" hint-placeholder-val="{{ false }}"><span style="padding:10px 12px;font-size:13px;color:#6B6B66">{{ crmSend.none }}</span></sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ crmSend.who }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#F2F2EF">
+              <span style="flex:0 0 36px;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:#FFEBD9;color:#D96E0B;font-size:12px;font-weight:700">{{ crmSend.who.initials }}</span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:14.5px;font-weight:650">{{ crmSend.who.name }}</span><span style="font-size:12px;color:#6B6B66">{{ crmSend.who.sub }}</span></span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ crmSend.note }}" hint-placeholder-val="{{ false }}"><span style="padding:10px 12px;border-radius:12px;background:#FFEBD9;color:#1F1F1C;font-size:13px;line-height:1.45">{{ crmSend.note }}</span></sc-if>
+          <sc-if value="{{ crmSend.ok }}" hint-placeholder-val="{{ false }}"><button onClick="{{ crmSend.act }}" style="width:100%;height:46px;margin-top:4px;border-radius:12px;border:0;background:#111111;color:#FFFFFF;font-size:15px;font-weight:700;opacity:{{ crmSend.op }}">{{ crmSend.ok }}</button></sc-if>
+          <button onClick="{{ crmSend.close }}" style="width:100%;height:44px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C;font-size:14.5px;font-weight:650">{{ crmSend.closeLabel }}</button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ shareSheet }}" hint-placeholder-val="{{ false }}">\n`],
   ],
   "Quote Settings v4.dc.html": [
     // No "Package saving" on the quotation, so none in the A4 sample (the user, 2026-11-11: "就不需要了 … 总数对就可以了").
