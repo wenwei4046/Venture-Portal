@@ -117,10 +117,11 @@ describe("CRM alerts' Invitations: answered on the computer too", () => {
 });
 
 describe("the desktop ⋮ keeps Mark as unread · Mute · Pin (v4, the owner 2026-11-10: \"要\")", () => {
-  it("after the phone's items and Label, before Block", () => {
+  it("after the phone's items and Label, then Audit log, before Block", () => {
     const { ctx } = ctxOf(PETER, { chat: "own" });
     const labels = menuLabels(ctx);
-    expect(labels.slice(-4)).toEqual(["Mark as unread", "Mute notifications", "Pin chat", "Block Customer own"]);
+    // Audit log sits last before Block (the owner, 2026-11-17: "audit log 在 block 的上面").
+    expect(labels.slice(-5)).toEqual(["Mark as unread", "Mute notifications", "Pin chat", "Audit log", "Block Customer own"]);
     expect(labels.indexOf("Label")).toBeLessThan(labels.indexOf("Mark as unread"));
   });
   it("each writes one's own pref", () => {
