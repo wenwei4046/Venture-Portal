@@ -55,6 +55,12 @@ export interface DeskUi {
   // Insight's period (the design draws the switch; choosing is filled in, BUILD-NOTES.md)
   insPer: "day" | "week" | "month" | "custom";
   insRange: { a: number; b: number } | null;
+  /** Custom's Compare with (2026-11-17): the range every "vs …" on Insight compares with; null = the days just before. */
+  insCmpRange?: { a: number; b: number } | null;
+  /** Overview's tables: the metric in each one's last column, and which one's list is open (2026-11-17). */
+  insOvAdCol?: import("../../shared/insight-overview").OvColKey;
+  insOvTeamCol?: import("../../shared/insight-overview").OvColKey;
+  insOvColMenu?: "ads" | "team" | null;
   /** Insight's Custom dates open (shared/date-range.tsx, docs/design_handoff_crm/fixes/voice-and-dates.md). */
   insPick?: boolean;
   /** Insight › Ads performance: the compare chip's date picker open (2026-11-11). */
@@ -286,7 +292,7 @@ export type FormSection = CrmForm["sections"][number];
 export const initialDeskUi = (): DeskUi => ({
   tab: "insight", pane: "closed", kind: "chat", collapsed: false, fold: {}, stage: "menu", pick: null, menu: false, toast: "", undo: null,
   chat: null, fromTeam: false, fromList: false, fromInfo: false, infoId: null, visit: null, clist: "Leads", clSort: "Last chat", clSortOpen: false, team: null, person: null, draft: {},
-  insPer: "month", insRange: null, insOpen: false, insTeam: null, insCards: null, mFor: "ads",
+  insPer: "month", insRange: null, insCmpRange: null, insOpen: false, insTeam: null, insCards: null, mFor: "ads",
   whoSel: [], whoOpen: false, inbF: "All", ibQ: "", bookPick: false, bookQ: "",
   sendFor: null, awChat: null, awMenuOpen: false, ad: null, adMode: "team", tm: {}, mv: {}, split: null, adSt: "Running", stOpen: false, ftEdit: null, ftDraft: null,
   cpF: "All", cpT: "This month", cpFrom: "", cpTo: "", cpSort: "Latest update", cpMine: false, cpP: null, cpPOpen: false, cpSel: null,
@@ -361,7 +367,7 @@ export interface DeskActions {
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
   saveRecents(list: string[]): void;
   /** One's own screen choices on the server (crm_save_ui_pref, mig 20261110120000) — read back as data.uiPrefs[key]. */
-  saveUiPref(key: "adsFigures" | "reportCols", value: unknown): void;
+  saveUiPref(key: "adsFigures" | "reportCols" | "ovCols", value: unknown): void;
   saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
   /** v2 frame 09b: one business profile to the number's WhatsApp and / or Facebook Page, each answered on its own. */
   saveProfile(form: FormData): Promise<import("@/app/(member)/member/crm-channels-actions").ProfileSaveResult | null>;

@@ -95,6 +95,31 @@ export function prevRange(r: { a: number; b: number }): { a: number; b: number }
   const days = Math.round((r.b - r.a) / 86_400_000) + 1;
   return { a: new Date(a.getFullYear(), a.getMonth(), a.getDate() - days).getTime(), b: new Date(a.getFullYear(), a.getMonth(), a.getDate() - 1).getTime() };
 }
+/**
+ * What Insight compares with (2026-11-17, the owner: "在 custom 做 compare 时间"): on Custom, the range picked under
+ * Compare with; otherwise, and on Custom with none picked, the period before (prevRange).
+ */
+export function compareRange(ui: { insPer: DeskCtx["ui"]["insPer"]; insCmpRange?: { a: number; b: number } | null }, r: { a: number; b: number }): { a: number; b: number } {
+  return ui.insPer === "custom" && ui.insCmpRange ? ui.insCmpRange : prevRange(r);
+}
+/** "vs Oct", "vs last week", "vs yesterday", "vs 1–17 Oct" (a picked range), "vs before" (Custom, the days just before). */
+export function compareWords(ui: { insPer: DeskCtx["ui"]["insPer"]; insCmpRange?: { a: number; b: number } | null }, pr: { a: number; b: number }): string {
+  if (ui.insPer === "custom") return ui.insCmpRange ? `vs ${rangeLine(ui.insCmpRange)}` : "vs before";
+  return ui.insPer === "month" ? `vs ${MON[new Date(pr.a).getMonth()].slice(0, 3)}` : ui.insPer === "week" ? "vs last week" : "vs yesterday";
+}
+/** Insight's head on Custom: "+ Compare", then "vs 1–17 Oct" (its dates open the picker) and × to compare with the days before. */
+export function insightCompareVM(ctx: DeskCtx) {
+  const { ui, patch } = ctx;
+  if (ui.tab !== "insight" || ui.insPer !== "custom" || ui.insTab === "ads" || ui.insTab === "upnext" || ui.insTab === "activity") return null;
+  const { r } = insightRange(ctx), on = !!ui.insCmpRange, c = ui.insCmpRange ?? prevRange(r);
+  return {
+    on, label: `vs ${rangeLine(c)}`,
+    // Off: start on the days just before and open the picker on them; on: × goes back to them.
+    toggle: () => patch(on ? { insCmpRange: null, insCmpPick: false } : { insCmpRange: prevRange(r), insCmpPick: true }),
+    open: () => patch({ insCmpPick: true }),
+    pick: on && ui.insCmpPick ? { value: c, apply: (x: { a: number; b: number }) => patch({ insCmpRange: x, insCmpPick: false }), cancel: () => patch({ insCmpPick: false }) } : null,
+  };
+}
 /** Avg. reply (minutes): each customer message → our next reply (auto-replies don't count), replies made in the range — the phone Insight's rule. */
 export function avgReply(customers: CrmCustomer[], r: { a: number; b: number }): number | null {
   const gaps: number[] = [];
@@ -131,9 +156,9 @@ export function insightVM(ctx0: DeskCtx) {
   // v2's hero: five cells — Leads · Show-up · Reply 24 h · Avg. reply · Won — each with its change against the period
   // before (README › Insight): a whole month against the month before, a week the week before, a day the day before, a
   // custom range the same number of days before it.
-  const pr = prevRange(r), pn = numbersOf(data.customers, data.visits, pr, now);
+  const pr = compareRange(ctx.ui, r), pn = numbersOf(data.customers, data.visits, pr, now);
   const prevLeads = data.customers.filter(c => inRange(c.createdAt, pr));
-  const vsName = ctx.ui.insPer === "month" ? `vs ${MON[new Date(pr.a).getMonth()].slice(0, 3)}` : ctx.ui.insPer === "week" ? "vs last week" : ctx.ui.insPer === "day" ? "vs yesterday" : "vs before";
+  const vsName = compareWords(ctx.ui, pr);
   const rate = (a: number, b: number) => (b ? (a / b) * 100 : null);
   const arrow = (d: number) => (d >= 0 ? "↑" : "↓");
   const ptDelta = (a: number | null, b: number | null) => (a == null || b == null ? `— ${vsName}` : `${arrow(a - b)} ${Math.abs(Math.round(a - b))}% ${vsName}`);
@@ -172,7 +197,8 @@ export function insightVM(ctx0: DeskCtx) {
     { label: "Reply 24 h", value: pct(rep24, n.leads), unit: "", ...pts(rate(rep24, n.leads), rate(prevLeads.filter(replied24).length, prevLeads.length)), open: openList("Reply 24 h") },
     { label: "Avg. reply", value: avgV[0], unit: avgV[1], ...(avgNow == null || avgPrev == null ? { d: "—", good: true } : { d: `${avgNow <= avgPrev ? "−" : "+"}${Math.abs(avgNow - avgPrev)} min`, good: avgNow <= avgPrev }), open: openList("Leads") },
     { label: "Won", value: wonRate(wonNow.n, n.leads) == null ? "—" : `${wonRate(wonNow.n, n.leads)}%`, unit: "", ...pts(wonRate(wonNow.n, n.leads), wonRate(wonPrev.n, prevLeads.length)), open: openList("Won") },
-  ].map((m, i) => ({ ...m, first: i === 0, vs: true, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
+  // The design's "vs last", unless Custom compares with a range picked: then that range's dates (2026-11-17).
+  ].map((m, i) => ({ ...m, first: i === 0, vs: true, vsWords: ctx.ui.insPer === "custom" && ctx.ui.insCmpRange ? vsName : undefined, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
   const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: teamLead(t), ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
     open: () => patch({ pane: "overlay", kind: "team", team: t.id, person: null }) }))];
 

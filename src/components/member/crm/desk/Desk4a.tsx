@@ -324,7 +324,7 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
 }
 
 interface InsightBits {
-  metrics4: { label: string; value: string; unit: string; d: string; deltaColor: string; first: boolean; vs?: boolean; open: () => void }[];
+  metrics4: { label: string; value: string; unit: string; d: string; deltaColor: string; first: boolean; vs?: boolean; vsWords?: string; open: () => void }[];
   teams4: { name: string; sub: string; leads: string; appt: string; apptW: string; show: string; won: string; lost: string; dot: string; person: boolean; open: boolean; pick: () => void }[];
   status4: { label: string; n: number; color: string; text: string; pct: string; open: () => void }[];
   statusTotal: number;
@@ -356,7 +356,7 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
           <span style={{ font: `500 42px ${TIGHT}`, letterSpacing: "-0.035em", lineHeight: 1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: m.first ? "var(--crm-rust)" : "var(--crm-ink)" }}>
             {m.value}{m.unit && <span style={{ fontSize: "0.42em", letterSpacing: 0, marginLeft: "3px", fontWeight: 400 }}>{m.unit}</span>}
           </span>
-          <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: m.deltaColor, whiteSpace: "nowrap" }}>{m.vs === false ? "" : <>{m.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>vs last</span></>}</span>
+          <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: m.deltaColor, whiteSpace: "nowrap" }}>{m.vs === false ? "" : <>{m.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{m.vsWords ?? "vs last"}</span></>}</span>
         </button>
       ))}
     </div>
@@ -1271,6 +1271,22 @@ export const adsFaint = (x: string) => !x || x === "—" || /^0(\.0+)?%?$/.test(
 const adsShown = (c: AdsCell, id: string) => (/%$/.test(c.v) ? (id === "showrate" || id === "apptrate" ? `${Math.round(parseFloat(c.v))}%` : c.v.replace(/(\.\d)\d%$/, "$1%")) : c.v);
 
 /**
+ * A figure's hover card (Ads Performance's figure strip, 2026-11-12; Insight › Overview's tiles too, 2026-11-17): the first
+ * line bold, the rest muted, `title`'s lines faint under a rule — placed under the figure, the strip unmoved.
+ */
+export function DeskFigureTip({ sub, title, at = "18px" }: { sub: string[]; title?: string; at?: string }) {
+  return (
+    <span data-ads-figure-sub="" role="tooltip" style={{ position: "absolute", top: `calc(100% + ${at})`, left: "50%", transform: "translateX(-50%)", zIndex: 20, display: "flex", flexDirection: "column", gap: "2px",
+      padding: "10px 12px", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", font: "500 11px/1.4 Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", pointerEvents: "none" }}>
+      {sub.map((s, j) => <span key={j} style={{ color: j ? undefined : "var(--crm-ink)", fontWeight: j ? 500 : 600 }}>{s}</span>)}
+      {title && <span style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px solid var(--crm-rule-soft)", display: "flex", flexDirection: "column", gap: "2px", color: "var(--crm-faint)" }}>
+        {title.split("\n").filter(Boolean).map((s, j) => <span key={j}>{s}</span>)}
+      </span>}
+    </span>
+  );
+}
+
+/**
  * v4 notes/21 · the figure strip (frame D2a): the picked figures in equal centred columns, each with an 8 px dot in its
  * line's colour; hover one for × (it goes); + adds one (Customise metrics), Show chart opens the chart under the strip.
  * Folded by default; which figures, their order and folded / open are kept per user on the server (vm/adsperf.ts).
@@ -1293,13 +1309,7 @@ export function DeskAdsStrip({ S }: { S: AdsStripBits }) {
             {/* A figure's notes (the marketing fee's tier, the way to the next, the three tiers) only while the pointer is on it
                 (the owner, 2026-11-12: "mkt 下面的提示改成鼠标指向 mkt fee 才出现") — a card under the figure, the strip unmoved. */}
             {!!f.sub?.length && hov === f.key && (
-              <span data-ads-figure-sub="" role="tooltip" style={{ position: "absolute", top: "calc(100% + 18px)", left: "50%", transform: "translateX(-50%)", zIndex: 20, display: "flex", flexDirection: "column", gap: "2px",
-                padding: "10px 12px", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", font: "500 11px/1.4 Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", pointerEvents: "none" }}>
-                {f.sub.map((s, j) => <span key={j} style={{ color: j ? undefined : "var(--crm-ink)", fontWeight: j ? 500 : 600 }}>{s}</span>)}
-                {f.title && <span style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px solid var(--crm-rule-soft)", display: "flex", flexDirection: "column", gap: "2px", color: "var(--crm-faint)" }}>
-                  {f.title.split("\n").filter(Boolean).map((s, j) => <span key={j}>{s}</span>)}
-                </span>}
-              </span>
+              <DeskFigureTip sub={f.sub} title={f.title} />
             )}
             {f.remove && (
               <button type="button" onClick={f.remove} aria-label={`Remove ${f.label}`} title={`Remove ${f.label}`} style={{ ...BTN, position: "absolute", top: "-14px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center",
