@@ -21,6 +21,7 @@ const ICON = {
   info: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
   appt: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14",
   block: "M5.6 5.6l12.8 12.8M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  audit: "M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2",
 };
 
 export function deskChatMenu(ctx: DeskCtx, c: DeskCtx["data"]["customers"][number] | undefined,
@@ -34,6 +35,9 @@ export function deskChatMenu(ctx: DeskCtx, c: DeskCtx["data"]["customers"][numbe
     it("Share", ICON.share, "var(--crm-tint-attention)", "var(--crm-rust)", () => patch({ menu: false, kind: "share" }), "Invite a teammate"),
     ...(o.move ? [it("Move", ICON.assign, "var(--crm-tint-cold)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "move" }), o.moveSub)] : []),
     it("Customer info", ICON.info, "var(--crm-tint-follow)", "var(--crm-brown)", () => patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: false })),
+    // The customer's Audit log (the owner, 2026-11-17: "增加 audit log"): Customer info opened on its log — the one log per
+    // customer (shared/customer-audit.ts: given / moved / shared, status, visits, Won with its amount, notes — who and when).
+    it("Audit log", ICON.audit, "var(--crm-field)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: true }), "Who did what, and when"),
     it("Appointment", ICON.appt, "var(--crm-cream)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "book", book: null })),
     it("Label", LABEL_ICON, "var(--crm-tint-appt)", "var(--crm-text-appt)", () => patch({ menu: false, labPop: { view: "labels", form: null } }), labelSub(data, c.id)),
     // Kept on the desktop past the phone's list (the owner, 2026-11-10, asked whether they should stay reachable: "要"):

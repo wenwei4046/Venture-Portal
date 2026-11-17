@@ -99,7 +99,8 @@ describe("Overview's tiles on hover (the owner, 2026-11-17: 鼠标指向这些�
     const w = { leads: 10, avgReply: 12, booked: 4, apptRate: 40, came: 3, due: 4, showRate: 75, won: 1 };
     const t = overviewTiles({ ads: m, adsPrev: { ...m, cost: 1000 }, work: w, workPrev: w } as never, true, "vs Oct");
     expect(t.find(x => x.label === "Total cost")!.tip).toEqual({ sub: ["Total cost = ads spend + marketing fee's share", "RM 1,000.00 + RM 250.00 = RM 1,250.00"], title: "vs Oct: RM 1,000" });
-    expect(t.find(x => x.label === "Per lead")!.tip.sub[1]).toBe("RM 1,250.00 ÷ 10 = RM 125.00");
+    // Over total leads (the owner, 2026-11-17: "perlead, 除 total leads") — here the period's 10.
+    expect(t.find(x => x.label === "Per lead")!.tip.sub).toEqual(["Per lead = (ads spend + fee) ÷ total leads", "RM 1,250.00 ÷ 10 = RM 125.00"]);
     expect(t.find(x => x.label === "Show-up")!.tip.sub[1]).toBe("3 ÷ 4 = 75%");
   });
 });
@@ -144,18 +145,39 @@ describe("sales, conversion, AOV and ROAS (the owner, 2026-11-17: 新增 convers
     expect(roas.tip.title).toBe("vs Oct: —"); // no sales then: nothing to divide
     expect(tiles.find(x => x.label === "AOV")!.tip.title).toBe("vs Oct: —");
   });
-  it("each table's last column is picked from a list, Sales at first", () => {
-    const s = vmWon();
-    expect(s.run().adCol.label).toBe("Sales");
-    expect(s.run().adCol.options.map(o => o.label)).toEqual(["Sales", "Conversion", "AOV", "ROAS", "Appt rate"]);
-    expect(s.run().teamCol.options.map(o => o.label)).toEqual(["Sales", "Conversion", "AOV"]); // a team has no cost: no ROAS
-    expect(s.run().teams.find(t => t.name === "Team Ann")!.extra).toBe("RM 8,000");
-    s.run().teamCol.toggle();
-    expect(s.run().teamCol.open).toBe(true);
-    s.run().teamCol.options.find(o => o.label === "Conversion")!.pick();
-    expect(s.ui().insOvColMenu).toBeNull();
-    expect(s.run().teamCol.label).toBe("Conversion");
-    expect(s.run().teams.find(t => t.name === "Team Ann")!.extra).toBe("67%");
-    expect(s.run().adCol.label).toBe("Sales"); // the other table keeps its own
+  it("each table keeps its columns; + adds a metric, × takes it off, kept per person (2026-11-17: 此外是 + 数据，不是替换)", () => {
+    const saved: unknown[] = [];
+    let ui: DeskUi = { ...initialDeskUi(), stage: "op", tab: "insight", insPer: "custom", insRange: NOV };
+    const patch = (p: Partial<DeskUi>) => { ui = { ...ui, ...p }; };
+    const run = () => deskOverviewVM({ ui, data: won, now: new Date(2026, 10, 17, 12), nameOf: (x: string) => x, act: {}, deskAct: { saveUiPref: (_k: string, v: unknown) => saved.push(v) }, set: () => {}, patch, teams, directors: [], me: { id: "boss", name: "Boss" } } as unknown as DeskCtx);
+    expect(run().adCol.cols).toEqual([]); // nothing added: the tables as they were
+    expect(run().teams.find(t => t.name === "Team Ann")!.extra).toEqual([]);
+    expect(run().adCol.options.map(o => [o.group, o.label])).toEqual([
+      ["CRM", "Sales"], ["CRM", "Conversion"], ["CRM", "AOV"], ["CRM", "ROAS"], ["CRM", "Appt rate"],
+      ["Meta Ads", "Impressions"], ["Meta Ads", "Reach"], ["Meta Ads", "Frequency"], ["Meta Ads", "CPM"], ["Meta Ads", "Link clicks"],
+      ["Meta Ads", "CPC"], ["Meta Ads", "CTR"], ["Meta Ads", "Clicks (all)"], ["Meta Ads", "Conversations"], ["Meta Ads", "Cost / conversation"]]);
+    expect(run().teamCol.options.map(o => o.label)).toEqual(["Sales", "Conversion", "AOV"]); // a team has no cost or ad figures
+    run().teamCol.options.find(o => o.label === "Sales")!.pick();
+    run().teamCol.options.find(o => o.label === "Conversion")!.pick();
+    expect(run().teamCol.cols.map(c => c.label)).toEqual(["Sales", "Conversion"]);
+    expect(run().teamCol.options.map(o => o.label)).toEqual(["AOV"]); // an added one is not offered twice
+    expect(run().teams.find(t => t.name === "Team Ann")!.extra).toEqual(["RM 8,000", "67%"]);
+    expect(saved.at(-1)).toEqual({ ads: [], team: ["sales", "conv"] });
+    run().teamCol.cols[0].remove();
+    expect(run().teamCol.cols.map(c => c.label)).toEqual(["Conversion"]);
+    expect(run().adCol.cols).toEqual([]); // the other table keeps its own
+  });
+  it("reads the kept set back, and an older single pick as one column", () => {
+    const at = (ovCols: unknown) => deskOverviewVM({ ui: { ...initialDeskUi(), stage: "op", tab: "insight" }, data: { ...won, uiPrefs: { ovCols } }, now: new Date(2026, 10, 17, 12), nameOf: (x: string) => x, act: {}, deskAct: {}, set: () => {}, patch: () => {}, teams, directors: [], me: { id: "boss", name: "Boss" } } as unknown as DeskCtx);
+    expect(at({ ads: ["sales", "cpc"], team: ["aov"] }).adCol.cols.map(c => c.key)).toEqual(["sales", "cpc"]);
+    expect(at({ ads: "sales", team: "conv" }).teamCol.cols.map(c => c.key)).toEqual(["conv"]);
+    expect(at({ ads: ["nonsense", "sales", "sales"] }).adCol.cols.map(c => c.key)).toEqual(["sales"]);
+  });
+  it("works Meta's columns out of an ad's figures, and says — before they are read", async () => {
+    const { colValue } = await import("../../shared/insight-overview");
+    const row = { leads: 10, won: 1, sales: 0, wonPaid: 0, came: 2, cost: 600, fig: { spend: 500, impr: 20000, reach: 8000, clicks: 250, allClicks: 400, msgconv: 40 } };
+    expect(["impr", "reach", "freq", "cpm", "clicks", "cpc", "ctr", "allclk", "msgconv", "cpmsg"].map(k => colValue(k as never, row)))
+      .toEqual(["20,000", "8,000", "2.50", "RM 25.00", "250", "RM 2.00", "1.25%", "400", "40", "RM 12.50"]);
+    expect(colValue("cpc", { ...row, fig: null })).toBe("—");
   });
 });

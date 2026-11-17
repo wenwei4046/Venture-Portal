@@ -87,14 +87,20 @@ describe("notes/24 §3 · the desktop chat's ⋮ is the phone's + Block", () => 
   it("lists Assign to (if allowed) · Share · Move (if allowed) · Customer info · Appointment · Label, a divider, Block NAME", () => {
     const { ctx } = ctxOf(P("ben", "rs", "peter"), false);
     const items = chatMenuVM(ctx, { starCount: 0, starredOpen: () => {} }).chatMenuItems;
-    expect(items.map(i => i.label)).toEqual(["Share", "Move", "Customer info", "Appointment", "Label",
+    expect(items.map(i => i.label)).toEqual(["Share", "Move", "Customer info", "Audit log", "Appointment", "Label",
       // …and, kept on the desktop (the owner, 2026-11-10: "要"), Mark as unread · Mute · Pin before Block.
       "Mark as unread", "Mute notifications", "Pin chat", "Block Daniel Lim"]);
-    expect(items.map(i => i.sub)).toEqual(["Invite a teammate", "Hand over to PETER", null, null, "Add a label", null, null, null, null]);
+    expect(items.map(i => i.sub)).toEqual(["Invite a teammate", "Hand over to PETER", null, "Who did what, and when", null, "Add a label", null, null, null, null]);
     expect(items.filter(i => i.sep).map(i => i.label)).toEqual(["Block Daniel Lim"]);
     expect(items.at(-1)).toMatchObject({ danger: true, fg: "var(--crm-oxblood)" });
     const mgr = chatMenuVM(ctxOf(P("peter", "hod", "boss"), true).ctx, { starCount: 0, starredOpen: () => {} }).chatMenuItems;
     expect(mgr[0]).toMatchObject({ label: "Assign to", sub: "Give this customer to anyone" });
+  });
+  it("Audit log opens Customer info on the customer's own log (the owner, 2026-11-17: 增加 audit log)", () => {
+    const { ctx, patch } = ctxOf(P("ben", "rs", "peter"), false);
+    const c = ctx.data.customers[0];
+    deskChatMenu(ctx, c, { assign: false, assignSub: "", move: false, moveSub: "" }).find(i => i.label === "Audit log")!.run();
+    expect(patch).toHaveBeenCalledWith(expect.objectContaining({ menu: false, kind: "info", infoId: c.id, infoAudit: true }));
   });
   it("Block is the Inbox's More › Block; Label opens the Label sheet", async () => {
     const { ctx, act, patch } = ctxOf(P("ben", "rs", "peter"), false);

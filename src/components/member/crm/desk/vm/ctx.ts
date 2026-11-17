@@ -58,8 +58,8 @@ export interface DeskUi {
   /** Custom's Compare with (2026-11-17): the range every "vs …" on Insight compares with; null = the days just before. */
   insCmpRange?: { a: number; b: number } | null;
   /** Overview's tables: the metric in each one's last column, and which one's list is open (2026-11-17). */
-  insOvAdCol?: import("../../shared/insight-overview").OvColKey;
-  insOvTeamCol?: import("../../shared/insight-overview").OvColKey;
+  insOvAdCols?: import("../../shared/insight-overview").OvColKey[];
+  insOvTeamCols?: import("../../shared/insight-overview").OvColKey[];
   insOvColMenu?: "ads" | "team" | null;
   /** Insight's Custom dates open (shared/date-range.tsx, docs/design_handoff_crm/fixes/voice-and-dates.md). */
   insPick?: boolean;

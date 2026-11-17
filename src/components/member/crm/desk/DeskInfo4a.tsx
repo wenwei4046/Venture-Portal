@@ -9,7 +9,7 @@
  * - The Audit log stays its own right-hand panel, folded by default to a 44px rail ("Audit log · 12"); opened, the D4b
  *   timeline (shared/audit-timeline.tsx — newest at the bottom, no heading inside).
  */
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { InfoValue } from "../shared/AdLink";
 import { Ic } from "../shared/icons4a";
 import { AuditTimeline, type AuditLine } from "../shared/audit-timeline";
@@ -142,10 +142,12 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
 /** Customer info's own Audit log (the owner, 2026-11-09: "能不能看到 audit log?"), folded until opened — the D4b timeline. */
 export function DeskInfoAudit4a({ items, open: openAt }: { open?: boolean; items?: AuditLine[] }) {
   const [open, setOpen] = useState(!!openAt);
-  useEffect(() => { if (openAt) setOpen(true); }, [openAt]);
+  const box = useRef<HTMLDivElement>(null);
+  // Opened from the chat's ⋮ › Audit log: open, and brought into view under Customer info (2026-11-17).
+  useEffect(() => { if (openAt) { setOpen(true); requestAnimationFrame(() => box.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); } }, [openAt]);
   if (!items) return null; // the prototype harness draws none
   return (
-    <div style={{ border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden", flex: "none" }}>
+    <div ref={box} data-info-audit="" style={{ border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden", flex: "none" }}>
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...BTN, width: "100%", height: "46px", display: "flex", alignItems: "center", gap: "8px", padding: "0 14px", background: "#fff", color: "var(--crm-ink)" }}>
         <span style={{ font: "600 14px Inter, sans-serif" }}>Audit log</span>
         <span style={{ font: "400 12.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{items.length}</span>
