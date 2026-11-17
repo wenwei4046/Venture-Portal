@@ -7,7 +7,7 @@
  */
 import { readsAds, withoutHiddenAds } from "@/lib/member/crm-data";
 import type { SourcePick } from "@/lib/member/crm-source";
-import { mins, overviewFigures, overviewTiles, pctOf, rm, rm2 } from "../../shared/insight-overview";
+import { colValue, colsFor, mins, overviewFigures, overviewTiles, pctOf, rm, rm2, type OvColKey } from "../../shared/insight-overview";
 import type { DeskCtx } from "./ctx";
 import { compareRange, compareWords, inBrand, insightRange } from "./insight";
 import { rangeLine } from "./frame4a";
@@ -21,24 +21,39 @@ export function deskOverviewVM(ctx: DeskCtx) {
     src: ui.insSrc as SourcePick | undefined, meta: ui.apMeta, money });
   const dotOf = (key: string) => { if (key === DIRECTOR_TEAM) return DIRECTOR_C[0]; const k = ctx.teams.findIndex(t => t.id === key); return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
   const maxLeads = Math.max(1, ...f.teams.map(t => t.leads));
+  // Each table's last column is picked from a list (the owner, 2026-11-17: "一个可选的 metric column"); Sales at first.
+  const colMenu = (table: "ads" | "team") => {
+    const list = colsFor(table, money), want: OvColKey = (table === "ads" ? ui.insOvAdCol : ui.insOvTeamCol) ?? "sales";
+    const on = list.find(c => c.key === want) ?? list[0];
+    return {
+      key: on.key, label: on.label, open: ui.insOvColMenu === table,
+      toggle: () => patch({ insOvColMenu: ui.insOvColMenu === table ? null : table }),
+      close: () => patch({ insOvColMenu: null }),
+      options: list.map(c => ({ label: c.label, on: c.key === on.key, pick: () => patch(table === "ads" ? { insOvAdCol: c.key, insOvColMenu: null } : { insOvTeamCol: c.key, insOvColMenu: null }) })),
+    };
+  };
+  const adCol = colMenu("ads"), teamCol = colMenu("team");
   return {
     money,
     // What every tile's change is against: "vs Oct", "vs last week", "vs 1–17 Oct" (Custom's Compare with).
     vs: compareWords(ui, prev),
     ready: f.ads.ready,
     tiles: overviewTiles(f, money, `vs ${rangeLine(prev)}`),
-    brands: f.brands.map(b => ({ label: b.label, spend: rm(b.spend), leads: String(b.leads), cpl: rm2(b.cpl), appt: String(b.appt), won: String(b.won) })),
+    adCol, teamCol,
+    brands: f.brands.map(b => ({ label: b.label, spend: rm(b.spend), leads: String(b.leads), cpl: rm2(b.cpl), appt: String(b.appt), won: String(b.won), extra: colValue(adCol.key, b) })),
     ads: f.adRows.slice(0, ui.insOvAllAds ? undefined : 8).map(a => {
       const open = ui.insOvAd === a.id, split = f.adTeams.find(x => x.id === a.id);
       return { id: a.id, name: a.name, brand: a.brand, spend: a.paid ? rm(a.spend) : "—", leads: String(a.leads), cpl: a.paid ? rm2(a.cpl) : "—", appt: String(a.appt), won: String(a.won),
+        extra: colValue(adCol.key, a.paid ? a : { ...a, cost: null }),
         open, canOpen: !!split?.teams.length, toggle: () => patch({ insOvAd: open ? null : a.id }),
-        teams: open && split ? split.teams.map(t => ({ name: t.name, dot: t.key ? dotOf(t.key) : "var(--crm-faint-2)", leads: String(t.leads), share: a.leads ? `${Math.round((t.leads / a.leads) * 100)}%` : "—", appt: String(t.booked), won: String(t.won) })) : [] };
+        teams: open && split ? split.teams.map(t => ({ name: t.name, dot: t.key ? dotOf(t.key) : "var(--crm-faint-2)", leads: String(t.leads), share: a.leads ? `${Math.round((t.leads / a.leads) * 100)}%` : "—", appt: String(t.booked), won: String(t.won),
+          extra: colValue(adCol.key, { ...t, cost: null }) })) : [] };
     }),
     adsMore: f.adRows.length > 8 ? { label: ui.insOvAllAds ? "Show fewer" : `Show all ${f.adRows.length} ads`, toggle: () => patch({ insOvAllAds: !ui.insOvAllAds }) } : null,
     teams: f.teams.flatMap(t => {
       const open = ui.insOvTeam === t.key && t.people.length > 0;
       const row = (x: typeof t | (typeof t.people)[number], person: boolean) => ({ name: x.name, person, leads: String(x.leads), leadsW: `${Math.round((x.leads / maxLeads) * 100)}%`,
-        reply: mins(x.avgReply), appt: pctOf(x.apptRate), show: pctOf(x.showRate), won: String(x.won) });
+        reply: mins(x.avgReply), appt: pctOf(x.apptRate), show: pctOf(x.showRate), won: String(x.won), extra: colValue(teamCol.key, x) });
       return [
         { ...row(t, false), key: t.key, dot: t.key ? dotOf(t.key) : "var(--crm-faint-2)", open, canOpen: t.people.length > 0, pick: () => (t.people.length ? patch({ insOvTeam: open ? null : t.key }) : undefined) },
         ...(open ? t.people.map(x => ({ ...row(x, true), key: `${t.key}:${x.id}`, dot: "transparent", open: false, canOpen: true, pick: () => patch({ pane: "overlay", kind: "team", team: t.key, person: x.id }) })) : []),

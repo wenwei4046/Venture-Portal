@@ -111,3 +111,44 @@ describe("the phone's Overview", () => {
     expect(phoneOverviewProps(ctx(null)).prev).toEqual({ a: D(9, 15), b: D(9, 31) });
   });
 });
+
+describe("sales, conversion, AOV and ROAS (the owner, 2026-11-17: 新增 conversion rate, total sales, ROAS, AOV)", () => {
+  const won = { ...data, customers: data.customers.map((c, i) => (i < 2 ? { ...c, status: "won", wonAmount: i ? 3000 : 5000 } : c)) } as unknown as CrmData;
+  function vmWon(over: Partial<DeskUi> = {}) {
+    let ui: DeskUi = { ...initialDeskUi(), stage: "op", tab: "insight", insPer: "custom", insRange: NOV, ...over };
+    const patch = (p: Partial<DeskUi>) => { ui = { ...ui, ...p }; };
+    const ctx = () => ({ ui, data: won, now: new Date(2026, 10, 17, 12), nameOf: (x: string) => x, act: {}, deskAct: {}, set: () => {}, patch, teams, directors: [], me: { id: "boss", name: "Boss" } } as unknown as DeskCtx);
+    return { run: () => deskOverviewVM(ctx()), ui: () => ui };
+  }
+  it("are cards, worked out on hover from the Won amount", () => {
+    const tiles = vmWon().run().tiles, tile = (l: string) => tiles.find(t => t.label === l)!;
+    expect(tile("Total sales").value).toBe("RM 8,000");
+    expect(tile("Conversion").value).toBe("67%"); // 2 won of 3 leads
+    expect(tile("Conversion").tip.sub).toEqual(["Conversion = won ÷ leads", "2 ÷ 3 = 67%"]);
+    expect(tile("AOV").value).toBe("RM 4,000");
+    expect(tile("AOV").tip.sub[1]).toBe("RM 8,000.00 ÷ 2 = RM 4,000.00");
+    expect(tile("ROAS").value).toBe("—"); // no spend read yet
+  });
+  it("ROAS is the ads' sales over their total cost", async () => {
+    const { overviewTiles } = await import("../../shared/insight-overview");
+    const m = { spend: 1000, fee: 250, cost: 1250, cpl: 125, leads: 10, appt: 0, won: 2, sales: 5000, ready: true };
+    const w = { leads: 10, avgReply: 12, booked: 4, apptRate: 40, came: 3, due: 4, showRate: 75, won: 2, sales: 5000 };
+    const roas = overviewTiles({ ads: m, adsPrev: m, work: w, workPrev: w } as never, true, "vs Oct").find(x => x.label === "ROAS")!;
+    expect(roas.value).toBe("4.00×");
+    expect(roas.tip.sub).toEqual(["ROAS = sales from ads ÷ total cost", "RM 5,000.00 ÷ RM 1,250.00 = 4.00×"]);
+  });
+  it("each table's last column is picked from a list, Sales at first", () => {
+    const s = vmWon();
+    expect(s.run().adCol.label).toBe("Sales");
+    expect(s.run().adCol.options.map(o => o.label)).toEqual(["Sales", "Conversion", "AOV", "ROAS", "Appt rate"]);
+    expect(s.run().teamCol.options.map(o => o.label)).toEqual(["Sales", "Conversion", "AOV"]); // a team has no cost: no ROAS
+    expect(s.run().teams.find(t => t.name === "Team Ann")!.extra).toBe("RM 8,000");
+    s.run().teamCol.toggle();
+    expect(s.run().teamCol.open).toBe(true);
+    s.run().teamCol.options.find(o => o.label === "Conversion")!.pick();
+    expect(s.ui().insOvColMenu).toBeNull();
+    expect(s.run().teamCol.label).toBe("Conversion");
+    expect(s.run().teams.find(t => t.name === "Team Ann")!.extra).toBe("67%");
+    expect(s.run().adCol.label).toBe("Sales"); // the other table keeps its own
+  });
+});

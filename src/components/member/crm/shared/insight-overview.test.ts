@@ -96,7 +96,7 @@ describe("Insight › Overview's team", () => {
   });
   it("shows which teams each ad's leads went to", () => {
     const f = overviewFigures(base());
-    expect(f.adTeams.find(a => a.id === AD_C)!.teams).toEqual([{ key: "t1", name: "Team Ann", leads: 2, booked: 2, won: 1 }]);
+    expect(f.adTeams.find(a => a.id === AD_C)!.teams).toEqual([{ key: "t1", name: "Team Ann", leads: 2, booked: 2, won: 1, sales: 0 }]);
     expect(f.adTeams.find(a => a.id === AD_D)!.teams.map(t => t.name)).toEqual(["Revenue Director"]);
     expect(f.adTeams.find(a => a.name.startsWith("No ad"))!.teams.map(t => t.name)).toEqual([NOBODY]);
   });
@@ -128,7 +128,8 @@ describe("Insight › Overview's words", () => {
     const f = overviewFigures(base({ meta: { [metaKey(NOV.a, NOV.b)]: { [AD_C]: fig(1000), [AD_D]: fig(500) } } }));
     expect(overviewTiles(f, true).map(t => [t.label, t.value])).toEqual([
       ["Ads spend", "RM 1,500"], ["Total cost", "RM 4,000"], ["Per lead", "RM 1,000.00"],
-      ["Leads", "4"], ["Avg. reply", "20 min"], ["Appt rate", "50%"], ["Show-up", "100%"], ["Won", "1"]]);
-    expect(overviewTiles(f, false).map(t => t.label)).toEqual(["Leads", "Avg. reply", "Appt rate", "Show-up", "Won"]);
+      ["Leads", "4"], ["Avg. reply", "20 min"], ["Appt rate", "50%"], ["Show-up", "100%"], ["Won", "1"],
+      ["Total sales", "RM 0"], ["Conversion", "25%"], ["AOV", "RM 0"], ["ROAS", "0.00×"]]);
+    expect(overviewTiles(f, false).map(t => t.label)).toEqual(["Leads", "Avg. reply", "Appt rate", "Show-up", "Won", "Total sales", "Conversion", "AOV"]);
   });
 });
