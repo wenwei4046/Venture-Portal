@@ -17,6 +17,7 @@ import AmountInput from './AmountInput'
 import RevenuePayoutBreakdown from './RevenuePayoutBreakdown'
 import ResetStaffStatutoryButton from '../[period]/[staffId]/payslip/_components/ResetStaffStatutoryButton'
 import type { PayrollRowData } from './PayrollGrid'
+import { payslipHref, withPaycheck } from '@/lib/payroll-paycheck-url'
 
 interface Props {
   row: PayrollRowData
@@ -349,7 +350,7 @@ export default function PaycheckWindow({
             <span className="btns">
               <a
                 className="pg-btn"
-                href={`/hr-costing/payroll/${period}/${row.staff_id}/payslip`}
+                href={payslipHref(period, row.staff_id, withPaycheck(`/hr-costing/payroll/${period}`, row.id))}
                 title="Open payslip"
               >
                 Payslip ↗

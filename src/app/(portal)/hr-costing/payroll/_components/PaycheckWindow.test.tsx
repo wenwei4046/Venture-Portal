@@ -221,7 +221,8 @@ describe('PaycheckWindow', () => {
     expect(dialog.textContent).toContain('3,575.65') // cost to company: gross + ER
     expect(dialog.textContent).toContain('2,753.85')
     expect((screen.getByRole('link', { name: 'Payslip ↗' }) as HTMLAnchorElement).getAttribute('href')).toBe(
-      '/hr-costing/payroll/2026-08-01/s1/payslip',
+      // Its Back opens this paycheck again (2026-11-17).
+      '/hr-costing/payroll/2026-08-01/s1/payslip?back=%2Fhr-costing%2Fpayroll%2F2026-08-01%3Fpaycheck%3Dr1',
     )
   })
 

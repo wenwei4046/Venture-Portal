@@ -11,7 +11,9 @@ const { updatePayrollRow, updatePayrollRows, deletePayrollRows, adjustRevenueCom
   adjustRevenueCommission: vi.fn().mockResolvedValue(undefined),
   refresh: vi.fn(),
 }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
+// The page's query — `?paycheck=` names the paycheck to open.
+let pageQuery = new URLSearchParams()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }), useSearchParams: () => pageQuery }))
 vi.mock('../actions', () => ({ updatePayrollRow, updatePayrollRows, deletePayrollRows }))
 vi.mock('../commission-actions', () => ({ adjustRevenueCommission }))
 
@@ -315,6 +317,33 @@ describe('PayrollGrid statutory fields and the paycheck', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Finance employee' }))
     expect(screen.getByRole('dialog', { name: 'Finance employee — paycheck' })).toBeVisible()
+  })
+
+  // A payslip's "← Back to payroll grid" comes back with ?paycheck= (2026-11-17).
+  it('opens the paycheck the URL names, and keeps the URL in step', () => {
+    window.history.replaceState(null, '', '/hr-costing/payroll/2026-09-01?paycheck=finance')
+    pageQuery = new URLSearchParams('paycheck=finance')
+    try {
+      render(grid([makeRow({})]))
+      expect(screen.getByRole('dialog', { name: 'Finance employee — paycheck' })).toBeVisible()
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(window.location.search).toBe('')
+      fireEvent.click(screen.getByRole('button', { name: 'Finance employee' }))
+      expect(window.location.search).toBe('?paycheck=finance')
+    } finally {
+      pageQuery = new URLSearchParams()
+      window.history.replaceState(null, '', '/')
+    }
+  })
+
+  it('ignores a paycheck the URL names that is not on the grid', () => {
+    pageQuery = new URLSearchParams('paycheck=somebody-else')
+    try {
+      render(grid([makeRow({})]))
+      expect(screen.queryByRole('dialog')).toBeNull()
+    } finally {
+      pageQuery = new URLSearchParams()
+    }
   })
 
   it('puts EPF, SOCSO, EIS and PCB under Deductions, employee side, as fields', () => {

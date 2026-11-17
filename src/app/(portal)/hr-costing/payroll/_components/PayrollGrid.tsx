@@ -1,7 +1,8 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { PAYCHECK_PARAM, withPaycheck } from '@/lib/payroll-paycheck-url'
 import { formatMoneyBare } from '@/lib/utils'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import {
@@ -183,7 +184,18 @@ export function lifecycleOf(r: PayrollRowData): LifecycleRow {
  */
 export default function PayrollGrid({ rows, period, monthClosed = false }: Props) {
   const router = useRouter()
-  const [openId, setOpenId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  // The open paycheck is in the URL (`?paycheck=`), so a payslip's Back — or a
+  // reload — opens it again (2026-11-17).
+  const [openId, setOpenId] = useState<string | null>(() => {
+    const id = searchParams?.get(PAYCHECK_PARAM)
+    return id && rows.some(r => r.id === id && r.scope === 'staff') ? id : null
+  })
+  useEffect(() => {
+    const here = window.location.pathname + window.location.search + window.location.hash
+    const next = withPaycheck(here, openId)
+    if (next !== here) window.history.replaceState(null, '', next)
+  }, [openId])
   const [department, setDepartment] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
