@@ -222,12 +222,13 @@ export function insightVM(ctx0: DeskCtx) {
   // Team activity, Insight's fourth tab as on the phone (the owner, 2026-11-09: "刚刚在手机版增加的 team activity 功能也增加到电脑端").
   const actOn = ctx.ui.tab === "insight" && ctx.ui.insTab === "activity" && mayUp;
   return {
-    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads" && !upOn && !actOn,
+    // Overview (2026-11-17) is Insight's first tab and where it opens; Team performance is a tab of its own beside it.
+    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads" && (ctx.ui.insTab ?? "overview") !== "overview" && !upOn && !actOn,
     kInsAct: actOn,
     // Up next (docs/design_handoff_crm_up_next): the Principal, the Director and whoever has a downline; never a salesperson.
     kUpNext: upOn,
     upNextProps: upOn ? deskUpNextProps(ctx0) : null,
-    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"], ...(mayUp ? [["upnext", "Up next"] as const, ["activity", "Team activity"] as const] : [])] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
+    insTabs: ([["overview", "Overview"], ["team", "Team performance"], ["ads", "Ads performance"], ...(mayUp ? [["upnext", "Up next"] as const, ["activity", "Team activity"] as const] : [])] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "overview") === k, pick: () => ctx.patch({ insTab: k }) })),
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,

@@ -335,10 +335,12 @@ export default function DeskScreens(p: DeskScreensProps) {
   // …and Assignment's Ad performance tab, for the ad open there (2026-10-23).
   const needs = [...((v.apNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]), ...(ui.tab === "assignment" && ui.adPane === "perf" ? v.adMetaNeed ?? [] : []),
     // Reports › Overview's Meta columns (2026-11-11): Spend, Impressions … for the period on screen.
-    ...((v.rpNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[])];
+    ...((v.rpNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]),
+    // Insight › Overview's spend and fee (2026-11-17): the period, the one before, and the months the fee is read on.
+    ...(v.overview?.need ?? [])];
   const apNeedKey = JSON.stringify(needs);
-  // …on Ads Performance, and on Reports › Ads performance, which draws the same table (2026-10-23).
-  const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && (ui.rpCat === "ads" || ((v.rpNeed as unknown[] | undefined)?.length ?? 0) > 0)) || (ui.tab === "assignment" && ui.adPane === "perf");
+  // …on Ads Performance, on Insight › Overview, and on Reports › Ads performance, which draws the same table (2026-10-23).
+  const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && (ui.insTab === "ads" || !!v.overview)) || (ui.tab === "reports" && (ui.rpCat === "ads" || ((v.rpNeed as unknown[] | undefined)?.length ?? 0) > 0)) || (ui.tab === "assignment" && ui.adPane === "perf");
   const asked = useRef(new Set<string>());
   useEffect(() => {
     // Meta's figures: CRM · Manage, or View at All read-only (readsAds) — the server asks the same.
