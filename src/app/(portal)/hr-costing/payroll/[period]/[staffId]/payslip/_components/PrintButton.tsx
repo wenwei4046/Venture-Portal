@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { safeBack } from '@/lib/payroll-paycheck-url'
 
 export default function PrintButton() {
   const sp = useSearchParams()
-  const backUrl = sp?.get('back') ?? '..'
+  // The paycheck it was opened from, on this site only (`safeBack`).
+  const backUrl = safeBack(sp?.get('back'), '..')
 
   return (
     <div className="flex items-center justify-between mb-4 print:hidden">
