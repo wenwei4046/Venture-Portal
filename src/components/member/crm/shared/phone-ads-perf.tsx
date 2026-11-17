@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily, fetchAdInsights } from "@/app/(member)/member/crm-actions";
-import { ALL, METRICS, metaFigures } from "../desk/vm/adsperf";
+import { ALL, METRICS, feeMonths, marketingFee, metaFigures } from "../desk/vm/adsperf";
 import { ST_META } from "../desk/vm/tokens";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { CrmData } from "@/lib/member/crm-data";
@@ -108,9 +108,35 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantMeta, idKey, si, ui, sb, ub, cmp]);
 
+  const T = new Date(p.now.getFullYear(), p.now.getMonth(), p.now.getDate()).getTime();
+  const feeIds = ads.map(a => a.id).filter(id => /^[0-9]{5,32}$/.test(id)), feeKey = [...feeIds].sort().join(",");
+  const monthsOf = (rr: Range) => feeMonths(rr.a, rr.b, T);
+  const [feeFig, setFeeFig] = useState<Record<string, Record<string, MetaFig | null>>>(() => keptGet("fee") ?? {});
+  const feeWant = [...monthsOf(r), ...monthsOf(rb)].map(([x, y]) => `${isoOf(x)}|${isoOf(y)}`).filter((k, n, l) => l.indexOf(k) === n), feeWantKey = feeWant.join(",");
+  useEffect(() => {
+    if (!p.live || !p.manage || !feeIds.length || !keys.includes("cpl")) return;
+    let on = true;
+    for (const k of feeWant) { const [x, y] = k.split("|"); void fetchAdInsights(feeIds, x, y).then(res => { if (on && res.ok) setFeeFig(f => { const n = { ...f, [k]: res.figs }; keptSet("fee", n); return n; }); }); }
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.live, p.manage, feeKey, feeWantKey, keys.includes("cpl")]);
+  // The fee on a range's months as a share of their spend; null until each month is read (the desktop's feeRate).
+  const rateOf = (rr: Range): number | null => {
+    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return !got || feeIds.some(id => !(id in got)) ? null : feeIds.reduce((s, id) => s + (got[id]?.spend ?? 0), 0); });
+    if (!ms.length || ms.some(s => s == null)) return null;
+    const spent = ms.reduce((n: number, s) => n + (s ?? 0), 0), fee = ms.reduce((n: number, s) => n + (marketingFee(s) ?? 0), 0);
+    return spent > 0 ? fee / spent : 0;
+  };
+  const totalLeads = (rr: Range) => customers.filter(c => { const t = day0(new Date(c.createdAt).getTime()); return !(c.adId && p.adNames[c.adId]?.hidden) && t >= rr.a && t <= rr.b; }).length;
+  const perLeadOf = (rr: Range, fig: Record<string, MetaFig | null>): number | null => {
+    const spend = metaFigures(ids.map(i => fig[i]), {}).spend, rate = rateOf(rr), n = totalLeads(rr);
+    return spend == null || rate == null || !n ? null : (spend * (1 + rate)) / n;
+  };
   const figsOf = (cs: CrmCustomer[], rr: Range, metaIds: string[], fig: Record<string, MetaFig | null>) => { const c = crmFigs(cs, p.visits, rr); return { ...c, ...metaFigures(metaIds.map(i => fig[i]), c) }; };
   const all = customers.filter(c => c.adId && !hidIds.has(c.adId));
-  const tot = figsOf(all, r, ids, figA), totB = figsOf(all, rb, ids, figB);
+  // Per lead, as the desktop's (the owner, 2026-11-17: "ads performance 的 per lead 也一起改"): (ads spend + the marketing
+  // fee's share) ÷ every lead of the period in the source picked — the fee is the calendar months' on all the source's ads.
+  const tot: Record<string, number | null> = { ...figsOf(all, r, ids, figA), cpl: perLeadOf(r, figA) }, totB: Record<string, number | null> = { ...figsOf(all, rb, ids, figB), cpl: perLeadOf(rb, figB) };
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
   const rows = ads.filter(a => !hidIds.has(a.id)).map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
   // The change on the comparison picked — the tiles and every ad's figures (the owner, 2026-10-24: "进行对比后，下方数据并没有显示增多或减少").
