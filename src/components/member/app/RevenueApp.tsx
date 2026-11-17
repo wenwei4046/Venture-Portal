@@ -59,7 +59,7 @@ import { RETURN_REFRESH_MS, isStaleAppError, reloader } from "./shell/pull-refre
 import StatusBar from "./shell/StatusBar";
 import Today from "./today/Today";
 import { hideIncome, todayModel, type TodayTodo } from "./today/today-model";
-import SubDeptSheet, { type SubDeptOption } from "./overlays/SubDeptSheet";
+import SubDeptSheet, { subDeptAbbr, type SubDeptOption } from "./overlays/SubDeptSheet";
 import BrandPicker, { type BrandOption } from "./overlays/BrandPicker";
 import Notifications from "./notifications/Notifications";
 import { notifGroups, notifications, notifSummary, type NotifItem, type NotifTab, type SettledResults } from "./notifications/notify-model";
@@ -844,7 +844,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   // A sub-department somebody directs (2026-10-14) reads as their title and rung; a seat as Home (the first) or Member.
   const subOptions: SubDeptOption[] = data.memberships.map((m, i) => ({
-    id: m.id, name: m.name, abbr: m.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase(),
+    id: m.id, name: m.name, abbr: subDeptAbbr(m.name),
     meta: m.director ? [m.title, m.rank].filter(Boolean).join(" · ")
       : i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));

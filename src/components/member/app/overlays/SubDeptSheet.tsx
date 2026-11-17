@@ -12,6 +12,16 @@ export interface SubDeptOption {
   meta: string;
 }
 
+/**
+ * A sub-department's two letters on its chip: each word's first letter when the name has two words or more (Dream
+ * Crafter → DC — the user, 2026-11-17: "应该是DC，不是DR"), else its first two letters (Fair → FA, IR → IR).
+ */
+export function subDeptAbbr(name: string): string {
+  const words = name.split(/[^A-Za-z]+/).filter(Boolean);
+  const letters = words.length >= 2 ? words.map(w => w[0]).join("") : words.join("");
+  return letters.slice(0, 2).toUpperCase();
+}
+
 /** Switch sub-department: only the ones the person belongs to. */
 export default function SubDeptSheet({ open, options, current, onPick, onClose }: {
   open: boolean;
