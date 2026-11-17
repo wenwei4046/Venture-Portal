@@ -21,6 +21,7 @@ import {
   type TabView,
 } from '@/lib/permission-tabs'
 import { sameReachTicks, toggleReach, type ReachTick } from '@/lib/sub-department-reach'
+import { brandsOn, sameBrandTicks, toggleBrand, type BrandTick } from '@/lib/crm-brand-ticks'
 import { sameSensitiveTicks, sensitiveOf, toggleSensitive, type SensitiveTick } from '@/lib/person-sensitive'
 import { SENSITIVE_FIELDS } from '@/lib/permission-matrix'
 import type { PersonAccessData } from '../_lib/person-permissions'
@@ -107,15 +108,20 @@ function TemplateAccess({
   const savedReview = access.ownReview ?? null
   const ownReview = reviewDraft ? reviewDraft.own : savedReview
   const reviewOn = ownReview ?? access.template.review ?? false
+  // Their CRM brands (2026-11-17): every brand, less what was taken off them; null = not read, no pills.
+  const [brandDraft, setBrandDraft] = useState<BrandTick[] | null>(null)
+  const savedBrands = access.crmBrands ?? []
+  const brandTicks = brandDraft ?? savedBrands
   const [view, setView] = useState<TabView>(() => TAB_VIEWS.find(v => viewCount(v.id, saved).seen > 0)?.id ?? 'hr')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length + (ownReview === null ? 0 : 1)
+  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length + (ownReview === null ? 0 : 1) + brandTicks.length
+  const brandDirty = brandDraft !== null && !sameBrandTicks(brandDraft, savedBrands)
   const reachDirty = reachDraft !== null && !sameReachTicks(reachDraft, savedReach)
   const sensDirty = sensDraft !== null && !sameSensitiveTicks(sensDraft, access.ownSensitive)
   const reviewDirty = reviewDraft !== null && reviewDraft.own !== savedReview
-  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty || reviewDirty
+  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty || reviewDirty || brandDirty
   const who = personName?.trim() || 'this person'
   // Their sensitive fields (the template's with their own over them) and the kind decide what a ticked tab opens.
   const held = useMemo(() => heldTabs(ticks, sensitive, access.template.baseRole, access.cellKeys), [ticks, sensitive, access])
@@ -132,12 +138,14 @@ function TemplateAccess({
         sensitive: sensTicks,
         // Only when it moved: their tick is left as it is otherwise.
         ...(reviewDirty ? { review: ownReview } : {}),
+        ...(brandDirty ? { brands: brandTicks } : {}),
       })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
       setReachDraft(null)
       setSensDraft(null)
       setReviewDraft(null)
+      setBrandDraft(null)
       onSaved?.()
       router.refresh()
     })
@@ -156,7 +164,7 @@ function TemplateAccess({
   const actions = canEdit ? (
     <span className={s.footActions}>
       {changes > 0 ? (
-        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]); setReviewDraft({ own: null }) }}>Reset to title</button>
+        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]); setReviewDraft({ own: null }); if (access.crmBrands) setBrandDraft([]) }}>Reset to title</button>
       ) : null}
       <button type="button" className={s.footSave} disabled={!dirty || pending} onClick={() => save(boxesOf(base, ticks))}>
         {pending ? 'Saving…' : 'Save'}
@@ -209,6 +217,11 @@ function TemplateAccess({
         onRow={tabId => setDraft(toggleRow(ticks, tabId))}
         onColumn={action => setDraft(toggleColumn(ticks, view, action))}
         onAll={() => setDraft(toggleView(ticks, view))}
+        brands={access.crmBrands ? {
+          on: brandsOn(brandTicks),
+          mine: new Set(brandTicks.map(t => t.brand)),
+          onToggle: brand => setBrandDraft(toggleBrand(brandTicks, brand)),
+        } : undefined}
         review={{
           on: reviewOn,
           mine: ownReview !== null,

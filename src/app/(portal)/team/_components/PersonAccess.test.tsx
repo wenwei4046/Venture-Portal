@@ -205,6 +205,54 @@ describe('a person’s sub-departments on the Revenue tabs', () => {
   })
 })
 
+// The CRM's brands (2026-11-17 — the owner: "只有 dc 权限的人可以看到 dc 的客户资讯，ads performance 等", "按人打勾"):
+// under the CRM's two rows, The Conts and Dream Crafter, both ticked until one is taken off for this person.
+describe('a person’s CRM brands', () => {
+  const crmTeam = (crmBrands: Array<{ brand: 'conts' | 'dc'; granted: boolean }> | null = []) => access({
+    template: {
+      id: 't', name: 'Revenue Team', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own' } }, sensitive: [],
+      tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit'], review: false,
+    },
+    crmBrands,
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.setPersonTabs.mockResolvedValue({ ok: true })
+  })
+
+  it('ticks both brands under the CRM row they view, none elsewhere', () => {
+    render(<PersonAccess access={crmTeam()} canEdit />)
+    expect(box('Profile · My leads & appointments · The Conts')).toHaveAttribute('aria-checked', 'true')
+    expect(box('Profile · My leads & appointments · Dream Crafter')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByRole('checkbox', { name: 'CRM · Team · Dream Crafter' })).toBeNull() // its View is not ticked
+    expect(screen.queryByRole('group', { name: 'Today · brands' })).toBeNull()
+  })
+
+  it('takes Dream Crafter off for him alone, with a red dot, and saves it with the boxes', async () => {
+    render(<PersonAccess access={crmTeam()} canEdit />)
+    fireEvent.click(box('Profile · My leads & appointments · Dream Crafter'))
+    expect(box('Profile · My leads & appointments · Dream Crafter')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByLabelText('changed for this person')).toBeInTheDocument()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], brands: [{ brand: 'dc', granted: false }] })
+  })
+
+  it('Reset to title gives him every brand again', async () => {
+    render(<PersonAccess access={crmTeam([{ brand: 'conts', granted: false }])} canEdit />)
+    expect(box('Profile · My leads & appointments · The Conts')).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
+    expect(box('Profile · My leads & appointments · The Conts')).toHaveAttribute('aria-checked', 'true')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], brands: [] })
+  })
+
+  it('shows no brands when they could not be read', () => {
+    render(<PersonAccess access={crmTeam(null)} canEdit />)
+    expect(screen.queryByRole('group', { name: 'Profile · My leads & appointments · brands' })).toBeNull()
+  })
+})
+
 // A person's own Salary / NRIC / Bank (2026-10-16 — the owner: "Edit Permission 的优先级是高于 Title 和 Template 的"):
 // three pills above the matrix, ticked where they see it, the red dot where it is theirs alone.
 describe('a person’s own sensitive fields', () => {

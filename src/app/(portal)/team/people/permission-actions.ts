@@ -26,6 +26,7 @@ import {
 import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permission-history'
 import { isReachTickList, sortedTicks, type ReachTick } from '@/lib/sub-department-reach'
 import { isSensitiveTickList, type SensitiveTick } from '@/lib/person-sensitive'
+import { isBrandTickList, sortedBrandTicks, type BrandTick } from '@/lib/crm-brand-ticks'
 
 /**
  * Writing permission templates (2026-10-08, the People Management revamp;
@@ -285,6 +286,8 @@ export async function setPersonTabs(input: {
   sensitive?: SensitiveTick[]
   /** Their own By management approve over the template's (2026-10-29); null: the template's again. */
   review?: boolean | null
+  /** Their CRM brands taken off (2026-11-17): the whole list — none, every brand again. */
+  brands?: BrandTick[]
 }): Promise<Result> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
@@ -296,7 +299,8 @@ export async function setPersonTabs(input: {
     !input.boxes.every(b => b && typeof b.granted === 'boolean' && parseGrant(`${b.tab}.${b.action}`) !== null) ||
     (input.reach !== undefined && !isReachTickList(input.reach)) ||
     (input.sensitive !== undefined && !isSensitiveTickList(input.sensitive)) ||
-    (input.review !== undefined && input.review !== null && typeof input.review !== 'boolean')
+    (input.review !== undefined && input.review !== null && typeof input.review !== 'boolean') ||
+    (input.brands !== undefined && !isBrandTickList(input.brands))
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -325,6 +329,11 @@ export async function setPersonTabs(input: {
     const flags = input.review === null ? [] : [{ flag: 'claims_review', granted: input.review }]
     const { error: flagError } = await supabase.rpc('permission_user_flags_set', { p_user: input.userId, p_flags: flags })
     if (flagError) return { ok: false, reason: flagError.message }
+  }
+  // Their CRM brands (2026-11-17): the whole list of what was taken off them.
+  if (input.brands !== undefined) {
+    const { error: brandError } = await supabase.rpc('permission_user_crm_brands_set', { p_user: input.userId, p_ticks: sortedBrandTicks(input.brands) })
+    if (brandError) return { ok: false, reason: brandError.message }
   }
   refresh()
   return { ok: true }

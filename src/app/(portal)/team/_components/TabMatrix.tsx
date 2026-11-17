@@ -15,6 +15,7 @@ import {
   type Tally,
 } from '@/lib/permission-tabs'
 import { AREA_OF_TAB, reachOf, tickedFor, type PersonReach, type ReachArea, type ReachTick } from '@/lib/sub-department-reach'
+import { CRM_BRANDS, type CrmBrand } from '@/lib/crm-brand-ticks'
 import s from './tab-matrix.module.css'
 
 /** One person's sub-departments on the rows that carry them (2026-10-16): their reach, their own ticks, a click. */
@@ -34,6 +35,19 @@ export interface MatrixReview {
   mine?: boolean
   onToggle: () => void
 }
+
+/**
+ * The CRM's brands (2026-11-17 — the owner: "只有 dc 权限的人可以看到 dc 的客户资讯，ads performance 等", "按人打勾"):
+ * under the CRM's two rows whose View is ticked, a pill per brand — their customers, chats and ads. `mine`: taken off
+ * (or given back) for this person alone (the red dot).
+ */
+export interface MatrixBrands {
+  on: ReadonlySet<CrmBrand>
+  mine: ReadonlySet<CrmBrand>
+  onToggle: (brand: CrmBrand) => void
+}
+
+const BRAND_HINT = 'Their CRM shows this brand’s customers, chats and ads'
 
 const REVIEW_HINT = 'Their requests are approved by their department’s Claim & approve first, then go to Finance'
 
@@ -68,6 +82,7 @@ export default function TabMatrix({
   held,
   reach,
   review,
+  brands,
   canEdit,
   compact = false,
 }: {
@@ -88,6 +103,8 @@ export default function TabMatrix({
   reach?: MatrixReach
   /** By management approve, under the Claim rows. */
   review?: MatrixReview
+  /** One person's CRM brands, under the CRM's rows. */
+  brands?: MatrixBrands
   canEdit: boolean
   /** The person window's tighter rail. */
   compact?: boolean
@@ -144,6 +161,30 @@ export default function TabMatrix({
                 {t.label}
                 {why ? <span className={s.held}>{why}</span> : null}
                 {subs ? <SubDepartmentPills reach={reach!} area={subs} tab={t.label} canEdit={canEdit} /> : null}
+                {brands && area === 'crm' && ticks.has(grantOf(t.id, 'view')) ? (
+                  <span className={s.subs} role="group" aria-label={`${t.label} · brands`}>
+                    {CRM_BRANDS.map(b => {
+                      const checked = brands.on.has(b.key)
+                      return (
+                        <button
+                          key={b.key}
+                          type="button"
+                          role="checkbox"
+                          aria-checked={checked}
+                          aria-label={`${t.label} · ${b.label}`}
+                          title={BRAND_HINT}
+                          disabled={!canEdit}
+                          className={`${s.sub} ${checked ? s.subOn : ''}`}
+                          onClick={() => brands.onToggle(b.key)}
+                        >
+                          <span className={s.subTick} aria-hidden>{checked ? '✓' : ''}</span>
+                          {b.label}
+                          {brands.mine.has(b.key) ? <span className={s.dot} aria-label="changed for this person" /> : null}
+                        </button>
+                      )
+                    })}
+                  </span>
+                ) : null}
                 {review && t.id.endsWith('.my_claims') && ticks.has(grantOf(t.id, 'view')) ? (
                   <span className={s.subs} role="group" aria-label={`${t.label} · routing`}>
                     <button
