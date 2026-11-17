@@ -28,25 +28,37 @@ function Section({ title, go, goLabel, children }: { title: string; go: () => vo
 }
 
 /**
- * A table's last column header: the metric shown, ▾, and the list to pick another (the owner, 2026-11-17: "一个可选的 metric
- * column"). Clicking outside the list closes it.
+ * An added column's head: its name and × to take it off (the owner, 2026-11-17: "此外是 + 数据，不是替换").
  */
-function ColPick({ c }: { c: OV["adCol"] }) {
+function ColHead({ c }: { c: OV["adCol"]["cols"][number] }) {
   return (
-    <div data-ov-col="" style={{ position: "relative", display: "flex", justifyContent: "flex-end" }}>
-      <button type="button" onClick={c.toggle} aria-haspopup="listbox" aria-expanded={c.open} title="Pick the metric for this column"
-        style={{ ...BTN, padding: 0, display: "flex", alignItems: "center", gap: "4px", font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: c.open ? "var(--crm-ink)" : "var(--crm-rust)" }}>
-        {c.label}<span aria-hidden style={{ fontSize: "9px" }}>▾</span>
-      </button>
+    <div data-ov-col={c.key} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px", minWidth: 0 }}>
+      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</span>
+      <button type="button" onClick={c.remove} aria-label={`Remove ${c.label}`} title={`Remove ${c.label}`}
+        style={{ ...BTN, flex: "none", padding: 0, width: "14px", height: "14px", display: "grid", placeItems: "center", font: "400 12px/1 Inter, sans-serif", color: "var(--crm-faint)" }}>×</button>
+    </div>
+  );
+}
+
+/** The table's "+": the metrics not yet added, the CRM's then Meta Ads'; clicking outside closes the list. */
+function ColAdd({ c }: { c: OV["adCol"] }) {
+  const groups = [...new Set(c.options.map(x => x.group))];
+  return (
+    <div data-ov-add="" style={{ position: "relative", display: "flex", justifyContent: "flex-end" }}>
+      {c.options.length > 0 && <button type="button" onClick={c.toggle} aria-haspopup="listbox" aria-expanded={c.open} aria-label="Add a column" title="Add a column"
+        style={{ ...BTN, padding: 0, width: "22px", height: "22px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 15px/1 Inter, sans-serif", background: c.open ? "var(--crm-ink)" : "var(--crm-field)", color: c.open ? "#fff" : "var(--crm-ink)" }}>+</button>}
       {c.open && (<>
         <div onClick={c.close} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
-        <div role="listbox" aria-label="Metric" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, minWidth: "150px", padding: "6px", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)",
+        <div role="listbox" aria-label="Add a column" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20, minWidth: "190px", maxHeight: "360px", overflowY: "auto", padding: "6px", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)",
           display: "flex", flexDirection: "column", textTransform: "none", letterSpacing: 0 }}>
-          {c.options.map(x => (
-            <button key={x.label} type="button" role="option" aria-selected={x.on} onClick={x.pick}
-              style={{ ...BTN, display: "flex", justifyContent: "space-between", gap: "12px", padding: "8px 10px", borderRadius: "6px", font: `${x.on ? 600 : 500} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: x.on ? "var(--crm-field)" : "transparent" }}>
-              {x.label}{x.on && <span aria-hidden style={{ color: "var(--crm-rust)" }}>✓</span>}
-            </button>
+          {groups.map(g => (
+            <Fragment key={g}>
+              <div style={{ padding: "8px 10px 4px", font: "600 10.5px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{g}</div>
+              {c.options.filter(x => x.group === g).map(x => (
+                <button key={x.label} type="button" role="option" aria-selected={false} onClick={x.pick}
+                  style={{ ...BTN, padding: "8px 10px", borderRadius: "6px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-row">{x.label}</button>
+              ))}
+            </Fragment>
           ))}
         </div>
       </>)}
@@ -56,10 +68,12 @@ function ColPick({ c }: { c: OV["adCol"] }) {
 
 export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boolean; pick: () => void }[] }) {
   const [hov, setHov] = useState<string | null>(null);
-  // Each table ends on its picked metric column (o.adCol / o.teamCol), one more column than before.
-  const adCols = o.money ? "minmax(0,2.2fr) minmax(0,1fr) repeat(6,minmax(0,0.8fr))" : "minmax(0,2.2fr) minmax(0,1fr) repeat(4,minmax(0,0.8fr))";
-  const brCols = o.money ? "minmax(0,2fr) repeat(6,minmax(0,1fr))" : "minmax(0,2fr) repeat(4,minmax(0,1fr))";
-  const tmCols = "minmax(0,2fr) minmax(0,1.4fr) repeat(5,minmax(0,0.8fr))";
+  // Each table's own columns, then the ones added with "+" (o.adCol / o.teamCol), then the "+" itself.
+  const more = (n: number) => (n ? ` repeat(${n},minmax(0,0.8fr))` : "") + " 30px";
+  const adCols = (o.money ? "minmax(0,2.2fr) minmax(0,1fr) repeat(5,minmax(0,0.8fr))" : "minmax(0,2.2fr) minmax(0,1fr) repeat(3,minmax(0,0.8fr))") + more(o.adCol.cols.length);
+  const brCols = (o.money ? "minmax(0,2fr) repeat(5,minmax(0,1fr))" : "minmax(0,2fr) repeat(3,minmax(0,1fr))") + more(o.adCol.cols.length);
+  const tmCols = "minmax(0,2fr) minmax(0,1.4fr) repeat(4,minmax(0,0.8fr))" + more(o.teamCol.cols.length);
+  const extra = (v: string[]) => <>{v.map((x, k) => <span key={k} style={R}>{x}</span>)}<span /></>;
   return (
     <div data-insight-overview="" style={{ display: "flex", flexDirection: "column", gap: "28px", paddingTop: "4px" }}>
       {src && (
@@ -81,24 +95,25 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
             <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: t.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)", whiteSpace: "nowrap" }}>
               {t.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{o.vs}</span>{t.sub && <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {t.sub}</span>}
             </span>
-            {/* How the figure is worked out and what it is compared with, on hover — Ads Performance's card (2026-11-17). */}
-            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} at="10px" />}
+            {/* How the figure is worked out and what it is compared with, on hover — Ads Performance's card (2026-11-17), beside
+                the tile, not under it, so it never sits over the next row (the owner: "位置很奇怪"). */}
+            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} side={i % 4 === 3 || i === o.tiles.length - 1 ? "left" : "right"} />}
           </div>
         ))}
       </div>
 
       <Section title="Ads" go={o.goAds} goLabel="Ads performance">
         {o.brands.length > 1 && (<>
-          <div style={{ ...HEAD, gridTemplateColumns: brCols }}><div>Brand</div>{o.money && <><div style={R}>Spend</div><div style={R}>Per lead</div></>}<div style={R}>Leads</div><div style={R}>Appt</div><div style={R}>Won</div><div style={R}>{o.adCol.label}</div></div>
+          <div style={{ ...HEAD, gridTemplateColumns: brCols }}><div>Brand</div>{o.money && <><div style={R}>Spend</div><div style={R}>Per lead</div></>}<div style={R}>Leads</div><div style={R}>Appt</div><div style={R}>Won</div>{o.adCol.cols.map(c => <div key={c.key} style={R}>{c.label}</div>)}<div /></div>
           {o.brands.map(b => (
             <div key={b.label} style={{ ...ROW, cursor: "default", gridTemplateColumns: brCols }}>
               <span style={{ fontWeight: 500 }}>{b.label}</span>{o.money && <><span style={R}>{b.spend}</span><span style={R}>{b.cpl}</span></>}
-              <span style={{ ...R, fontWeight: 500 }}>{b.leads}</span><span style={R}>{b.appt}</span><span style={R}>{b.won}</span><span style={R}>{b.extra}</span>
+              <span style={{ ...R, fontWeight: 500 }}>{b.leads}</span><span style={R}>{b.appt}</span><span style={R}>{b.won}</span>{extra(b.extra)}
             </div>
           ))}
           <div style={{ height: "18px" }} />
         </>)}
-        <div style={{ ...HEAD, gridTemplateColumns: adCols }}><div>Ad</div><div>Brand</div>{o.money && <><div style={R}>Spend</div><div style={R}>Per lead</div></>}<div style={R}>Leads</div><div style={R}>Appt</div><div style={R}>Won</div><ColPick c={o.adCol} /></div>
+        <div style={{ ...HEAD, gridTemplateColumns: adCols }}><div>Ad</div><div>Brand</div>{o.money && <><div style={R}>Spend</div><div style={R}>Per lead</div></>}<div style={R}>Leads</div><div style={R}>Appt</div><div style={R}>Won</div>{o.adCol.cols.map(c => <ColHead key={c.key} c={c} />)}<ColAdd c={o.adCol} /></div>
         {o.ads.map(a => (
           <Fragment key={a.id}>
             <button type="button" onClick={a.canOpen ? a.toggle : undefined} aria-expanded={a.canOpen ? a.open : undefined} className="crm4a-row" style={{ ...ROW, gridTemplateColumns: adCols, cursor: a.canOpen ? "pointer" : "default" }}>
@@ -108,7 +123,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
               </span>
               <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.brand || "—"}</span>
               {o.money && <><span style={R}>{a.spend}</span><span style={R}>{a.cpl}</span></>}
-              <span style={{ ...R, fontWeight: 500 }}>{a.leads}</span><span style={R}>{a.appt}</span><span style={R}>{a.won}</span><span style={R}>{a.extra}</span>
+              <span style={{ ...R, fontWeight: 500 }}>{a.leads}</span><span style={R}>{a.appt}</span><span style={R}>{a.won}</span>{extra(a.extra)}
             </button>
             {a.open && a.teams.map(t => (
               <div key={t.name} style={{ ...ROW, cursor: "default", minHeight: "38px", gridTemplateColumns: adCols, background: "var(--crm-hover)", fontSize: "13px" }}>
@@ -117,7 +132,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
                 </span>
                 <span style={{ fontSize: "12px", color: "var(--crm-faint)" }}>{t.share} of leads</span>
                 {o.money && <><span /><span /></>}
-                <span style={R}>{t.leads}</span><span style={R}>{t.appt}</span><span style={R}>{t.won}</span><span style={R}>{t.extra}</span>
+                <span style={R}>{t.leads}</span><span style={R}>{t.appt}</span><span style={R}>{t.won}</span>{extra(t.extra)}
               </div>
             ))}
           </Fragment>
@@ -127,7 +142,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
       </Section>
 
       <Section title="Team" go={o.goTeam} goLabel="Team performance">
-        <div style={{ ...HEAD, gridTemplateColumns: tmCols }}><div>Team</div><div style={{ paddingLeft: "24px" }}>Leads</div><div style={R}>Avg. reply</div><div style={R}>Appt rate</div><div style={R}>Show-up</div><div style={R}>Won</div><ColPick c={o.teamCol} /></div>
+        <div style={{ ...HEAD, gridTemplateColumns: tmCols }}><div>Team</div><div style={{ paddingLeft: "24px" }}>Leads</div><div style={R}>Avg. reply</div><div style={R}>Appt rate</div><div style={R}>Show-up</div><div style={R}>Won</div>{o.teamCol.cols.map(c => <ColHead key={c.key} c={c} />)}<ColAdd c={o.teamCol} /></div>
         {o.teams.map(t => (
           <button key={t.key} type="button" onClick={t.pick} aria-expanded={t.person || !t.canOpen ? undefined : t.open} className="crm4a-row"
             style={{ ...ROW, gridTemplateColumns: tmCols, cursor: t.canOpen ? "pointer" : "default", background: t.person ? "var(--crm-hover)" : "transparent" }}>
@@ -141,7 +156,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
               </span>
               <span style={{ width: "34px", textAlign: "right", fontWeight: 500 }}>{t.leads}</span>
             </span>
-            <span style={R}>{t.reply}</span><span style={R}>{t.appt}</span><span style={R}>{t.show}</span><span style={R}>{t.won}</span><span style={R}>{t.extra}</span>
+            <span style={R}>{t.reply}</span><span style={R}>{t.appt}</span><span style={R}>{t.show}</span><span style={R}>{t.won}</span>{extra(t.extra)}
           </button>
         ))}
       </Section>

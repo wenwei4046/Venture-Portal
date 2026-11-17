@@ -75,8 +75,11 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
       setPos({ left, top });
     };
     place();
+    // A picker drawn before the button it hangs from (Insight's head puts it first) measures before that button's ref is
+    // set, and fell back to the window's right edge (the owner, 2026-11-17: "位置很奇怪"): measure again on the next frame.
+    const raf = requestAnimationFrame(place);
     window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
-    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, [anchor, sheet, month]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };

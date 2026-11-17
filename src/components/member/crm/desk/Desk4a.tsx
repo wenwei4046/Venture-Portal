@@ -1274,9 +1274,11 @@ const adsShown = (c: AdsCell, id: string) => (/%$/.test(c.v) ? (id === "showrate
  * A figure's hover card (Ads Performance's figure strip, 2026-11-12; Insight › Overview's tiles too, 2026-11-17): the first
  * line bold, the rest muted, `title`'s lines faint under a rule — placed under the figure, the strip unmoved.
  */
-export function DeskFigureTip({ sub, title, at = "18px" }: { sub: string[]; title?: string; at?: string }) {
+export function DeskFigureTip({ sub, title, at = "18px", side }: { sub: string[]; title?: string; at?: string; side?: "left" | "right" }) {
+  // Under the figure (the ads strip, one row), or beside it (Overview's tiles, several rows: never over the row below).
+  const where: CSSProperties = side ? { top: "-6px", ...(side === "right" ? { left: "calc(100% - 6px)" } : { right: "calc(100% - 6px)" }) } : { top: `calc(100% + ${at})`, left: "50%", transform: "translateX(-50%)" };
   return (
-    <span data-ads-figure-sub="" role="tooltip" style={{ position: "absolute", top: `calc(100% + ${at})`, left: "50%", transform: "translateX(-50%)", zIndex: 20, display: "flex", flexDirection: "column", gap: "2px",
+    <span data-ads-figure-sub="" role="tooltip" style={{ position: "absolute", ...where, zIndex: 20, display: "flex", flexDirection: "column", gap: "2px",
       padding: "10px 12px", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", font: "500 11px/1.4 Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", pointerEvents: "none" }}>
       {sub.map((s, j) => <span key={j} style={{ color: j ? undefined : "var(--crm-ink)", fontWeight: j ? 500 : 600 }}>{s}</span>)}
       {title && <span style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px solid var(--crm-rule-soft)", display: "flex", flexDirection: "column", gap: "2px", color: "var(--crm-faint)" }}>

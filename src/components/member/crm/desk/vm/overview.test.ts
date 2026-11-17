@@ -57,7 +57,7 @@ describe("Insight › Overview on the desktop", () => {
     expect(s.ui().insOvTeam).toBe("t1");
     expect(s.run().teams.filter(t => t.person).map(t => [t.name, t.leads])).toEqual([["BEN", "2"], ["ANN", "1"]]);
     s.run().ads.find(a => a.name === "Skyline")!.toggle();
-    expect(s.run().ads.find(a => a.name === "Skyline")!.teams).toEqual([{ name: "Team Ann", dot: expect.any(String), leads: "2", share: "100%", appt: "0", won: "0", extra: "RM 0" }]);
+    expect(s.run().ads.find(a => a.name === "Skyline")!.teams).toEqual([{ name: "Team Ann", dot: expect.any(String), leads: "2", share: "100%", appt: "0", won: "0", extra: [] }]);
   });
   it("hides the money for whoever may not read the ads' figures", () => {
     const s = vm();

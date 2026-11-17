@@ -39,8 +39,9 @@ export interface OverviewIn {
 }
 
 export interface OvMoney { spend: number | null; fee: number | null; cost: number | null; cpl: number | null }
-export interface OvAdRow extends OvMoney { id: string; name: string; brand: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; paid: boolean }
-export interface OvBrandRow extends OvMoney { key: SourceBrand | "none"; label: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number }
+export interface OvAdRow extends OvMoney { id: string; name: string; brand: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; paid: boolean;
+  /** Meta's figures for the period (a paid ad, read); null until read or with no money. */ fig: MetaFig | null }
+export interface OvBrandRow extends OvMoney { key: SourceBrand | "none"; label: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; fig: MetaFig | null }
 export interface OvWork { leads: number; avgReply: number | null; booked: number; apptRate: number | null; came: number; due: number; showRate: number | null; won: number;
   /** RM: the Won amount of the period's leads marked won (crm_contacts.won_amount, asked when a visit is marked Won). */ sales: number;
   /** Won customers with an amount — what AOV divides by. */ wonPaid: number }
@@ -119,6 +120,14 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     if (!got || want.some(id => !(id in got))) return null;
     return want.reduce((s, id) => s + (got[id]?.spend ?? 0), 0);
   };
+  // Meta's figures for some ads, added up as Ads Performance adds them; null until every one was read.
+  const figOf = (want: string[], a: number, b: number): MetaFig | null => {
+    if (!p.money || !want.length) return null;
+    const got = meta?.[metaKey(a, b)];
+    if (!got || want.some(id => !(id in got))) return null;
+    return want.reduce((s, id) => { const g = got[id]; return g ? { spend: s.spend + g.spend, impr: s.impr + g.impr, reach: s.reach + g.reach, clicks: s.clicks + g.clicks, allClicks: s.allClicks + g.allClicks, msgconv: s.msgconv + g.msgconv } : s; },
+      { spend: 0, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 } as MetaFig);
+  };
   // The fee is the calendar month's, on every ad of the brand: its share of the months' spend (Ads Performance's feeRate).
   const feeRate = (a: number, b: number): number | null => {
     const ms = feeMonths(a, b, T).map(([x, y]) => spendOf(paidIds, x, y));
@@ -138,7 +147,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     const first = data.customers.find(c => adKey(c) === id);
     const name = first?.adId ? first.ad : first ? `No ad · ${first.channel === "whatsapp" ? "WhatsApp" : "Messenger"}` : data.adNames?.[id]?.name ?? id;
     const b = brandOfAd(id);
-    return { id, name, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
+    return { id, name, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
   }).filter(a => a.leads > 0 || (a.paid && (a.spend ?? 0) > 0) || (a.paid && a.spend == null && p.money))
     .sort((x, y) => y.leads - x.leads || (y.spend ?? 0) - (x.spend ?? 0) || x.name.localeCompare(y.name));
 
@@ -154,7 +163,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   const brands: OvBrandRow[] = brandKeys.map(k => {
     const mine = ids.filter(id => (brandOfAd(id) ?? "none") === k), cs = adCs.filter(c => mine.includes(adKey(c)));
     const w = workOf(cs, data, r, now);
-    return { key: k, label: k === "none" ? "Other" : BRAND_LABEL[k], leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, ...money(spendOf(mine.filter(isMetaId), r.a, r.b), w.leads, rate) };
+    return { key: k, label: k === "none" ? "Other" : BRAND_LABEL[k], leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, fig: figOf(mine.filter(isMetaId), r.a, r.b), ...money(spendOf(mine.filter(isMetaId), r.a, r.b), w.leads, rate) };
   }).filter(b => b.leads > 0 || (b.spend ?? 0) > 0);
 
   // The teams: the Revenue Director's own, then each team, each person; customers nobody has yet last.
@@ -235,8 +244,9 @@ export function overviewTiles(f: OverviewFigures, withMoney: boolean, vs = "vs l
         a.fee == null ? "" : `+ fee ${rm(a.fee)}`),
       t("Total cost", rm(a.cost), change(a.cost, ap.cost, "cost"), {
         sub: ["Total cost = ads spend + marketing fee's share", ...(a.spend == null || a.fee == null ? [] : [`${rm2(a.spend)} + ${rm2(a.fee)} = ${rm2(a.cost)}`])], title: was(rm(ap.cost)) }),
-      t("Per lead", rm2(a.cpl), change(a.cpl, ap.cpl, "cost"), {
-        sub: ["Per lead = (ads spend + fee) ÷ leads from ads", ...(a.cost == null || !a.leads ? [] : [`${rm2(a.cost)} ÷ ${a.leads.toLocaleString("en-MY")} = ${rm2(a.cpl)}`])], title: was(rm2(ap.cpl)) }),
+      // Over every lead of the period, not the ads' alone (the owner, 2026-11-17: "perlead, 除 total leads").
+      t("Per lead", rm2(perLead(a.cost, w.leads)), change(perLead(a.cost, w.leads), perLead(ap.cost, wp.leads), "cost"), {
+        sub: ["Per lead = (ads spend + fee) ÷ total leads", ...(a.cost == null || !w.leads ? [] : [`${rm2(a.cost)} ÷ ${w.leads.toLocaleString("en-MY")} = ${rm2(perLead(a.cost, w.leads))}`])], title: was(rm2(perLead(ap.cost, wp.leads))) }),
     ] : []),
     t("Leads", w.leads.toLocaleString("en-MY"), change(w.leads, wp.leads, "count"), {
       sub: ["Leads = new customers in the period", "Each customer counted once"], title: was(wp.leads.toLocaleString("en-MY")) }),
@@ -265,28 +275,57 @@ export function overviewTiles(f: OverviewFigures, withMoney: boolean, vs = "vs l
   ];
 }
 
+export const perLead = (cost: number | null | undefined, leads: number) => (cost == null || !leads ? null : cost / leads);
 export const convOf = (x: { won: number; came: number }) => (x.came ? (x.won / x.came) * 100 : null);
 export const aovOf = (x: { wonPaid: number; sales: number }) => (x.wonPaid ? x.sales / x.wonPaid : null);
 export const roasOf = (sales: number, cost: number | null | undefined) => (sales > 0 && cost && cost > 0 ? sales / cost : null);
 export const roasText = (sales: number, cost: number | null | undefined) => { const v = roasOf(sales, cost); return v == null ? "—" : `${v.toFixed(2)}×`; };
 
 /**
- * The tables' last column, picked from a list (the owner, 2026-11-17, circling the end of the Ads and Team tables: "新增一个
- * metric column", then "一个可选的 metric column"): Sales at first. ROAS only where there is a cost (an ad, a brand).
+ * The tables' added columns (the owner, 2026-11-17: "我要的 metric 是 cpc etc, 目前有的这些可以保留，此外是 + 数据，不是替换"):
+ * every column the tables have stays; "+" adds one of these, each with ×. The CRM's own figures, then Meta's per ad (what
+ * Ads Performance's figures are made of — the same cache, `apMeta`; no new read from Meta). A team has no cost or ad
+ * figures, so it is offered the CRM's alone.
  */
-export type OvColKey = "sales" | "conv" | "aov" | "roas" | "appt";
-export const OV_COLS: { key: OvColKey; label: string; money?: boolean; ads?: boolean }[] = [
-  { key: "sales", label: "Sales" }, { key: "conv", label: "Conversion" }, { key: "aov", label: "AOV" },
-  { key: "roas", label: "ROAS", money: true, ads: true }, { key: "appt", label: "Appt rate", ads: true },
+export type OvColKey = "sales" | "conv" | "aov" | "roas" | "appt" | "impr" | "reach" | "freq" | "cpm" | "clicks" | "cpc" | "ctr" | "allclk" | "msgconv" | "cpmsg";
+export const OV_COLS: { key: OvColKey; label: string; group: "CRM" | "Meta Ads"; money?: boolean; ads?: boolean }[] = [
+  { key: "sales", label: "Sales", group: "CRM" }, { key: "conv", label: "Conversion", group: "CRM" }, { key: "aov", label: "AOV", group: "CRM" },
+  { key: "roas", label: "ROAS", group: "CRM", money: true, ads: true }, { key: "appt", label: "Appt rate", group: "CRM", ads: true },
+  { key: "impr", label: "Impressions", group: "Meta Ads", money: true, ads: true }, { key: "reach", label: "Reach", group: "Meta Ads", money: true, ads: true },
+  { key: "freq", label: "Frequency", group: "Meta Ads", money: true, ads: true }, { key: "cpm", label: "CPM", group: "Meta Ads", money: true, ads: true },
+  { key: "clicks", label: "Link clicks", group: "Meta Ads", money: true, ads: true }, { key: "cpc", label: "CPC", group: "Meta Ads", money: true, ads: true },
+  { key: "ctr", label: "CTR", group: "Meta Ads", money: true, ads: true }, { key: "allclk", label: "Clicks (all)", group: "Meta Ads", money: true, ads: true },
+  { key: "msgconv", label: "Conversations", group: "Meta Ads", money: true, ads: true }, { key: "cpmsg", label: "Cost / conversation", group: "Meta Ads", money: true, ads: true },
 ];
 export const colsFor = (table: "ads" | "team", money: boolean) => OV_COLS.filter(c => (!c.money || money) && (!c.ads || table === "ads"));
-export function colValue(key: OvColKey, x: { leads: number; won: number; sales: number; wonPaid: number; came: number; appt?: number; booked?: number; cost?: number | null }): string {
+/** A kept list of added columns: what the person added, known keys only, once each (an older single pick reads as one). */
+export function keptCols(v: unknown): OvColKey[] {
+  const list = Array.isArray(v) ? v : typeof v === "string" ? [v] : [];
+  return list.filter((k, n): k is OvColKey => OV_COLS.some(c => c.key === k) && list.indexOf(k) === n);
+}
+const num = (v: number) => Math.round(v).toLocaleString("en-MY");
+export function colValue(key: OvColKey, x: { leads: number; won: number; sales: number; wonPaid: number; came: number; appt?: number; booked?: number; cost?: number | null; fig?: MetaFig | null }): string {
   if (key === "sales") return rm(x.sales);
   if (key === "conv") return pctOf(convOf(x));
   if (key === "aov") return rm(aovOf(x));
   if (key === "roas") return roasText(x.sales, x.cost);
-  const b = x.appt ?? x.booked ?? 0;
-  return pctOf(x.leads ? (b / x.leads) * 100 : null);
+  if (key === "appt") { const b = x.appt ?? x.booked ?? 0; return pctOf(x.leads ? (b / x.leads) * 100 : null); }
+  const f = x.fig;
+  if (!f) return "—";
+  const per = (n: number) => (n ? rm2(f.spend / n) : "—");
+  switch (key) {
+    case "impr": return num(f.impr);
+    case "reach": return num(f.reach);
+    case "freq": return f.reach ? (f.impr / f.reach).toFixed(2) : "—";
+    case "cpm": return f.impr ? rm2((f.spend / f.impr) * 1000) : "—";
+    case "clicks": return num(f.clicks);
+    case "cpc": return per(f.clicks);
+    case "ctr": return f.impr ? `${((f.clicks / f.impr) * 100).toFixed(2)}%` : "—";
+    case "allclk": return num(f.allClicks);
+    case "msgconv": return num(f.msgconv);
+    case "cpmsg": return per(f.msgconv);
+  }
+  return "—";
 }
 
 /** Days in a range, both ends counted. */
