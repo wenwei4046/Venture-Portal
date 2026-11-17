@@ -466,14 +466,17 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     if (!this.checkReq() || !this.props.sendToCrm) return;
     this.setState({ shareOpen: false });
     const c = this.state.crmId ? this.state.crmPick || { id: this.state.crmId, name: this.state.cust.att } : null;
-    if (c) this.crmCheck(c); else this.setState({ crmSend: { step: "pick", q: "", hits: [] } });
+    if (c) { this.crmCheck(c); return; }
+    // The CRM's customers are listed at once, as a dropdown (the user, 2026-11-17: "除了搜寻，也连接 contact 下拉式").
+    this.setState({ crmSend: { step: "pick", q: "", hits: [] } }, () => this.crmSendFind("", 0));
   }
-  crmSendFind(q) {
+  /** Lists the CRM's customers for what is typed: nothing = the latest, one letter = names starting with it ("打 M，可以看到 M 的客户"). */
+  crmSendFind(q, wait = 220) {
     this.setState(s => ({ crmSend: s.crmSend && { ...s.crmSend, q } }));
     clearTimeout(this._csT);
     const t = q.trim(), ask = this.props.searchCrm;
-    if (t.length < 2 || !ask) { this.setState(s => ({ crmSend: s.crmSend && { ...s.crmSend, hits: [] } })); return; }
-    this._csT = setTimeout(() => ask(t).then(hits => { const cs = this.state.crmSend; if (cs && cs.step === "pick" && cs.q.trim() === t) this.setState({ crmSend: { ...cs, hits, asked: t } }); }).catch(() => {}), 220);
+    if (!ask) return;
+    this._csT = setTimeout(() => ask(t).then(hits => { const cs = this.state.crmSend; if (cs && cs.step === "pick" && cs.q.trim() === t) this.setState({ crmSend: { ...cs, hits, asked: t, failed: false } }); }).catch(() => { const cs = this.state.crmSend; if (cs && cs.step === "pick" && cs.q.trim() === t) this.setState({ crmSend: { ...cs, hits: [], asked: t, failed: true } }); }), wait);
   }
   crmCheck(c) {
     this.setState({ crmSend: { step: "check", c } });
@@ -515,9 +518,9 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const base = { title: "Send to CRM chat", sub: "", pick: false, q: "", onQ: () => {}, hits: [], none: "", who, note: "", ok: "", act: () => {}, op: 1, closeLabel: "Cancel", close };
     if (cs.step === "pick") {
       const q = (cs.q || "").trim();
-      return { ...base, sub: "Pick the customer. The quotation PDF goes into their chat in the CRM.", pick: true, q: cs.q || "", onQ: e => this.crmSendFind(e.target.value),
+      return { ...base, sub: "Pick the customer, or type to find them. The quotation PDF goes into their chat in the CRM.", pick: true, q: cs.q || "", onQ: e => this.crmSendFind(e.target.value),
         hits: (cs.hits || []).map(h => ({ name: h.name, initials: ini(h.name), sub: [h.phone, h.usize, h.uloc].filter(Boolean).join(" · "), pick: () => this.crmCheck(h) })),
-        none: q.length < 2 ? "Type at least 2 letters or digits." : cs.asked === q && !(cs.hits || []).length ? "No customer in your CRM matches." : "" };
+        none: cs.asked !== q ? (cs.hits || []).length ? "" : "Loading customers…" : cs.failed ? "The CRM could not be searched. Check the connection." : !(cs.hits || []).length ? (q ? "No customer in your CRM matches." : "No customers in your CRM yet.") : "" };
     }
     if (cs.step === "check") return { ...base, sub: "Checking the customer's chat…" };
     if (cs.step === "shut") return { ...base, sub: "This quotation was not sent.",

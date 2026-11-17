@@ -120,7 +120,7 @@ export function IrQuoteScreen(p: {
       inApp: p.inApp, rootH: p.rootH, preview: !!p.preview && boot.boot.edit,
       onNav: p.onNav, onSettings: p.onSettings, onClosePreview: p.onClosePreview,
       searchCrm: p.offline
-        ? async (q: string) => CRM_CUSTOMERS.filter(c => (c.name + " " + c.phone).toLowerCase().includes(q.toLowerCase())).map(c => ({ ...c, type: c.ptype, size: c.usize, loc: c.uloc }))
+        ? async (q: string) => CRM_CUSTOMERS.filter(c => { const t = q.trim().toLowerCase(); return t.length === 1 && /\D/.test(t) ? c.name.toLowerCase().startsWith(t) : (c.name + " " + c.phone).toLowerCase().includes(t); }).map(c => ({ ...c, type: c.ptype, size: c.usize, loc: c.uloc }))
         : async (q: string) => { const r = await searchIrQuoteCustomers(q); return r.ok ? r.data.map(asCustomer) : []; },
       // The demo and the design preview send nothing: an open chat that "sends" after a moment.
       crmReach: p.offline

@@ -20,7 +20,7 @@ function quote(over: { state?: Record<string, unknown>; reach?: Reach; sent?: { 
     checkReq: () => over.ready ?? true, flash: vi.fn(), saveDraft: vi.fn(), crmCaption: () => "Quotation\nTotal: RM 1.00",
     pdfFor: () => Promise.resolve(new Blob(["%PDF"], { type: "application/pdf" })),
     pdfFile: (b: Blob) => new File([b], "Quotation.pdf", { type: "application/pdf" }),
-    setState(s: unknown) { const next = typeof s === "function" ? (s as (x: unknown) => Record<string, unknown>)(self.state) : s; self.state = { ...self.state, ...(next as Record<string, unknown>) }; },
+    setState(s: unknown, then?: () => void) { const next = typeof s === "function" ? (s as (x: unknown) => Record<string, unknown>)(self.state) : s; self.state = { ...self.state, ...(next as Record<string, unknown>) }; then?.(); },
   };
   for (const k of KEEP) self[k] = P[k].bind(self);
   const box = () => (self.crmSendBox as () => Box | false)();
@@ -44,12 +44,28 @@ describe("Send to CRM chat", () => {
     expect(q.self.state.confirm).toMatchObject({ title: "Sent to Tan Wei Ming" });
   });
 
-  it("asks for the customer when step 1 picked none, then checks the one picked", async () => {
+  it("lists the CRM's customers at once when step 1 picked none, and from one letter", async () => {
+    vi.useFakeTimers();
+    const q = quote();
+    const ask = vi.fn(async (t: string) => t === "" ? [{ id: "c1", name: "Tan Wei Ming" }, { id: "c2", name: "Mei Ling" }] : [{ id: "c2", name: "Mei Ling" }]);
+    (q.self.props as Record<string, unknown>).searchCrm = ask;
+    (q.self.sendCrm as () => void)();
+    expect((q.box() as Box).pick).toBe(true);
+    expect((q.box() as Box).none).toBe("Loading customers…");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(ask).toHaveBeenCalledWith("");
+    expect((q.box() as Box).hits.map(h => h.name)).toEqual(["Tan Wei Ming", "Mei Ling"]);
+    (q.self.crmSendFind as (s: string) => void)("M");
+    await vi.advanceTimersByTimeAsync(250);
+    expect(ask).toHaveBeenLastCalledWith("M");
+    expect((q.box() as Box).hits.map(h => h.name)).toEqual(["Mei Ling"]);
+    vi.useRealTimers();
+  });
+
+  it("checks the customer picked from the list", async () => {
     vi.useFakeTimers();
     const q = quote();
     (q.self.sendCrm as () => void)();
-    expect((q.box() as Box).pick).toBe(true);
-    expect((q.box() as Box).none).toMatch(/at least 2/);
     (q.self.crmSendFind as (s: string) => void)("jason");
     await vi.advanceTimersByTimeAsync(250);
     vi.useRealTimers();

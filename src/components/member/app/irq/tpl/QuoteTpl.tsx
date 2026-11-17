@@ -2771,9 +2771,9 @@ export function renderQuote(v: DcVals, C: DcComponents) {
               {"\n          "}
               {(v["crmSend"]?.["pick"]) ? (<>
                 {"\n            "}
-                <input value={dcValue(v["crmSend"]?.["q"])} onChange={v["crmSend"]?.["onQ"]} placeholder={"Search the CRM by name or phone"} type={"text"} style={{"width":"100%","height":"44px","padding":"0 12px","borderRadius":"12px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"14px","boxSizing":"border-box"}} />
+                <input value={dcValue(v["crmSend"]?.["q"])} onChange={v["crmSend"]?.["onQ"]} placeholder={"Type a name or phone, or pick below"} type={"text"} style={{"width":"100%","height":"44px","padding":"0 12px","borderRadius":"12px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"14px","boxSizing":"border-box"}} />
                 {"\n            "}
-                <div style={{"display":"flex","flexDirection":"column","gap":"1px"}}>
+                <div style={{"display":"flex","flexDirection":"column","gap":"1px","maxHeight":"min(44vh,340px)","overflowY":"auto","overscrollBehavior":"contain","margin":"0 -6px","padding":"0 6px"}}>
                   {"\n              "}
                   {dcList(v["crmSend"]?.["hits"]).map((L_ch_15, L_ch_15_i) => (
                     <Fragment key={L_ch_15_i}>
