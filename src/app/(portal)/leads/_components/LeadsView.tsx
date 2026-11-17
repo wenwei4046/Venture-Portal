@@ -19,6 +19,7 @@ import type { LeadConfig, LeadContact } from '@/lib/leads/types'
 import { LeadIcon, type LeadIconName } from '@/components/layout/lead-icons'
 import { flash } from '@/components/hrv/toast'
 import Popover from './ui/Popover'
+import Segmented from './ui/Segmented'
 import { MenuItem } from './ui/ContextMenu'
 import { SortHead } from './ui/bits'
 import { initials } from './bits'
@@ -179,6 +180,10 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
 
   return (
     <div className={s.page}>
+      <div className={s.views}>
+        <Segmented value="leads" label="Leads view" options={[{ value: 'leads', label: 'Leads' }, { value: 'visits', label: 'Showroom visits' }]}
+          onChange={v => (v === 'visits' ? router.push('/leads/list?v=visits') : undefined)} />
+      </div>
       <section className={s.card}>
         <div className={s.tools}>
           {ticked.length ? (

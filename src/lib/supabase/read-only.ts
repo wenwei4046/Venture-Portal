@@ -153,7 +153,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'att_config', 'att_month', 'att_requests_list', 'att_ledger', 'att_register', 'att_file',
   // Lead View (mig 20261016300200):
   'lead_config', 'lead_inbox', 'lead_my_unread_marks', 'lead_agent_brands', 'lead_outlets', 'lead_team', 'lead_staff_directory', 'lead_rule_of', 'lead_ad_posts', 'lead_labels', 'lead_thread', 'lead_list', 'lead_leads', 'lead_info', 'lead_business_hours', 'lead_reply_rules', 'lead_library', 'lead_data_files', 'lead_data_folders', 'lead_link_text', 'lead_quick_replies', 'lead_pages', 'lead_leave', 'lead_ai_dismissed', 'lead_ai_more', 'lead_ai_earlier', 'lead_ai_corrections', 'lead_flows', 'lead_auto_categories', 'lead_knowledge', 'lead_personas',
-  'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more', 'lead_ads',
+  'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more', 'lead_ads', 'lead_visits', 'lead_overview',
   // Admin › Guest Link (mig 20261011091000):
   'guest_link_admin', 'guest_link_legend',
   // VOLATILE, read to write nothing:

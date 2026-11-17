@@ -2435,4 +2435,92 @@ await db.exec(`
   await as(CS_USER, ALL)
 }
 
+// Showroom visits and Overview (mig 20261117200000): the showroom's log, an ad account's outlet, its spend, the figures by
+// outlet; an Outlet staff reads and writes their own outlets only.
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  for (let i = 0; i < 2; i++) {
+    await db.exec(await f('20261117200000_lead_visits_overview.sql'))
+    await db.exec(await f('20261117200100_lead_visits_overview_guards.sql'))
+  }
+  for (const fn of ['lead_save_visit', 'lead_delete_visit']) {
+    check((await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc.includes(`PERFORM public.tab_write_guard(ARRAY['/leads/list'], ARRAY['leads.edit']);`), true, `${fn} asks Leads`)
+  }
+  for (const fn of ['lead_set_ad_account_outlet', 'lead_save_ad_spend']) {
+    check((await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc.includes('tab_write_guard'), false, `${fn}: the cell decides (Insight has no write box)`)
+  }
+  for (const sig of ['lead_visits(date,date)', 'lead_save_visit(uuid,jsonb)', 'lead_delete_visit(uuid)', 'lead_set_ad_account_outlet(text,uuid)', 'lead_save_ad_spend(jsonb,jsonb)', 'lead_overview(date,date)']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+  for (const sig of ['lead_visit_json(lead_visits)', 'lead_outlet_mine(uuid)']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: the functions’ own`)
+  }
+  const outs = (await q(`select o.id, o.name from public.lead_outlets o where o.deleted_at is null order by o.name`))
+  const pwcc = outs.find(o => o.name === 'PWCC Penang').id, other = outs.find(o => o.name !== 'PWCC Penang').id
+  await as(CS_USER, ['leads.view'])
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', ['{}'], /Lead View · Edit/, 'a visit needs Edit')
+  await as(CS_USER, ALL)
+  const visit = o => ({ outletId: pwcc, visitOn: '2026-11-03', name: 'Lucy', phone: '+60 12-280 0377', salesPerson: 'Mayson', brand: 'The Couch Factory', source: 'xhs', products: '[Sofa] AM 9055', status: 'follow_up', ...o })
+  const save = (id, o) => q('select public.lead_save_visit($1, $2::jsonb) v', [id, JSON.stringify(visit(o))]).then(r => r[0].v)
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', [JSON.stringify(visit({ source: 'tiktok' }))], /Where did they come from/, 'a source it does not know')
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', [JSON.stringify(visit({ name: '', phone: '' }))], /A name or a phone/, 'nobody')
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', [JSON.stringify(visit({ status: 'close_sales' }))], /purchase day/, 'a sale needs its day')
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', [JSON.stringify(visit({ status: 'close_sales', purchaseOn: '2026-11-04' }))], /amount/, 'and its amount')
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', [JSON.stringify(visit({ priceOffered: 'abc' }))], /ringgit/, 'an amount that is no number')
+  const v1 = await save(null, {})
+  check([v1.phone, v1.source, v1.status, v1.sales, v1.createdBy], ['0122800377', 'xhs', 'follow_up', null, 'Mei Ling'], 'kept as digits, 60 read as 0')
+  // Lead View has a customer with that phone: the row links to the chat.
+  const cid = (await q(`select id from public.lead_contacts where not is_test order by created_at limit 1`))[0]?.id
+    ?? (await q(`select id from public.lead_contacts order by created_at limit 1`))[0].id
+  await q(`update public.lead_contacts set phone = '0122800377', is_test = false where id = $1`, [cid])
+  const v1b = await save(v1.id, { status: 'close_sales', purchaseOn: '2026-11-05', sales: '2490', orderNo: 'TCF0321', items: '[Sofa] AM 9055' })
+  check([v1b.id, v1b.status, v1b.purchaseOn, Number(v1b.sales), v1b.contactId], [v1.id, 'close_sales', '2026-11-05', 2490, cid], 'closed, linked to the chat')
+  const v2 = await save(null, { name: 'Melison', phone: '', source: 'facebook', visitOn: '2026-11-04' })
+  await save(null, { name: 'Elsewhere', outletId: other, source: 'google' })
+  const back = await save(v2.id, { name: 'Melison', phone: '', source: 'facebook', visitOn: '2026-11-04', status: 'follow_up', purchaseOn: '2026-11-04', sales: '99' })
+  check([back.purchaseOn, back.sales], [null, null], 'a purchase is kept only on a closed sale')
+  const list = (await q(`select public.lead_visits('2026-11-01', '2026-11-30') j`))[0].j
+  check(list.map(v => v.name), ['Melison', 'Lucy', 'Elsewhere'].sort((a, b) => list.findIndex(v => v.name === a) - list.findIndex(v => v.name === b)), 'read back')
+  check(list.length, 3, 'three visits')
+  check((await q(`select public.lead_visits('2026-11-05', '2026-11-05') j`))[0].j.map(v => v.name), ['Lucy'], 'a purchase in the range brings its visit')
+  await refuses(`select public.lead_visits('2026-11-30', '2026-11-01')`, [], /range of days/, 'a backwards range')
+
+  // Ad accounts and their spend.
+  await as(CS_USER, ['leads.view', 'leads.edit'])
+  await refuses(`select public.lead_save_ad_spend('[]', '[]')`, [], /Lead View · Manage/, 'spend needs Manage')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_save_ad_spend($1::jsonb, $2::jsonb)`, [JSON.stringify([{ accountId: '2173506546903527', name: "2990's Mini@Kelana Jaya" }]),
+    JSON.stringify([{ accountId: '2173506546903527', day: '2026-11-03', funnel: 100.5, branding: 20 }, { accountId: '2173506546903527', day: '2026-11-04', funnel: 50, branding: 0 },
+      { accountId: '999', day: '2026-11-04', funnel: 7, branding: 0 }])])
+  await q(`select public.lead_save_ad_spend('[]', $1::jsonb)`, [JSON.stringify([{ accountId: '2173506546903527', day: '2026-11-04', funnel: 60, branding: 0 }])])
+  check((await q(`select count(*)::int n from public.lead_ad_spend`))[0].n, 2, 'an account Meta did not list is not kept; a day read again replaces it')
+  await refuses(`select public.lead_save_ad_spend('[]', $1::jsonb)`, [JSON.stringify([{ accountId: 'x', day: '2026-11-04', funnel: 1, branding: 0 }])], /Ad accounts/, 'a bad account')
+  await refuses(`select public.lead_set_ad_account_outlet('1', null)`, [], /not one Lead View can read/, 'an account not listed')
+  await q(`select public.lead_set_ad_account_outlet('2173506546903527', $1)`, [pwcc])
+
+  const ov = (await q(`select public.lead_overview('2026-11-01', '2026-11-30') j`))[0].j
+  check(ov.visits.filter(x => x.outletId === pwcc).map(x => [x.source, x.n]).sort(), [['facebook', 1], ['xhs', 1]], 'visits by source')
+  check(ov.sales.map(x => [x.outletId, x.source, x.orders, Number(x.amount)]), [[pwcc, 'xhs', 1, 2490]], 'sales by source')
+  check(ov.spend.map(x => [x.outletId, Number(x.funnel), Number(x.branding)]), [[pwcc, 160.5, 20]], 'spend on its outlet')
+  check(ov.accounts.map(a => [a.accountId, a.outletId]), [['2173506546903527', pwcc]], 'the accounts for whoever reads every outlet')
+  check(Array.isArray(ov.inquiries), true, 'inquiries counted')
+
+  // Removed: gone from the list and the figures.
+  await q('select public.lead_delete_visit($1)', [v2.id])
+  await refuses('select public.lead_delete_visit($1)', [v2.id], /gone/, 'removed once')
+  check((await q(`select public.lead_visits('2026-11-01', '2026-11-30') j`))[0].j.length, 2, 'two left')
+
+  // An Outlet staff (Daniel, PWCC Penang in the Team section) reads and writes PWCC alone.
+  const DAN = id(901)
+  await q('select public.lead_team_save($1, $2, true, true, $3::uuid[], null, null)', [id(902), 'outlet', [pwcc]])
+  await db.exec(`update public.hr_staff_costs set status = 'active' where id = '${id(902)}'; update public.users set is_active = true where id = '${DAN}'`)
+  await db.exec(`select set_config('test.uid', '${DAN}', false), set_config('test.cells', 'leads.view,leads.edit', false)`)
+  check((await q('select public.lead_my_outlets() s'))[0].s, [pwcc], 'Daniel is PWCC Penang’s')
+  check((await q(`select public.lead_visits('2026-11-01', '2026-11-30') j`))[0].j.map(v => v.name), ['Lucy'], 'an Outlet staff reads their outlet’s visits alone')
+  await refuses('select public.lead_save_visit(null, $1::jsonb)', [JSON.stringify(visit({ outletId: other }))], /not one of yours/, 'nor writes another’s')
+  const theirs = (await q(`select public.lead_overview('2026-11-01', '2026-11-30') j`))[0].j
+  check([theirs.accounts, theirs.visits.every(x => x.outletId === pwcc), theirs.spend.map(x => x.outletId)], [[], true, [pwcc]], 'their outlet’s figures, no ad accounts')
+  await as(CS_USER, ALL)
+}
+
 console.log(`validate-leads: ${checks} checks passed`)
