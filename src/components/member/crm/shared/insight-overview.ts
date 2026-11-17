@@ -236,7 +236,7 @@ export function overviewTiles(f: OverviewFigures, withMoney: boolean, vs = "vs l
       t("Total cost", rm(a.cost), change(a.cost, ap.cost, "cost"), {
         sub: ["Total cost = ads spend + marketing fee's share", ...(a.spend == null || a.fee == null ? [] : [`${rm2(a.spend)} + ${rm2(a.fee)} = ${rm2(a.cost)}`])], title: was(rm(ap.cost)) }),
       t("Per lead", rm2(a.cpl), change(a.cpl, ap.cpl, "cost"), {
-        sub: ["Per lead = total cost ÷ leads from ads", ...(a.cost == null || !a.leads ? [] : [`${rm2(a.cost)} ÷ ${a.leads.toLocaleString("en-MY")} = ${rm2(a.cpl)}`])], title: was(rm2(ap.cpl)) }),
+        sub: ["Per lead = (ads spend + fee) ÷ leads from ads", ...(a.cost == null || !a.leads ? [] : [`${rm2(a.cost)} ÷ ${a.leads.toLocaleString("en-MY")} = ${rm2(a.cpl)}`])], title: was(rm2(ap.cpl)) }),
     ] : []),
     t("Leads", w.leads.toLocaleString("en-MY"), change(w.leads, wp.leads, "count"), {
       sub: ["Leads = new customers in the period", "Each customer counted once"], title: was(wp.leads.toLocaleString("en-MY")) }),
