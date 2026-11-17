@@ -45,6 +45,7 @@ import PersonCloseControl from './PersonCloseControl'
 import UnpricedBillsNotice from './UnpricedBillsNotice'
 import PaperRefCell from './PaperRefCell'
 import { useSalespersonCloses } from './useSalespersonCloses'
+import { backspaceResetsColumns, isDefaultOrder, moveColumn, normaliseOrder } from '@/lib/commission/column-order'
 import { SheetIcon } from '@/components/sheet/SheetIcon'
 import s from './commission-workbench.module.css'
 import c from './close-controls.module.css'
@@ -83,7 +84,10 @@ const COLUMNS: [Column, string][] = [
   ['margin', 'Margin'], ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
   ['incentive', 'Margin incentive'],
 ]
-const NUMERIC_COLUMNS: Column[] = ['sales', 'commissionable', 'margin', 'product', 'kpi', 'incentive']
+const DEFAULT_ORDER: Column[] = COLUMNS.map(([key]) => key)
+const COLUMN_LABEL = new Map(COLUMNS)
+const ORDER_KEY = 'commission-column-order'
+const NUMERIC_COLUMNS: Column[] =['sales', 'commissionable', 'margin', 'product', 'kpi', 'incentive']
 const money = formatMoney
 const quantity = (value: number) => new Intl.NumberFormat('en-MY', { maximumFractionDigits: 8 }).format(value)
 const pct = (n: number | null | undefined) => n == null ? '—' : `${(n * 100).toFixed(1).replace('.0', '')}%`
@@ -259,6 +263,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const [currentTeam, setCurrentTeam] = useState(false)
   const [showExcluded, setShowExcluded] = useState(false)
   const [hidden, setHidden] = useState<Column[]>(['location'])
+  // The order of the middle columns: a header dragged onto another moves it
+  // there, Backspace puts the default back (user 2026-11-17). Kept in this
+  // browser for every month — a convenience, nothing anybody else reads.
+  const [columnOrder, setColumnOrder] = useState<Column[]>(DEFAULT_ORDER)
+  const [dragColumn, setDragColumn] = useState<Column | null>(null)
+  const [dropColumn, setDropColumn] = useState<Column | null>(null)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [billDone, setBillDone] = useState<BillMenuOutcome | null>(null)
@@ -308,6 +318,29 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       try { sessionStorage.setItem(layoutKey, JSON.stringify({ hidden, showExcluded })) } catch { /* private mode */ }
     }
   }, [layoutKey, hidden, showExcluded, hydrated])
+
+  const [orderRead, setOrderRead] = useState(false)
+  useEffect(() => {
+    try { setColumnOrder(normaliseOrder(JSON.parse(localStorage.getItem(ORDER_KEY) ?? 'null'), DEFAULT_ORDER)) } catch { /* storage is optional */ }
+    setOrderRead(true)
+  }, [])
+  useEffect(() => {
+    if (!orderRead) return
+    try {
+      if (isDefaultOrder(columnOrder, DEFAULT_ORDER)) localStorage.removeItem(ORDER_KEY)
+      else localStorage.setItem(ORDER_KEY, JSON.stringify(columnOrder))
+    } catch { /* private mode */ }
+  }, [columnOrder, orderRead])
+  useEffect(() => {
+    if (isDefaultOrder(columnOrder, DEFAULT_ORDER)) return
+    const onKey = (e: KeyboardEvent) => {
+      if (!backspaceResetsColumns(e)) return
+      e.preventDefault()
+      setColumnOrder(DEFAULT_ORDER)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [columnOrder])
 
   // What the month pays is the scheme's own switches, as saved (Review settings
   // › This month pays): a switch there is saved, and the page follows it with
@@ -404,7 +437,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     commission: (selectedClose?.total ?? selected.totalCommission) + salarySource.commissionElsewhere + salarySource.payrollAdjustment,
   }) : null
   const isVisible = (key: Column) => !hidden.includes(key)
-  const columns = COLUMNS.filter(([key]) => isVisible(key))
+  const columns: [Column, string][] = columnOrder.filter(isVisible).map(key => [key, COLUMN_LABEL.get(key) ?? key])
   const brands = [...new Set(board.personalRows.flatMap(r => r.brands))].sort()
   const carriedCount = new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.id)).size
   const upsaleCount = new Set(data.input.orders.filter(o => o.upsale).map(o => o.id)).size
@@ -806,7 +839,13 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       <div className={s.tableScroll} role="region" aria-label={`${overriding ? 'Overriding' : 'Personal'} commission table, scroll horizontally`} tabIndex={0}>
         <table className={s.table} aria-label={overriding ? 'Overriding commission by downline order' : 'Personal commission by sales order'}>
           <thead><tr><th className={s.stickyFirst}>Sales order</th>{overriding && <th>Downline</th>}
-            {visibleColumns.map(([key, label]) => <th key={key} title={key === 'sales' ? SALES_VALUE_HINT : key === 'commissionable' ? COMMISSIONABLE_HINT : undefined}>{overriding && key === 'product' ? 'Override basis' : label}</th>)}
+            {visibleColumns.map(([key, label]) => <th key={key} data-column={key} draggable
+              className={[s.movableHead, dragColumn === key ? s.headDragging : '', dropColumn === key && dragColumn !== key ? s.headDropTarget : ''].filter(Boolean).join(' ')}
+              title={`${key === 'sales' ? `${SALES_VALUE_HINT}\n` : key === 'commissionable' ? `${COMMISSIONABLE_HINT}\n` : ''}Drag to move · Backspace restores the order`}
+              onDragStart={e => { setDragColumn(key); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', key) }}
+              onDragOver={e => { if (!dragColumn) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dropColumn !== key) setDropColumn(key) }}
+              onDrop={e => { e.preventDefault(); if (dragColumn) setColumnOrder(order => moveColumn(order, dragColumn, key)); setDragColumn(null); setDropColumn(null) }}
+              onDragEnd={() => { setDragColumn(null); setDropColumn(null) }}>{overriding && key === 'product' ? 'Override basis' : label}</th>)}
             <th>Review</th><th className={s.stickyTotal}>Total commission</th></tr></thead>
           <tbody>{filtered.map((row, i) => {
             const origin = originOf(row)
