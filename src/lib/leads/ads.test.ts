@@ -22,7 +22,7 @@ describe('reading the answer', () => {
       '120210000000003': { error: 'x' },
     })
     expect(rows).toEqual([
-      { adId: '120210000000001', name: 'Oct Sofa Week · Video', campaign: 'Oct Sofa', adset: 'KL 25-45', accountId: '1234567', status: 'ACTIVE', link: 'https://www.facebook.com/111_222' },
+      { adId: '120210000000001', name: 'Oct Sofa Week · Video', campaign: 'Oct Sofa', adset: 'KL 25-45', accountId: '1234567', status: 'ACTIVE', link: 'https://www.facebook.com/111/posts/222' },
       { adId: '120210000000002', name: 'IG Reel', campaign: '', adset: '', accountId: '', status: '', link: 'https://www.instagram.com/p/abc/' },
     ])
   })

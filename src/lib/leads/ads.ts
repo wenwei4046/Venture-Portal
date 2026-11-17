@@ -70,12 +70,16 @@ type GraphAd = {
   creative?: { effective_object_story_id?: string; instagram_permalink_url?: string }
 }
 
-/** The ad's post: its Instagram permalink, else its Facebook post (page_post ids, digits only). */
+/**
+ * The ad's post: its Instagram permalink, else its Facebook post (page_post ids, digits only) as
+ * `facebook.com/<page>/posts/<post>` — an ad's post is unpublished, and Facebook answers "This isn't available" at
+ * `facebook.com/<page>_<post>` (the owner's phone, 2026-11-13).
+ */
 export function adLinkOf(creative: GraphAd['creative']): string {
   const ig = creative?.instagram_permalink_url
   if (ig && /^https:\/\//.test(ig)) return ig
-  const story = creative?.effective_object_story_id
-  return story && /^[0-9]+_[0-9]+$/.test(story) ? `https://www.facebook.com/${story}` : ''
+  const story = creative?.effective_object_story_id?.match(/^([0-9]+)_([0-9]+)$/)
+  return story ? `https://www.facebook.com/${story[1]}/posts/${story[2]}` : ''
 }
 
 /** Graph's `?ids=` answer, keyed by ad id, as rows to keep. Ids Meta did not answer for are left out. */
