@@ -15,7 +15,8 @@ describe("Team activity on the phone's Insight", () => {
     expect(nav).toContain("Assignment");
     expect(nav).not.toContain("Activity");
     const sw = screen.getByRole("button", { name: "Team activity" }).parentElement!;
-    expect([...sw.children].map(b => b.textContent)).toEqual(["Team", "Ads", "Up next", "Activity"]);
+    // Overview first since 2026-11-17 (ads + team performance on one page).
+    expect([...sw.children].map(b => b.textContent)).toEqual(["Overview", "Team", "Ads", "Up next", "Activity"]);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Team activity" })); });
     // v4 8e: no "Team activity" title (the switch says Activity) — the espresso figure strip.
     expect(document.querySelector("[data-act-strip]")).not.toBeNull();

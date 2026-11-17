@@ -13,6 +13,7 @@ import { upNextOpen } from "../../shared/up-next-data";
 import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
 import { activityPeriod, clistVM, insightVM } from "./insight";
+import { deskOverviewVM } from "./overview";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
 import { answerOf, formV2 } from "./form";
 import { initials } from "./data";
@@ -98,6 +99,9 @@ export function deskVM(ctx: DeskCtx) {
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
     leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
       openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),
+    // Insight › Overview (2026-11-17): ads + team on one page, Insight's first tab (DeskOverview.tsx, vm/overview.ts).
+    kInsOv: ui.tab === "insight" && (ui.insTab ?? "overview") === "overview",
+    overview: ui.tab === "insight" && (ui.insTab ?? "overview") === "overview" ? deskOverviewVM(ctx) : null,
     kActivity: ui.tab === "activity" || (ui.tab === "insight" && ui.insTab === "activity" && upNextOpen(data, ctx.me.id)),
     // Team activity (docs/design_handoff_crm): its own page, on the people book Calendar and People read.
     activity: { data, book: peopleBook(data, ctx.teams, ctx.directors), live: ctx.live, who: ui.actWho ?? null, nameOf: ctx.nameOf,

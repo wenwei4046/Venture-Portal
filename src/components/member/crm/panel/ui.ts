@@ -130,6 +130,8 @@ export interface PanelUi {
   ovUp?: boolean;
   /** Insight's Activity side: Team activity, beside Team performance (the owner, 2026-11-09). */
   ovAct?: boolean;
+  /** Insight's Overview side (2026-11-17: ads + team on one page): where Insight opens; false once another side is picked. */
+  ovSum?: boolean;
   /** Assignment › Active: switches not saved yet (id → locked), null = as saved. */
   actDraft: Record<string, boolean> | null;
   // Calendar

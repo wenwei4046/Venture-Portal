@@ -10,6 +10,7 @@
 import type { ChangeEvent as RChangeEvent, CSSProperties, FocusEvent, KeyboardEvent, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
 import { useEffect, useRef, useState, Fragment } from "react";
 import { Ic, type Icon4a } from "./icons4a";
+import { PhoneOverview, type PhoneOverviewProps } from "./phone-overview";
 import { boldRuns } from "./bold-text";
 import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
@@ -198,8 +199,9 @@ export function Phone4aHero({ items, cols, compact }: { items: { label: string; 
 
 /** T01 (v3) · Team Insight's head: the avatar left, "Hello, …" and the line under it, the house right; then, for CRM ·
  * Manage, Team performance | Ads performance (the Ads side is the Ads Performance page drawn under this head). */
-export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { ads: boolean; up: boolean; act?: boolean; canAds: boolean; canUp: boolean; canAct?: boolean; team: () => void; adsPick: () => void; upPick: () => void; actPick?: () => void } | null } }) {
-  // Order (the owner, 2026-11-09: "整理一下手机版的 insight 顺序; team-ads-up next-activity"): Team · Ads · Up next · Activity.
+export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { sum?: boolean; sumPick?: () => void; ads: boolean; up: boolean; act?: boolean; canAds: boolean; canUp: boolean; canAct?: boolean; team: () => void; adsPick: () => void; upPick: () => void; actPick?: () => void } | null } }) {
+  // Order (the owner, 2026-11-09: "整理一下手机版的 insight 顺序; team-ads-up next-activity"): Team · Ads · Up next · Activity —
+  // with Overview first since 2026-11-17 (ads + team on one page, shared/phone-overview.tsx).
   // v4 8b (every Insight side): the words at 13 px, 500 / 600 on show; the full names kept for a screen reader.
   const seg = (label: string, on: boolean, pick: () => void, aria?: string) => (
     <button type="button" onClick={pick} aria-pressed={on} aria-label={aria} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(13), fontWeight: on ? 600 : 500,
@@ -215,7 +217,7 @@ export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: s
       </span>
       {h.house && <button type="button" onClick={h.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
     </div>
-    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team", !h.sw.ads && !h.sw.up && !h.sw.act, h.sw.team, "Team performance")}{h.sw.canAds && seg("Ads", h.sw.ads, h.sw.adsPick, "Ads performance")}{h.sw.canUp && seg("Up next", h.sw.up, h.sw.upPick)}{h.sw.canAct && h.sw.actPick && seg("Activity", !!h.sw.act, h.sw.actPick, "Team activity")}</div>}
+    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{h.sw.sumPick && seg("Overview", !!h.sw.sum, h.sw.sumPick)}{seg("Team", !h.sw.sum && !h.sw.ads && !h.sw.up && !h.sw.act, h.sw.team, "Team performance")}{h.sw.canAds && seg("Ads", h.sw.ads, h.sw.adsPick, "Ads performance")}{h.sw.canUp && seg("Up next", h.sw.up, h.sw.upPick)}{h.sw.canAct && h.sw.actPick && seg("Activity", !!h.sw.act, h.sw.actPick, "Team activity")}</div>}
     </div>
   );
 }
@@ -229,7 +231,7 @@ type OvTeam = { name: string; c: string; leads: number; appt: string; show: stri
  * opens to its people, in the same columns.
  */
 export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: string; vsLabel: string; ovOpenPeriod: () => void; cmpPick: () => void;
-  hero4: { label: string; value: string; delta: string; good: boolean; open?: () => void }[]; teamRows: OvTeam[] } }) {
+  hero4: { label: string; value: string; delta: string; good: boolean; open?: () => void }[]; teamRows: OvTeam[]; sum?: PhoneOverviewProps | null } }) {
   const COLS = "minmax(0,1fr) 52px 52px 52px";
   const num = (bold: boolean): CSSProperties => ({ textAlign: "right", fontWeight: bold ? 500 : 400, whiteSpace: "nowrap" });
   return (<>
@@ -240,6 +242,8 @@ export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: stri
         <button type="button" onClick={ov.cmpPick} style={{ ...BTN, flex: "none", color: "var(--crm-muted)" }}>· {ov.vsLabel}</button>
       </span>
     </div>
+    {/* Insight › Overview (2026-11-17): the same period row, then ads + team on one page in place of the hero and Teams. */}
+    {ov.sum ? <PhoneOverview {...ov.sum} /> : (<>
     <div data-ov-hero="" style={{ flex: "none", display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: "12px", padding: "14px 0", borderRadius: "16px", background: "var(--crm-rust)", color: "#fff" }}>
       {ov.hero4.map((m, i) => (
         <div key={m.label} onClick={m.open} role={m.open ? "button" : undefined} style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0, padding: "0 16px", borderLeft: i % 2 ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", cursor: m.open ? "pointer" : "default" }}>
@@ -282,6 +286,7 @@ export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: stri
         </div>
       ))}
     </div>
+    </>)}
   </>);
 }
 

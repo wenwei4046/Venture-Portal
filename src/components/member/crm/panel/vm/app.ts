@@ -29,7 +29,8 @@ import { teamMineSwap } from "../../shared/team-mine";
 import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
 import type { KeyboardEvent } from "react";
-import { first, ini, periodRange, type PanelCtx } from "./common";
+import { DIRECTOR, first, ini, periodRange, type PanelCtx } from "./common";
+import type { PhoneOverviewProps } from "../../shared/phone-overview";
 
 /** The ad editor's numbers (rev 1011 §8): Enter moves to the next visible number box and selects it; on the last one the
  * keyboard closes. Never a submit. The prototype's own handler, over the page (the app has no screen-label root). */
@@ -68,7 +69,23 @@ function profile6(ctx: PanelCtx, house: boolean) {
 }
 
 /** v3 T01 · Insight's head, on both of its sides. */
-function insightHead(ctx: PanelCtx, house: boolean, adsOn: boolean, up: boolean, act = false) {
+/**
+ * Insight › Overview's props on the phone (2026-11-17): the CRM's data, Insight's period and the one before it (a whole
+ * month against the month before, else the same number of days before), the teams with their colours. The figures are
+ * worked out in shared/phone-overview.tsx (shared/insight-overview.ts — the desktop's own).
+ */
+export function phoneOverviewProps(ctx: PanelCtx): PhoneOverviewProps {
+  const { ui, now, patch } = ctx, r = periodRange(ui.period, ui.ovRange, now);
+  const whole = ui.period === "month";
+  const prev = whole ? { a: new Date(new Date(r.a).getFullYear(), new Date(r.a).getMonth() - 1, 1).getTime(), b: new Date(new Date(r.a).getFullYear(), new Date(r.a).getMonth(), 0).getTime() }
+    : { a: r.a - (r.b - r.a + DAY), b: r.a - DAY };
+  return { data: ctx.data, r, prev, now, teams: ctx.teams.map(t => ({ id: t.id, name: t.name, c: t.c, people: t.people })), directors: ctx.directors,
+    directorTeam: "Revenue Director", directorColour: DIRECTOR.c, live: ctx.live, money: readsAds(ctx.data.can),
+    openAds: readsAds(ctx.data.can) ? () => patch({ ovSum: false, ovAds: true, ovUp: false, ovAct: false }) : undefined,
+    openTeam: () => patch({ ovSum: false, ovAds: false, ovUp: false, ovAct: false }) };
+}
+
+function insightHead(ctx: PanelCtx, house: boolean, adsOn: boolean, up: boolean, act = false, sum = false) {
   // "Principal" is the signed-in Boss's own word; viewing somebody (a cross-team viewer is a Boss too) names them.
   const { me, patch } = ctx, boss = me.role === "boss" && !ctx.viewingAs, ads = readsAds(ctx.data.can);
   return {
@@ -77,9 +94,11 @@ function insightHead(ctx: PanelCtx, house: boolean, adsOn: boolean, up: boolean,
     ini: ini(me.name), house, exit: () => ctx.exitApp(),
     // Team · Activity · Ads · Up next — Activity is Team activity (the owner, 2026-11-09: "team activity 放到 insight 的 team 中，可以和
     // team performance 開多一個分頁"; it was the bottom bar's).
-    sw: ads || upNextOpen(ctx.data, me.id) ? { ads: adsOn, up, act, canAds: ads, canUp: upNextOpen(ctx.data, me.id), canAct: upNextOpen(ctx.data, me.id),
-      team: () => patch({ ovAds: false, ovUp: false, ovAct: false }), adsPick: () => patch({ ovAds: true, ovUp: false, ovAct: false }), upPick: () => patch({ ovUp: true, ovAds: false, ovAct: false }),
-      actPick: () => patch({ ovAct: true, ovAds: false, ovUp: false }) } : null,
+    // Overview first (2026-11-17, the owner: ads + team performance on one page), so the switch is always there.
+    sw: { sum, sumPick: () => patch({ ovSum: true, ovAds: false, ovUp: false, ovAct: false }),
+      ads: adsOn, up, act, canAds: ads, canUp: upNextOpen(ctx.data, me.id), canAct: upNextOpen(ctx.data, me.id),
+      team: () => patch({ ovSum: false, ovAds: false, ovUp: false, ovAct: false }), adsPick: () => patch({ ovSum: false, ovAds: true, ovUp: false, ovAct: false }), upPick: () => patch({ ovSum: false, ovUp: true, ovAds: false, ovAct: false }),
+      actPick: () => patch({ ovSum: false, ovAct: true, ovAds: false, ovUp: false }) },
   };
 }
 
@@ -104,7 +123,9 @@ export function panelAppVM(ctx: PanelCtx) {
   const x = assignExtraVM(ctx, as0);
   const as = as0 ? { ...as0, adRows: x.adRows, ae: { ...as0.ae, ...x.aeApply, ...(x.aeSave ?? {}) } } : undefined;
   const cal = show.cal ? calendarVM(ctx) : undefined;
-  const ov0 = show.ov ? overviewVM(ctx) : undefined;
+  // Insight › Overview (2026-11-17): Team performance's own screen (its head and period row) drawing ads + team instead.
+  const ovSum = show.ov && ui.ovSum !== false;
+  const ov0 = show.ov ? { ...overviewVM(ctx), sum: ovSum ? phoneOverviewProps(ctx) : null } : undefined;
   // The top bar shows only for a back link ("‹ Profile" on Ads Performance, "‹ Assignment" in a section). The bell — the
   // prototype's bellIn / bellTop — with the house and Team | Mine left of it, sits on Insight alone, the first page of the
   // bottom bar, as the Revenue app keeps its header to Today (2026-10-14, the owner: "principal view … 只存在于 Insight 界面";
@@ -121,7 +142,7 @@ export function panelAppVM(ctx: PanelCtx) {
     // The house on Insight too, the page Team opens on (2026-10-16, the owner) — left of the avatar.
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
-    th: insightHead(ctx, !!bl.showBell, ovAds, ovUp, ovAct),
+    th: insightHead(ctx, !!bl.showBell, ovAds, ovUp, ovAct, ovSum),
     // Calendar (appointments + leave) and Assignment › People, and Team activity (docs/design_handoff_crm): the desktop's
     // view models, drawn as the prototypes' phone frames (shared/PhoneLeaveCal.tsx, shared/PhoneTeamActivity.tsx).
     // Assignment › Leave on the phone (2026-11-09): the same leave records, Pause and Lock as the desktop's.

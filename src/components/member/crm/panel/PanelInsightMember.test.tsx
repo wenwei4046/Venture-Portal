@@ -10,12 +10,15 @@ beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
 
 async function tap(el: Element) { fireEvent.click(el); await act(async () => {}); }
+// Insight opens on Overview since 2026-11-17; these are Team performance's.
+const toTeam = () => tap(screen.getByRole("button", { name: "Team performance" }));
 
 describe("a member on Team Insight", () => {
   it("opens the Team inbox filtered to them, as oneself", async () => {
     window.history.replaceState({}, "", "/member/preview?crmAs=boss");
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
+    await toTeam();
     // v4 8b: Teams is a table — Leads · Appt · Show, still no Won (the owner, 2026-11-10: "不要 won").
     expect(screen.queryByText("Won")).toBeNull();
     await tap(screen.getByText("Team Kelvin"));
@@ -32,6 +35,7 @@ describe("Insight's Leads", () => {
     window.history.replaceState({}, "", "/member/preview?crmAs=boss");
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
+    await toTeam();
     expect(screen.queryByText("Tap a team for its people")).toBeNull();
     await tap(screen.getByRole("button", { name: /^Leads/ }));
     expect(screen.getByText(/^Leads · /)).toBeInTheDocument();

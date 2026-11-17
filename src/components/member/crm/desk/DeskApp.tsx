@@ -14,6 +14,7 @@ import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
+import { DeskOverview } from "./DeskOverview";
 import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskChatMenu4a, DeskChatWait4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInfoAudit4a, DeskInsight4a, DeskMetricPicker4a, DeskPartnerPane4a, DeskRail4a, DeskRepPick4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
@@ -1861,6 +1862,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
           {!!(v.notWide) && (<>
             <div style={{ flex: "1", minWidth: "0", boxSizing: "border-box", padding: v.f4.pad, display: "flex", flexDirection: "column", gap: v.f4.gap, overflow: "auto" }}>
               {!!(v.kList) && (<DeskInboxList4a v={v} />)}
+              {!!(v.kInsOv && v.overview) && (<DeskOverview o={v.overview!} src={v.src4} />)}
               {!!(v.kInsight) && (<DeskInsight4a v={v} />)}
               {!!(v.kUpNext && v.upNextProps) && (<DeskUpNext4a {...v.upNextProps!} />)}
               {!!(v.kCh) && (<>
