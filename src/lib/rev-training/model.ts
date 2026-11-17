@@ -273,6 +273,8 @@ const LIB_TYPES: Readonly<Record<string, string>> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ppt: 'application/vnd.ms-powerpoint',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  // CSV (the owner, 2026-11-17: "CSV 需要").
+  csv: 'text/csv',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -294,7 +296,7 @@ export function libContentType(fileName: string): string | null {
 
 /** Why a file cannot go into the Library — or null. */
 export function libFileRefusal(file: { name: string; size: number }): string | null {
-  if (!libContentType(file.name)) return 'Add a PDF, a Word, Excel or PowerPoint file, a picture or a video — or paste a link.'
+  if (!libContentType(file.name)) return 'Add a PDF, a Word, Excel, CSV or PowerPoint file, a picture or a video — or paste a link.'
   if (file.size > LIB_MAX_BYTES) return 'That file is larger than 2 GB.'
   return null
 }

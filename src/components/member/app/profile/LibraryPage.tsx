@@ -155,7 +155,7 @@ export default function LibraryPage({ api, rights, readOnly, onBack, onSeen }: {
               </label>
               {form.at === "add" && form.kind === "file" ? (
                 <div className={t.field}>
-                  <span className={t.label}>File — PDF, Word, Excel, PowerPoint, a picture or a video</span>
+                  <span className={t.label}>File — PDF, Word, Excel, CSV, PowerPoint, a picture or a video</span>
                   <input ref={fileRef} type="file" accept={LIB_ACCEPT} className={t.input} onChange={e => {
                     const file = e.target.files?.[0] ?? null;
                     const refused = file ? libFileRefusal(file) : null;

@@ -88,6 +88,7 @@ describe('the Library', () => {
   it('takes PDF, Office, pictures and videos up to 2 GB; anything else is a link', () => {
     expect(libFileRefusal({ name: 'a.pdf', size: 10 })).toBeNull()
     expect(libFileRefusal({ name: 'a.DOCX', size: 10 })).toBeNull()
+    expect(libFileRefusal({ name: 'sales.csv', size: 10 })).toBeNull()
     expect(libFileRefusal({ name: 'a.exe', size: 10 })).toMatch(/paste a link/)
     expect(libFileRefusal({ name: 'a.mp4', size: 3 * 1024 ** 3 })).toMatch(/2 GB/)
   })
