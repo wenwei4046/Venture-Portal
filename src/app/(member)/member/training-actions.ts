@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { appClosed } from "@/lib/member/app-pages";
 import {
-  adminTestsFromRows, draftFromRow, draftProblem, libraryFromRows, refusal, resultFromRow, safeLink, scoresFromRows, takeFromRow,
-  testsFromRows, type AdminTest, type DraftTest, type LibraryCategory, type TestResult, type TestScoreRow, type TestSummary, type TestToTake,
+  adminTestsFromRows, attemptFromRow, draftFromRow, toMarkFromRows, draftProblem, libraryFromRows, refusal, resultFromRow, safeLink, scoresFromRows, takeFromRow,
+  testsFromRows, type AdminTest, type Answer, type AttemptView, type DraftTest, type ToMark, type LibraryCategory, type TestResult, type TestScoreRow, type TestSummary, type TestToTake,
 } from "@/lib/rev-training/model";
 import type { Outcome } from "@/lib/rev-training/api";
 
@@ -70,13 +70,32 @@ export async function takeTest(id: string): Promise<Outcome<TestToTake>> {
   return run(() => reader("tests"), db => db.rpc("rev_test_take", { p_id: id }), takeFromRow, "The test could not be opened. Please try again.");
 }
 
-export async function submitTest(id: string, answers: Record<string, number[]>): Promise<Outcome<TestResult>> {
+export async function submitTest(id: string, answers: Record<string, Answer>): Promise<Outcome<TestResult>> {
   if (!isId(id)) return { ok: false, error: "That test is not there." };
-  // Only question ids and whole numbers go to the database — it scores them itself.
+  // Only question ids, whole numbers and words go to the database — it scores them itself.
   const clean = Object.fromEntries(Object.entries(answers ?? {}).filter(([k]) => isId(k))
-    .map(([k, v]) => [k, (Array.isArray(v) ? v : []).filter(n => Number.isInteger(n) && n >= 0 && n < 8).slice(0, 8)]));
+    .map(([k, v]) => [k, typeof v === "string" ? v.slice(0, 3000)
+      : (Array.isArray(v) ? v : []).filter(n => Number.isInteger(n) && n >= 0 && n < 8).slice(0, 8)]));
   return run(() => reader("tests"), db => db.rpc("rev_test_submit", { p_id: id, p_answers: clean }), resultFromRow,
     "Your answers could not be handed in. Please try again.");
+}
+
+/** One attempt with its marks: one's own (Free test's box), or anybody's to a writer (the database decides which). */
+export async function fetchAttempt(id: string): Promise<Outcome<AttemptView>> {
+  if (!isId(id)) return { ok: false, error: "That attempt is not there." };
+  return run(() => reader("tests"), db => db.rpc("rev_test_attempt", { p_id: id }), attemptFromRow, "The answers could not be read. Please try again.");
+}
+
+export async function fetchToMark(): Promise<Outcome<ToMark[]>> {
+  return run(() => writer("view"), db => db.rpc("rev_tests_to_mark"), toMarkFromRows, "What waits for marking could not be read. Please try again.");
+}
+
+/** Mark an attempt's written answers (Edit). */
+export async function markAttempt(id: string, marks: Record<string, { points: number; comment: string }>): Promise<Outcome<AttemptView>> {
+  if (!isId(id)) return { ok: false, error: "That attempt is not there." };
+  const clean = Object.fromEntries(Object.entries(marks ?? {}).filter(([k]) => isId(k))
+    .map(([k, m]) => [k, { points: Math.max(0, Math.round(Number(m?.points) || 0)), comment: String(m?.comment ?? "").slice(0, 500) }]));
+  return run(() => writer("edit"), db => db.rpc("rev_test_mark", { p_attempt: id, p_marks: clean }), attemptFromRow, "The marks could not be saved. Please try again.");
 }
 
 export async function fetchAdminTests(): Promise<Outcome<AdminTest[]>> {

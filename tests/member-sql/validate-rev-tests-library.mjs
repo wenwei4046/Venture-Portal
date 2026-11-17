@@ -242,7 +242,7 @@ check(await one(`SELECT jsonb_array_length(public.rev_tests_mine())`), 1, 'the P
 // ── Taking it ───────────────────────────────────────────────────────────────────
 await as(U.ann)
 const taken = await one(`SELECT public.rev_test_take($1)`, [T1])
-check(taken.questions.map(x => Object.keys(x).sort().join(',')), Array(3).fill('choices,id,kind,prompt'), 'handed out without its answers')
+check(taken.questions.map(x => Object.keys(x).sort().join(',')), Array(3).fill('choices,id,kind,points,prompt'), 'handed out without its answers (its points shown)')
 check(taken.questions[2].choices, ['True', 'False'], 'true / false')
 const [q1, q2, q3] = taken.questions.map(x => x.id)
 const r1 = await one(`SELECT public.rev_test_submit($1, $2)`, [T1, JSON.stringify({ [q1]: [0], [q2]: [1], [q3]: [9, 1, 'x'] })])
@@ -348,5 +348,68 @@ await as(U.peter, WRITER)
 const EMPTY = await one(`SELECT public.rev_lib_category_save(NULL, 'Spare')`)
 await q(`SELECT public.rev_lib_category_delete($1)`, [EMPTY])
 check(await peek1(`SELECT count(*)::int FROM public.rev_lib_categories WHERE id = $1`, [EMPTY]), 0, 'an empty category goes')
+
+// ── Points and written answers (2026-11-17 — the owner: "每题设不同分数；简答题／段落题（人工改）需要") ──
+await as(U.peter, WRITER)
+await refuses(`SELECT public.rev_test_save($1)`, [JSON.stringify({ title: 'Bad', questions: [{ kind: 'single', prompt: 'Q', choices: ['A', 'B'], correct: [0], points: 0 }] })],
+  /give it 1 to 100 points/, 'a question is worth 1 to 100 points')
+const T2 = await one(`SELECT public.rev_test_save($1)`, [JSON.stringify({ title: 'Selling a mattress', published: true, questions: [
+  { kind: 'single', prompt: 'Queen is how wide?', choices: ['150 cm', '180 cm'], correct: [0], points: 2 },
+  { kind: 'short', prompt: 'Name our latex brand.', points: 3, choices: ['ignored'], correct: [0] },
+  { kind: 'paragraph', prompt: 'How do you answer "too expensive"?', points: 5, explain: 'Value, warranty, instalments.' },
+  { kind: 'short', prompt: 'Your favourite model?', points: 1 },
+] })])
+check((await peek(`SELECT kind, points, cardinality(choices) AS c, cardinality(correct) AS r FROM public.rev_test_questions WHERE test_id = $1 ORDER BY position`, [T2]))
+  .map(r => `${r.kind}:${r.points}:${r.c}:${r.r}`), ['single:2:2:1', 'short:3:0:0', 'paragraph:5:0:0', 'short:1:0:0'],
+  'every question its own points; a written one keeps no choices and no right answer')
+await as(U.ann)
+const t2 = await one(`SELECT public.rev_test_take($1)`, [T2])
+check(t2.questions.map(q => [q.kind, q.points]), [['single', 2], ['short', 3], ['paragraph', 5], ['short', 1]], 'handed out with each question\'s points')
+const [w1, w2, w3, w4] = t2.questions.map(q => q.id)
+const long = 'x'.repeat(400)
+const r4 = await one(`SELECT public.rev_test_submit($1, $2)`, [T2, JSON.stringify({ [w1]: [0], [w2]: `  ${long}  `, [w3]: 'Show the value.', [w4]: [1] })])
+check([r4.score, r4.total, r4.pending, r4.saved], [2, 11, true, true], 'the choice question\'s 2 of 11; the written ones wait')
+check(r4.review.map(r => [r.kind, r.awarded, r.pending]), [['single', 2, false], ['short', null, true], ['paragraph', null, true], ['short', 0, false]],
+  'a written answer waits for its mark; a blank one (or a choice sent to it) is 0')
+const A4 = r4.attemptId
+check((await peek(`SELECT answers ->> $2 AS a FROM public.rev_test_attempts WHERE id = $1`, [A4, w2]))[0].a.length, 300, 'a short answer is kept to 300 characters')
+const mine2 = (await one(`SELECT public.rev_tests_mine()`)).find(t => t.id === T2)
+check([mine2.points, mine2.written, mine2.best, mine2.last, mine2.lastPending, mine2.lastId === A4], [11, true, null, 2, true, true],
+  'their list: 11 points, written answers in it, no best while it waits, the last waiting')
+check((await one(`SELECT public.rev_test_attempt($1)`, [A4])).pending, true, 'they read their own attempt')
+await refuses(`SELECT public.rev_test_mark($1, '{}')`, [A4], /Edit is not ticked/, 'a seller marks nothing')
+await as(U.ben)
+await refuses(`SELECT public.rev_test_attempt($1)`, [A4], /somebody else's/, 'nor reads somebody else\'s attempt')
+
+// A writer changes the test before marking: the attempt keeps the test as it was taken.
+await as(U.peter, WRITER)
+await q(`SELECT public.rev_test_save($1)`, [JSON.stringify({ id: T2, title: 'Selling a mattress', published: true, questions: [
+  { kind: 'single', prompt: 'Changed', choices: ['A', 'B'], correct: [1], points: 1 }] })])
+const toMark = await one(`SELECT public.rev_tests_to_mark()`)
+check(toMark.map(m => [m.title, m.name, m.score, m.total]), [['Selling a mattress', 'ANN LIM', 2, 11]], 'what waits for marking')
+check((await one(`SELECT public.rev_tests_admin()`)).find(t => t.id === T2).toMark, 1, 'the writers\' list counts it')
+const seen = await one(`SELECT public.rev_test_attempt($1)`, [A4])
+check(seen.questions.map(x => x.prompt), ['Queen is how wide?', 'Name our latex brand.', 'How do you answer "too expensive"?', 'Your favourite model?'],
+  'the attempt as it was taken, though the test changed')
+check(seen.questions.every(x => !('correct' in x)), true, '…its questions without their answers (the review carries them)')
+await as(U.peter, ['rev_training.view'])
+await refuses(`SELECT public.rev_test_mark($1, '{}')`, [A4], /Edit is not ticked/, 'marking is Edit\'s')
+await as(U.peter, WRITER)
+await refuses(`SELECT public.rev_test_mark($1, $2)`, [A4, JSON.stringify({ [w2]: { points: 3 } })], /Give every written answer its points/, 'every written answer at once')
+await refuses(`SELECT public.rev_test_mark($1, $2)`, [A4, JSON.stringify({ [w2]: { points: 3 }, [w3]: { comment: 'no points' } })], /Give every written answer its points/, 'a mark is its points')
+await refuses(`SELECT public.rev_test_mark($1, $2)`, [A4, JSON.stringify({ [w2]: { points: 4 }, [w3]: { points: 2 } })], /at most its question's 3 points/, 'never past the question\'s points')
+const marked = await one(`SELECT public.rev_test_mark($1, $2)`, [A4, JSON.stringify({ [w2]: { points: 3 }, [w3]: { points: 2, comment: ' Say the warranty too. ' } })])
+check([marked.score, marked.total, marked.pending, marked.markedByName], [7, 11, false, 'PETER NG'], 'marked: 2 + 3 + 2 of 11, by its writer')
+check(marked.review.map(r => [r.awarded, r.comment ?? '']), [[2, ''], [3, ''], [2, 'Say the warranty too.'], [0, '']], 'each written answer\'s points and comment')
+check(await one(`SELECT jsonb_array_length(public.rev_tests_to_mark())`), 0, 'nothing waits now')
+await as(U.ann)
+const mine3 = (await one(`SELECT public.rev_tests_mine()`)).find(t => t.id === T2)
+check([mine3.best, mine3.bestTotal, mine3.last, mine3.lastPending], [7, 11, 7, false], 'their best is the marked score')
+await as(U.peter, WRITER)
+const again = await one(`SELECT public.rev_test_mark($1, $2)`, [A4, JSON.stringify({ [w2]: { points: 1 }, [w3]: { points: 5 } })])
+check(again.score, 8, 'marked again: the marks replaced')
+const res2 = (await one(`SELECT public.rev_test_results($1)`, [T2])).find(r => r.name === 'ANN LIM')
+check([res2.best, res2.last, res2.lastPending], [8, 8, false], 'the writers\' scores follow the marks')
+check(await one(`SELECT has_function_privilege('authenticated', 'public.rev_test_review_json(jsonb,jsonb,jsonb)', 'EXECUTE')`), false, 'the review helper is nobody\'s to call')
 
 console.log(`validate-rev-tests-library: ${checks} checks passed`)

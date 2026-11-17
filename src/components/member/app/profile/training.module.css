@@ -182,3 +182,13 @@
   font-size: calc(15px * var(--rv-type));
   padding: 0 12px;
 }
+
+/* Points and written answers (2026-11-17) */
+.typeRow { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+.areaTall { min-height: 120px; }
+.written { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--rv-cream); border: 1px solid var(--rv-line); font-size: calc(14.5px * var(--rv-type)); line-height: 1.45; color: var(--rv-ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.markRow { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; align-items: center; }
+.markPts { display: flex; align-items: center; gap: 6px; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); white-space: nowrap; }
+.markPts .input { width: 56px; text-align: center; padding: 10px 6px; }
+.markWait { color: var(--rv-amber); font-weight: 700; }
+.extMark { background: var(--rv-amber-bg); color: var(--rv-amber); }

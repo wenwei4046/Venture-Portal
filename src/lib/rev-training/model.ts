@@ -3,15 +3,27 @@
  * app draws, read defensively (a field the database leaves out is never trusted to be there). Pure: no React, no
  * Supabase. The owner's answers: IR only; the Principal and the Revenue Director write them; a test may be taken
  * again; one answer, several answers, true / false; the Library's files and links in categories, "New" until opened.
+ * 2026-11-17 (the owner: "每题设不同分数；简答题／段落题（人工改）需要"): each question its own points, and a short
+ * answer or a paragraph a writer marks by hand — the attempt waits for its marks until then.
  */
 
-export type QuestionKind = 'single' | 'multiple' | 'truefalse'
+export type QuestionKind = 'single' | 'multiple' | 'truefalse' | 'short' | 'paragraph'
 
 export const KIND_LABEL: Readonly<Record<QuestionKind, string>> = {
   single: 'One answer',
   multiple: 'Several answers',
   truefalse: 'True or false',
+  short: 'Short answer',
+  paragraph: 'Paragraph',
 }
+
+export const KINDS: readonly QuestionKind[] = ['single', 'multiple', 'truefalse', 'short', 'paragraph']
+
+/** A question answered in words, marked by a writer. */
+export const isWritten = (kind: QuestionKind): boolean => kind === 'short' || kind === 'paragraph'
+
+/** How long a written answer may be (the database keeps no more). */
+export const WRITTEN_MAX: Readonly<Record<'short' | 'paragraph', number>> = { short: 300, paragraph: 3000 }
 
 /** A test in the list one takes them from — with one's own scores. */
 export interface TestSummary {
@@ -21,28 +33,92 @@ export interface TestSummary {
   /** False only for a writer's draft (members never see one). */
   published: boolean
   questions: number
+  /** Every question's points added up. */
+  points: number
+  /** It has written answers, so a hand-in waits for marking. */
+  written: boolean
   attempts: number
+  /** The best marked score, and out of what. */
   best: number | null
+  bestTotal: number | null
+  lastId: string | null
   last: number | null
   lastTotal: number | null
+  lastPending: boolean
   lastAt: string | null
 }
 
-/** A test handed out to be taken: its questions and choices, never which are right. */
+export interface TakeQuestion {
+  id: string
+  kind: QuestionKind
+  prompt: string
+  choices: string[]
+  points: number
+}
+
+/** A test handed out to be taken: its questions, choices and points, never which are right. */
 export interface TestToTake {
   id: string
   title: string
   intro: string
-  questions: { id: string; kind: QuestionKind; prompt: string; choices: string[] }[]
+  questions: TakeQuestion[]
 }
 
-/** What a hand-in answers: the score, then question by question what was picked and what was right. */
+/** An answer: the choices picked, or the words written. */
+export type Answer = number[] | string
+
+/** One question of an attempt: what was picked or written, what was right, the points given (null while it waits). */
+export interface ReviewItem {
+  id: string
+  kind: QuestionKind
+  chosen: number[]
+  correct: number[]
+  right: boolean
+  text: string
+  points: number
+  awarded: number | null
+  comment: string
+  pending: boolean
+  explain: string
+}
+
+/** What a hand-in answers: the score so far, then question by question. */
 export interface TestResult {
+  attemptId: string | null
   score: number
   total: number
+  /** A written answer waits for a writer's mark. */
+  pending: boolean
   /** False when the taker has no Revenue staff record (a writer trying it): scored, not kept. */
   saved: boolean
-  review: { id: string; chosen: number[]; correct: number[]; right: boolean; explain: string }[]
+  review: ReviewItem[]
+}
+
+/** One attempt as kept: the test as it was taken, and its marks — the taker's own, or anybody's to a writer. */
+export interface AttemptView {
+  id: string
+  testId: string
+  title: string
+  name: string
+  at: string
+  score: number
+  total: number
+  pending: boolean
+  markedByName: string
+  markedAt: string | null
+  questions: TakeQuestion[]
+  review: ReviewItem[]
+}
+
+/** An attempt waiting for marking. */
+export interface ToMark {
+  id: string
+  testId: string
+  title: string
+  name: string
+  at: string
+  score: number
+  total: number
 }
 
 /** A question as its writer edits it. */
@@ -51,6 +127,7 @@ export interface DraftQuestion {
   prompt: string
   choices: string[]
   correct: number[]
+  points: number
   explain: string
 }
 
@@ -68,8 +145,10 @@ export interface AdminTest {
   title: string
   published: boolean
   questions: number
+  points: number
   people: number
   attempts: number
+  toMark: number
   byName: string
   updatedAt: string
 }
@@ -82,6 +161,8 @@ export interface TestScoreRow {
   best: number | null
   last: number | null
   total: number | null
+  lastId: string | null
+  lastPending: boolean
   lastAt: string | null
 }
 
@@ -111,14 +192,26 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
 const ints = (v: unknown): number[] => arr(v).map(num).filter((n): n is number => n !== null && Number.isInteger(n))
-const kindOf = (v: unknown): QuestionKind => (v === 'multiple' || v === 'truefalse' ? v : 'single')
+const kindOf = (v: unknown): QuestionKind => (v === 'multiple' || v === 'truefalse' || v === 'short' || v === 'paragraph' ? v : 'single')
+const pts = (v: unknown): number => { const n = num(v); return n !== null && n >= 1 ? n : 1 }
+
+const takeQuestion = (q: Record<string, unknown>): TakeQuestion =>
+  ({ id: str(q.id), kind: kindOf(q.kind), prompt: str(q.prompt), choices: arr(q.choices).map(str), points: pts(q.points) })
+
+const reviewItem = (x: Record<string, unknown>): ReviewItem => ({
+  id: str(x.id), kind: kindOf(x.kind), chosen: ints(x.chosen), correct: ints(x.correct), right: x.right === true,
+  text: str(x.text), points: pts(x.points), awarded: num(x.awarded), comment: str(x.comment), pending: x.pending === true,
+  explain: str(x.explain),
+})
 
 /** `rev_tests_mine()`. */
 export function testsFromRows(data: unknown): TestSummary[] {
   return arr(data).map(obj).filter(r => str(r.id)).map(r => ({
     id: str(r.id), title: str(r.title), intro: str(r.intro), published: r.published !== false,
-    questions: num(r.questions) ?? 0, attempts: num(r.attempts) ?? 0, best: num(r.best), last: num(r.last),
-    lastTotal: num(r.lastTotal), lastAt: str(r.lastAt) || null,
+    questions: num(r.questions) ?? 0, points: num(r.points) ?? num(r.questions) ?? 0, written: r.written === true,
+    attempts: num(r.attempts) ?? 0, best: num(r.best), bestTotal: num(r.bestTotal) ?? num(r.lastTotal),
+    lastId: str(r.lastId) || null, last: num(r.last), lastTotal: num(r.lastTotal), lastPending: r.lastPending === true,
+    lastAt: str(r.lastAt) || null,
   }))
 }
 
@@ -126,12 +219,7 @@ export function testsFromRows(data: unknown): TestSummary[] {
 export function takeFromRow(data: unknown): TestToTake | null {
   const r = obj(data)
   if (!str(r.id)) return null
-  return {
-    id: str(r.id), title: str(r.title), intro: str(r.intro),
-    questions: arr(r.questions).map(obj).filter(q => str(q.id)).map(q => ({
-      id: str(q.id), kind: kindOf(q.kind), prompt: str(q.prompt), choices: arr(q.choices).map(str),
-    })),
-  }
+  return { id: str(r.id), title: str(r.title), intro: str(r.intro), questions: arr(r.questions).map(obj).filter(q => str(q.id)).map(takeQuestion) }
 }
 
 /** `rev_test_submit(id, answers)`. */
@@ -140,16 +228,36 @@ export function resultFromRow(data: unknown): TestResult | null {
   const total = num(r.total)
   if (total === null) return null
   return {
-    score: num(r.score) ?? 0, total, saved: r.saved === true,
-    review: arr(r.review).map(obj).map(x => ({ id: str(x.id), chosen: ints(x.chosen), correct: ints(x.correct), right: x.right === true, explain: str(x.explain) })),
+    attemptId: str(r.attemptId) || null, score: num(r.score) ?? 0, total, pending: r.pending === true, saved: r.saved === true,
+    review: arr(r.review).map(obj).map(reviewItem),
   }
+}
+
+/** `rev_test_attempt(id)` / `rev_test_mark(…)`. */
+export function attemptFromRow(data: unknown): AttemptView | null {
+  const r = obj(data)
+  const total = num(r.total)
+  if (!str(r.id) || total === null) return null
+  return {
+    id: str(r.id), testId: str(r.testId), title: str(r.title), name: str(r.name), at: str(r.at), score: num(r.score) ?? 0, total,
+    pending: r.pending === true, markedByName: str(r.markedByName), markedAt: str(r.markedAt) || null,
+    questions: arr(r.questions).map(obj).filter(q => str(q.id)).map(takeQuestion), review: arr(r.review).map(obj).map(reviewItem),
+  }
+}
+
+/** `rev_tests_to_mark()`. */
+export function toMarkFromRows(data: unknown): ToMark[] {
+  return arr(data).map(obj).filter(r => str(r.id)).map(r => ({
+    id: str(r.id), testId: str(r.testId), title: str(r.title), name: str(r.name), at: str(r.at), score: num(r.score) ?? 0, total: num(r.total) ?? 0,
+  }))
 }
 
 /** `rev_tests_admin()`. */
 export function adminTestsFromRows(data: unknown): AdminTest[] {
   return arr(data).map(obj).filter(r => str(r.id)).map(r => ({
     id: str(r.id), title: str(r.title), published: r.published === true, questions: num(r.questions) ?? 0,
-    people: num(r.people) ?? 0, attempts: num(r.attempts) ?? 0, byName: str(r.byName), updatedAt: str(r.updatedAt),
+    points: num(r.points) ?? num(r.questions) ?? 0, people: num(r.people) ?? 0, attempts: num(r.attempts) ?? 0,
+    toMark: num(r.toMark) ?? 0, byName: str(r.byName), updatedAt: str(r.updatedAt),
   }))
 }
 
@@ -160,7 +268,7 @@ export function draftFromRow(data: unknown): DraftTest | null {
   return {
     id: str(r.id), title: str(r.title), intro: str(r.intro), published: r.published === true,
     questions: arr(r.questions).map(obj).map(q => ({
-      kind: kindOf(q.kind), prompt: str(q.prompt), choices: arr(q.choices).map(str), correct: ints(q.correct), explain: str(q.explain),
+      kind: kindOf(q.kind), prompt: str(q.prompt), choices: arr(q.choices).map(str), correct: ints(q.correct), points: pts(q.points), explain: str(q.explain),
     })),
   }
 }
@@ -169,7 +277,7 @@ export function draftFromRow(data: unknown): DraftTest | null {
 export function scoresFromRows(data: unknown): TestScoreRow[] {
   return arr(data).map(obj).filter(r => str(r.staffId)).map(r => ({
     staffId: str(r.staffId), name: str(r.name), attempts: num(r.attempts) ?? 0, best: num(r.best), last: num(r.last),
-    total: num(r.total), lastAt: str(r.lastAt) || null,
+    total: num(r.total), lastId: str(r.lastId) || null, lastPending: r.lastPending === true, lastAt: str(r.lastAt) || null,
   }))
 }
 
@@ -203,9 +311,17 @@ export function scoreText(score: number | null, total: number | null): string {
   return score === null || total === null ? '—' : `${score} / ${total}`
 }
 
+/** "1 point", "3 points". */
+export const pointsText = (n: number): string => (n === 1 ? '1 point' : `${n} points`)
+
 /** A whole percentage of a score. */
 export function percent(score: number, total: number): number {
   return total > 0 ? Math.round((score / total) * 100) : 0
+}
+
+/** Points still waiting for a writer's mark. */
+export function waitingPoints(review: readonly ReviewItem[]): number {
+  return review.filter(r => r.pending).reduce((n, r) => n + r.points, 0)
 }
 
 /** Pick or unpick a choice: one answer (and true / false) swaps; several toggles. */
@@ -214,24 +330,28 @@ export function pick(kind: QuestionKind, chosen: readonly number[], i: number): 
   return chosen.includes(i) ? chosen.filter(x => x !== i) : [...chosen, i].sort((a, b) => a - b)
 }
 
-/** How many questions have an answer picked. */
-export function answeredCount(answers: Readonly<Record<string, readonly number[]>>, test: TestToTake): number {
-  return test.questions.filter(q => (answers[q.id]?.length ?? 0) > 0).length
+/** Is a question answered — a choice picked, or words written. */
+export const answered = (a: Answer | undefined): boolean => (typeof a === 'string' ? a.trim() !== '' : (a?.length ?? 0) > 0)
+
+/** How many questions have an answer. */
+export function answeredCount(answers: Readonly<Record<string, Answer>>, test: TestToTake): number {
+  return test.questions.filter(q => answered(answers[q.id])).length
 }
 
 /** A fresh question of a type. */
-export function emptyQuestion(kind: QuestionKind = 'single'): DraftQuestion {
-  return kind === 'truefalse'
-    ? { kind, prompt: '', choices: ['True', 'False'], correct: [], explain: '' }
-    : { kind, prompt: '', choices: ['', '', ''], correct: [], explain: '' }
+export function emptyQuestion(kind: QuestionKind = 'single', points = 1): DraftQuestion {
+  if (kind === 'truefalse') return { kind, prompt: '', choices: ['True', 'False'], correct: [], points, explain: '' }
+  if (isWritten(kind)) return { kind, prompt: '', choices: [], correct: [], points, explain: '' }
+  return { kind, prompt: '', choices: ['', '', ''], correct: [], points, explain: '' }
 }
 
 /** A question moved to another type: its choices kept where they can be, its right answers trimmed to fit. */
 export function changeKind(q: DraftQuestion, kind: QuestionKind): DraftQuestion {
   if (kind === q.kind) return q
   if (kind === 'truefalse') return { ...q, kind, choices: ['True', 'False'], correct: [] }
-  const choices = q.kind === 'truefalse' ? ['', '', ''] : q.choices
-  const correct = q.kind === 'truefalse' ? [] : kind === 'single' ? q.correct.slice(0, 1) : q.correct
+  if (isWritten(kind)) return { ...q, kind, choices: [], correct: [] }
+  const choices = q.kind === 'truefalse' || isWritten(q.kind) ? ['', '', ''] : q.choices
+  const correct = q.kind === 'truefalse' || isWritten(q.kind) ? [] : kind === 'single' ? q.correct.slice(0, 1) : q.correct
   return { ...q, kind, choices, correct }
 }
 
@@ -254,12 +374,25 @@ export function draftProblem(t: DraftTest): string | null {
   for (const [n, q] of t.questions.entries()) {
     const at = `Question ${n + 1}`
     if (!q.prompt.trim()) return `${at}: write the question.`
+    if (!Number.isInteger(q.points) || q.points < 1 || q.points > 100) return `${at}: give it 1 to 100 points.`
+    if (isWritten(q.kind)) continue
     if (q.kind !== 'truefalse') {
       if (q.choices.some(c => !c.trim())) return `${at}: fill in every answer, or remove the empty one.`
       if (q.choices.length < 2 || q.choices.length > 8) return `${at}: give 2 to 8 answers to pick from.`
     }
     if (!q.correct.length) return `${at}: mark the right answer.`
     if (q.kind !== 'multiple' && q.correct.length > 1) return `${at}: only one answer can be right — or make it a several-answers question.`
+  }
+  return null
+}
+
+/** What stops a marking being saved, or null: every written answer its points, 0 to its question's. */
+export function marksProblem(review: readonly ReviewItem[], marks: Readonly<Record<string, { points: string; comment: string }>>): string | null {
+  for (const r of review) {
+    if (!isWritten(r.kind) || !r.text.trim()) continue
+    const raw = marks[r.id]?.points ?? ''
+    if (!/^\d+$/.test(raw.trim())) return 'Give every written answer its points.'
+    if (Number(raw) > r.points) return `A written answer gets at most its question's ${r.points} points.`
   }
   return null
 }

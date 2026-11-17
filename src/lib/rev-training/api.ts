@@ -1,4 +1,4 @@
-import type { AdminTest, DraftTest, LibraryCategory, TestResult, TestScoreRow, TestSummary, TestToTake } from './model'
+import type { AdminTest, Answer, AttemptView, DraftTest, LibraryCategory, TestResult, TestScoreRow, TestSummary, TestToTake, ToMark } from './model'
 
 export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -10,7 +10,13 @@ export type Outcome<T> = { ok: true; data: T } | { ok: false; error: string }
 export interface TrainingApi {
   tests(): Promise<Outcome<TestSummary[]>>
   take(id: string): Promise<Outcome<TestToTake>>
-  submit(id: string, answers: Record<string, number[]>): Promise<Outcome<TestResult>>
+  submit(id: string, answers: Record<string, Answer>): Promise<Outcome<TestResult>>
+  /** One attempt with its marks: one's own, or anybody's to a writer. */
+  attempt(id: string): Promise<Outcome<AttemptView>>
+  /** Attempts whose written answers wait for marking. */
+  toMark(): Promise<Outcome<ToMark[]>>
+  /** Mark an attempt's written answers: { question id: { points, comment } }. */
+  mark(attemptId: string, marks: Record<string, { points: number; comment: string }>): Promise<Outcome<AttemptView>>
   adminTests(): Promise<Outcome<AdminTest[]>>
   adminTest(id: string): Promise<Outcome<DraftTest>>
   saveTest(test: DraftTest): Promise<Outcome<string>>

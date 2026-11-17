@@ -461,6 +461,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'rev_tests_mine', 'rev_test_take', 'rev_test_submit', 'rev_tests_admin', 'rev_test_admin', 'rev_test_save', 'rev_test_publish',
   'rev_test_delete', 'rev_test_results', 'rev_library', 'rev_library_open', 'rev_lib_category_save', 'rev_lib_category_delete',
   'rev_lib_item_add', 'rev_lib_item_edit', 'rev_lib_item_delete',
+  // …an attempt (its taker or a writer), what waits for marking (View) and marking it (Edit) — 2026-11-17.
+  'rev_test_attempt', 'rev_tests_to_mark', 'rev_test_mark',
   // Marketing's view (mig 20261023214100): its board, sidebar and search by Marketing · View; one's own notices.
   'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
   // Marketing's tasks (mig 20261023234000): started by Marketing · Create; a stage accepted, worked, handed on by

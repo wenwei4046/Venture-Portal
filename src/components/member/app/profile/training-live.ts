@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { TrainingApi } from "@/lib/rev-training/api";
 import { libContentType, libFileRefusal, libPath } from "@/lib/rev-training/model";
 import {
-  addLibraryItem, deleteLibraryCategory, deleteLibraryItem, deleteTest, editLibraryItem, fetchAdminTest, fetchAdminTests, fetchLibrary,
+  addLibraryItem, fetchAttempt, fetchToMark, markAttempt, deleteLibraryCategory, deleteLibraryItem, deleteTest, editLibraryItem, fetchAdminTest, fetchAdminTests, fetchLibrary,
   fetchTests, fetchTestScores, openLibraryItem, publishTest, saveLibraryCategory, saveTest, submitTest, takeTest,
 } from "@/app/(member)/member/training-actions";
 
@@ -17,6 +17,9 @@ export function liveTrainingApi(): TrainingApi {
     tests: fetchTests,
     take: takeTest,
     submit: submitTest,
+    attempt: fetchAttempt,
+    toMark: fetchToMark,
+    mark: markAttempt,
     adminTests: fetchAdminTests,
     adminTest: fetchAdminTest,
     saveTest,

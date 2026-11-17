@@ -24,6 +24,9 @@
 --    the questions without them; rev_test_submit scores on the server and only then shows what was right.
 -- 5. Files live in R2 (portal-wide/storage.md › A NEW BUCKET): bucket `rev-library`, private, 2 GB a file, any type.
 --    Create puts a file under library/; a reader of the Library reads the files its items name; Edit deletes them.
+-- 6. Points and written answers (2026-11-17 — the owner: "每题设不同分数；简答题／段落题（人工改）需要"): each question is
+--    worth 1–100 points; a short answer or a paragraph is marked by a writer (Edit: `rev_test_mark`, 0 to its points and
+--    a comment) — the attempt waits (`pending`) until then, keeping the test as it was taken (`sheet`).
 -- PGlite: tests/member-sql/validate-rev-tests-library.mjs. Running it twice changes nothing.
 
 CREATE OR REPLACE FUNCTION pg_temp.swap_check(p_sig regprocedure, p_old text, p_new text)
@@ -133,29 +136,45 @@ CREATE TABLE IF NOT EXISTS public.rev_tests (
   deleted_at timestamptz
 );
 
+-- A question: one answer, several answers or true / false (scored here), or a short answer / a paragraph (marked by
+-- a writer — 2026-11-17, the owner: "简答题／段落题（人工改）需要"). Each worth its own points (the owner: "每题设不同分数").
 CREATE TABLE IF NOT EXISTS public.rev_test_questions (
   id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   test_id  uuid NOT NULL REFERENCES public.rev_tests(id) ON DELETE CASCADE,
   position integer NOT NULL CHECK (position >= 0),
-  kind     text NOT NULL CHECK (kind IN ('single', 'multiple', 'truefalse')),
+  kind     text NOT NULL CHECK (kind IN ('single', 'multiple', 'truefalse', 'short', 'paragraph')),
   prompt   text NOT NULL CHECK (length(btrim(prompt)) BETWEEN 1 AND 1000),
-  choices  text[] NOT NULL CHECK (cardinality(choices) BETWEEN 2 AND 8),
-  correct  integer[] NOT NULL CHECK (cardinality(correct) >= 1),
-  explain  text NOT NULL DEFAULT '' CHECK (length(explain) <= 1000)
+  choices  text[] NOT NULL DEFAULT '{}',
+  correct  integer[] NOT NULL DEFAULT '{}',
+  points   integer NOT NULL DEFAULT 1 CHECK (points BETWEEN 1 AND 100),
+  explain  text NOT NULL DEFAULT '' CHECK (length(explain) <= 1000),
+  CHECK (CASE WHEN kind IN ('short', 'paragraph') THEN cardinality(choices) = 0 AND cardinality(correct) = 0
+              ELSE cardinality(choices) BETWEEN 2 AND 8 AND cardinality(correct) >= 1 END)
 );
 CREATE INDEX IF NOT EXISTS rev_test_questions_test ON public.rev_test_questions (test_id, position);
 
+-- A hand-in. `sheet` is the test as it was taken (its questions, right answers and points), so a test changed later
+-- never changes an attempt or its marking. `answers` = { question id: [choice …] | "written answer" }; `marks` = a
+-- writer's { question id: { points, comment } } for the written answers. `pending` while a written answer waits.
 CREATE TABLE IF NOT EXISTS public.rev_test_attempts (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  test_id    uuid NOT NULL REFERENCES public.rev_tests(id),
-  staff_id   uuid NOT NULL REFERENCES public.hr_staff_costs(id),
-  user_id    uuid REFERENCES public.users(id),
-  answers    jsonb NOT NULL DEFAULT '{}'::jsonb,
-  score      integer NOT NULL CHECK (score >= 0),
-  total      integer NOT NULL CHECK (total >= 1 AND score <= total),
-  created_at timestamptz NOT NULL DEFAULT now()
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  test_id        uuid NOT NULL REFERENCES public.rev_tests(id),
+  staff_id       uuid NOT NULL REFERENCES public.hr_staff_costs(id),
+  user_id        uuid REFERENCES public.users(id),
+  sheet          jsonb NOT NULL,
+  answers        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  auto_score     integer NOT NULL CHECK (auto_score >= 0),
+  marks          jsonb NOT NULL DEFAULT '{}'::jsonb,
+  score          integer NOT NULL CHECK (score >= 0),
+  total          integer NOT NULL CHECK (total >= 1 AND score <= total),
+  pending        boolean NOT NULL DEFAULT false,
+  marked_by      uuid REFERENCES public.users(id),
+  marked_by_name text,
+  marked_at      timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS rev_test_attempts_test ON public.rev_test_attempts (test_id, staff_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS rev_test_attempts_pending ON public.rev_test_attempts (created_at) WHERE pending;
 
 CREATE TABLE IF NOT EXISTS public.rev_lib_categories (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -343,7 +362,54 @@ CREATE POLICY rev_library_files_delete ON public.file_objects FOR DELETE TO auth
 
 -- ── 6. Free test — taking one ──────────────────────────────────────────────────
 
--- The tests one may take: published (a writer sees drafts too, marked), with one's own scores.
+-- An attempt question by question (nobody's to call): what was picked or written, what was right, the points given —
+-- a choice question's by its answer, a written one's by the writer's mark (null while it waits; 0 when left blank).
+CREATE OR REPLACE FUNCTION public.rev_test_review_json(p_sheet jsonb, p_answers jsonb, p_marks jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql IMMUTABLE
+SET search_path = public
+AS $fn$
+DECLARE
+  v_out  jsonb := '[]'::jsonb;
+  v_q    jsonb;
+  v_id   text;
+  v_kind text;
+  v_pts  integer;
+  v_a    jsonb;
+  v_m    jsonb;
+  v_text text;
+  v_ch   jsonb;
+  v_cor  jsonb;
+  v_right boolean;
+BEGIN
+  FOR v_q IN SELECT e FROM jsonb_array_elements(coalesce(p_sheet, '[]'::jsonb)) e LOOP
+    v_id := v_q ->> 'id';
+    v_kind := v_q ->> 'kind';
+    v_pts := (v_q ->> 'points')::integer;
+    v_a := coalesce(p_answers, '{}'::jsonb) -> v_id;
+    IF v_kind IN ('short', 'paragraph') THEN
+      v_text := CASE WHEN jsonb_typeof(v_a) = 'string' THEN v_a #>> '{}' ELSE '' END;
+      v_m := coalesce(p_marks, '{}'::jsonb) -> v_id;
+      v_out := v_out || jsonb_build_object('id', v_id, 'kind', v_kind, 'text', v_text, 'points', v_pts,
+        'awarded', CASE WHEN v_text = '' THEN 0 WHEN v_m IS NULL THEN NULL ELSE (v_m ->> 'points')::integer END,
+        'comment', coalesce(v_m ->> 'comment', ''), 'pending', v_text <> '' AND v_m IS NULL,
+        'explain', coalesce(v_q ->> 'explain', ''));
+    ELSE
+      v_ch := CASE WHEN jsonb_typeof(v_a) = 'array' THEN v_a ELSE '[]'::jsonb END;
+      v_cor := v_q -> 'correct';
+      v_right := (SELECT coalesce(array_agg(x::integer ORDER BY x::integer), '{}') FROM jsonb_array_elements_text(v_ch) x)
+               = (SELECT coalesce(array_agg(x::integer ORDER BY x::integer), '{}') FROM jsonb_array_elements_text(v_cor) x);
+      v_out := v_out || jsonb_build_object('id', v_id, 'kind', v_kind, 'chosen', v_ch, 'correct', v_cor, 'right', v_right,
+        'points', v_pts, 'awarded', CASE WHEN v_right THEN v_pts ELSE 0 END, 'pending', false,
+        'explain', coalesce(v_q ->> 'explain', ''));
+    END IF;
+  END LOOP;
+  RETURN v_out;
+END
+$fn$;
+
+-- The tests one may take: published (a writer sees drafts too, marked), with one's own scores — the best of the
+-- marked ones, and the last, waiting or not.
 CREATE OR REPLACE FUNCTION public.rev_tests_mine()
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -359,24 +425,32 @@ BEGIN
   RETURN coalesce((
     SELECT jsonb_agg(jsonb_build_object(
              'id', t.id, 'title', t.title, 'intro', t.intro, 'published', t.published, 'updatedAt', t.updated_at,
-             'questions', (SELECT count(*) FROM public.rev_test_questions q WHERE q.test_id = t.id),
-             'attempts', coalesce(a.n, 0), 'best', a.best, 'last', a.last, 'lastTotal', a.last_total, 'lastAt', a.last_at)
+             'questions', q.n, 'points', q.pts, 'written', q.written,
+             'attempts', coalesce(a.n, 0), 'best', a.best, 'bestTotal', a.best_total,
+             'lastId', a.last_id, 'last', a.last, 'lastTotal', a.last_total, 'lastPending', coalesce(a.last_pending, false), 'lastAt', a.last_at)
            ORDER BY t.published DESC, t.updated_at DESC)
       FROM public.rev_tests t
+      JOIN LATERAL (
+        SELECT count(*) AS n, sum(x.points) AS pts, bool_or(x.kind IN ('short', 'paragraph')) AS written
+          FROM public.rev_test_questions x WHERE x.test_id = t.id
+      ) q ON q.n > 0
       LEFT JOIN LATERAL (
-        SELECT count(*) AS n, max(x.score) AS best,
+        SELECT count(*) AS n,
+               max(x.score) FILTER (WHERE NOT x.pending) AS best,
+               (array_agg(x.total ORDER BY x.score DESC) FILTER (WHERE NOT x.pending))[1] AS best_total,
+               (array_agg(x.id ORDER BY x.created_at DESC))[1] AS last_id,
                (array_agg(x.score ORDER BY x.created_at DESC))[1] AS last,
                (array_agg(x.total ORDER BY x.created_at DESC))[1] AS last_total,
+               (array_agg(x.pending ORDER BY x.created_at DESC))[1] AS last_pending,
                max(x.created_at) AS last_at
           FROM public.rev_test_attempts x WHERE x.test_id = t.id AND x.staff_id = v_staff
       ) a ON v_staff IS NOT NULL
      WHERE t.deleted_at IS NULL AND (t.published OR v_writer)
-       AND EXISTS (SELECT 1 FROM public.rev_test_questions q WHERE q.test_id = t.id)
   ), '[]'::jsonb);
 END
 $fn$;
 
--- One test to take: its questions and choices, never which are right.
+-- One test to take: its questions, choices and points, never which are right.
 CREATE OR REPLACE FUNCTION public.rev_test_take(p_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -393,26 +467,33 @@ BEGIN
   END IF;
   RETURN jsonb_build_object('id', v_test.id, 'title', v_test.title, 'intro', v_test.intro,
     'questions', coalesce((SELECT jsonb_agg(jsonb_build_object('id', q.id, 'kind', q.kind, 'prompt', q.prompt,
-                                              'choices', to_jsonb(q.choices)) ORDER BY q.position)
+                                              'choices', to_jsonb(q.choices), 'points', q.points) ORDER BY q.position)
                              FROM public.rev_test_questions q WHERE q.test_id = p_id), '[]'::jsonb));
 END
 $fn$;
 
--- Hand a test in: `p_answers` = { "<question id>": [choice index, …] }. Scored here — a question is right when exactly
--- its right choices were picked. Kept for a member of Revenue (`saved`); a writer with no staff record just sees the
--- score. Answers then what was right, question by question.
+-- Hand a test in: `p_answers` = { "<question id>": [choice index, …] | "written answer" }. A choice question is right
+-- when exactly its right choices were picked and gives its points; a written answer waits for a writer's mark (a blank
+-- one is 0). Kept for a member of Revenue (`saved`) with the test as it was taken; a writer with no staff record just
+-- sees the score. Answers the attempt question by question.
 CREATE OR REPLACE FUNCTION public.rev_test_submit(p_id uuid, p_answers jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $fn$
 DECLARE
-  v_staff  uuid;
-  v_test   public.rev_tests;
-  v_total  integer;
-  v_score  integer;
-  v_review jsonb;
-  v_clean  jsonb;
+  v_staff   uuid;
+  v_test    public.rev_tests;
+  v_sheet   jsonb;
+  v_clean   jsonb := '{}'::jsonb;
+  v_q       public.rev_test_questions;
+  v_a       jsonb;
+  v_text    text;
+  v_review  jsonb;
+  v_auto    integer;
+  v_total   integer;
+  v_pending boolean;
+  v_id      uuid;
 BEGIN
   PERFORM public.rev_training_reader('rev.tests');
   IF p_answers IS NULL OR jsonb_typeof(p_answers) <> 'object' THEN
@@ -424,37 +505,72 @@ BEGIN
     RAISE EXCEPTION 'That test is not open any more.' USING ERRCODE = 'P0002';
   END IF;
 
-  WITH q AS (
-    SELECT q.id, q.position, q.correct, q.explain,
-           CASE WHEN jsonb_typeof(p_answers -> q.id::text) = 'array'
-                THEN ARRAY(SELECT DISTINCT (e #>> '{}')::integer FROM jsonb_array_elements(p_answers -> q.id::text) e
-                            WHERE jsonb_typeof(e) = 'number' AND (e #>> '{}') ~ '^[0-9]+$'
-                              AND (e #>> '{}')::integer < cardinality(q.choices) ORDER BY 1)
-                ELSE ARRAY[]::integer[] END AS chosen
-      FROM public.rev_test_questions q WHERE q.test_id = p_id
-  )
-  SELECT count(*)::integer,
-         count(*) FILTER (WHERE chosen = ARRAY(SELECT unnest(correct) ORDER BY 1))::integer,
-         jsonb_agg(jsonb_build_object('id', id, 'chosen', to_jsonb(chosen), 'correct', to_jsonb(correct),
-                                      'right', chosen = ARRAY(SELECT unnest(correct) ORDER BY 1), 'explain', explain)
-                   ORDER BY position),
-         coalesce(jsonb_object_agg(id::text, to_jsonb(chosen)), '{}'::jsonb)
-    INTO v_total, v_score, v_review, v_clean
-    FROM q;
-  IF v_total = 0 THEN
+  SELECT jsonb_agg(jsonb_build_object('id', q.id, 'kind', q.kind, 'prompt', q.prompt, 'choices', to_jsonb(q.choices),
+           'correct', to_jsonb(q.correct), 'points', q.points, 'explain', q.explain) ORDER BY q.position)
+    INTO v_sheet FROM public.rev_test_questions q WHERE q.test_id = p_id;
+  IF v_sheet IS NULL THEN
     RAISE EXCEPTION 'That test has no questions yet.' USING ERRCODE = '22023';
   END IF;
 
+  -- Only what the questions take: choices in range, a written answer trimmed to its length.
+  FOR v_q IN SELECT * FROM public.rev_test_questions q WHERE q.test_id = p_id LOOP
+    v_a := p_answers -> v_q.id::text;
+    IF v_q.kind IN ('short', 'paragraph') THEN
+      v_text := CASE WHEN jsonb_typeof(v_a) = 'string' THEN btrim(v_a #>> '{}') ELSE '' END;
+      v_clean := v_clean || jsonb_build_object(v_q.id::text, left(v_text, CASE WHEN v_q.kind = 'short' THEN 300 ELSE 3000 END));
+    ELSE
+      v_clean := v_clean || jsonb_build_object(v_q.id::text, coalesce((
+        SELECT jsonb_agg(DISTINCT (e #>> '{}')::integer) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v_a) = 'array' THEN v_a ELSE '[]'::jsonb END) e
+         WHERE jsonb_typeof(e) = 'number' AND (e #>> '{}') ~ '^[0-9]+$' AND (e #>> '{}')::integer < cardinality(v_q.choices)), '[]'::jsonb));
+    END IF;
+  END LOOP;
+
+  v_review := public.rev_test_review_json(v_sheet, v_clean, '{}'::jsonb);
+  SELECT coalesce(sum((r ->> 'awarded')::integer), 0), bool_or((r ->> 'pending')::boolean)
+    INTO v_auto, v_pending FROM jsonb_array_elements(v_review) r;
+  SELECT sum((q ->> 'points')::integer) INTO v_total FROM jsonb_array_elements(v_sheet) q;
+
   v_staff := public.rev_training_staff();
   IF v_staff IS NOT NULL THEN
-    INSERT INTO public.rev_test_attempts (test_id, staff_id, user_id, answers, score, total)
-    VALUES (p_id, v_staff, auth.uid(), v_clean, v_score, v_total);
+    INSERT INTO public.rev_test_attempts (test_id, staff_id, user_id, sheet, answers, auto_score, score, total, pending)
+    VALUES (p_id, v_staff, auth.uid(), v_sheet, v_clean, v_auto, v_auto, v_total, coalesce(v_pending, false))
+    RETURNING id INTO v_id;
   END IF;
-  RETURN jsonb_build_object('score', v_score, 'total', v_total, 'saved', v_staff IS NOT NULL, 'review', v_review);
+  RETURN jsonb_build_object('attemptId', v_id, 'score', v_auto, 'total', v_total, 'pending', coalesce(v_pending, false),
+    'saved', v_staff IS NOT NULL, 'review', v_review);
 END
 $fn$;
 
--- ── 7. Free test — writing and results (Free test & Library) ───────────────────
+-- One attempt, question by question with its marks: the taker's own, or anybody's to a writer.
+CREATE OR REPLACE FUNCTION public.rev_test_attempt(p_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  v_a public.rev_test_attempts;
+BEGIN
+  SELECT * INTO v_a FROM public.rev_test_attempts a WHERE a.id = p_id;
+  IF v_a.id IS NULL THEN
+    RAISE EXCEPTION 'That attempt is not there.' USING ERRCODE = 'P0002';
+  END IF;
+  IF NOT public.has_any_action(ARRAY['rev_training.view']) THEN
+    PERFORM public.rev_training_reader('rev.tests');
+    IF v_a.staff_id IS DISTINCT FROM public.rev_training_staff() THEN
+      RAISE EXCEPTION 'That attempt is somebody else''s.' USING ERRCODE = '42501';
+    END IF;
+  END IF;
+  RETURN jsonb_build_object('id', v_a.id, 'testId', v_a.test_id,
+    'title', (SELECT t.title FROM public.rev_tests t WHERE t.id = v_a.test_id),
+    'name', (SELECT s.employee_name FROM public.hr_staff_costs s WHERE s.id = v_a.staff_id),
+    'at', v_a.created_at, 'score', v_a.score, 'total', v_a.total, 'pending', v_a.pending,
+    'markedByName', v_a.marked_by_name, 'markedAt', v_a.marked_at,
+    'questions', (SELECT jsonb_agg(q - 'correct' - 'explain') FROM jsonb_array_elements(v_a.sheet) q),
+    'review', public.rev_test_review_json(v_a.sheet, v_a.answers, v_a.marks));
+END
+$fn$;
+
+-- ── 7. Free test — writing, marking and results (Free test & Library) ──────────
 
 CREATE OR REPLACE FUNCTION public.rev_tests_admin()
 RETURNS jsonb
@@ -468,8 +584,10 @@ BEGIN
              'id', t.id, 'title', t.title, 'intro', t.intro, 'published', t.published, 'byName', t.by_name,
              'updatedAt', t.updated_at,
              'questions', (SELECT count(*) FROM public.rev_test_questions q WHERE q.test_id = t.id),
+             'points', (SELECT coalesce(sum(q.points), 0) FROM public.rev_test_questions q WHERE q.test_id = t.id),
              'people', (SELECT count(DISTINCT x.staff_id) FROM public.rev_test_attempts x WHERE x.test_id = t.id),
-             'attempts', (SELECT count(*) FROM public.rev_test_attempts x WHERE x.test_id = t.id))
+             'attempts', (SELECT count(*) FROM public.rev_test_attempts x WHERE x.test_id = t.id),
+             'toMark', (SELECT count(*) FROM public.rev_test_attempts x WHERE x.test_id = t.id AND x.pending))
            ORDER BY t.updated_at DESC)
       FROM public.rev_tests t WHERE t.deleted_at IS NULL
   ), '[]'::jsonb);
@@ -488,8 +606,8 @@ BEGIN
   PERFORM public.rev_training_need('view');
   SELECT jsonb_build_object('id', t.id, 'title', t.title, 'intro', t.intro, 'published', t.published,
            'questions', coalesce((SELECT jsonb_agg(jsonb_build_object('id', q.id, 'kind', q.kind, 'prompt', q.prompt,
-                                    'choices', to_jsonb(q.choices), 'correct', to_jsonb(q.correct), 'explain', q.explain)
-                                    ORDER BY q.position)
+                                    'choices', to_jsonb(q.choices), 'correct', to_jsonb(q.correct), 'points', q.points,
+                                    'explain', q.explain) ORDER BY q.position)
                                     FROM public.rev_test_questions q WHERE q.test_id = t.id), '[]'::jsonb))
     INTO v FROM public.rev_tests t WHERE t.id = p_id AND t.deleted_at IS NULL;
   IF v IS NULL THEN
@@ -499,8 +617,9 @@ BEGIN
 END
 $fn$;
 
--- Save a test whole: { id?, title, intro, published, questions: [{ kind, prompt, choices[], correct[], explain }] }.
--- A new one is Create's; changing one, Edit's. Its questions are written again from the list.
+-- Save a test whole: { id?, title, intro, published, questions: [{ kind, prompt, choices[], correct[], points, explain }] }.
+-- A new one is Create's; changing one, Edit's. Its questions are written again from the list (an attempt keeps the
+-- test as it was taken).
 CREATE OR REPLACE FUNCTION public.rev_test_save(p_test jsonb)
 RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
@@ -517,6 +636,7 @@ DECLARE
   v_prompt    text;
   v_choices   text[];
   v_correct   integer[];
+  v_points    integer;
 BEGIN
   PERFORM public.rev_training_need(CASE WHEN v_id IS NULL THEN 'create' ELSE 'edit' END);
   IF v_title = '' THEN
@@ -549,33 +669,42 @@ BEGIN
     v_i := v_i + 1;
     v_kind := coalesce(v_q ->> 'kind', 'single');
     v_prompt := btrim(coalesce(v_q ->> 'prompt', ''));
-    IF v_kind NOT IN ('single', 'multiple', 'truefalse') THEN
+    IF v_kind NOT IN ('single', 'multiple', 'truefalse', 'short', 'paragraph') THEN
       RAISE EXCEPTION 'Question %: pick its type.', v_i USING ERRCODE = '22023';
     END IF;
     IF v_prompt = '' THEN
       RAISE EXCEPTION 'Question %: write the question.', v_i USING ERRCODE = '22023';
     END IF;
-    IF v_kind = 'truefalse' THEN
-      v_choices := ARRAY['True', 'False'];
+    v_points := CASE WHEN (v_q ->> 'points') ~ '^[0-9]+$' THEN (v_q ->> 'points')::integer ELSE 1 END;
+    IF v_points < 1 OR v_points > 100 THEN
+      RAISE EXCEPTION 'Question %: give it 1 to 100 points.', v_i USING ERRCODE = '22023';
+    END IF;
+    IF v_kind IN ('short', 'paragraph') THEN
+      v_choices := '{}';
+      v_correct := '{}';
     ELSE
-      v_choices := ARRAY(SELECT btrim(c #>> '{}') FROM jsonb_array_elements(coalesce(v_q -> 'choices', '[]'::jsonb)) c);
-      IF EXISTS (SELECT 1 FROM unnest(v_choices) c WHERE c = '') THEN
-        RAISE EXCEPTION 'Question %: fill in every answer, or remove the empty one.', v_i USING ERRCODE = '22023';
+      IF v_kind = 'truefalse' THEN
+        v_choices := ARRAY['True', 'False'];
+      ELSE
+        v_choices := ARRAY(SELECT btrim(c #>> '{}') FROM jsonb_array_elements(coalesce(v_q -> 'choices', '[]'::jsonb)) c);
+        IF EXISTS (SELECT 1 FROM unnest(v_choices) c WHERE c = '') THEN
+          RAISE EXCEPTION 'Question %: fill in every answer, or remove the empty one.', v_i USING ERRCODE = '22023';
+        END IF;
+        IF cardinality(v_choices) < 2 OR cardinality(v_choices) > 8 THEN
+          RAISE EXCEPTION 'Question %: give 2 to 8 answers to pick from.', v_i USING ERRCODE = '22023';
+        END IF;
       END IF;
-      IF cardinality(v_choices) < 2 OR cardinality(v_choices) > 8 THEN
-        RAISE EXCEPTION 'Question %: give 2 to 8 answers to pick from.', v_i USING ERRCODE = '22023';
+      v_correct := ARRAY(SELECT DISTINCT (c #>> '{}')::integer FROM jsonb_array_elements(coalesce(v_q -> 'correct', '[]'::jsonb)) c
+                          WHERE (c #>> '{}') ~ '^[0-9]+$' AND (c #>> '{}')::integer < cardinality(v_choices) ORDER BY 1);
+      IF cardinality(v_correct) = 0 THEN
+        RAISE EXCEPTION 'Question %: mark the right answer.', v_i USING ERRCODE = '22023';
+      END IF;
+      IF v_kind <> 'multiple' AND cardinality(v_correct) > 1 THEN
+        RAISE EXCEPTION 'Question %: only one answer can be right — or make it a several-answers question.', v_i USING ERRCODE = '22023';
       END IF;
     END IF;
-    v_correct := ARRAY(SELECT DISTINCT (c #>> '{}')::integer FROM jsonb_array_elements(coalesce(v_q -> 'correct', '[]'::jsonb)) c
-                        WHERE (c #>> '{}') ~ '^[0-9]+$' AND (c #>> '{}')::integer < cardinality(v_choices) ORDER BY 1);
-    IF cardinality(v_correct) = 0 THEN
-      RAISE EXCEPTION 'Question %: mark the right answer.', v_i USING ERRCODE = '22023';
-    END IF;
-    IF v_kind <> 'multiple' AND cardinality(v_correct) > 1 THEN
-      RAISE EXCEPTION 'Question %: only one answer can be right — or make it a several-answers question.', v_i USING ERRCODE = '22023';
-    END IF;
-    INSERT INTO public.rev_test_questions (test_id, position, kind, prompt, choices, correct, explain)
-    VALUES (v_id, v_i - 1, v_kind, v_prompt, v_choices, v_correct, left(btrim(coalesce(v_q ->> 'explain', '')), 1000));
+    INSERT INTO public.rev_test_questions (test_id, position, kind, prompt, choices, correct, points, explain)
+    VALUES (v_id, v_i - 1, v_kind, v_prompt, v_choices, v_correct, v_points, left(btrim(coalesce(v_q ->> 'explain', '')), 1000));
   END LOOP;
   RETURN v_id;
 END
@@ -608,7 +737,80 @@ BEGIN
 END
 $fn$;
 
+-- What waits for marking, oldest first (View).
+CREATE OR REPLACE FUNCTION public.rev_tests_to_mark()
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+  PERFORM public.rev_training_need('view');
+  RETURN coalesce((
+    SELECT jsonb_agg(jsonb_build_object('id', a.id, 'testId', a.test_id, 'title', t.title, 'name', s.employee_name,
+             'at', a.created_at, 'score', a.score, 'total', a.total) ORDER BY a.created_at)
+      FROM public.rev_test_attempts a
+      JOIN public.rev_tests t ON t.id = a.test_id
+      JOIN public.hr_staff_costs s ON s.id = a.staff_id
+     WHERE a.pending
+  ), '[]'::jsonb);
+END
+$fn$;
+
+-- Mark an attempt's written answers (Edit): `p_marks` = { "<question id>": { points, comment } }, each 0 to the
+-- question's points, every written answer at once (marked again: the marks replaced). The score is the choice
+-- questions' points plus the marks.
+CREATE OR REPLACE FUNCTION public.rev_test_mark(p_attempt uuid, p_marks jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $fn$
+DECLARE
+  v_a     public.rev_test_attempts;
+  v_q     jsonb;
+  v_id    text;
+  v_m     jsonb;
+  v_p     integer;
+  v_clean jsonb := '{}'::jsonb;
+  v_n     integer := 0;
+BEGIN
+  PERFORM public.rev_training_need('edit');
+  SELECT * INTO v_a FROM public.rev_test_attempts WHERE id = p_attempt FOR UPDATE;
+  IF v_a.id IS NULL THEN
+    RAISE EXCEPTION 'That attempt is not there.' USING ERRCODE = 'P0002';
+  END IF;
+  IF p_marks IS NULL OR jsonb_typeof(p_marks) <> 'object' THEN
+    RAISE EXCEPTION 'Give each written answer its points.' USING ERRCODE = '22023';
+  END IF;
+  FOR v_q IN SELECT e FROM jsonb_array_elements(v_a.sheet) e WHERE e ->> 'kind' IN ('short', 'paragraph') LOOP
+    v_id := v_q ->> 'id';
+    v_n := v_n + 1;
+    IF coalesce(v_a.answers ->> v_id, '') = '' THEN
+      CONTINUE;  -- left blank: 0, nothing to mark
+    END IF;
+    v_m := p_marks -> v_id;
+    IF v_m IS NULL OR coalesce(v_m ->> 'points', '') !~ '^[0-9]+$' THEN
+      RAISE EXCEPTION 'Give every written answer its points.' USING ERRCODE = '22023';
+    END IF;
+    v_p := (v_m ->> 'points')::integer;
+    IF v_p > (v_q ->> 'points')::integer THEN
+      RAISE EXCEPTION 'A written answer gets at most its question''s % points.', v_q ->> 'points' USING ERRCODE = '22023';
+    END IF;
+    v_clean := v_clean || jsonb_build_object(v_id, jsonb_build_object('points', v_p, 'comment', left(btrim(coalesce(v_m ->> 'comment', '')), 500)));
+  END LOOP;
+  IF v_n = 0 THEN
+    RAISE EXCEPTION 'This test has no written answers to mark.' USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.rev_test_attempts
+     SET marks = v_clean, pending = false,
+         score = auto_score + coalesce((SELECT sum((m ->> 'points')::integer) FROM jsonb_each(v_clean) j(k, m)), 0),
+         marked_by = auth.uid(), marked_by_name = public.rev_training_actor(), marked_at = now()
+   WHERE id = p_attempt;
+  RETURN public.rev_test_attempt(p_attempt);
+END
+$fn$;
+
 -- Everybody's scores on one test: every member of IR today, those who took it first, and anybody else who did.
+-- Best of the marked attempts; the last, and whether it waits for marking.
 CREATE OR REPLACE FUNCTION public.rev_test_results(p_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -631,13 +833,16 @@ BEGIN
        WHERE x.test_id = p_id
     )
     SELECT jsonb_agg(jsonb_build_object('staffId', p.id, 'name', p.name, 'attempts', coalesce(a.n, 0), 'best', a.best,
-                                        'last', a.last, 'total', a.total, 'lastAt', a.last_at)
+                                        'last', a.last, 'total', a.total, 'lastId', a.last_id,
+                                        'lastPending', coalesce(a.last_pending, false), 'lastAt', a.last_at)
                      ORDER BY a.n IS NULL, a.best DESC NULLS LAST, p.name)
       FROM people p
       LEFT JOIN LATERAL (
-        SELECT count(*) AS n, max(x.score) AS best,
+        SELECT count(*) AS n, max(x.score) FILTER (WHERE NOT x.pending) AS best,
+               (array_agg(x.id ORDER BY x.created_at DESC))[1] AS last_id,
                (array_agg(x.score ORDER BY x.created_at DESC))[1] AS last,
                (array_agg(x.total ORDER BY x.created_at DESC))[1] AS total,
+               (array_agg(x.pending ORDER BY x.created_at DESC))[1] AS last_pending,
                max(x.created_at) AS last_at
           FROM public.rev_test_attempts x WHERE x.test_id = p_id AND x.staff_id = p.id
         HAVING count(*) > 0
@@ -836,13 +1041,18 @@ $fn$;
 
 REVOKE ALL ON FUNCTION public.rev_tests_mine(), public.rev_test_take(uuid), public.rev_test_submit(uuid, jsonb),
   public.rev_tests_admin(), public.rev_test_admin(uuid), public.rev_test_save(jsonb), public.rev_test_publish(uuid, boolean),
-  public.rev_test_delete(uuid), public.rev_test_results(uuid), public.rev_library(), public.rev_library_open(uuid),
+  public.rev_test_delete(uuid), public.rev_test_results(uuid), public.rev_test_attempt(uuid), public.rev_tests_to_mark(),
+  public.rev_test_mark(uuid, jsonb), public.rev_library(), public.rev_library_open(uuid),
   public.rev_lib_category_save(uuid, text), public.rev_lib_category_delete(uuid),
   public.rev_lib_item_add(uuid, text, text, text, text, text), public.rev_lib_item_edit(uuid, uuid, text, text, text),
   public.rev_lib_item_delete(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.rev_tests_mine(), public.rev_test_take(uuid), public.rev_test_submit(uuid, jsonb),
   public.rev_tests_admin(), public.rev_test_admin(uuid), public.rev_test_save(jsonb), public.rev_test_publish(uuid, boolean),
-  public.rev_test_delete(uuid), public.rev_test_results(uuid), public.rev_library(), public.rev_library_open(uuid),
+  public.rev_test_delete(uuid), public.rev_test_results(uuid), public.rev_test_attempt(uuid), public.rev_tests_to_mark(),
+  public.rev_test_mark(uuid, jsonb), public.rev_library(), public.rev_library_open(uuid),
   public.rev_lib_category_save(uuid, text), public.rev_lib_category_delete(uuid),
   public.rev_lib_item_add(uuid, text, text, text, text, text), public.rev_lib_item_edit(uuid, uuid, text, text, text),
   public.rev_lib_item_delete(uuid) TO authenticated;
+
+-- The review of an attempt is the functions' own.
+REVOKE ALL ON FUNCTION public.rev_test_review_json(jsonb, jsonb, jsonb) FROM PUBLIC, anon, authenticated;

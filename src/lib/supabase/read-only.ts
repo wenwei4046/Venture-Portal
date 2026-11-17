@@ -82,6 +82,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   // The Revenue app's Free test and Library (mig 20261117010000): the tests, one to take, the Library — and the writers'
   // list, one test with its answers, its scores — all STABLE.
   'rev_tests_mine', 'rev_test_take', 'rev_library', 'rev_tests_admin', 'rev_test_admin', 'rev_test_results',
+  // …an attempt with its marks, and what waits for marking (2026-11-17) — STABLE.
+  'rev_test_attempt', 'rev_tests_to_mark',
   // Marketing's view (mig 20261023214100): its board, sidebar, search and one's own notices — all STABLE.
   'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
   // Marketing's task page (mig 20261023234000): one project, its stages' work and trail — STABLE.
