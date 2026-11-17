@@ -9,21 +9,24 @@ import { readsAds, withoutHiddenAds } from "@/lib/member/crm-data";
 import type { SourcePick } from "@/lib/member/crm-source";
 import { mins, overviewFigures, overviewTiles, pctOf, rm, rm2 } from "../../shared/insight-overview";
 import type { DeskCtx } from "./ctx";
-import { inBrand, insightRange, prevRange } from "./insight";
+import { compareRange, compareWords, inBrand, insightRange } from "./insight";
+import { rangeLine } from "./frame4a";
 import { DIRECTOR_C, DIRECTOR_TEAM, teamColours } from "./tokens";
 
 export function deskOverviewVM(ctx: DeskCtx) {
   const { ui, patch } = ctx;
   const data = inBrand(withoutHiddenAds(ctx.data), ui.insSrc as SourcePick | undefined);
-  const { r } = insightRange(ctx), prev = prevRange(r), money = readsAds(ctx.data.can);
+  const { r } = insightRange(ctx), prev = compareRange(ui, r), money = readsAds(ctx.data.can);
   const f = overviewFigures({ data, r, prev, now: ctx.now, teams: ctx.teams, directors: ctx.directors, directorTeam: DIRECTOR_TEAM,
     src: ui.insSrc as SourcePick | undefined, meta: ui.apMeta, money });
   const dotOf = (key: string) => { if (key === DIRECTOR_TEAM) return DIRECTOR_C[0]; const k = ctx.teams.findIndex(t => t.id === key); return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
   const maxLeads = Math.max(1, ...f.teams.map(t => t.leads));
   return {
     money,
+    // What every tile's change is against: "vs Oct", "vs last week", "vs 1–17 Oct" (Custom's Compare with).
+    vs: compareWords(ui, prev),
     ready: f.ads.ready,
-    tiles: overviewTiles(f, money),
+    tiles: overviewTiles(f, money, `vs ${rangeLine(prev)}`),
     brands: f.brands.map(b => ({ label: b.label, spend: rm(b.spend), leads: String(b.leads), cpl: rm2(b.cpl), appt: String(b.appt), won: String(b.won) })),
     ads: f.adRows.slice(0, ui.insOvAllAds ? undefined : 8).map(a => {
       const open = ui.insOvAd === a.id, split = f.adTeams.find(x => x.id === a.id);

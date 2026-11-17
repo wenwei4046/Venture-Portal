@@ -77,7 +77,8 @@ function profile6(ctx: PanelCtx, house: boolean) {
 export function phoneOverviewProps(ctx: PanelCtx): PhoneOverviewProps {
   const { ui, now, patch } = ctx, r = periodRange(ui.period, ui.ovRange, now);
   const whole = ui.period === "month";
-  const prev = whole ? { a: new Date(new Date(r.a).getFullYear(), new Date(r.a).getMonth() - 1, 1).getTime(), b: new Date(new Date(r.a).getFullYear(), new Date(r.a).getMonth(), 0).getTime() }
+  // The date sheet's Compare to, when one is picked (Team performance and Ads read the same ui.cmp, 2026-11-17).
+  const prev = ui.cmp ? ui.cmp : whole ? { a: new Date(new Date(r.a).getFullYear(), new Date(r.a).getMonth() - 1, 1).getTime(), b: new Date(new Date(r.a).getFullYear(), new Date(r.a).getMonth(), 0).getTime() }
     : { a: r.a - (r.b - r.a + DAY), b: r.a - DAY };
   return { data: ctx.data, r, prev, now, teams: ctx.teams.map(t => ({ id: t.id, name: t.name, c: t.c, people: t.people })), directors: ctx.directors,
     directorTeam: "Revenue Director", directorColour: DIRECTOR.c, live: ctx.live, money: readsAds(ctx.data.can),

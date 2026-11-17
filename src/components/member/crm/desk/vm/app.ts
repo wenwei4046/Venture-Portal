@@ -12,7 +12,7 @@ import { peopleBook } from "../../shared/people-book";
 import { upNextOpen } from "../../shared/up-next-data";
 import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
-import { activityPeriod, clistVM, insightVM } from "./insight";
+import { activityPeriod, clistVM, insightCompareVM, insightVM } from "./insight";
 import { deskOverviewVM } from "./overview";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
 import { answerOf, formV2 } from "./form";
@@ -92,7 +92,8 @@ export function deskVM(ctx: DeskCtx) {
     ...formPageVM(ctx),
     ...auditVM(ctx),
     ...channelsVM(ctx),
-    ...adsPerfVM(ctx),
+    // Insight's "+ Compare": Ads performance's own on its tab, Custom's Compare with on the others (2026-11-17).
+    ...(ap => ({ ...ap, insCmp: ap.insCmp ?? insightCompareVM(ctx) }))(adsPerfVM(ctx)),
     ...reportsVM(ctx),
     // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
     kWorkspace: false, // My reports left Reports (2026-11-09); a stored "workspace" tab shows Reports
@@ -155,10 +156,10 @@ export function deskVM(ctx: DeskCtx) {
     infoFold: ui.infoFold ?? [], toggleInfoFold: (label: string) => ctx.set(u => ({ ...u, infoFold: (u.infoFold ?? []).includes(label) ? (u.infoFold ?? []).filter(x => x !== label) : [...(u.infoFold ?? []), label] })),
     kBook: ui.kind === "book", kNote: ui.kind === "note", kForm: ui.kind === "form",
     book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
-    cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },
+    cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null, insCmpRange: null }); },
     periodOpts: (["day", "week", "month", "custom"] as const).map((k, i) => ({ label: ["Today", "This week", "This month", "Custom"][i], on: ui.insPer === k, off: ui.insPer !== k,
       // Custom opens the shared picker (any From and To, earlier months too); Apply sets the range (voice-and-dates.md §2).
-      pick: () => (k === "custom" ? patch({ insPer: "custom", insPick: true, insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null, insPick: false })) })),
+      pick: () => (k === "custom" ? patch({ insPer: "custom", insPick: true, insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null, insCmpRange: null, insPick: false, insCmpPick: false })) })),
     insPicker: ui.insPick ? { allFrom: data.customers.reduce((m, c) => Math.min(m, new Date(c.createdAt).getTime() || m), ctx.now.getTime()), value: ui.insRange, apply: (r: { a: number; b: number }) => patch({ insPer: "custom", insRange: r, insPick: false }), cancel: () => patch({ insPick: false }) } : null,
     periodNow: ({ day: "Today", week: "This week", month: "This month", custom: "Custom" } as const)[ui.insPer],
     // The toast's Undo (30 s): a Send to goes back to whoever had the customer; a delete brings the notifications back.

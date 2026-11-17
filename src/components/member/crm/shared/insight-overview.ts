@@ -206,20 +206,37 @@ export function change(now: number | null, before: number | null, kind: "count" 
   return { d: `${x >= 0 ? "+" : "−"}${Math.abs(x)}%`, good: kind === "cost" ? x <= 0 : x >= 0 };
 }
 
-/** The six tiles across the top: the ads' three money figures, then the team's leads, appt rate and won. */
-export function overviewTiles(f: OverviewFigures, withMoney: boolean) {
-  const t = (label: string, value: string, c: { d: string; good: boolean }, sub = "") => ({ label, value, d: c.d, good: c.good, sub });
+export interface OvTip { sub: string[]; title?: string }
+/**
+ * Each tile's hover (the owner, 2026-11-17: "鼠标指向这些数据会出现小字提示，像 ads performance 一样"): how the figure is
+ * worked out, in the period's own numbers where there are any, then what it is compared with — Ads Performance's card
+ * (sub: the first line bold; title: under a rule, faint). `vs` names the compared dates ("vs 1–17 Oct").
+ */
+export function overviewTiles(f: OverviewFigures, withMoney: boolean, vs = "vs last") {
+  const t = (label: string, value: string, c: { d: string; good: boolean }, tip: OvTip, sub = "") => ({ label, value, d: c.d, good: c.good, sub, tip });
+  const was = (v: string) => `${vs}: ${v}`;
+  const a = f.ads, ap = f.adsPrev, w = f.work, wp = f.workPrev;
+  const div = (x: number, y: number, out: string) => (y ? [`${x.toLocaleString("en-MY")} ÷ ${y.toLocaleString("en-MY")} = ${out}`] : []);
   return [
     ...(withMoney ? [
-      t("Ads spend", rm(f.ads.spend), change(f.ads.spend, f.adsPrev.spend, "cost"), f.ads.fee == null ? "" : `+ fee ${rm(f.ads.fee)}`),
-      t("Total cost", rm(f.ads.cost), change(f.ads.cost, f.adsPrev.cost, "cost")),
-      t("Per lead", rm2(f.ads.cpl), change(f.ads.cpl, f.adsPrev.cpl, "cost")),
+      t("Ads spend", rm(a.spend), change(a.spend, ap.spend, "cost"), {
+        sub: ["Ads spend = what Ads Manager spent on the ads", ...(a.fee == null ? [] : [`Marketing fee's share ${rm2(a.fee)} is added in Total cost`])], title: was(rm(ap.spend)) },
+        a.fee == null ? "" : `+ fee ${rm(a.fee)}`),
+      t("Total cost", rm(a.cost), change(a.cost, ap.cost, "cost"), {
+        sub: ["Total cost = ads spend + marketing fee's share", ...(a.spend == null || a.fee == null ? [] : [`${rm2(a.spend)} + ${rm2(a.fee)} = ${rm2(a.cost)}`])], title: was(rm(ap.cost)) }),
+      t("Per lead", rm2(a.cpl), change(a.cpl, ap.cpl, "cost"), {
+        sub: ["Per lead = total cost ÷ leads from ads", ...(a.cost == null || !a.leads ? [] : [`${rm2(a.cost)} ÷ ${a.leads.toLocaleString("en-MY")} = ${rm2(a.cpl)}`])], title: was(rm2(ap.cpl)) }),
     ] : []),
-    t("Leads", f.work.leads.toLocaleString("en-MY"), change(f.work.leads, f.workPrev.leads, "count")),
-    t("Avg. reply", mins(f.work.avgReply), change(f.work.avgReply, f.workPrev.avgReply, "time")),
-    t("Appt rate", pctOf(f.work.apptRate), change(f.work.apptRate, f.workPrev.apptRate, "rate")),
-    t("Show-up", pctOf(f.work.showRate), change(f.work.showRate, f.workPrev.showRate, "rate")),
-    t("Won", f.work.won.toLocaleString("en-MY"), change(f.work.won, f.workPrev.won, "count")),
+    t("Leads", w.leads.toLocaleString("en-MY"), change(w.leads, wp.leads, "count"), {
+      sub: ["Leads = new customers in the period", "Each customer counted once"], title: was(wp.leads.toLocaleString("en-MY")) }),
+    t("Avg. reply", mins(w.avgReply), change(w.avgReply, wp.avgReply, "time"), {
+      sub: ["Avg. reply = a customer's message to our next reply, averaged", "Replies made in the period · auto-replies don't count"], title: was(mins(wp.avgReply)) }),
+    t("Appt rate", pctOf(w.apptRate), change(w.apptRate, wp.apptRate, "rate"), {
+      sub: ["Appt rate = leads who booked ÷ leads", ...div(w.booked, w.leads, pctOf(w.apptRate))], title: was(pctOf(wp.apptRate)) }),
+    t("Show-up", pctOf(w.showRate), change(w.showRate, wp.showRate, "rate"), {
+      sub: ["Show-up = customers who came ÷ visits due", ...div(w.came, w.due, pctOf(w.showRate))], title: was(pctOf(wp.showRate)) }),
+    t("Won", w.won.toLocaleString("en-MY"), change(w.won, wp.won, "count"), {
+      sub: ["Won = the period's leads marked won"], title: was(wp.won.toLocaleString("en-MY")) }),
   ];
 }
 

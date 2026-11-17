@@ -5,7 +5,8 @@
  * before), the ads — by brand, then ad by ad, an ad opening to the teams its leads went to — and the teams, a team
  * opening to its people. Drawn in Insight's own look (Desk4a.tsx › DeskInsight4a); the figures are vm/overview.ts's.
  */
-import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
+import { DeskFigureTip } from "./Desk4a";
 import type { DeskOverview as OV } from "./vm/overview";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -27,6 +28,7 @@ function Section({ title, go, goLabel, children }: { title: string; go: () => vo
 }
 
 export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boolean; pick: () => void }[] }) {
+  const [hov, setHov] = useState<string | null>(null);
   const adCols = o.money ? "minmax(0,2.4fr) minmax(0,1fr) repeat(5,minmax(0,0.8fr))" : "minmax(0,2.4fr) minmax(0,1fr) repeat(3,minmax(0,0.8fr))";
   const brCols = o.money ? "minmax(0,2fr) repeat(5,minmax(0,1fr))" : "minmax(0,2fr) repeat(3,minmax(0,1fr))";
   const tmCols = "minmax(0,2fr) minmax(0,1.4fr) repeat(4,minmax(0,0.8fr))";
@@ -44,12 +46,15 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
       )}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(o.tiles.length, 4)},minmax(0,1fr))`, rowGap: "22px", padding: "22px 0", borderRadius: "12px", background: "var(--crm-sum)", border: "1px solid var(--crm-sum-line)" }}>
         {o.tiles.map((t, i) => (
-          <div key={t.label} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "0 18px", minWidth: 0, borderLeft: `1px solid ${i % 4 ? "var(--crm-hero-line)" : "transparent"}` }}>
+          <div key={t.label} data-ov-tile={t.label} onMouseEnter={() => setHov(t.label)} onMouseLeave={() => setHov(h => (h === t.label ? null : h))}
+            style={{ position: "relative", display: "flex", flexDirection: "column", gap: "8px", padding: "0 18px", minWidth: 0, borderLeft: `1px solid ${i % 4 ? "var(--crm-hero-line)" : "transparent"}` }}>
             <span style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{t.label}</span>
             <span style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.03em", lineHeight: 1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: i === 0 ? "var(--crm-rust)" : "var(--crm-ink)" }}>{t.value}</span>
             <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: t.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)", whiteSpace: "nowrap" }}>
-              {t.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>vs last</span>{t.sub && <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {t.sub}</span>}
+              {t.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{o.vs}</span>{t.sub && <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {t.sub}</span>}
             </span>
+            {/* How the figure is worked out and what it is compared with, on hover — Ads Performance's card (2026-11-17). */}
+            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} at="10px" />}
           </div>
         ))}
       </div>
