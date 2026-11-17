@@ -22,14 +22,20 @@ export function deskOverviewVM(ctx: DeskCtx) {
   const dotOf = (key: string) => { if (key === DIRECTOR_TEAM) return DIRECTOR_C[0]; const k = ctx.teams.findIndex(t => t.id === key); return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
   const maxLeads = Math.max(1, ...f.teams.map(t => t.leads));
   // Each table's last column is picked from a list (the owner, 2026-11-17: "一个可选的 metric column"); Sales at first.
+  // Kept per person on the server (crm_save_ui_pref "ovCols"), as Ads Performance keeps its figures.
+  const keptRaw = ctx.data.uiPrefs?.ovCols as { ads?: OvColKey; team?: OvColKey } | undefined;
+  const kept = { ads: keptRaw?.ads ?? ui.insOvAdCol, team: keptRaw?.team ?? ui.insOvTeamCol };
   const colMenu = (table: "ads" | "team") => {
-    const list = colsFor(table, money), want: OvColKey = (table === "ads" ? ui.insOvAdCol : ui.insOvTeamCol) ?? "sales";
+    const list = colsFor(table, money), want: OvColKey = (table === "ads" ? ui.insOvAdCol : ui.insOvTeamCol) ?? kept[table] ?? "sales";
     const on = list.find(c => c.key === want) ?? list[0];
     return {
       key: on.key, label: on.label, open: ui.insOvColMenu === table,
       toggle: () => patch({ insOvColMenu: ui.insOvColMenu === table ? null : table }),
       close: () => patch({ insOvColMenu: null }),
-      options: list.map(c => ({ label: c.label, on: c.key === on.key, pick: () => patch(table === "ads" ? { insOvAdCol: c.key, insOvColMenu: null } : { insOvTeamCol: c.key, insOvColMenu: null }) })),
+      options: list.map(c => ({ label: c.label, on: c.key === on.key, pick: () => {
+        patch(table === "ads" ? { insOvAdCol: c.key, insOvColMenu: null } : { insOvTeamCol: c.key, insOvColMenu: null });
+        ctx.deskAct?.saveUiPref?.("ovCols", { ...kept, [table]: c.key });
+      } })),
     };
   };
   const adCol = colMenu("ads"), teamCol = colMenu("team");

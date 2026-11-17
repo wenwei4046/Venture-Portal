@@ -39,13 +39,14 @@ export interface OverviewIn {
 }
 
 export interface OvMoney { spend: number | null; fee: number | null; cost: number | null; cpl: number | null }
-export interface OvAdRow extends OvMoney { id: string; name: string; brand: string; leads: number; appt: number; won: number; sales: number; paid: boolean }
-export interface OvBrandRow extends OvMoney { key: SourceBrand | "none"; label: string; leads: number; appt: number; won: number; sales: number }
+export interface OvAdRow extends OvMoney { id: string; name: string; brand: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; paid: boolean }
+export interface OvBrandRow extends OvMoney { key: SourceBrand | "none"; label: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number }
 export interface OvWork { leads: number; avgReply: number | null; booked: number; apptRate: number | null; came: number; due: number; showRate: number | null; won: number;
-  /** RM: the Won amount of the period's leads marked won (crm_contacts.won_amount, asked when a visit is marked Won). */ sales: number }
+  /** RM: the Won amount of the period's leads marked won (crm_contacts.won_amount, asked when a visit is marked Won). */ sales: number;
+  /** Won customers with an amount — what AOV divides by. */ wonPaid: number }
 export interface OvPersonRow extends OvWork { id: string; name: string }
 export interface OvTeamRow extends OvWork { key: string; name: string; people: OvPersonRow[] }
-export interface OvAdTeams { id: string; name: string; leads: number; teams: { key: string; name: string; leads: number; booked: number; won: number; sales: number }[] }
+export interface OvAdTeams { id: string; name: string; leads: number; teams: { key: string; name: string; leads: number; booked: number; won: number; sales: number; wonPaid: number; came: number }[] }
 
 export interface OverviewFigures {
   ads: OvMoney & { leads: number; appt: number; won: number; sales: number; ready: boolean };
@@ -84,7 +85,11 @@ export function avgReplyOf(customers: CrmCustomer[], r: OvRange): number | null 
 export function workOf(cs: CrmCustomer[], data: CrmData, r: OvRange, now: Date): OvWork {
   const n = numbersOf(cs, data.visits, r, now);
   return { leads: n.leads, avgReply: avgReplyOf(cs, r), booked: n.booked, apptRate: n.leads ? (n.booked / n.leads) * 100 : null,
-    came: n.came, due: n.due, showRate: n.due ? (n.came / n.due) * 100 : null, won: n.won, sales: salesOf(cs, r) };
+    came: n.came, due: n.due, showRate: n.due ? (n.came / n.due) * 100 : null, won: n.won, sales: salesOf(cs, r), wonPaid: wonPaidOf(cs, r) };
+}
+/** The range's won leads that have an amount (AOV's divisor). */
+export function wonPaidOf(cs: CrmCustomer[], r: OvRange): number {
+  return cs.filter(c => c.status === "won" && inRange(c.createdAt, r) && Number(c.wonAmount) > 0).length;
 }
 /** The Won amount of the range's leads marked won — the leads Won counts (numbersOf), each customer once. */
 export function salesOf(cs: CrmCustomer[], r: OvRange): number {
@@ -133,7 +138,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     const first = data.customers.find(c => adKey(c) === id);
     const name = first?.adId ? first.ad : first ? `No ad · ${first.channel === "whatsapp" ? "WhatsApp" : "Messenger"}` : data.adNames?.[id]?.name ?? id;
     const b = brandOfAd(id);
-    return { id, name, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, paid, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
+    return { id, name, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
   }).filter(a => a.leads > 0 || (a.paid && (a.spend ?? 0) > 0) || (a.paid && a.spend == null && p.money))
     .sort((x, y) => y.leads - x.leads || (y.spend ?? 0) - (x.spend ?? 0) || x.name.localeCompare(y.name));
 
@@ -149,7 +154,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   const brands: OvBrandRow[] = brandKeys.map(k => {
     const mine = ids.filter(id => (brandOfAd(id) ?? "none") === k), cs = adCs.filter(c => mine.includes(adKey(c)));
     const w = workOf(cs, data, r, now);
-    return { key: k, label: k === "none" ? "Other" : BRAND_LABEL[k], leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, ...money(spendOf(mine.filter(isMetaId), r.a, r.b), w.leads, rate) };
+    return { key: k, label: k === "none" ? "Other" : BRAND_LABEL[k], leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, ...money(spendOf(mine.filter(isMetaId), r.a, r.b), w.leads, rate) };
   }).filter(b => b.leads > 0 || (b.spend ?? 0) > 0);
 
   // The teams: the Revenue Director's own, then each team, each person; customers nobody has yet last.
@@ -172,13 +177,14 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   for (const g of groups) for (const x of g.people) if (!teamOfPerson.has(x.id)) teamOfPerson.set(x.id, { key: g.key, name: g.name });
   const adTeams: OvAdTeams[] = adRows.filter(a => a.leads > 0).map(a => {
     const cs = leadsIn(adCs.filter(c => adKey(c) === a.id), r);
-    const by = new Map<string, { key: string; name: string; leads: number; booked: number; won: number; sales: number }>();
+    const by = new Map<string, { key: string; name: string; leads: number; booked: number; won: number; sales: number; wonPaid: number; came: number }>();
     for (const c of cs) {
       const t = (c.assignedTo && teamOfPerson.get(c.assignedTo)) || { key: "", name: NOBODY };
-      const row = by.get(t.key) ?? { ...t, leads: 0, booked: 0, won: 0, sales: 0 };
+      const row = by.get(t.key) ?? { ...t, leads: 0, booked: 0, won: 0, sales: 0, wonPaid: 0, came: 0 };
       row.leads++;
       if (data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")) row.booked++;
-      if (c.status === "won") { row.won++; if (Number(c.wonAmount) > 0) row.sales += Number(c.wonAmount); }
+      if (data.visits.some(v => v.customerId === c.id && v.state === "attended" && inRange(v.start, r))) row.came++;
+      if (c.status === "won") { row.won++; if (Number(c.wonAmount) > 0) { row.sales += Number(c.wonAmount); row.wonPaid++; } }
       by.set(t.key, row);
     }
     return { id: a.id, name: a.name, leads: a.leads, teams: [...by.values()].sort((x, y) => (x.key === "" ? 1 : 0) - (y.key === "" ? 1 : 0) || y.leads - x.leads || x.name.localeCompare(y.name)) };
@@ -245,21 +251,23 @@ export function overviewTiles(f: OverviewFigures, withMoney: boolean, vs = "vs l
     // The owner, 2026-11-17: "新增：conversion rate, total sales, ROAS, AOV" — sales = the Won amount asked when a visit is
     // marked Won; ROAS on the ads' own sales and total cost.
     t("Total sales", rm(w.sales), change(w.sales, wp.sales, "count"), {
-      sub: ["Total sales = the Won amount of the period's leads marked won", `${w.won.toLocaleString("en-MY")} won · ${rm2(w.sales)}`], title: was(rm(wp.sales)) }),
+      sub: ["Total sales = the Won amount of the period's leads marked won", w.wonPaid ? `${w.wonPaid.toLocaleString("en-MY")} won with an amount · ${rm2(w.sales)}` : "No customer marked Won with an amount yet", "Recorded only · commission is unchanged"], title: was(rm(wp.sales)) }),
     t("Conversion", pctOf(convOf(w)), change(convOf(w), convOf(wp), "rate"), {
-      sub: ["Conversion = won ÷ leads", ...div(w.won, w.leads, pctOf(convOf(w)))], title: was(pctOf(convOf(wp))) }),
+      sub: ["Conversion = won ÷ customers who showed up", w.came ? div(w.won, w.came, pctOf(convOf(w)))[0] : "Nobody showed up in the period"], title: was(pctOf(convOf(wp))) }),
     t("AOV", rm(aovOf(w)), change(aovOf(w), aovOf(wp), "count"), {
-      sub: ["AOV = total sales ÷ won", ...(w.won ? [`${rm2(w.sales)} ÷ ${w.won.toLocaleString("en-MY")} = ${rm2(aovOf(w))}`] : [])], title: was(rm(aovOf(wp))) }),
+      sub: ["AOV = total sales ÷ won customers with an amount", w.wonPaid ? `${rm2(w.sales)} ÷ ${w.wonPaid.toLocaleString("en-MY")} = ${rm2(aovOf(w))}` : "No customer marked Won with an amount yet"], title: was(rm(aovOf(wp))) }),
     ...(withMoney ? [
-      t("ROAS", roasText(a.sales, a.cost), change(roasOf(a.sales, a.cost), roasOf(ap.sales, ap.cost), "count"), {
-        sub: ["ROAS = sales from ads ÷ total cost", ...(a.cost ? [`${rm2(a.sales)} ÷ ${rm2(a.cost)} = ${roasText(a.sales, a.cost)}`] : [])], title: was(roasText(ap.sales, ap.cost)) }),
+      t("ROAS", roasText(w.sales, a.cost), change(roasOf(w.sales, a.cost), roasOf(wp.sales, ap.cost), "count"), {
+        sub: ["ROAS = total sales ÷ total cost (ads spend + marketing fee's share)",
+          ...(w.sales && a.cost ? [`${rm(w.sales)} ÷ ${rm(a.cost)} = ${roasText(w.sales, a.cost)} (ads + fee)`] : [!w.sales ? "No customer marked Won with an amount yet" : "No ads cost read for the period yet"]),
+          ...(w.sales && a.spend ? [`${rm(w.sales)} ÷ ${rm(a.spend)} = ${roasText(w.sales, a.spend)} (ads only)`] : [])], title: was(roasText(wp.sales, ap.cost)) }),
     ] : []),
   ];
 }
 
-export const convOf = (x: { won: number; leads: number }) => (x.leads ? (x.won / x.leads) * 100 : null);
-export const aovOf = (x: { won: number; sales: number }) => (x.won ? x.sales / x.won : null);
-export const roasOf = (sales: number, cost: number | null | undefined) => (cost && cost > 0 ? sales / cost : null);
+export const convOf = (x: { won: number; came: number }) => (x.came ? (x.won / x.came) * 100 : null);
+export const aovOf = (x: { wonPaid: number; sales: number }) => (x.wonPaid ? x.sales / x.wonPaid : null);
+export const roasOf = (sales: number, cost: number | null | undefined) => (sales > 0 && cost && cost > 0 ? sales / cost : null);
 export const roasText = (sales: number, cost: number | null | undefined) => { const v = roasOf(sales, cost); return v == null ? "—" : `${v.toFixed(2)}×`; };
 
 /**
@@ -272,7 +280,7 @@ export const OV_COLS: { key: OvColKey; label: string; money?: boolean; ads?: boo
   { key: "roas", label: "ROAS", money: true, ads: true }, { key: "appt", label: "Appt rate", ads: true },
 ];
 export const colsFor = (table: "ads" | "team", money: boolean) => OV_COLS.filter(c => (!c.money || money) && (!c.ads || table === "ads"));
-export function colValue(key: OvColKey, x: { leads: number; won: number; sales: number; appt?: number; booked?: number; cost?: number | null }): string {
+export function colValue(key: OvColKey, x: { leads: number; won: number; sales: number; wonPaid: number; came: number; appt?: number; booked?: number; cost?: number | null }): string {
   if (key === "sales") return rm(x.sales);
   if (key === "conv") return pctOf(convOf(x));
   if (key === "aov") return rm(aovOf(x));
