@@ -20,9 +20,11 @@ const signed = (n: number) => (Math.abs(n) < EPS ? '—' : `${n > 0 ? '+' : '−
 const bare = (n: number) => (Math.abs(n) < EPS ? '—' : formatMoneyBare(n))
 const day = (d: string | null) => (d ? dayjs(d).format('D MMM YYYY') : '—')
 
-type Extra = 'sofar' | 'pi' | 'next' | 'last' | 'pos'
+type Extra = 'sofar' | 'open' | 'pi' | 'next' | 'last' | 'pos'
 const EXTRAS: Array<{ key: Extra; label: string }> = [
   { key: 'sofar', label: 'Received / paid so far (actual)' },
+  // What is still to come in and go out — this month's and overdue (2026-11-18, the user: "这个月还要收的" → C).
+  { key: 'open', label: 'Still to collect / to pay' },
   { key: 'pi', label: 'Interest in / out' },
   { key: 'next', label: 'Next due' },
   { key: 'last', label: 'Last received / paid' },
@@ -33,7 +35,7 @@ const COLS_KEY = 'repayment.by-company.columns'
 // tables do; kept by the browser. Company stays first, the row's button last.
 const ORDER_KEY = 'repayment.by-company.order'
 // Overdue stands beside its side (2026-11-16, C): a company's this-month and overdue, collect then pay.
-const DEFAULT_ORDER = ['collect', 'earlierCollect', 'pay', 'earlierPay', 'net', 'profit', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
+const DEFAULT_ORDER = ['collect', 'earlierCollect', 'pay', 'earlierPay', 'net', 'profit', 'openCollect', 'openPay', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
 type ColKey = (typeof DEFAULT_ORDER)[number]
 
 type Filter = 'all' | 'both' | 'late' | 'loss'
@@ -76,7 +78,14 @@ export function ByCompanyCards({ companies, basis, month }: { companies: Company
             <StatCard key="out" tone="out" label={`Paid · ${mon}`} value={formatMoney(f.pay)} icon="send" note="Really went out this month" />,
             netCard('Received − paid (principal + interest)'),
             profitCard(`Interest + penalty received ${formatMoney(f.interestIn)} − paid ${formatMoney(f.interestOut)}`),
-            <StatCard key="open" label={`Still open · ${mon}`} value={`${formatMoneyBare(open.collect)} / ${formatMoneyBare(open.pay)}`} icon="clock" note="To collect / to pay, not yet settled" />,
+            <StatCard
+              key="open"
+              label={`Still open · ${mon}`}
+              value={`${formatMoneyBare(open.collect)} / ${formatMoneyBare(open.pay)}`}
+              icon="clock"
+              // Each side's this month + overdue (2026-11-18, C).
+              note={`Collect ${formatMoneyBare(open.collectNow)} + overdue ${formatMoneyBare(open.collectEarlier)} · pay ${formatMoneyBare(open.payNow)} + overdue ${formatMoneyBare(open.payEarlier)}`}
+            />,
           ]
         : [
             <StatCard key="in" tone="in" label={`To collect · ${mon}`} value={formatMoney(f.collect)} icon="inbox" note={split(f.nowCollect, f.earlierCollect)} />,
@@ -255,6 +264,18 @@ export default function ByCompany({
         return cell(`${s.num} ${tone(v)}`, signed(v))
       },
       foot: () => cell(s.num, signed(total('profit'))),
+    },
+    openCollect: {
+      key: 'openCollect', label: 'Still to collect', num: true, extra: 'open',
+      co: (_, f) => cell(`${s.num} ${f.openCollect >= EPS ? s.good : s.quiet}`, bare(f.openCollect)),
+      deal: (d) => cell(s.num, d.side === 'collect' ? bare(d.open) : ''),
+      foot: () => cell(s.num, bare(total('openCollect'))),
+    },
+    openPay: {
+      key: 'openPay', label: 'Still to pay', num: true, extra: 'open',
+      co: (_, f) => cell(`${s.num} ${f.openPay >= EPS ? s.bad : s.quiet}`, bare(f.openPay)),
+      deal: (d) => cell(s.num, d.side === 'pay' ? bare(d.open) : ''),
+      foot: () => cell(s.num, bare(total('openPay'))),
     },
     gotCollect: {
       key: 'gotCollect', label: 'Received so far', num: true, extra: 'sofar',
@@ -474,7 +495,7 @@ export default function ByCompany({
         </div>
       </div>
       <p className={s.note}>
-        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid this month' : 'all to collect − all to pay, this month’s and overdue together'}. Overdue = still owed from months before, each side its own column. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
+        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid this month' : 'all to collect − all to pay, this month’s and overdue together'}. Overdue = still owed from months before, each side its own column. Still to collect / to pay (Columns) = this month&rsquo;s and overdue not yet settled. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
         {A ? 'interest and penalty received − interest and penalty paid' : 'interest due to us − interest we owe'} this month. A contra is no cash and is left out of Actual.
       </p>
     </section>

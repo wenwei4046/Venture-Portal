@@ -75,4 +75,20 @@ describe('By company by right', () => {
     expect(screen.getByText('This month RM 1,100.00 + overdue RM 600.00')).toBeInTheDocument()
     expect(screen.getByText('This month RM 500.00 + overdue RM 300.00')).toBeInTheDocument()
   })
+
+  // 2026-11-18 — the user: "如果我要看这个月还要收的呢？" → C.
+  it('says what is still to collect and pay — a column from Columns, and the Still open card split', () => {
+    const half: Company[] = [{ ...late[0], deals: [{ ...late[0].deals[0], open: 900 }, late[0].deals[1]] }]
+    render(<ByCompany companies={half} basis="act" monthLong="November 2026" />)
+    fireEvent.click(screen.getByRole('button', { name: /Columns/ }))
+    fireEvent.click(screen.getByLabelText('Still to collect / to pay'))
+    expect(heads()).toEqual(expect.arrayContaining(['Still to collect', 'Still to pay']))
+    const at = (name: string) => heads().indexOf(name)
+    const row = screen.getByText('HK').closest('tr') as HTMLElement
+    expect(row.querySelectorAll('td')[at('Still to collect')]).toHaveTextContent('900.00')
+    expect(row.querySelectorAll('td')[at('Still to pay')]).toHaveTextContent('800.00')
+    render(<ByCompanyCards companies={half} basis="act" month="2026-11" />)
+    // 900 still open to collect, 600 of it overdue; 800 to pay, 300 of it overdue.
+    expect(screen.getByText('Collect 300.00 + overdue 600.00 · pay 500.00 + overdue 300.00')).toBeInTheDocument()
+  })
 })
