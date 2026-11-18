@@ -107,6 +107,9 @@ export interface Figures {
   earlierCollect: number
   nowPay: number
   earlierPay: number
+  /** Still to settle on the month's rows (this month's and overdue), each side (2026-11-18 — the user: "如果我要看这个月还要收的呢？" → C). */
+  openCollect: number
+  openPay: number
   gotCollect: number
   gotPay: number
 }
@@ -240,17 +243,37 @@ export function figuresOf(deals: CoDeal[], basis: Basis): Figures {
     earlierCollect: sum('collect', 'earlier'),
     nowPay: r2(sum('pay', 'due') - sum('pay', 'earlier')),
     earlierPay: sum('pay', 'earlier'),
+    openCollect: sum('collect', 'open'),
+    openPay: sum('pay', 'open'),
     gotCollect: sum('collect', 'got'),
     gotPay: sum('pay', 'got'),
   }
 }
 
-/** The cards' extra figures: what is still open on each side, and how much of everything due is settled. */
-export function openOf(deals: CoDeal[]): { collect: number; pay: number; settledShare: number | null } {
+/** The cards' extra figures: what is still open on each side — and of it, what is overdue from months before (all of
+ *  an earlier month's owed is still open; the rest is this month's) — and how much of everything due is settled. */
+export function openOf(deals: CoDeal[]): {
+  collect: number
+  pay: number
+  collectNow: number
+  collectEarlier: number
+  payNow: number
+  payEarlier: number
+  settledShare: number | null
+} {
   const sum = (side: Side, k: 'open' | 'due') => r2(deals.filter((d) => d.side === side).reduce((s, d) => s + d[k], 0))
   const due = sum('collect', 'due') + sum('pay', 'due')
   const open = sum('collect', 'open') + sum('pay', 'open')
-  return { collect: sum('collect', 'open'), pay: sum('pay', 'open'), settledShare: due > EPS ? Math.max(0, Math.min(1, (due - open) / due)) : null }
+  const early = (side: Side) => r2(deals.filter((d) => d.side === side).reduce((s, d) => s + d.earlier, 0))
+  return {
+    collect: sum('collect', 'open'),
+    pay: sum('pay', 'open'),
+    collectNow: r2(Math.max(0, sum('collect', 'open') - early('collect'))),
+    collectEarlier: early('collect'),
+    payNow: r2(Math.max(0, sum('pay', 'open') - early('pay'))),
+    payEarlier: early('pay'),
+    settledShare: due > EPS ? Math.max(0, Math.min(1, (due - open) / due)) : null,
+  }
 }
 
 /** The chart's months: each side's interest and cash, by right and actual. */

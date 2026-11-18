@@ -96,6 +96,9 @@ describe('byCompany', () => {
     expect(open.collect).toBe(1700)
     expect(open.pay).toBe(800)
     expect(open.settledShare).toBeCloseTo((3600 - 2500) / 3600)
+    // Of what is still open, HK's 600 is overdue from October; the rest is November's (2026-11-18).
+    expect(open).toMatchObject({ collectNow: 1100, collectEarlier: 600, payNow: 800, payEarlier: 0 })
+    expect(due).toMatchObject({ openCollect: 1700, openPay: 800 })
   })
 })
 
