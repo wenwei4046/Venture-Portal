@@ -217,11 +217,15 @@ export default function DataCenterView({ files: allFiles, folders, foldersReady,
   // uploads the words again as its next version, as Replace file does. The AI reads text files as they are.
   const [note, setNote] = useState<{ id: string | null; place: Place; name: string; body: string; note: string } | null>(null)
   const newNote = () => { if (curOk) setNote({ id: null, place: curOk, name: '', body: '', note: '' }) }
+  // Reading the note back takes a few seconds: its button says so meanwhile.
+  const [opening, setOpening] = useState<string | null>(null)
   const editNote = (f: DataFile) => {
     if (!f.path) return
+    setOpening(f.id)
     start(async () => {
       setError('')
       const r = await readDataNote(f.path!)
+      setOpening(null)
       if (!r.ok) { setError(r.reason); return }
       setNote({ id: f.id, place: placeOf(f), name: f.name.replace(/\.(txt|md)$/i, ''), body: r.data, note: '' })
     })
@@ -509,7 +513,7 @@ export default function DataCenterView({ files: allFiles, folders, foldersReady,
                     <div className={d.sect2}>
                       <div className={d.verHead}>
                         <span className={d.verKicker}>VERSIONS</span>
-                        {canManage && isNote(f) ? <button type="button" className={d.replace} disabled={!can || busy} onClick={() => editNote(f)}><LeadIcon name="file-pen" size={12} />Edit note</button>
+                        {canManage && isNote(f) ? <button type="button" className={d.replace} disabled={!can || busy} onClick={() => editNote(f)}><LeadIcon name="file-pen" size={12} />{opening === f.id ? 'Opening…' : 'Edit note'}</button>
                           : canManage ? <button type="button" className={d.replace} disabled={!ready || busy} onClick={() => replaceFile(f.id)}><LeadIcon name="refresh-cw" size={12} />Replace file</button> : null}
                       </div>
                       {vers.map((v, i) => (
