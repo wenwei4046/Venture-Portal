@@ -36,6 +36,7 @@ import { adHref } from "../../shared/AdLink";
 import { lastReal, urgencyOf } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
 import { FB_BLOCKED, FB_BLOCKED_NOTE, isFbBlocked } from "../../shared/fb-blocked";
+import { openCustomerPick } from "../../shared/customer-pick";
 
 /** The chat head's defaults (4a frame 02), spread first so each kind's head and the chat's wait lay over them. */
 const PH_BASE = { avBg: undefined, avFg: undefined, status: "", statusColor: "var(--crm-muted)", clock: false };
@@ -99,6 +100,8 @@ export function deskVM(ctx: DeskCtx) {
     kWorkspace: false, // My reports left Reports (2026-11-09); a stored "workspace" tab shows Reports
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
     leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
+      // Book appt (the owner, 2026-11-19): a customer picked opens their Appointment sheet beside the calendar.
+      bookAppt: () => openCustomerPick({ customers: data.customers, pick: c => patch({ pane: "docked", chat: c.id, kind: "book", book: null, visit: null, infoId: null, menu: false }) }),
       openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),
     // Insight › Overview (2026-11-17): ads + team on one page, Insight's first tab (DeskOverview.tsx, vm/overview.ts).
     kInsOv: ui.tab === "insight" && (ui.insTab ?? "overview") === "overview",

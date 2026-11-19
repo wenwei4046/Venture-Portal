@@ -49,6 +49,8 @@ export function PhoneCalendar({ input, top }: { input: In; top?: ReactNode }) {
           <span {...press(v.pPrev)} aria-label="Previous month" style={round}><Svg d="m15 18-6-6 6-6" size={18} /></span>
           <span {...press(v.pNext)} aria-label="Next month" style={round}><Svg d="m9 18 6-6-6-6" size={18} /></span>
           {v.showLeave && v.canAdd && <span {...press(v.pAdd)} aria-label="Add leave" style={{ ...round, marginLeft: "4px", background: "var(--crm-rust)", color: "#fff" }}><Svg d={PLUS} size={18} w={2.2} /></span>}
+          {/* Book appt, top right (the owner, 2026-11-19): pick a customer, then their Book visit. */}
+          {input.bookAppt && <span {...press(input.bookAppt)} data-book-appt="" aria-label="Book appt" style={{ ...round, width: "auto", padding: "0 14px", gap: "4px", display: "flex", alignItems: "center", marginLeft: "4px", background: v.showLeave && v.canAdd ? "#fff" : "var(--crm-rust)", color: v.showLeave && v.canAdd ? "var(--crm-rust)" : "#fff", border: "1px solid var(--crm-rust)", boxSizing: "border-box", font: `500 ${fs(13)} ${INTER}`, whiteSpace: "nowrap" }}><Svg d={PLUS} size={15} w={2.2} />Appt</span>}
         </div>
         {/* notes/19 §2: the layer chips 32 px, 12.5 px words, a 14 px tick box. */}
         <div style={{ flex: "none", display: "flex", gap: "8px" }}>

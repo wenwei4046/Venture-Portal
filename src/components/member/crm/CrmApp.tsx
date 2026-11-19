@@ -40,6 +40,8 @@ import { photosAhead, warmPhotos } from "./shared/media-cache";
 import { MessageMenu } from "./shared/msg-menu";
 import { AttachSheetHost } from "./shared/attach-sheet";
 import { ActionSheetHost } from "./shared/action-sheet";
+import { CustomerPickHost } from "./shared/customer-pick";
+import { InviteAskHost } from "./shared/won-files";
 import { NotifSummaryHost } from "./shared/notif-summary";
 import { answerOnScreen, closeNotices } from "@/components/pwa/notice-screen";
 import { paintStatusBar, topColorOf } from "@/components/pwa/status-bar";
@@ -275,6 +277,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       <MessageMenu />
       <AttachSheetHost />
       <ActionSheetHost />
+      <CustomerPickHost />
+      <InviteAskHost />
       <NotifSummaryHost />
     </div>
   );

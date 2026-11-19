@@ -19,6 +19,7 @@ import { keepSent } from "../shared/media-cache";
 import { isPrepared, prepareImage } from "../shared/image-prep";
 import { fitVideo, fitVoice, VIDEO_PICK_MAX } from "../shared/video-fit";
 import { dayLabel, timeLabel, windowShut } from "./vm/common";
+import { askInvite } from "../shared/won-files";
 
 export interface SalesActions {
   openChat(customerId: string): void;
@@ -36,10 +37,12 @@ export interface SalesActions {
   setLabel(customerId: string, labelId: string, on: boolean): Promise<void>;
   /** `extra`: answers to the questions the Control panel added to Customer info (CRM Desktop rev 1, B5); null clears one. */
   saveDetails(customerId: string, f: { name: string; phone: string; type: string; size: string; loc: string; req: string; budget: string; extra?: Record<string, string | null> }): Promise<boolean>;
-  book(customerId: string, roomId: string, start: string): Promise<boolean>;
+  /** Whether the customer is sent the visit card (the owner, 2026-11-19: a sale closed on the phone needs none): left out, the
+   * screen asks once Book is pressed (shared/won-files › askInvite); the question closed books nothing. */
+  book(customerId: string, roomId: string, start: string, notify?: boolean): Promise<boolean>;
   moveVisit(visitId: string, roomId: string, start: string): Promise<boolean>;
   /** An appointment online or elsewhere (the owner, 2026-10-24): booked, or a visit changed to one. */
-  bookCustom(customerId: string, f: CustomVisit): Promise<boolean>;
+  bookCustom(customerId: string, f: CustomVisit, notify?: boolean): Promise<boolean>;
   moveCustom(visitId: string, f: CustomVisit): Promise<boolean>;
   cancelVisit(visitId: string): Promise<boolean>;
   outcome(visitId: string, came: boolean, outcome: "follow_up" | "won" | "lost" | "rebooked", extra?: { amount?: number; reason?: string; note?: string }): Promise<boolean>;
@@ -49,6 +52,9 @@ export interface SalesActions {
   keyPhoto(visitId: string, kind: "out" | "back", file: File): Promise<boolean>;
   /** A key photo’s address to look at it: a link signed for an hour (the demo keeps the phone’s own copy). */
   keyPhotoUrl(path: string): Promise<string | null>;
+  /** Won's quotation and bank slip (the owner, 2026-11-19; mig 20261119230000): both into crm-media under the customer's
+   * folder, then crm_set_won_files — before `outcome(…, "won")`, which refuses Won without them. */
+  wonFiles(visitId: string, quote: File, slip: File): Promise<boolean>;
   saveQuickReplies(items: { shortcut: string; message: string }[]): Promise<void>;
   /** Profile › Quick replies: typed in place, saved a moment after the last keystroke (a half-typed row is kept on screen, not saved). */
   editQuickReplies(items: CrmQuickReply[]): void;
@@ -230,17 +236,22 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       patchCustomer(customerId, c => ({ ...c, name: f.name.trim(), phone: f.phone.trim() || c.phone, details: { type: f.type, size: f.size, loc: f.loc.trim(), req: f.req.trim(), budget: f.budget.trim() }, extra: merged(c.extra) }));
       return true;
     },
-    async book(customerId, roomId, start) {
+    async book(customerId, roomId, start, notify) {
+      const send = notify ?? (await askInvite(data().customers.find(x => x.id === customerId)?.name ?? ""));
+      if (send === null) return false;
       const r = await write("crm_book", { p_contact: customerId, p_showroom: roomId, p_start: start, p_minutes: 60 });
       if (!r.ok) return false;
       const saved = r.data as { id: string } | null;
       setData(d => ({ ...d, visits: [...d.visits, { id: saved?.id ?? uid(), customerId, showroomId: roomId, start, minutes: 60, state: "booked", outcome: null, remindedAt: null }] }));
       patchCustomer(customerId, c => ({ ...c, status: "appointment", lost: undefined, previous: undefined }));
       const rm = room(roomId);
-      await sendCard(customerId, { kind: "Confirmed", start, room: rm?.name ?? "", addr: rm?.address ?? "" });
+      if (send) await sendCard(customerId, { kind: "Confirmed", start, room: rm?.name ?? "", addr: rm?.address ?? "" });
+      else toast("Booked · the customer was not sent the invitation");
       return true;
     },
-    async bookCustom(customerId, f) {
+    async bookCustom(customerId, f, notify) {
+      const send = notify ?? (await askInvite(data().customers.find(x => x.id === customerId)?.name ?? ""));
+      if (send === null) return false;
       const r = await write("crm_book_typed", { p_contact: customerId, p_type: f.type.id, p_start: f.start, p_answers: f.answers, p_minutes: 60 });
       if (!r.ok) return false;
       // The database's own row when there is one; else (the demo) worked out here as the database would.
@@ -250,7 +261,8 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       const vr = virtualRoom(v);
       setData(d => ({ ...d, visits: [...d.visits, { ...v, showroomId: vr.id }], rooms: [...d.rooms, vr] }));
       patchCustomer(customerId, c => ({ ...c, status: "appointment", lost: undefined, previous: undefined }));
-      await sendCard(customerId, visitCard("Confirmed", v, vr));
+      if (send) await sendCard(customerId, visitCard("Confirmed", v, vr));
+      else toast("Booked · the customer was not sent the invitation");
       return true;
     },
     async moveCustom(visitId, f) {
@@ -324,6 +336,30 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       const r = await createClient().storage.from("crm-media").createSignedUrl(path, 3600);
       if (r.error || !r.data?.signedUrl) { toast("The photo could not be opened."); return null; }
       return r.data.signedUrl;
+    },
+    async wonFiles(visitId, quote, slip) {
+      const v = visit(visitId);
+      if (!v) return false;
+      if (!live) {
+        const own = (f: File) => ({ path: typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(f) : "demo", name: f.name });
+        setVisit(visitId, x => ({ ...x, wonFiles: { quote: own(quote), slip: own(slip) } }));
+        return true;
+      }
+      const up = async (f: File, fallback: string) => {
+        if (f.size > 25 * 1024 * 1024) { toast(`${f.name} is over 25 MB.`); return null; }
+        const file = f.type.startsWith("image/") && f.type !== "image/gif" ? await prepareImage(f, false) : f;
+        const mime = (file.type || "application/octet-stream").split(";")[0];
+        const path = mediaPath(v.customerId, file.name || fallback, mime);
+        const r = await createClient().storage.from("crm-media").upload(path, file, { contentType: mime, upsert: false });
+        if (r.error) { toast(`${f.name || fallback} could not be uploaded. Check the connection and try again.`); return null; }
+        return path;
+      };
+      const [q, s] = await Promise.all([up(quote, "quotation"), up(slip, "bank-slip")]);
+      if (!q || !s) return false;
+      const r = await write("crm_set_won_files", { p_appointment: visitId, p_quote_path: q, p_quote_name: quote.name, p_slip_path: s, p_slip_name: slip.name });
+      if (!r.ok) return false;
+      setVisit(visitId, x => ({ ...x, wonFiles: { quote: { path: q, name: quote.name }, slip: { path: s, name: slip.name } } }));
+      return true;
     },
     async remind(visitId) {
       const v = visit(visitId);

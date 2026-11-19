@@ -22,11 +22,11 @@ const FIELD: CSSProperties = { height: "40px", padding: "0 10px", boxSizing: "bo
 /** The page: title row (Calendar's layer toggles), the toolbar, Month or Week, the panel, the modal, the toast. */
 export function DeskLeaveCalPage({ mode, input, title, bare }: { mode: "calendar" | "people"; input: Omit<LeaveCalIn, "mode" | "ui" | "set" | "flash">; title: string; bare?: boolean }) {
   const v = useLeaveCal(mode, input, { desk: true });
-  return <DeskLeaveCal v={v} title={title} bare={bare} />;
+  return <DeskLeaveCal v={v} title={title} bare={bare} bookAppt={input.bookAppt} />;
 }
 
 /** People inside Assignment is `bare`: Assignment's head (its title and four tabs) is the page's. */
-export function DeskLeaveCal({ v, title, tabs, bare }: { v: LeaveCalVM; title: string; tabs?: ReactNode; bare?: boolean }) {
+export function DeskLeaveCal({ v, title, tabs, bare, bookAppt }: { v: LeaveCalVM; title: string; tabs?: ReactNode; bare?: boolean; bookAppt?: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [left, setLeft] = useState(305);
   useLayoutEffect(() => {
@@ -47,6 +47,10 @@ export function DeskLeaveCal({ v, title, tabs, bare }: { v: LeaveCalVM; title: s
                 {y.label}<span style={{ fontSize: "12px", color: "var(--crm-faint)" }}>{y.n}</span>
               </span>
             ))}
+            {/* Book appt, top right (the owner, 2026-11-19): pick a customer, then their Book visit. */}
+            {bookAppt && <span {...press(bookAppt)} data-book-appt="" className={s.cta} style={{ height: "34px", padding: "0 14px", borderRadius: "17px", display: "flex", alignItems: "center", gap: "6px", font: `500 13px ${INTER}`, background: "var(--crm-rust)", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <Svg d="M12 5v14M5 12h14" size={14} w={2.2} />Book appt
+            </span>}
           </div>
         </div>
       ) : bare ? null : (<>

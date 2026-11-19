@@ -7,7 +7,7 @@
 import { Fragment } from "react";
 import H from "../crm.module.css";
 import { InfoValue } from "../shared/AdLink";
-import { Phone4aCalHead, Phone4aCalLists, Phone4aCalMonth } from "../shared/phone4a";
+import { Phone4aCalHead, Phone4aCalLists, Phone4aCalMonth, Phone4aWonFiles } from "../shared/phone4a";
 import type { CalendarVM } from "./vm/calendar";
 
 /** Calendar: Month / Week / Day, Today with Show up / No show, upcoming, outcome and celebration; Customer info and its form. */
@@ -151,7 +151,7 @@ export default function SalesCalendar({ v }: { v: CalendarVM }) {
                 <span style={{ fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-brown)" }}>RM</span>
                 <input value={v.wonAmount} onChange={v.wonSet} inputMode="decimal" placeholder="0" style={{ flex: "1", minWidth: "0", height: "50px", border: "0", background: "transparent", font: "inherit", fontSize: "calc(22px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums", outline: "none" }} />
               </label>
-              <span onClick={v.wonSave} style={{ height: "50px", borderRadius: "25px", background: v.wonSaveBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>Save</span>
+              <Phone4aWonFiles v={v.wonFiles} /><span onClick={v.wonSave} style={{ height: "50px", borderRadius: "25px", background: v.wonSaveBg, color: "#fff", display: "grid", placeItems: "center", fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}>Save</span>
             </div>
           </>)}
         </div>

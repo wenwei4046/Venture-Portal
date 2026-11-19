@@ -182,6 +182,8 @@ function calendar(body) {
   if (a < 0 || u < 0) throw new Error("phone-4a: calendar lists");
   const [, ue] = el(body.slice(u), up, "section", "calendar upcoming");
   body = body.slice(0, a) + "<Phone4aCalLists v={v} />" + body.slice(u + ue);
+  // Won asks for the quotation and the bank slip under the amount (the owner, 2026-11-19: both required).
+  body = once(body, "<span onClick={v.wonSave}", "<Phone4aWonFiles v={v.wonFiles} /><span onClick={v.wonSave}", "won files");
   return body;
 }
 

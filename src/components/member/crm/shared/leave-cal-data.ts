@@ -24,6 +24,7 @@ export function leaveCalData(o: {
   data: CrmData; me: CrmPerson; now: Date; act: PanelActions; readOnly?: boolean;
   teams: { id: string; name: string; tl: CrmPerson; people: CrmPerson[] }[]; directors: CrmPerson[];
   openAppt?: (a: CalAppt) => void;
+  bookAppt?: () => void;
 }): Omit<LeaveCalIn, "mode" | "ui" | "set" | "flash"> {
   const { data: d } = o;
   const book = peopleBook(d, o.teams, o.directors);
@@ -38,6 +39,7 @@ export function leaveCalData(o: {
   return {
     book, leaves: d.leaves ?? [], appts, now: officeStamp(o.now),
     canEdit: may, canLock: !o.readOnly && d.can.manage,
+    ...(o.bookAppt && !o.readOnly ? { bookAppt: o.bookAppt } : {}),
     acts: {
       saveLeave: l => o.act.saveLeave(l),
       removeLeave: id => o.act.removeLeave(id),

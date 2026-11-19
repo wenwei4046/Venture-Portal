@@ -12,7 +12,7 @@ const vm = (b: Parameters<typeof customBookVM>[0]["b"], save = vi.fn(async () =>
 
 describe("Book visit › appointment types (2026-10-24)", () => {
   it("offers Showroom and every type switched on", () => {
-    expect(vm({}).tabs.map(t => t.label)).toEqual(["Showroom", "Online", "Other", "Site visit"]);
+    expect(vm({}).tabs.map(t => t.label)).toEqual(["Showroom", "Online", "Phone", "Other", "Site visit"]);
     expect(customBookVM({ b: {}, put: () => {}, changing: false, now, types: [{ ...SITE, on: false }], save: vi.fn(), done: () => {} }).tabs.map(t => t.label)).toEqual(["Showroom"]);
   });
   it("needs a date and a time, the place and every required question", () => {
