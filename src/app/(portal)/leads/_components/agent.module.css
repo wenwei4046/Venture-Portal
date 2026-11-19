@@ -522,3 +522,10 @@ textarea.fInput { line-height: 1.5; resize: vertical; }
 .lSel { flex: none; width: 180px; height: 34px; padding: 0 10px; border: 1px solid rgb(var(--lv-line)); border-radius: 9px; background: rgb(var(--lv-surface)); font-family: inherit; font-size: 13px; color: rgb(var(--lv-fg)); outline: none; cursor: pointer; }
 .lNum { flex: none; display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgb(var(--lv-fg-3)); }
 .lNum .num { height: 34px; padding: 0 10px; border-color: rgb(var(--lv-line)); font-size: 13px; }
+
+/* Knowledge › Files: what is not read (improvement pack B, 2026-11-19) */
+.pFile[data-unread] .pFileName { color: rgb(var(--lv-fg-4)); text-decoration: line-through; }
+.pUnread { font-size: 11px; line-height: 1.4; color: rgb(var(--lv-accent)); padding-left: 2px; }
+.kTrail[data-unread] { color: rgb(var(--lv-accent)); }
+.readNote { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: rgb(var(--lv-accent-tint)); font-size: 12px; line-height: 1.45; color: rgb(var(--lv-fg-2)); }
+.readNote > svg { flex: none; margin-top: 1px; color: rgb(var(--lv-accent)); }

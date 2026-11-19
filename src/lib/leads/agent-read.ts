@@ -4,7 +4,7 @@ import type { KnowledgeCard } from './ai'
 import type { AgentDocument } from './ai-model'
 import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile } from './agent'
 import { memoryCards, memoryOf, orderedPrompt, questionNotes, type AgentMemory } from './agent-memory'
-import { knowledgeReads, linkDue, type DataFolder } from './data-center'
+import { agentFiles, folderPath, knowledgeOutline, linkDue, readPlan, READ_STATE_LABEL, type DataFolder } from './data-center'
 import { forBrand, isLive, type LeadInfo } from './info'
 import { readLink } from './link-read'
 import type { LeadOutlet } from './outlets'
@@ -54,34 +54,36 @@ export async function agentMore(client: SupabaseClient, brandId: string, today: 
   const allFolders = folders.ok ? folders.data : []
   // What AI Agent › Knowledge picked (mig 20261102140000) — the whole line above each pick (v3 § 5) — on and in date;
   // before it, the brand's folder and Shared.
-  const picked = m.knowledge ? knowledgeReads(m.knowledge, all, allFolders) : agentReads(all, brandId)
-  const files: DataFile[] = on('know') ? picked.filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file) : []
+  const files: DataFile[] = !on('know') ? []
+    : m.knowledge ? agentFiles(m.knowledge, all, allFolders, today)
+    : agentReads(all, brandId).filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
+  // Which files it reads — the same plan AI Agent › Knowledge shows (2026-11-19, improvement pack B).
+  const plan = readPlan(files)
+  const where = (f: DataFile) => { const p = folderPath(f, allFolders); return p ? `${p} › ${f.name}` : f.name }
   const documents: AgentDocument[] = []
-  let total = 0
-  for (const f of files) {
-    const how = readable(f)
-    if (!f.path || !how || how === 'link' || documents.length >= 6 || f.sizeBytes > 10_000_000 || total + f.sizeBytes > 24_000_000) continue
+  for (const { file: f, state } of plan) {
+    if (state !== 'read' || !f.path) continue
     const { data } = await client.storage.from('lead-data').download(f.path)
     if (!data) continue
-    total += f.sizeBytes
     const buf = Buffer.from(await data.arrayBuffer())
-    if (how === 'pdf') documents.push({ kind: 'pdf', title: f.name, base64: buf.toString('base64') })
-    else if (how === 'text') documents.push({ kind: 'text', title: f.name, text: buf.toString('utf8').slice(0, 200_000) })
-    else documents.push({ kind: 'image', title: f.name, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
+    const how = readable(f), title = where(f), context = [`card id file-${f.id}`, (f.category ?? '').trim()].filter(Boolean).join(' · ')
+    if (how === 'pdf') documents.push({ kind: 'pdf', title, context, base64: buf.toString('base64') })
+    else if (how === 'text') documents.push({ kind: 'text', title, context, text: buf.toString('utf8').slice(0, 200_000) })
+    else documents.push({ kind: 'image', title, context, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
   }
   const links = await linkPages(client, files.filter(f => f.kind === 'link'))
-  // ASKED ABOUT: a file's own instructions, then those of each folder above it.
-  const folderLine = (id: string | null | undefined): string[] => {
-    const out: string[] = []
-    for (let d = id ? allFolders.find(x => x.id === id) : undefined; d && out.length < 50; d = d.parentId ? allFolders.find(x => x.id === d!.parentId) : undefined) out.push(d.id)
-    return out
-  }
-  const asks = files.map(f => ({ f, notes: questionNotes(mem.fileQs, [f.id, ...folderLine(f.folderId)]) })).filter(x => x.notes.length)
+  // A link's own ASKED ABOUT (a file's and a folder's go with the outline, under the file and the folder).
+  const linkAsks = files.filter(f => f.kind === 'link').map(f => ({ f, notes: questionNotes(mem.fileQs, [f.id]) })).filter(x => x.notes.length)
   const knowledge = [
-    documents.length ? 'The documents attached before the conversation are the brand’s files; cite one by its card id (file-…).' : '',
-    asks.length ? `How to answer questions about these files:\n${asks.map(x => `- ${x.f.name}\n${x.notes.map(n => `  - ${n}`).join('\n')}`).join('\n')}` : '',
+    // Improvement pack A (2026-11-19): the folders and files as the Data Center keeps them.
+    knowledgeOutline(plan, allFolders, mem.fileQs),
+    linkAsks.length ? `How to answer questions about these web pages:\n${linkAsks.map(x => `- ${x.f.url}\n${x.notes.map(n => `  - ${n}`).join('\n')}`).join('\n')}` : '',
     links.length ? `Web pages the brand keeps (their words as last read):\n${links.join('\n\n')}` : '',
   ].filter(Boolean).join('\n\n')
+  const fileBody = new Map(plan.map(p => [p.file.id, [
+    p.file.kind === 'link' ? '' : `Folder: ${folderPath(p.file, allFolders) || 'the brand’s folder'}`,
+    p.state === 'read' ? '(attached document)' : p.state === 'link' ? '' : `(${READ_STATE_LABEL[p.state]})`,
+  ].filter(Boolean).join('\n')]))
   // Current promotions: General info cards of a promotions category, live today, for this brand.
   const promos = info.ok
     ? info.data.cards.filter(c => isLive(c, today) && forBrand(c, brandId) && /promo/i.test(info.data.cats.find(k => k.id === c.catId)?.label ?? ''))
@@ -112,7 +114,7 @@ export async function agentMore(client: SupabaseClient, brandId: string, today: 
     ask: { system, documents },
     /** This customer switched off: the conversation is sent without what we know about them. */
     factsOff: !on('cust'),
-    cards: (old: KnowledgeCard[]) => [...agentCards(old, infoFor, brandId, today, on('faq') ? m.answers : [], files), ...memCards],
+    cards: (old: KnowledgeCard[]) => [...agentCards(old, infoFor, brandId, today, on('faq') ? m.answers : [], files, f => fileBody.get(f.id)), ...memCards],
   }
 }
 

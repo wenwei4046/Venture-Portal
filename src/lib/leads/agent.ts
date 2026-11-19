@@ -253,7 +253,7 @@ export function answersPrompt(answers: FixedAnswer[], playbook: PlaySituation[])
  * Everything the agent may cite as a card: the old Data Center cards, the brand's live General info, the fixed answers
  * and the files it reads — so `usedCardIds` names one of them and the Inbox shows what a draft relied on.
  */
-export function agentCards(old: KnowledgeCard[], info: LeadInfo | null, brandId: string, today: string, answers: FixedAnswer[], files: DataFile[]): KnowledgeCard[] {
+export function agentCards(old: KnowledgeCard[], info: LeadInfo | null, brandId: string, today: string, answers: FixedAnswer[], files: DataFile[], fileBody?: (f: DataFile) => string | undefined): KnowledgeCard[] {
   const infoCards: KnowledgeCard[] = info ? info.cards
     .filter(c => isLive(c, today) && forBrand(c, brandId))
     .map(c => ({
@@ -262,7 +262,7 @@ export function agentCards(old: KnowledgeCard[], info: LeadInfo | null, brandId:
       startsOn: c.validFrom, endsOn: c.validUntil, active: true, updatedByName: '', updatedAt: '',
     } as KnowledgeCard)) : []
   const answerCards = answers.map(a => ({ id: `answer-${a.id}`, brandId, kind: 'faq', title: a.question.slice(0, 80), body: a.answer, startsOn: null, endsOn: null, active: true, updatedByName: '', updatedAt: '' } as KnowledgeCard))
-  const fileCards = files.map(f => ({ id: `file-${f.id}`, brandId: f.brandId, kind: 'note', title: f.name.slice(0, 80), body: f.kind === 'link' ? `Web page: ${f.url}` : '(attached document)', startsOn: f.validFrom, endsOn: f.validUntil, active: true, updatedByName: '', updatedAt: '' } as KnowledgeCard))
+  const fileCards = files.map(f => ({ id: `file-${f.id}`, brandId: f.brandId, kind: 'note', title: f.name.slice(0, 80), body: f.kind === 'link' ? `Web page: ${f.url}` : fileBody?.(f) || '(attached document)', startsOn: f.validFrom, endsOn: f.validUntil, active: true, updatedByName: '', updatedAt: '' } as KnowledgeCard))
   return [...old, ...infoCards, ...answerCards, ...fileCards]
 }
 
