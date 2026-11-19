@@ -8,7 +8,7 @@
  *     frames 13d / 13e, one sheet for both ways in, drawn ABOVE the CRM's tab bar (portalled into the CRM's shell).
  * Sheets fade their scrim in and slide up as every Control panel sheet. Sizes are the frames' on-screen px (fs below).
  */
-import { useEffect, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { CAL } from "./cal-look";
 import { InShell } from "./shell-portal";
 import type { LeaveCalIn, LeaveCalVM } from "./leave-cal";
@@ -27,6 +27,41 @@ const Svg = ({ d, size, w = 2, style }: { d: string; size: number; w?: number; s
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" style={style}><path d={d} /></svg>
 );
 const PLUS = "M12 5v14M5 12h14";
+
+/** The calendar's one +: a menu of Book appt and Add leave when both are open, else the one that is; none, no button. */
+export function CalPlus({ leave, appt, round }: { leave?: () => void; appt?: () => void; round: CSSProperties }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const out = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", out);
+    return () => document.removeEventListener("pointerdown", out);
+  }, [open]);
+  const only = leave ?? appt;
+  if (!only) return null;
+  const both = !!leave && !!appt;
+  const tap = both ? () => setOpen(o => !o) : only;
+  const label = both ? "Add" : leave ? "Add leave" : "Book appt";
+  const item = (name: string, icon: string, go: () => void) => (
+    <span {...press(() => { setOpen(false); go(); })} role="menuitem" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", font: `500 ${fs(14)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
+      <Svg d={icon} size={17} style={{ color: "var(--crm-rust)" }} />{name}
+    </span>
+  );
+  return (
+    <span ref={box} style={{ position: "relative", flex: "none", marginLeft: "4px" }}>
+      <span {...press(tap)} aria-label={label} aria-haspopup={both ? "menu" : undefined} aria-expanded={both ? open : undefined} data-cal-plus=""
+        style={{ ...round, background: "var(--crm-rust)", color: "#fff", transition: "transform .18s", transform: open ? "rotate(45deg)" : "none" }}><Svg d={PLUS} size={18} w={2.2} /></span>
+      {open && leave && appt && (
+        <span role="menu" data-cal-plus-menu="" style={{ position: "absolute", top: "46px", right: 0, zIndex: 20, display: "flex", flexDirection: "column", minWidth: "170px", background: "#fff", borderRadius: "14px", boxShadow: "0 10px 30px rgba(42,22,12,.18)", border: "1px solid var(--crm-rule)", overflow: "hidden" }}>
+          {item("Book appt", "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", appt)}
+          <span style={{ height: "1px", background: "var(--crm-rule)" }} />
+          {item("Add leave", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 1 0 8a4 4 0 0 1 0-8M17 11h6", leave)}
+        </span>
+      )}
+    </span>
+  );
+}
 
 /* ── Calendar ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -48,9 +83,9 @@ export function PhoneCalendar({ input, top }: { input: In; top?: ReactNode }) {
             style={{ flex: "1 1 auto", minWidth: 0, margin: 0, font: `500 ${fs(26)} ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: v.notThisWeek ? "pointer" : "default" }}>{v.pMonthLabel}</h1>
           <span {...press(v.pPrev)} aria-label="Previous month" style={round}><Svg d="m15 18-6-6 6-6" size={18} /></span>
           <span {...press(v.pNext)} aria-label="Next month" style={round}><Svg d="m9 18 6-6-6-6" size={18} /></span>
-          {v.showLeave && v.canAdd && <span {...press(v.pAdd)} aria-label="Add leave" style={{ ...round, marginLeft: "4px", background: "var(--crm-rust)", color: "#fff" }}><Svg d={PLUS} size={18} w={2.2} /></span>}
-          {/* Book appt, top right (the owner, 2026-11-19): pick a customer, then their Book visit. */}
-          {input.bookAppt && <span {...press(input.bookAppt)} data-book-appt="" aria-label="Book appt" style={{ ...round, width: "auto", padding: "0 14px", gap: "4px", display: "flex", alignItems: "center", marginLeft: "4px", background: v.showLeave && v.canAdd ? "#fff" : "var(--crm-rust)", color: v.showLeave && v.canAdd ? "var(--crm-rust)" : "#fff", border: "1px solid var(--crm-rust)", boxSizing: "border-box", font: `500 ${fs(13)} ${INTER}`, whiteSpace: "nowrap" }}><Svg d={PLUS} size={15} w={2.2} />Appt</span>}
+          {/* ONE + (the owner, 2026-11-19: "只需要点红色的+，就 pop up add leave & appointment 的 button"): with both
+              ways open it shows a small menu — Book appt · Add leave; with one, it does that one. */}
+          <CalPlus leave={v.showLeave && v.canAdd ? v.pAdd : undefined} appt={input.bookAppt} round={round} />
         </div>
         {/* notes/19 §2: the layer chips 32 px, 12.5 px words, a 14 px tick box. */}
         <div style={{ flex: "none", display: "flex", gap: "8px" }}>

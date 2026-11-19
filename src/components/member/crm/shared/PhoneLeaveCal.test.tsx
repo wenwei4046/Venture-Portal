@@ -38,6 +38,30 @@ describe("the phone's Calendar (v4 notes/19)", () => {
     expect(screen.getByText("Nur Aisyah")).toBeTruthy();
   });
 
+  it("one red + opens Book appt · Add leave when both are open (the owner, 2026-11-19)", () => {
+    const bookAppt = vi.fn();
+    render(<Shell><PhoneCalendar input={{ ...input, bookAppt }} /></Shell>);
+    expect(screen.queryByLabelText("Book appt")).toBeNull();
+    expect(document.querySelectorAll("[data-cal-plus]").length).toBe(1);
+    fireEvent.click(screen.getByLabelText("Add"));
+    const menu = screen.getByRole("menu");
+    fireEvent.click(within(menu).getByText("Book appt"));
+    expect(bookAppt).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Add"));
+    fireEvent.click(within(screen.getByRole("menu")).getByText("Add leave"));
+    expect(screen.getByRole("dialog", { name: "Add leave" })).toBeTruthy();
+  });
+
+  it("with only Book appt open, the + books at once", () => {
+    const bookAppt = vi.fn();
+    render(<PhoneCalendar input={{ ...input, bookAppt, canEdit: () => false, canLock: false }} />);
+    const plus = document.querySelector<HTMLElement>("[data-cal-plus]")!;
+    fireEvent.click(plus);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(bookAppt.mock.calls.length + (screen.queryByRole("dialog") ? 1 : 0)).toBe(1);
+  });
+
   it("the layer chips are 32 px", () => {
     render(<PhoneCalendar input={input} />);
     expect(screen.getByText("Appointments").closest<HTMLElement>("[role=button]")!.style.height).toBe("32px");
