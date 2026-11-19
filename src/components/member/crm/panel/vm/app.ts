@@ -28,6 +28,7 @@ import { jobTitle, teamName, teamOf } from "../../shared/people";
 import { teamMineSwap } from "../../shared/team-mine";
 import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
+import { openCustomerPick } from "../../shared/customer-pick";
 import type { KeyboardEvent } from "react";
 import { DIRECTOR, first, ini, periodRange, type PanelCtx } from "./common";
 import type { PhoneOverviewProps } from "../../shared/phone-overview";
@@ -148,7 +149,10 @@ export function panelAppVM(ctx: PanelCtx) {
     // view models, drawn as the prototypes' phone frames (shared/PhoneLeaveCal.tsx, shared/PhoneTeamActivity.tsx).
     // Assignment › Leave on the phone (2026-11-09): the same leave records, Pause and Lock as the desktop's.
     leaveCalP: show.as && ui.asSec === "Lv" ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: () => {} }) : null,
-    leaveCal: show.lc ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: a => set(u => ({ ...u, calInfo: a.customerId })) }) : null,
+    leaveCal: show.lc ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs,
+      // Book appt (the owner, 2026-11-19): a customer picked opens their chat on Book visit.
+      bookAppt: () => openCustomerPick({ customers: ctx.data.customers, pick: c => set(u => ({ ...u, calInfo: null, lead: c.id, pMenu: false, pInfo: false, pForm: null, pBook: { customerId: c.id, room: 0, day: day0(now) + DAY, slot: null, view: "month" } })) }),
+      openAppt: a => set(u => ({ ...u, calInfo: a.customerId })) }) : null,
     activity: show.act ? { data: ctx.data, book: peopleBook(ctx.data, ctx.teams, ctx.directors), live: ctx.live, who: null, nameOf: ctx.nameOf,
       roleOf: (id: string) => { const p = ctx.data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
       // The chat opens over Insight, so Back comes to Team activity as it was left (the owner, 2026-11-09).

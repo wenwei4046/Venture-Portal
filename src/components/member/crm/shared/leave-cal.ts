@@ -44,6 +44,8 @@ export interface LeaveCalIn {
   set(p: Partial<LeaveCalUi> | ((u: LeaveCalUi) => Partial<LeaveCalUi>)): void;
   flash(t: string): void;
   acts: LeaveCalActs;
+  /** Calendar › Book appt (the owner, 2026-11-19): pick a customer, then their Book visit. Absent = no button (read only). */
+  bookAppt?: () => void;
 }
 
 export function leaveCalStart(now: string, mode: "calendar" | "people"): LeaveCalUi {

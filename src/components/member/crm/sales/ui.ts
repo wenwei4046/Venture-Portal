@@ -19,6 +19,11 @@ export interface OutcomeAsk {
   amount?: string;
   reason?: string;
   otherText?: string;
+  /** Won's quotation and bank slip, picked on the phone (both required — the owner, 2026-11-19). */
+  quote?: File;
+  slip?: File;
+  /** A phone appointment: Picked up rather than Show up. */
+  call?: boolean;
 }
 
 /** Showroom (room, day, slot) or online / elsewhere (shared/custom-book.tsx, 2026-10-24). */

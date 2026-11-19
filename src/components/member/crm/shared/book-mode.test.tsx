@@ -14,6 +14,6 @@ describe("Book visit › the type bar", () => {
     render(<Phone4aBookMode m={m} />);
     const bar = screen.getByRole("button", { name: "Showroom" }).parentElement!;
     expect(bar.style.flexShrink).toBe("0");
-    expect(screen.getAllByRole("button").map(b => b.textContent)).toEqual(["Showroom", "Online", "Other"]);
+    expect(screen.getAllByRole("button").map(b => b.textContent)).toEqual(["Showroom", "Online", "Phone", "Other"]);
   });
 });

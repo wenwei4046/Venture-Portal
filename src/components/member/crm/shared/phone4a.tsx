@@ -562,14 +562,16 @@ export function Phone4aInsightMine({ v }: { v: { p4: {
 
 
 /** M10 · the Calendar's title row: "Calendar" and its views (Month · Week · Day — production's three; 4a's segmented look). */
-export function Phone4aCalHead({ v }: { v: { calViews: { label: string; weight: number; pick: () => void }[] } }) {
+export function Phone4aCalHead({ v }: { v: { calViews: { label: string; weight: number; pick: () => void }[]; calBook?: () => void } }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "0 20px" }}>
       <h1 style={{ margin: 0, fontFamily: TIGHT, fontWeight: 500, fontSize: fs(30), letterSpacing: "-0.025em", lineHeight: 1.2 }}>Calendar</h1>
-      <div style={{ display: "flex", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>
+      <div style={{ marginLeft: "auto", display: "flex", padding: "4px", borderRadius: "22px", background: "var(--crm-field)" }}>
         {v.calViews.map(o => { const on = o.weight > 600;
           return <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, height: "34px", padding: "0 14px", borderRadius: "17px", fontSize: fs(14), fontWeight: on ? 500 : 400, background: on ? "var(--crm-rust)" : "transparent", color: on ? "#fff" : "var(--crm-muted)" }}>{o.label}</button>; })}
       </div>
+      {/* Book appt, top right (the owner, 2026-11-19): pick a customer, then their Book visit. */}
+      {v.calBook && <button type="button" onClick={v.calBook} data-book-appt="" aria-label="Book appt" title="Book appt" style={{ ...BTN, flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff" }}><Ic name="plus" size={20} /></button>}
     </div>
   );
 }
@@ -623,7 +625,7 @@ function KeyRow({ k }: { k: CalKeys }) {
  * Change · No show · Show up. Upcoming: Change · Send reminder (Send again once sent) — every button production's. */
 export function Phone4aCalLists({ v }: { v: {
   hasToday: boolean; todayCount: string; noUpcoming: boolean; upTitle: string; upCount: string;
-  todayList: (CalItem & CalKeys & { due: boolean; soon: string; change: unknown; came: () => void; noShow: () => void })[];
+  todayList: (CalItem & CalKeys & { due: boolean; soon: string; change: unknown; came: () => void; noShow: () => void; cameLabel?: string })[];
   upList: (CalItem & { done: boolean; remind: () => void; rLabel: string; change: unknown })[]; cal4: { today: string } } }) {
   const Kick = ({ children }: { children: ReactNode }) => <span style={{ padding: "4px 4px 0", fontSize: fs(11), fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{children}</span>;
   const Card = ({ a, today, btns, keys }: { a: CalItem; today?: boolean; btns: CalBtn[]; keys?: CalKeys }) => {
@@ -656,7 +658,7 @@ export function Phone4aCalLists({ v }: { v: {
   const byDay = <T extends CalItem>(xs: T[]) => xs.reduce<[string, T[]][]>((g, x) => { const l = g[g.length - 1]; if (l && l[0] === x.kick) l[1].push(x); else g.push([x.kick, [x]]); return g; }, []);
   const today = v.todayList.filter(a => !a.due), due = v.todayList.filter(a => a.due);
   const marks = (a: (typeof v.todayList)[number], green: boolean): CalBtn[] => [
-    { label: "Change", on: a.change as () => void }, { label: "No show", on: a.noShow }, { label: "Show up", kind: green ? "green" : "main", on: a.came }];
+    { label: "Change", on: a.change as () => void }, { label: "No show", on: a.noShow }, { label: a.cameLabel ?? "Show up", kind: green ? "green" : "main", on: a.came }];
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "4px 0 -24px", padding: "14px 16px 28px", background: "var(--crm-hover)", flex: "1 0 auto" }}>
       {v.hasToday && today.length > 0 && (<><Kick>Today · {v.cal4.today}</Kick>{today.map((a, i) => <Card key={"t" + i} a={{ ...a, room: a.soon ? `${a.room} · ${a.soon}` : a.room }} today btns={marks(a, true)} keys={a} />)}</>)}
@@ -887,3 +889,7 @@ export function Phone4aActiveSave({ v }: { v: ActiveVM }) {
     </span>
   );
 }
+
+/** Won's quotation and bank slip (the owner, 2026-11-19) — named here so the generators'
+ * IMPORT picks them up with the rest of the Phone4a parts. */
+export { WonFiles as Phone4aWonFiles } from "./won-files";

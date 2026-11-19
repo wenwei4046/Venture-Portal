@@ -10,10 +10,12 @@ import { customPrefill } from "../../shared/custom-book";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { BORDER, gb, day0, DAY, dayLabel, firstName, ini, money, stop, timeLabel, type PEvent, type SalesCtx } from "./common";
 import type { OutcomeAsk } from "../ui";
-import { contactInfoVM, customerFormVM } from "./customer";
+import { bookingSkipsForm, contactInfoVM, customerFormVM } from "./customer";
+import { openCustomerPick } from "../../shared/customer-pick";
 import { oneAtATime } from "../../shared/once";
 import { askKeyPhoto } from "../../shared/key-photo";
 import { openViewer } from "../../shared/viewer";
+import type { WonFilesVM } from "../../shared/won-files";
 
 export const LOST_OPTIONS: [string, string, string][] = [
   ["Price", "too_expensive", "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"],
@@ -72,7 +74,9 @@ export function calendarVM(ctx: SalesCtx) {
   const todayV = all.filter(a => a.v.state === "booked" && (day0(a.at) === T || (a.at < now && day0(a.at) >= T - 14 * DAY))).sort((x, y) => +x.at - +y.at);
   const earlier = todayV.filter(a => day0(a.at) < T).length, today = todayV.length - earlier;
   const vLabel = (a: Shown) => `${dayLabel(a.at)}, ${timeLabel(a.at)}`;
-  const ask = (a: Shown, mode?: "noshow"): OutcomeAsk => ({ visitId: a.v.id, customerId: a.c.id, name: a.c.name, when: vLabel(a), room: a.room, ...(mode ? { mode } : {}) });
+  const ask = (a: Shown, mode?: "noshow"): OutcomeAsk => ({ visitId: a.v.id, customerId: a.c.id, name: a.c.name, when: vLabel(a), room: a.room, ...(mode ? { mode } : {}), ...(isCall(a) ? { call: true } : {}) });
+  // A phone appointment (the owner, 2026-11-19) is marked Picked up rather than Show up.
+  const isCall = (a: Shown) => a.v.typeId === "phone";
   // The unit’s key handed over with a photo (the owner, 2026-10-28): collected before the visit, returned after it.
   const KEY_ASK = {
     out: { title: "Photo of the key collected", sub: "Take or choose a photo of the key you collected for this visit.", saved: "Key collected · photo saved" },
@@ -98,12 +102,12 @@ export function calendarVM(ctx: SalesCtx) {
   // ── The outcome popup ──
   const oa = ui.outcomeAsk;
   const toChat = (customerId: string, status: string) => set(u => ({ ...u, outcomeAsk: null, tab: "inbox", chat: customerId, filter: { type: "status", v: status }, hist: [...u.hist, u.tab].slice(-20) }));
-  let outcomeTitle = oa ? oa.name + (oa.mode === "noshow" ? " didn't show up" : " showed up") : "";
+  let outcomeTitle = oa ? oa.name + (oa.call ? (oa.mode === "noshow" ? " didn't pick up" : " picked up") : oa.mode === "noshow" ? " didn't show up" : " showed up") : "";
   let outcomeWhen = oa ? `${oa.when} · ${oa.room}` : "";
   let outcomeOpts: { label: string; sub: string; fg: string; bg: string; icon: string; pick: () => void }[] = [];
   let outcomeClose = () => patch({ outcomeAsk: null });
   const lost = { isLost: false, notLost: true, lostReasons: [] as { label: string; icon: string; pick: () => void; bg: string; fg: string; bd: string; ic: string; ring: string; dot: string }[], otherText: "", otherBd: "var(--crm-rule)", otherSet: (_: ChangeEvent<HTMLInputElement>) => {}, lostSave: undefined as undefined | (() => void), lostSaveBg: "var(--crm-line)" };
-  const won = { isWon: false, wonAmount: "", wonSet: (_: ChangeEvent<HTMLInputElement>) => {}, wonSave: undefined as undefined | (() => void), wonSaveBg: "var(--crm-line)" };
+  const won = { isWon: false, wonAmount: "", wonSet: (_: ChangeEvent<HTMLInputElement>) => {}, wonSave: undefined as undefined | (() => void), wonSaveBg: "var(--crm-line)", wonFiles: null as WonFilesVM | null };
   if (oa && !oa.wonStep && !oa.lostStep) {
     const FU: [string, string, string, string, string] = ["Follow up", "", "var(--crm-brown)", "var(--crm-tint-appt)", "M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"];
     const LO: [string, string, string, string, string] = ["Lost", "", "var(--crm-oxblood)", "var(--crm-tint-attention)", "M6 6l12 12M18 6 6 18"];
@@ -125,12 +129,20 @@ export function calendarVM(ctx: SalesCtx) {
   }
   if (oa?.wonStep) {
     outcomeTitle = "Amount"; outcomeWhen = "";
-    const amt = (oa.amount ?? "").replace(/[^\d.]/g, ""), ok = Number(amt) > 0;
+    const amt = (oa.amount ?? "").replace(/[^\d.]/g, ""), ok = Number(amt) > 0 && !!oa.quote && !!oa.slip;
+    const setO = (p: Partial<OutcomeAsk>) => set(u => (u.outcomeAsk ? { ...u, outcomeAsk: { ...u.outcomeAsk, ...p } } : u));
     Object.assign(won, {
       isWon: true, wonAmount: oa.amount ?? "", wonSaveBg: ok ? "var(--crm-brown)" : "var(--crm-line)",
-      wonSet: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^\d,.]/g, ""); set(u => (u.outcomeAsk ? { ...u, outcomeAsk: { ...u.outcomeAsk, amount: v } } : u)); },
+      wonSet: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^\d,.]/g, ""); setO({ amount: v }); },
+      // Both required (the owner, 2026-11-19); the database refuses Won without them too.
+      wonFiles: {
+        quote: { label: "Quotation", name: oa.quote?.name ?? null, pick: (f: File) => setO({ quote: f }) },
+        slip: { label: "Bank slip", name: oa.slip?.name ?? null, pick: (f: File) => setO({ slip: f }) },
+      },
       wonSave: ok ? async () => {
-        if (!(await act.outcome(oa.visitId, true, "won", { amount: Number(amt) }))) return;
+        const saved = await oneAtATime(`won:${oa.visitId}`, async () =>
+          (await act.wonFiles(oa.visitId, oa.quote!, oa.slip!)) && act.outcome(oa.visitId, true, "won", { amount: Number(amt) }));
+        if (!saved) return;
         patch({ outcomeAsk: null, celebrate: { name: oa.name, amount: money(Number(amt)), customerId: oa.customerId } });
         clearTimeout(refs.celT);
         refs.celT = setTimeout(() => set(u => ({ ...u, celebrate: null, tab: "inbox", chat: oa.customerId, filter: { type: "status", v: "Won" } })), 5000);
@@ -180,6 +192,10 @@ export function calendarVM(ctx: SalesCtx) {
       label, pick: () => patch({ calView: k }), bg: cv === k ? "#fff" : "transparent", fg: cv === k ? "var(--crm-ink)" : "var(--crm-muted)", weight: cv === k ? 650 : 500, shadow: cv === k ? "0 1px 3px rgba(42,22,12,.12)" : "none",
     })),
     calIsMonth: cv === "month", calIsWeek: cv === "week", calIsDay: cv === "day",
+    // Book appt, top right (the owner, 2026-11-19: "calendar 的右上角点击之后能直接 book appt"): pick one of one's customers,
+    // then their chat opens on Book visit — the customer form first while it is incomplete, as the chat's own Appointment.
+    calBook: () => openCustomerPick({ customers: mine, pick: c => set(u => ({ ...u, tab: "inbox", chat: c.id, hist: [...u.hist, u.tab].slice(-20),
+      ...(bookingSkipsForm(c, data) ? { book: { customerId: c.id, room: 0, day: T, slot: null } } : { cform: { customerId: c.id, edit: false } }) })) }),
     // Three months back, eight ahead.
     calMonths: Array.from({ length: 12 }, (_, k) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 3 + k, 1), on = d.getFullYear() === ym[0] && d.getMonth() === ym[1];
@@ -224,7 +240,7 @@ export function calendarVM(ctx: SalesCtx) {
       // v3 M10: a visit still to come today says how soon ("in 2 h", "in 40 min").
       soon: a.at > now ? soonLabel(+a.at - +now) : "",
       time: day0(a.at) === T ? timeLabel(a.at) : `${gb(a.at, { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(a.at)}`,
-      change: change(a), ...keys(a),
+      change: change(a), ...keys(a), cameLabel: isCall(a) ? "Picked up" : "Show up",
       // At a showroom that hands the key over (the owner, 2026-10-29 — its switch in Showrooms): Show up needs the key returned on
       // a photo; a No show too once the key was collected (2026-10-28). Anywhere else a visit is marked as before.
       came: () => (!keyRoom(a) || a.v.keyBack ? patch({ outcomeAsk: ask(a) }) : keyAsk(a, "back", () => patch({ outcomeAsk: ask(a) }))),

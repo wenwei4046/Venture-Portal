@@ -54,6 +54,8 @@ export const APPT_FIELD_KINDS: { k: ApptFieldKind; label: string }[] = [
 /** The two built in, as crm_appt_types_in_force() has them. */
 export const DEFAULT_APPT_TYPES: ApptType[] = [
   { id: "online", label: "Online", on: true, base: "online", fields: [{ id: "link", label: "Meeting link", kind: "link" }, { id: "remarks", label: "Remarks", kind: "long" }] },
+  // A phone call (the owner, 2026-11-19: right of Online — the date, the time and remarks).
+  { id: "phone", label: "Phone", on: true, base: "place", fields: [{ id: "remarks", label: "Remarks", kind: "long" }] },
   { id: "other", label: "Other", on: true, base: "place", fields: [{ id: "place", label: "Place", kind: "place", required: true }, { id: "remarks", label: "Remarks", kind: "long" }] },
 ];
 /** crm_appt_types_read()'s answer as types; anything else = the two built in. */
@@ -190,7 +192,11 @@ export interface CrmVisit {
    * after it — each a file in crm-media under the customer’s folder. A Show up needs the key returned; a No show too once collected. */
   keyOut?: CrmKeyPhoto;
   keyBack?: CrmKeyPhoto;
+  /** A visit marked Won carries its quotation and bank slip (the owner, 2026-11-19; mig 20261119230000) — files in crm-media
+   * under the customer's folder, both required before Won. */
+  wonFiles?: { quote: CrmWonFile; slip: CrmWonFile };
 }
+export interface CrmWonFile { path: string; name: string }
 /** `by`: the staff member who took the photo (crm_appointments.key_*_by). */
 export interface CrmKeyPhoto { path: string; at: string; by?: string | null }
 
@@ -535,6 +541,7 @@ export interface CrmVisitRow {
   kind?: string | null; meeting_link?: string | null; place?: string | null; remarks?: string | null;
   type_id?: string | null; answers?: Record<string, string> | null;
   key_out_path?: string | null; key_out_at?: string | null; key_back_path?: string | null; key_back_at?: string | null; key_out_by?: string | null; key_back_by?: string | null;
+  won_quote_path?: string | null; won_quote_name?: string | null; won_slip_path?: string | null; won_slip_name?: string | null;
 }
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
@@ -699,6 +706,7 @@ export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
     ...(a.remarks ? { remarks: a.remarks } : {}),
     ...(a.key_out_path ? { keyOut: { path: a.key_out_path, at: a.key_out_at ?? "", by: a.key_out_by ?? null } } : {}),
     ...(a.key_back_path ? { keyBack: { path: a.key_back_path, at: a.key_back_at ?? "", by: a.key_back_by ?? null } } : {}),
+    ...(a.won_quote_path && a.won_slip_path ? { wonFiles: { quote: { path: a.won_quote_path, name: a.won_quote_name ?? "Quotation" }, slip: { path: a.won_slip_path, name: a.won_slip_name ?? "Bank slip" } } } : {}),
   };
 };
 /** The room an online / elsewhere visit is named by. */

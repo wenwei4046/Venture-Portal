@@ -18,7 +18,8 @@ export function typesProblem(types: ApptType[]): string {
     if (t.fields.length > 20) return `"${t.label}": up to 20 questions.`;
     if (t.fields.some(f => !f.label.trim())) return `"${t.label}": name each question.`;
     if (t.fields.some(f => f.kind === "choice" && !(f.options ?? []).some(o => o.trim()))) return `"${t.label}": give each choice question its choices.`;
-    if (t.base === "place" && !t.fields.some(f => f.kind === "place")) return `"${t.label}" is at a place: give it a Place question.`;
+    // Phone (2026-11-19) is a call, at no place: the one place type with no Place question (crm_save_appt_types the same).
+    if (t.base === "place" && t.id !== "phone" && !t.fields.some(f => f.kind === "place")) return `"${t.label}" is at a place: give it a Place question.`;
   }
   return "";
 }
