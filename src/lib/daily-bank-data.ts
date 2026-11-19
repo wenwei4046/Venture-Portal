@@ -5,6 +5,8 @@
 //   B/F        = Σ journal_lines on the bank's GL code, JE date < D
 //   In/Out D   = Σ debits / credits dated D, split by the JE's segment
 //   Pending    = PVs submitted on/before D and NOT approved by end of D
+//                (a payroll funding transfer moves money, it does not spend
+//                it: out of its bank and into the one it funds, HR's column)
 //                (approval_requests.created_at / approved_at — historical
 //                days are reconstructed from these timestamps, so a voided
 //                or rejected item's disappearance time is approximate)
@@ -143,7 +145,7 @@ export async function fetchDailyBank(
 
       const { data: pvRows } = await supabase
         .from('payment_vouchers')
-        .select('id, voucher_no, payee_name, description, amount, bank_account_id, direction, status, updated_at, reference_type')
+        .select('id, voucher_no, payee_name, description, amount, bank_account_id, direction, status, updated_at, reference_type, voucher_type')
         .in('id', pendingIds)
       const vouchers = ((pvRows ?? []) as Array<{
         id: string
@@ -156,6 +158,7 @@ export async function fetchDailyBank(
         status: string
         updated_at: string
         reference_type: string | null
+        voucher_type: string | null
       }>).filter(
         v =>
           v.direction === 'debit' &&
@@ -165,7 +168,7 @@ export async function fetchDailyBank(
 
       const { data: srcRows } = await supabase
         .from('payment_voucher_sources')
-        .select('voucher_id, pool, amount, role')
+        .select('voucher_id, pool, amount, role, account_code')
         .in('voucher_id', vouchers.map(v => v.id))
       return { vouchers, srcRows }
     })(),
@@ -234,16 +237,17 @@ export async function fetchDailyBank(
   let pendingByBank = new Map<string, PendingItem[]>()
   if (pending) {
     const { vouchers, srcRows } = pending
-    const srcByVoucher = new Map<string, Array<{ pool: string | null; amount: number }>>()
+    const srcByVoucher = new Map<string, Array<{ pool: string | null; amount: number; accountCode: string | null }>>()
     for (const s of ((srcRows ?? []) as Array<{
       voucher_id: string
       pool: string | null
       amount: number
       role: string | null
+      account_code: string | null
     }>)) {
       if (s.role === 'mirror') continue // paying-dept mirror rows are the OTHER side
       const list = srcByVoucher.get(s.voucher_id) ?? []
-      list.push({ pool: s.pool, amount: Number(s.amount) })
+      list.push({ pool: s.pool, amount: Number(s.amount), accountCode: s.account_code })
       srcByVoucher.set(s.voucher_id, list)
     }
 
@@ -261,21 +265,55 @@ export async function fetchDailyBank(
       }
     }
 
-    pendingByBank = new Map()
-    for (const v of listed) {
-      if (!v.bank_account_id) continue
+    // What a pending voucher does to each bank (2026-11-19 — the user, on the
+    // board: "帮我检查这个是不是有问题" → "开 PR 修"). A payment leaves its own
+    // bank, from its pools' columns. A payroll funding transfer
+    // (payroll_bank_transfer) moves its pools' money into HR's payroll custody,
+    // in the bank whose GL code its rows carry: from one bank to another it
+    // leaves the first and comes into the second, under HR (a negative pending
+    // = money coming in); within one bank no cash moves — only the columns
+    // change, Revenue's down and HR's up, the bank's total untouched. It used to
+    // be taken off its bank whole: Alliance → Alliance rounds of RM 295k showed
+    // as spent, and an HLB → Alliance round never reached Alliance.
+    const bankByCode = new Map(banks.map(b => [b.gl_account_code as string, b]))
+    type Leg = { bankId: string; amounts: SegAmounts; total: number; description: string }
+    const legsOf = (v: (typeof vouchers)[number]): Leg[] => {
+      if (!v.bank_account_id) return []
       const amounts = emptyAmounts()
       addVoucher(amounts, v)
-      const item: PendingItem = {
-        voucherNo: v.voucher_no ?? '—',
-        payee: v.payee_name ?? '—',
-        description: v.description ?? '',
-        amounts,
-        total: r2(Number(v.amount)),
+      const total = r2(Number(v.amount))
+      const description = v.description ?? ''
+      if (v.voucher_type !== 'payroll_bank_transfer') return [{ bankId: v.bank_account_id, amounts, total, description }]
+      const destCode = (srcByVoucher.get(v.id) ?? []).find(s => s.accountCode)?.accountCode ?? null
+      const dest = destCode ? bankByCode.get(destCode) : undefined
+      if (!dest) return [{ bankId: v.bank_account_id, amounts, total, description }]
+      if (dest.id === v.bank_account_id) {
+        addAmounts(amounts, 'hr', -total)
+        return [{ bankId: v.bank_account_id, amounts, total: 0, description: `${description} · within ${dest.bank_name}, no cash moves` }]
       }
-      const list = pendingByBank.get(v.bank_account_id) ?? []
-      list.push(item)
-      pendingByBank.set(v.bank_account_id, list)
+      const into = emptyAmounts()
+      addAmounts(into, 'hr', -total)
+      const from = banks.find(b => b.id === v.bank_account_id)?.bank_name ?? 'another bank'
+      return [
+        { bankId: v.bank_account_id, amounts, total, description: `${description} · to ${dest.bank_name}` },
+        { bankId: dest.id, amounts: into, total: -total, description: `${description} · in from ${from}` },
+      ]
+    }
+
+    pendingByBank = new Map()
+    for (const v of listed) {
+      for (const leg of legsOf(v)) {
+        const item: PendingItem = {
+          voucherNo: v.voucher_no ?? '—',
+          payee: v.payee_name ?? '—',
+          description: leg.description,
+          amounts: leg.amounts,
+          total: leg.total,
+        }
+        const list = pendingByBank.get(leg.bankId) ?? []
+        list.push(item)
+        pendingByBank.set(leg.bankId, list)
+      }
     }
     // Voucher-number order (= submit order) — the .in() fetch above returns
     // rows in arbitrary DB order, which read as a jumble on the day sheet.
@@ -287,12 +325,13 @@ export async function fetchDailyBank(
     // payload feeds the PDF, which has no CJK glyphs.
     const foldedByBank = new Map<string, { amounts: SegAmounts; total: number; count: number }>()
     for (const v of folded) {
-      if (!v.bank_account_id) continue
-      const f = foldedByBank.get(v.bank_account_id) ?? { amounts: emptyAmounts(), total: 0, count: 0 }
-      addVoucher(f.amounts, v)
-      f.total = r2(f.total + Number(v.amount))
-      f.count += 1
-      foldedByBank.set(v.bank_account_id, f)
+      for (const leg of legsOf(v)) {
+        const f = foldedByBank.get(leg.bankId) ?? { amounts: emptyAmounts(), total: 0, count: 0 }
+        for (const c of Object.keys(leg.amounts) as DbColumn[]) addAmounts(f.amounts, c, leg.amounts[c] ?? 0)
+        f.total = r2(f.total + leg.total)
+        f.count += 1
+        foldedByBank.set(leg.bankId, f)
+      }
     }
     for (const [bankId, f] of foldedByBank) {
       const list = pendingByBank.get(bankId) ?? []

@@ -164,3 +164,75 @@ describe("Daily Bank — today is the office's", () => {
     })
   })
 })
+
+// 2026-11-19 — the user, on the board: "帮我检查这个是不是有问题" → "开 PR 修". A payroll
+// funding transfer moves money into HR's payroll custody; it is not spent.
+describe('Daily Bank — a pending payroll funding transfer', () => {
+  const run = async (transfer: { bank: string; dest: string }, seesPayroll = true) => {
+    const banks = [
+      { id: 'hlb', bank_name: 'Hong Leong Bank', gl_account_code: '3000', is_primary: true },
+      { id: 'abb', bank_name: 'Alliance Bank', gl_account_code: '3010', is_primary: false },
+    ]
+    const vouchers = [
+      { id: 'v-fund', voucher_no: 'HV-PV-202601-0050', payee_name: 'HOUZS Venture — Payroll staging (Alliance Bank)', description: 'Payroll bank transfer — Dec 2025', amount: 5000, reference_type: 'payroll_payment_request', voucher_type: 'payroll_bank_transfer', bank_account_id: transfer.bank },
+      { id: 'v-pay', voucher_no: 'HV-PV-202601-0051', payee_name: 'Marketing payroll', description: 'Payroll disbursement', amount: 3000, reference_type: 'payroll_disbursement', voucher_type: 'other', bank_account_id: 'abb' },
+    ].map((v) => ({ ...v, direction: 'debit', status: 'pending_approval', updated_at: SUBMITTED }))
+    const sources = [
+      { voucher_id: 'v-fund', pool: 'dept_pool_director', amount: 5000, role: 'primary', account_code: transfer.dest },
+      { voucher_id: 'v-pay', pool: 'dept_pool_hr', amount: 3000, role: 'primary', account_code: '4070' },
+    ]
+    const from = (table: string) => {
+      let ids: string[] | null = null
+      let receipts = false
+      const rows = (): unknown[] =>
+        table === 'bank_accounts' ? banks
+          : table === 'approval_requests' ? vouchers.map((v) => ({ reference_id: v.id, status: 'pending', created_at: SUBMITTED, approved_at: null, updated_at: SUBMITTED }))
+          : table === 'payment_vouchers' ? (receipts ? [] : vouchers.filter((v) => ids?.includes(v.id)))
+          : table === 'payment_voucher_sources' ? sources.filter((s) => ids?.includes(s.voucher_id))
+          : []
+      const q = {
+        select: () => q, not: () => q, order: () => q, lte: () => q, neq: () => q, range: () => q,
+        eq: (column: string, value: unknown) => {
+          if (table === 'payment_vouchers' && column === 'direction' && value === 'credit') receipts = true
+          return q
+        },
+        in: (column: string, values: string[]) => {
+          if (column === 'id' || column === 'voucher_id') ids = values
+          return q
+        },
+        then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => Promise.resolve(resolve({ data: rows(), error: null })),
+      }
+      return q
+    }
+    const data = await fetchDailyBank({ from } as unknown as SupabaseClient, DAY, { seesPayroll })
+    const bank = (id: string) => data.banks.find((b) => b.bankId === id)!
+    return { data, hlb: bank('hlb'), abb: bank('abb') }
+  }
+
+  it('from one bank to another: out of the first, into the second under HR', async () => {
+    const { hlb, abb } = await run({ bank: 'hlb', dest: '3010' })
+    expect(hlb.pendingTotal).toMatchObject({ director: 5000, hr: 0 })
+    const into = abb.pending.find((p) => p.voucherNo === 'HV-PV-202601-0050')!
+    expect([into.total, into.amounts.hr, into.description]).toEqual([-5000, -5000, 'Payroll bank transfer — Dec 2025 · in from Hong Leong Bank'])
+    // Alliance: 5,000 in, 3,000 out to staff — 2,000 more free than before the round.
+    expect(abb.pendingTotal).toMatchObject({ hr: -2000 })
+    // Across the banks only the staff's 3,000 leaves.
+    expect(hlb.pending.concat(abb.pending).reduce((s, p) => s + p.total, 0)).toBe(3000)
+  })
+
+  it('within one bank: no cash moves — Director down, HR up, the bank untouched', async () => {
+    const { abb } = await run({ bank: 'abb', dest: '3010' })
+    const round = abb.pending.find((p) => p.voucherNo === 'HV-PV-202601-0050')!
+    expect(round.total).toBe(0)
+    expect(round.amounts).toMatchObject({ director: 5000, hr: -5000 })
+    expect(round.description).toContain('no cash moves')
+  })
+
+  it('folded for an account without Payroll payouts: the same pending, nobody named', async () => {
+    const open = await run({ bank: 'hlb', dest: '3010' })
+    const folded = await run({ bank: 'hlb', dest: '3010' }, false)
+    expect(folded.abb.pendingTotal).toEqual(open.abb.pendingTotal)
+    expect(folded.hlb.pendingTotal).toEqual(open.hlb.pendingTotal)
+    expect(folded.data.totals).toEqual(open.data.totals)
+  })
+})
