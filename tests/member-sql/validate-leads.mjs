@@ -2521,6 +2521,61 @@ await db.exec(`
   const theirs = (await q(`select public.lead_overview('2026-11-01', '2026-11-30') j`))[0].j
   check([theirs.accounts, theirs.visits.every(x => x.outletId === pwcc), theirs.spend.map(x => x.outletId)], [[], true, [pwcc]], 'their outlet’s figures, no ad accounts')
   await as(CS_USER, ALL)
+
+  // ── 20261119200000: the outlets are ticked per person in People › Permissions ──
+  await db.exec(`
+    create or replace function public.has_perm(p text) returns boolean language sql stable as $$
+      select p = any (string_to_array(coalesce(current_setting('test.perms', true), ''), ',')) $$;
+    create table if not exists public.permission_table_reads (table_name text primary key, actions text[]);
+    create or replace function public.permission_reads_guard(p text) returns void language sql as $$ select $$;
+  `)
+  const ticksSql = (await readFile(new URL('../../supabase/migrations/20261119200000_lead_outlet_ticks.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(ticksSql)
+  await db.exec(ticksSql) // twice: the swap and the copy are idempotent
+  const perms = async p => db.exec(`select set_config('test.perms', '${p}', false)`)
+  check((await q('select user_id, outlet_id from public.user_lead_outlets')).map(r => [r.user_id, r.outlet_id]), [[DAN, pwcc]], 'the Team’s outlets became Daniel’s ticks')
+  check((await q(`select prosrc like '%user_lead_outlets%' s from pg_proc where proname = 'lead_team'`))[0].s, true, 'lead_team reads the ticks')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_my_outlets()', 'EXECUTE') a, has_function_privilege('authenticated', 'public.person_lead_outlets(uuid)', 'EXECUTE') b,
+    has_function_privilege('anon', 'public.person_lead_outlets(uuid)', 'EXECUTE') c, has_function_privilege('anon', 'public.permission_user_lead_outlets_set(uuid,uuid[])', 'EXECUTE') d`))[0],
+    { a: false, b: true, c: false, d: false }, 'grants: the scope is the functions’, the window’s two authenticated’s')
+
+  // Daniel: his tick; with Manage, every outlet.
+  await db.exec(`select set_config('test.uid', '${DAN}', false), set_config('test.cells', 'leads.view,leads.edit', false)`)
+  check((await q('select public.lead_my_outlets() s'))[0].s, [pwcc], 'a tick narrows to that outlet')
+  check((await q(`select public.lead_visits('2026-11-01', '2026-11-30') j`))[0].j.map(v => v.name), ['Lucy'], 'the visits follow the tick')
+  check((await q(`select public.lead_outlet_ok(array['${pwcc}']::uuid[], 'cs', null, null) a, public.lead_outlet_ok(array['${pwcc}']::uuid[], 'cs', '${pwcc}', null) b,
+    public.lead_outlet_ok(array['${pwcc}']::uuid[], 'cs', '${other}', null) c, public.lead_outlet_ok(null, 'cs', null, null) d`))[0],
+    { a: false, b: true, c: false, d: true }, 'a chat with no outlet is no longer an outlet person’s')
+  await db.exec(`select set_config('test.cells', 'leads.view,leads.manage', false)`)
+  check((await q('select public.lead_my_outlets() s'))[0].s, null, 'Lead View · Manage always sees every outlet')
+  await db.exec(`select set_config('test.uid', '${CS_USER}', false), set_config('test.cells', 'leads.view', false)`)
+  check((await q('select public.lead_my_outlets() s'))[0].s, null, 'no tick: every outlet')
+
+  // Setting them: whoever manages permissions, a whole list.
+  await perms('')
+  await db.exec(`select set_config('test.cells', 'accounts.manage,leads.view', false)`)
+  await refuses('select public.permission_user_lead_outlets_set($1, $2::uuid[])', [DAN, [other]], /manages permissions/, 'only whoever manages permissions sets them')
+  await refuses('select public.person_lead_outlets($1)', [DAN], /reads people/, 'nor reads them without People or Permissions')
+  await perms('permissions_manage')
+  await q('select public.permission_user_lead_outlets_set($1, $2::uuid[])', [DAN, [other, pwcc]])
+  const win = (await q('select public.person_lead_outlets($1) j', [DAN]))[0].j
+  check([win.ticked.slice().sort(), win.outlets.length > 1, win.outlets.every(o => o.id && o.name && o.brandId)], [[other, pwcc].sort(), true, true], 'the window: every outlet, their ticks')
+  check((await q('select public.lead_team() t'))[0].t.find(x => x.name === 'Daniel Chew').outlets.slice().sort(), [other, pwcc].sort(), 'Settings › Team shows the ticks')
+  await q('select public.permission_user_lead_outlets_set($1, $2::uuid[])', [DAN, [other]])
+  await refuses('select public.permission_user_lead_outlets_set($1, $2::uuid[])', [DAN, [id(99999)]], /not there/, 'an outlet that is not there')
+  await db.exec(`select set_config('test.uid', '${DAN}', false), set_config('test.cells', 'leads.view', false)`)
+  check((await q('select public.lead_my_outlets() s'))[0].s, [other], 'the new tick holds')
+  check((await q(`select public.lead_visits('2026-11-01', '2026-11-30') j`))[0].j.every(v => v.outletId === other), true, 'and the visits follow it')
+  // Their only outlet removed: nothing, never every outlet.
+  await db.exec(`update public.lead_outlets set deleted_at = now() where id = '${other}'`)
+  check((await q('select public.lead_my_outlets() s'))[0].s, [], 'a removed outlet leaves nothing, not everything')
+  await db.exec(`update public.lead_outlets set deleted_at = null where id = '${other}'`)
+  await db.exec(`select set_config('test.uid', '${CS_USER}', false)`)
+  await db.exec(`select set_config('test.cells', 'accounts.manage,leads.view', false)`)
+  await q('select public.permission_user_lead_outlets_set($1, $2::uuid[])', [DAN, []])
+  check((await q(`select count(*)::int n from public.user_lead_outlets where user_id = '${DAN}'`))[0].n, 0, 'an empty list = every outlet again')
+  await perms('')
+  await as(CS_USER, ALL)
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

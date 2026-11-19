@@ -846,19 +846,20 @@ function TeamPanel({ members, directory, outlets, brands, canManage }: {
               <>
                 <div className={s.tmSect}>
                   <span className={s.tmK}>OUTLETS</span>
-                  {brands.filter(b => outlets.some(o => o.brandId === b.id)).map(b => (
+                  {/* 2026-11-19: ticked per person in People › Permissions (user_lead_outlets); shown here, set there. */}
+                  {cur.outlets.length ? brands.filter(b => outlets.some(o => o.brandId === b.id && cur.outlets.includes(o.id))).map(b => (
                     <div key={b.id} className={s.tmGroup}>
                       <span className={s.tmGroupName}>{b.name}</span>
                       <div className={s.tmPills}>
-                        {outlets.filter(o => o.brandId === b.id).map(o => {
-                          const on = cur.outlets.includes(o.id)
-                          return <button key={o.id} type="button" className={s.tmPill} aria-pressed={on} disabled={!can}
-                            onClick={() => save(cur, { outlets: on ? cur.outlets.filter(x => x !== o.id) : [...cur.outlets, o.id] })}>{o.name}</button>
-                        })}
+                        {outlets.filter(o => o.brandId === b.id && cur.outlets.includes(o.id)).map(o => (
+                          <span key={o.id} className={s.tmPill} data-on>{o.name}</span>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                  {!cur.outlets.length ? <span className={s.tmWarn}>Pick at least one outlet</span> : null}
+                  )) : <span className={s.tmNote}>All outlets</span>}
+                  <span className={s.tmNote}>
+                    Set in People › Permissions{cur.hasLogin ? <> · <a href={`/team/people/${cur.staffId}`}>Open their permissions</a></> : null}
+                  </span>
                 </div>
                 <div className={s.tmCan}>
                   <span className={s.tmK}>CAN</span>

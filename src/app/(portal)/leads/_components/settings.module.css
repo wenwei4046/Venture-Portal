@@ -250,7 +250,7 @@
 .tmGroupName { font-size: 12px; color: rgb(var(--lv-fg-3)); }
 .tmPills { display: flex; flex-wrap: wrap; gap: 6px; }
 .tmPill { white-space: nowrap; cursor: pointer; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgb(var(--lv-line)); background: rgb(var(--lv-surface)); font-family: inherit; font-size: 13px; color: rgb(var(--lv-fg)); }
-.tmPill[aria-pressed='true'] { border-color: rgb(var(--lv-sel)); background: rgb(var(--lv-sel)); }
+.tmPill[aria-pressed='true'], .tmPill[data-on] { border-color: rgb(var(--lv-sel)); background: rgb(var(--lv-sel)); }
 .tmPill:disabled { cursor: default; }
 .tmWarn { font-size: 12px; color: rgb(var(--lv-accent)); }
 .tmCan { display: flex; flex-direction: column; gap: 2px; }

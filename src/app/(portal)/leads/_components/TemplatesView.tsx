@@ -187,7 +187,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
     if (item) added = fromLibrary(draft.steps, item, where).map(x => ({ ...x, name: x.name || item.name }))
     else {
       const k = kind ?? 'question'
-      added = [{ id: freshId(draft.steps), kind: k, name: typeOf(k).label, text: '', ...(k === 'question' ? { buttons: [{ label: 'Option 1', next: '' }] } : { next: '' }), ...(k === 'phone' ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}), ...(['question', 'text', 'phone'].includes(k) ? { back: true } : {}), pos: where }]
+      added = [{ id: freshId(draft.steps), kind: k, name: typeOf(k).label, text: '', ...(k === 'question' ? { buttons: [{ label: 'Option 1', next: '' }] } : { next: '' }), ...(k === 'phone' ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}), pos: where }]
     }
     const first = added[0]
     change(d => ({
