@@ -97,3 +97,13 @@ export function importToast(r: { added: number; skipped: { name: string; reason:
   const first = r.skipped[0];
   return `${head} · ${r.skipped.length} left out — ${first.name}: ${first.reason}${r.skipped.length > 1 ? ` (+${r.skipped.length - 1})` : ""}`;
 }
+
+/**
+ * What the chat keeps under a template's words (2026-11-19, the owner: the GRR template reached the customer with its
+ * three buttons, the CRM's bubble showed none — "要，修一下"): its footer, then each button on a line of its own, as the
+ * customer's WhatsApp draws them under the message. Kept in the message's own words, so every chat shows it.
+ */
+export function templateTail(p: { footer?: string; buttons?: string[] }): string {
+  const lines = [...(p.footer?.trim() ? [p.footer.trim()] : []), ...(p.buttons ?? []).filter(b => b.trim()).map(b => `↩ ${b.trim()}`)];
+  return lines.length ? `\n\n${lines.join("\n")}` : "";
+}

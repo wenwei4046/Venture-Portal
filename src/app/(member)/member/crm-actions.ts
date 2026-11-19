@@ -12,7 +12,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { headerKind, importPlan, type TemplateParts } from "@/lib/whatsapp/template-import";
+import { headerKind, importPlan, templateTail, type TemplateParts } from "@/lib/whatsapp/template-import";
 import { crmAdNumbers, crmPages, listMetaAds, metaAdBudget, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
@@ -645,7 +645,7 @@ export async function sendCrmTemplate(contactId: string, template: { name: strin
     }
     const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, language, params, { named: parts.param, header }) });
     if (!sent.ok) throw new Error(sent.error);
-    const message = await recorded(db, { contact: contactId, externalId: sent.wamid, kind: "template", body: fillTemplate(text, params) || template.name });
+    const message = await recorded(db, { contact: contactId, externalId: sent.wamid, kind: "template", body: (fillTemplate(text, params) || template.name) + templateTail({ footer: parts.footer, buttons: parts.buttons?.map(b => b.text) }) });
     if (!message) return { ok: false, error: "Sent to the customer on WhatsApp, but it could not be saved here. Reload before sending again." };
     return { ok: true, message };
   } catch (error) {

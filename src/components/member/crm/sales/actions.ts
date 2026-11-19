@@ -11,6 +11,7 @@ import {
 import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPrefs, CrmQuickReply, CrmVisit } from "@/lib/member/crm-data";
 import { apptValues, virtualRoom, visitFromRow, type ApptType, type CrmVisitRow } from "@/lib/member/crm-data";
 import type { WaTemplate } from "@/lib/whatsapp/send";
+import { templateTail } from "@/lib/whatsapp/template-import";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
@@ -444,9 +445,9 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       return r.templates;
     },
     async sendTemplate(customerId, t, params) {
-      if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: "template", text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? ""), at: new Date().toISOString(), status: "sent", by: me }); return true; }
+      if (!live) { addMessage(customerId, { id: uid(), from: "me", kind: "template", text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? "") + templateTail(t), at: new Date().toISOString(), status: "sent", by: me }); return true; }
       const tempId = `sending-${uid()}`;
-      addMessage(customerId, { id: tempId, from: "me", kind: "template", text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? ""), at: new Date().toISOString(), status: "sending", by: me });
+      addMessage(customerId, { id: tempId, from: "me", kind: "template", text: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] ?? "") + templateTail(t), at: new Date().toISOString(), status: "sending", by: me });
       const r = await inTurn(customerId, () => sendCrmTemplate(customerId, t, params));
       if (!r.ok) { swapMessage(customerId, tempId, null); toast(r.error); return false; }
       swapMessage(customerId, tempId, r.message);
