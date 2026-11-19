@@ -17,19 +17,20 @@ const companies: Company[] = [
     ],
   },
 ]
-const heads = () => Array.from(document.querySelectorAll('thead th')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim()).filter(Boolean)
+const heads = () => Array.from(document.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim()).filter(Boolean)
+const groups = () => Array.from(document.querySelectorAll('thead th[data-group]')).map((th) => [th.textContent, Number(th.getAttribute('colspan'))])
 
 beforeEach(() => window.localStorage.clear())
 
 describe('By company’s headings', () => {
   it('move when one is dragged onto another, and keep the order', () => {
     const { unmount } = render(<ByCompany companies={companies} basis="act" monthLong="November 2026" />)
-    expect(heads()).toEqual(['Company', 'Received', 'Collect · overdue', 'Paid', 'Pay · overdue', 'Net', 'Interest + penalty'])
-    const th = (name: string) => Array.from(document.querySelectorAll('thead th')).find((el) => el.textContent?.startsWith(name)) as HTMLElement
-    fireEvent.dragStart(th('Net'))
-    fireEvent.dragOver(th('Received'))
-    fireEvent.drop(th('Received'))
-    expect(heads()).toEqual(['Company', 'Net', 'Received', 'Collect · overdue', 'Paid', 'Pay · overdue', 'Interest + penalty'])
+    expect(heads()).toEqual(['Company', 'Received', 'Paid', 'Net', 'Interest + penalty', 'Collect', 'Pay'])
+    const th = (key: string) => document.querySelector(`thead th[data-col="${key}"]`) as HTMLElement
+    fireEvent.dragStart(th('net'))
+    fireEvent.dragOver(th('collect'))
+    fireEvent.drop(th('collect'))
+    expect(heads()).toEqual(['Company', 'Net', 'Received', 'Paid', 'Interest + penalty', 'Collect', 'Pay'])
     // The company's figures follow their heading.
     const row = screen.getByText('CAR').closest('tr') as HTMLElement
     expect(row.querySelectorAll('td')[1]).toHaveTextContent('+50.00')
@@ -42,10 +43,21 @@ describe('By company’s headings', () => {
     expect(heads()[1]).toBe('Received')
   })
 
-  it('keeps an order saved before overdue was split, both sides in its place', () => {
-    window.localStorage.setItem('repayment.by-company.order', JSON.stringify(['net', 'earlier', 'collect', 'pay', 'profit']))
+  // 2026-11-19 — the user: "有点乱，分不清什么是什么" → A + B.
+  it('stand in named groups, collect tinted apart from pay', () => {
+    window.localStorage.setItem('repayment.by-company.order', JSON.stringify(['net', 'earlierCollect', 'collect']))
     render(<ByCompany companies={companies} basis="act" monthLong="November 2026" />)
-    expect(heads()).toEqual(['Company', 'Net', 'Collect · overdue', 'Pay · overdue', 'Received', 'Paid', 'Interest + penalty'])
+    // An order kept before the groups is not read: the grouped order shows.
+    expect(groups()).toEqual([
+      ['This month · actual', 4],
+      ['Overdue from before', 2],
+    ])
+    const row = screen.getByText('CAR').closest('tr') as HTMLElement
+    const td = row.querySelectorAll('td')
+    expect([1, 2, 3, 5, 6].map((i) => td[i].getAttribute('data-dir'))).toEqual(['in', 'out', null, 'in', 'out'])
+    // A rule at each group's first column.
+    expect([1, 5].map((i) => td[i].getAttribute('data-start'))).toEqual(['true', 'true'])
+    expect(td[2].hasAttribute('data-start')).toBe(false)
   })
 })
 
@@ -65,12 +77,13 @@ describe('By company by right', () => {
   ]
   it('splits each side into this month and overdue, and the cards say both', () => {
     render(<ByCompany companies={late} basis="due" monthLong="November 2026" />)
-    expect(heads()).toEqual(['Company', 'Collect · this month', 'Collect · overdue', 'Pay · this month', 'Pay · overdue', 'Net', 'Interest profit'])
+    expect(heads()).toEqual(['Company', 'Collect', 'Pay', 'Net', 'Interest profit', 'Collect', 'Pay'])
+    expect(groups()[0]).toEqual(['This month · by right', 4])
     const row = screen.getByText('HK').closest('tr') as HTMLElement
     const td = row.querySelectorAll('td')
-    expect([td[1], td[2], td[3], td[4]].map((c) => c.textContent)).toEqual(['1,100.00', '600.00', '500.00', '300.00'])
+    expect([td[1], td[5], td[2], td[6]].map((c) => c.textContent)).toEqual(['1,100.00', '600.00', '500.00', '300.00'])
     // Net is all of each side: 1,700 − 800.
-    expect(td[5]).toHaveTextContent('+900.00')
+    expect(td[3]).toHaveTextContent('+900.00')
     render(<ByCompanyCards companies={late} basis="due" month="2026-11" />)
     expect(screen.getByText('This month RM 1,100.00 + overdue RM 600.00')).toBeInTheDocument()
     expect(screen.getByText('This month RM 500.00 + overdue RM 300.00')).toBeInTheDocument()
@@ -82,11 +95,12 @@ describe('By company by right', () => {
     render(<ByCompany companies={half} basis="act" monthLong="November 2026" />)
     fireEvent.click(screen.getByRole('button', { name: /Columns/ }))
     fireEvent.click(screen.getByLabelText('Still to collect / to pay'))
-    expect(heads()).toEqual(expect.arrayContaining(['Still to collect', 'Still to pay']))
-    const at = (name: string) => heads().indexOf(name)
+    expect(groups()).toContainEqual(['Still to settle', 2])
+    const keys = Array.from(document.querySelectorAll('thead th[data-col]')).map((th) => th.getAttribute('data-col'))
+    const at = (key: string) => keys.indexOf(key)
     const row = screen.getByText('HK').closest('tr') as HTMLElement
-    expect(row.querySelectorAll('td')[at('Still to collect')]).toHaveTextContent('900.00')
-    expect(row.querySelectorAll('td')[at('Still to pay')]).toHaveTextContent('800.00')
+    expect(row.querySelectorAll('td')[at('openCollect')]).toHaveTextContent('900.00')
+    expect(row.querySelectorAll('td')[at('openPay')]).toHaveTextContent('800.00')
     render(<ByCompanyCards companies={half} basis="act" month="2026-11" />)
     // 900 still open to collect, 600 of it overdue; 800 to pay, 300 of it overdue.
     expect(screen.getByText('Collect 300.00 + overdue 600.00 · pay 500.00 + overdue 300.00')).toBeInTheDocument()

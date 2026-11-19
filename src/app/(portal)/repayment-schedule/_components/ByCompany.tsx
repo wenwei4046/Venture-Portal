@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, cloneElement, useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react'
 import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
@@ -32,11 +32,14 @@ const EXTRAS: Array<{ key: Extra; label: string }> = [
 ]
 const COLS_KEY = 'repayment.by-company.columns'
 // The order the figures stand in (2026-11-13 — the user: "我不能自己拖着排？"): drag a heading onto another, as the hub
-// tables do; kept by the browser. Company stays first, the row's button last.
-const ORDER_KEY = 'repayment.by-company.order'
-// Overdue stands beside its side (2026-11-16, C): a company's this-month and overdue, collect then pay.
-const DEFAULT_ORDER = ['collect', 'earlierCollect', 'pay', 'earlierPay', 'net', 'profit', 'openCollect', 'openPay', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
+// tables do; kept by the browser. Company stays first, the row's button last. v2 (2026-11-19): the headings stand in
+// groups now, so an order kept before starts again from the grouped one.
+const ORDER_KEY = 'repayment.by-company.order.v2'
+// Grouped by time, collect then pay in each (2026-11-19 — the user: "有点乱，分不清什么是什么" → A + B): this month,
+// overdue from before, still to settle, settled so far; a band over the headings names each group.
+const DEFAULT_ORDER = ['collect', 'pay', 'net', 'profit', 'earlierCollect', 'earlierPay', 'openCollect', 'openPay', 'gotCollect', 'gotPay', 'pi', 'next', 'last', 'pos'] as const
 type ColKey = (typeof DEFAULT_ORDER)[number]
+type Group = 'month' | 'overdue' | 'open' | 'sofar' | 'more'
 
 type Filter = 'all' | 'both' | 'late' | 'loss'
 type SortKey = 'name' | 'collect' | 'pay' | 'net' | 'profit' | 'earlierCollect' | 'earlierPay'
@@ -130,10 +133,7 @@ export default function ByCompany({
     try {
       const o = JSON.parse(window.localStorage.getItem(ORDER_KEY) ?? '[]') as ColKey[]
       if (Array.isArray(o) && o.length) {
-        // An order kept before the split (2026-11-16) had one 'earlier': its place takes both sides.
-        const known = o
-          .flatMap((k) => ((k as string) === 'earlier' ? (['earlierCollect', 'earlierPay'] as ColKey[]) : [k]))
-          .filter((k, i, all) => (DEFAULT_ORDER as readonly string[]).includes(k) && all.indexOf(k) === i)
+        const known = o.filter((k, i, all) => (DEFAULT_ORDER as readonly string[]).includes(k) && all.indexOf(k) === i)
         setOrder([...known, ...DEFAULT_ORDER.filter((k) => !known.includes(k))])
       }
     } catch {
@@ -203,9 +203,12 @@ export default function ByCompany({
   )
   const toggleSort = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, dir: cur.dir === 1 ? -1 : 1 } : { key, dir: key === 'name' ? 1 : -1 }))
 
-  // Each figure's column: its heading, what a company row, a deal row and the foot say in it.
+  // Each figure's column: its group, its heading, the side it is (tinted: collect green, pay red — 2026-11-19, B), what
+  // a company row, a deal row and the foot say in it.
   type Col = {
     key: ColKey
+    group: Group
+    dir?: 'in' | 'out'
     label: string
     num?: boolean
     sort?: SortKey
@@ -221,7 +224,7 @@ export default function ByCompany({
   const cell = (cls: string, v: ReactNode) => <td className={cls}>{v}</td>
   const COLS: Record<ColKey, Col> = {
     collect: {
-      key: 'collect', label: A ? 'Received' : 'Collect · this month', num: true, sort: 'collect',
+      key: 'collect', group: 'month', dir: 'in', label: A ? 'Received' : 'Collect', num: true, sort: 'collect',
       co: (_, f) => {
         const v = A ? f.collect : f.nowCollect
         return cell(`${s.num} ${v >= EPS ? s.good : s.quiet}`, bare(v))
@@ -230,13 +233,13 @@ export default function ByCompany({
       foot: () => cell(s.num, bare(total(A ? 'collect' : 'nowCollect'))),
     },
     earlierCollect: {
-      key: 'earlierCollect', label: 'Collect · overdue', num: true, sort: 'earlierCollect',
+      key: 'earlierCollect', group: 'overdue', dir: 'in', label: 'Collect', num: true, sort: 'earlierCollect',
       co: (_, f) => cell(`${s.num} ${f.earlierCollect >= EPS ? s.bad : s.quiet}`, bare(f.earlierCollect)),
       deal: (d) => cell(`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`, d.side === 'collect' ? bare(d.earlier) : ''),
       foot: () => cell(s.num, bare(total('earlierCollect'))),
     },
     pay: {
-      key: 'pay', label: A ? 'Paid' : 'Pay · this month', num: true, sort: 'pay',
+      key: 'pay', group: 'month', dir: 'out', label: A ? 'Paid' : 'Pay', num: true, sort: 'pay',
       co: (_, f) => {
         const v = A ? f.pay : f.nowPay
         return cell(`${s.num} ${v >= EPS ? s.bad : s.quiet}`, bare(v))
@@ -245,19 +248,19 @@ export default function ByCompany({
       foot: () => cell(s.num, bare(total(A ? 'pay' : 'nowPay'))),
     },
     earlierPay: {
-      key: 'earlierPay', label: 'Pay · overdue', num: true, sort: 'earlierPay',
+      key: 'earlierPay', group: 'overdue', dir: 'out', label: 'Pay', num: true, sort: 'earlierPay',
       co: (_, f) => cell(`${s.num} ${f.earlierPay >= EPS ? s.bad : s.quiet}`, bare(f.earlierPay)),
       deal: (d) => cell(`${s.num} ${d.earlier >= EPS ? s.bad : s.quiet}`, d.side === 'pay' ? bare(d.earlier) : ''),
       foot: () => cell(s.num, bare(total('earlierPay'))),
     },
     net: {
-      key: 'net', label: 'Net', num: true, sort: 'net',
+      key: 'net', group: 'month', label: 'Net', num: true, sort: 'net',
       co: (_, f) => cell(`${s.num} ${tone(f.net)}`, signed(f.net)),
       deal: () => cell(s.num, ''),
       foot: () => cell(s.num, signed(total('net'))),
     },
     profit: {
-      key: 'profit', label: A ? 'Interest + penalty' : 'Interest profit', num: true, sort: 'profit',
+      key: 'profit', group: 'month', label: A ? 'Interest + penalty' : 'Interest profit', num: true, sort: 'profit',
       co: (_, f) => cell(`${s.num} ${tone(f.profit)}`, signed(f.profit)),
       deal: (d) => {
         const v = d.side === 'collect' ? shownInt(d) : -shownInt(d)
@@ -266,49 +269,49 @@ export default function ByCompany({
       foot: () => cell(s.num, signed(total('profit'))),
     },
     openCollect: {
-      key: 'openCollect', label: 'Still to collect', num: true, extra: 'open',
+      key: 'openCollect', group: 'open', dir: 'in', label: 'Collect', num: true, extra: 'open',
       co: (_, f) => cell(`${s.num} ${f.openCollect >= EPS ? s.good : s.quiet}`, bare(f.openCollect)),
       deal: (d) => cell(s.num, d.side === 'collect' ? bare(d.open) : ''),
       foot: () => cell(s.num, bare(total('openCollect'))),
     },
     openPay: {
-      key: 'openPay', label: 'Still to pay', num: true, extra: 'open',
+      key: 'openPay', group: 'open', dir: 'out', label: 'Pay', num: true, extra: 'open',
       co: (_, f) => cell(`${s.num} ${f.openPay >= EPS ? s.bad : s.quiet}`, bare(f.openPay)),
       deal: (d) => cell(s.num, d.side === 'pay' ? bare(d.open) : ''),
       foot: () => cell(s.num, bare(total('openPay'))),
     },
     gotCollect: {
-      key: 'gotCollect', label: 'Received so far', num: true, extra: 'sofar',
+      key: 'gotCollect', group: 'sofar', dir: 'in', label: 'Received', num: true, extra: 'sofar',
       co: (_, f) => cell(`${s.num} ${s.good}`, bare(f.gotCollect)),
       deal: (d) => cell(s.num, d.side === 'collect' ? bare(d.got) : ''),
       foot: () => cell(s.num, bare(total('gotCollect'))),
     },
     gotPay: {
-      key: 'gotPay', label: 'Paid so far', num: true, extra: 'sofar',
+      key: 'gotPay', group: 'sofar', dir: 'out', label: 'Paid', num: true, extra: 'sofar',
       co: (_, f) => cell(`${s.num} ${s.bad}`, bare(f.gotPay)),
       deal: (d) => cell(s.num, d.side === 'pay' ? bare(d.got) : ''),
       foot: () => cell(s.num, bare(total('gotPay'))),
     },
     pi: {
-      key: 'pi', label: A ? 'Interest + penalty in / out' : 'Interest in / out', num: true, extra: 'pi',
+      key: 'pi', group: 'more', label: A ? 'Interest + penalty in / out' : 'Interest in / out', num: true, extra: 'pi',
       co: (_, f) => cell(s.num, `${formatMoneyBare(f.interestIn)} / ${formatMoneyBare(f.interestOut)}`),
       deal: (d) => cell(s.num, `P ${formatMoneyBare(Math.max(0, shownFig(d) - shownInt(d)))} · I ${formatMoneyBare(shownInt(d))}`),
       foot: () => cell(s.num, `${formatMoneyBare(total('interestIn'))} / ${formatMoneyBare(total('interestOut'))}`),
     },
     next: {
-      key: 'next', label: 'Next due', extra: 'next',
+      key: 'next', group: 'more', label: 'Next due', extra: 'next',
       co: () => <td />,
       deal: (d) => <td>{d.next ? `${dayjs(d.next.due).format('D MMM')} · ${formatMoneyBare(d.next.amount)}` : '—'}</td>,
       foot: () => <td />,
     },
     last: {
-      key: 'last', label: 'Last received / paid', extra: 'last',
+      key: 'last', group: 'more', label: 'Last received / paid', extra: 'last',
       co: () => <td />,
       deal: (d) => <td>{day(d.last)}</td>,
       foot: () => <td />,
     },
     pos: {
-      key: 'pos', label: 'Total owed both ways', num: true, extra: 'pos',
+      key: 'pos', group: 'more', label: 'Total owed both ways', num: true, extra: 'pos',
       co: (c) => (
         <td className={`${s.num} ${tone(c.position)}`}>
           {signed(c.position)}
@@ -320,16 +323,39 @@ export default function ByCompany({
     },
   }
   const cols = order.map((k) => COLS[k]).filter((c) => !c.extra || has(c.extra))
+  const GROUP: Record<Group, string> = {
+    month: A ? 'This month · actual' : 'This month · by right',
+    overdue: 'Overdue from before',
+    open: 'Still to settle',
+    sofar: 'Settled so far',
+    more: '',
+  }
+  // The band over the headings: a run of columns of one group under one name; a group's first column draws a rule.
+  const runs: Array<{ group: Group; span: number; first: ColKey }> = []
+  for (const c of cols) {
+    const last = runs[runs.length - 1]
+    if (last && last.group === c.group && c.group !== 'more') last.span += 1
+    else runs.push({ group: c.group, span: 1, first: c.key })
+  }
+  const starts = new Set(runs.map((r) => r.first))
+  const mark = (c: Col, node: ReactNode) =>
+    cloneElement(node as ReactElement<Record<string, unknown>>, {
+      'data-dir': c.dir,
+      'data-start': starts.has(c.key) ? 'true' : undefined,
+    })
 
   const head = (c: Col) => (
     <th
       key={c.key}
+      data-col={c.key}
       data-num={c.num ? 'true' : undefined}
+      data-dir={c.dir}
+      data-start={starts.has(c.key) ? 'true' : undefined}
       data-sort={c.sort ?? undefined}
       data-dragging={drag.from === c.key ? 'true' : undefined}
       data-drop={drag.over === c.key && drag.from && drag.from !== c.key ? 'true' : undefined}
       aria-sort={c.sort && sort.key === c.sort ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}
-      title="Drag to move · click to sort"
+      title={`${GROUP[c.group] ? `${GROUP[c.group]} · ` : ''}${c.label} — drag to move${c.sort ? ' · click to sort' : ''}`}
       draggable
       onDragStart={(e) => {
         try {
@@ -372,7 +398,7 @@ export default function ByCompany({
           {d.pending ? <span className="chip wait ml-2">pending PV</span> : null}
           <div className={s.sub}>{d.words}</div>
         </td>
-        {cols.map((c) => <Fragment key={c.key}>{c.deal(d)}</Fragment>)}
+        {cols.map((c) => <Fragment key={c.key}>{mark(c, c.deal(d))}</Fragment>)}
         <td className="text-right whitespace-nowrap">
           {canRecord && !d.pending && d.open >= EPS && d.href ? (
             <Link href={`${d.href}${c1 ? '#repayment-form' : '#repay_principal'}`} className="sch-row-btn border-0">
@@ -436,14 +462,19 @@ export default function ByCompany({
         <div className={s.scroll}>
           <table className={s.table}>
             <thead>
-              <tr>
-                <th data-sort="name" aria-sort={sort.key === 'name' ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} onClick={() => toggleSort('name')}>
+              <tr className={s.groups}>
+                <th rowSpan={2} data-col="name" data-sort="name" aria-sort={sort.key === 'name' ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined} onClick={() => toggleSort('name')}>
                   Company
                   {sortGlyph('name')}
                 </th>
-                {cols.map(head)}
-                <th aria-label="Actions" />
+                {runs.map((r) => (
+                  <th key={r.first} colSpan={r.span} data-group={r.group} data-start="true">
+                    {GROUP[r.group]}
+                  </th>
+                ))}
+                <th rowSpan={2} aria-label="Actions" />
               </tr>
+              <tr>{cols.map(head)}</tr>
             </thead>
             <tbody>
               {shown.length === 0 ? (
@@ -474,7 +505,7 @@ export default function ByCompany({
                           {c.both ? ' · both sides' : ''}
                         </div>
                       </td>
-                      {cols.map((col) => <Fragment key={col.key}>{col.co(c, f)}</Fragment>)}
+                      {cols.map((col) => <Fragment key={col.key}>{mark(col, col.co(c, f))}</Fragment>)}
                       <td />
                     </tr>
                     {isOpen ? c.deals.map(dealRow) : null}
@@ -486,7 +517,7 @@ export default function ByCompany({
                   <td>
                     Total · {shown.length} {shown.length === 1 ? 'company' : 'companies'}
                   </td>
-                  {cols.map((col) => <Fragment key={col.key}>{col.foot()}</Fragment>)}
+                  {cols.map((col) => <Fragment key={col.key}>{mark(col, col.foot())}</Fragment>)}
                   <td />
                 </tr>
               ) : null}
@@ -495,7 +526,7 @@ export default function ByCompany({
         </div>
       </div>
       <p className={s.note}>
-        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Net = {A ? 'received − paid this month' : 'all to collect − all to pay, this month’s and overdue together'}. Overdue = still owed from months before, each side its own column. Still to collect / to pay (Columns) = this month&rsquo;s and overdue not yet settled. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
+        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Green columns are money coming to us, red going out. Net = {A ? 'received − paid this month' : 'all to collect − all to pay, this month’s and overdue together'}. Overdue from before = still owed from months before. Still to settle (Columns) = this month&rsquo;s and overdue not yet settled. {A ? 'Interest + penalty' : 'Interest profit'} ={' '}
         {A ? 'interest and penalty received − interest and penalty paid' : 'interest due to us − interest we owe'} this month. A contra is no cash and is left out of Actual.
       </p>
     </section>
