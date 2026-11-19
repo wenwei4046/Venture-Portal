@@ -111,11 +111,44 @@ export const textMessage = (to: string, body: string, quote?: string | null) =>
 export const reactionMessage = (to: string, wamid: string, emoji: string) =>
   ({ to, type: "reaction", reaction: { message_id: wamid, emoji } });
 
-/** An approved template; its body's variables ({{1}}, {{2}}…) are filled in order. */
-export const templateMessage = (to: string, name: string, language: string, params: string[]) => ({
-  to, type: "template",
-  template: { name, language: { code: language }, ...(params.length ? { components: [{ type: "body", parameters: params.map(text => ({ type: "text", text })) }] } : {}) },
-});
+/**
+ * An approved template; its body's variables ({{1}}, {{2}}…) are filled in order — or, for a template whose one variable
+ * is a named one (imported from Meta, 2026-11-19), by that name. A header picture / video / PDF goes by its uploaded media id.
+ */
+export const templateMessage = (to: string, name: string, language: string, params: string[],
+  opts: { named?: string; header?: { kind: "image" | "video" | "document"; id: string; filename?: string } } = {}) => {
+  const components: Record<string, unknown>[] = [];
+  if (opts.header) {
+    const { kind, id, filename } = opts.header;
+    components.push({ type: "header", parameters: [{ type: kind, [kind]: { id, ...(kind === "document" && filename ? { filename } : {}) } }] });
+  }
+  if (params.length) {
+    components.push({ type: "body", parameters: params.map((text, i) => ({ type: "text", text, ...(opts.named && i === 0 ? { parameter_name: opts.named } : {}) })) });
+  }
+  return { to, type: "template", template: { name, language: { code: language }, ...(components.length ? { components } : {}) } };
+};
+
+/** Every template of the account, whole — what Import from Meta reads (2026-11-19). */
+export async function fetchWhatsAppTemplatesFull(
+  opts: { wabaId: string; token: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ ok: true; rows: import("./template-import").MetaTemplateRow[] } | { ok: false; error: string }> {
+  const rows: import("./template-import").MetaTemplateRow[] = [];
+  let next: string | null = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(opts.wabaId)}/message_templates?fields=id,name,language,status,category,parameter_format,components&limit=100`;
+  for (let page = 0; next && page < 10; page++) {
+    let response: Response;
+    try {
+      response = await fetchImpl(next, { headers: { Authorization: `Bearer ${opts.token}` }, cache: "no-store" });
+    } catch {
+      return { ok: false, error: "Could not reach WhatsApp for the templates." };
+    }
+    const payload = (await response.json().catch(() => null)) as { data?: import("./template-import").MetaTemplateRow[]; paging?: { next?: string } } | null;
+    if (!response.ok) return { ok: false, error: sendError(response.status, payload) };
+    rows.push(...(payload?.data ?? []));
+    next = payload?.paging?.next ?? null;
+  }
+  return { ok: true, rows };
+}
 
 /** A photo or document we uploaded (its media id), with a caption / file name. */
 /** A photo, video, voice note or document by its uploaded media id. A voice note carries no caption (WhatsApp takes none). */
@@ -169,7 +202,11 @@ export async function uploadWhatsAppMedia(
 }
 
 /** `name` is Meta's; `label` the CRM's own name for it (rev 1011's templates), shown instead when there is one. */
-export interface WaTemplate { name: string; label?: string; language: string; category: string; text: string; params: number }
+export interface WaTemplate {
+  name: string; label?: string; language: string; category: string; text: string; params: number;
+  /** An imported template's other parts, for the list a salesperson picks from (2026-11-19): the header's words or its kind, the footer, the buttons' words. */
+  header?: string; footer?: string; buttons?: string[];
+}
 
 /** The approved templates of the WhatsApp Business Account, with their body text. */
 export async function fetchWhatsAppTemplates(

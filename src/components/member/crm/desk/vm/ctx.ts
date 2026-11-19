@@ -207,6 +207,8 @@ export interface DeskUi {
   addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;
   cltF: string; cltFOpen: boolean; cltEdit: string | null; cltDraft: string | null; cltDN: string | null; cltDC: "WhatsApp" | "Messenger" | null; cltDL?: string | null; cltDK?: string | null; cltIsNew: boolean; cltAsk: string | null; cltMore: boolean; cltVars: string[];
+  /** Import from Meta running (2026-11-19); a header file uploading for this template. */
+  cltImporting?: boolean; cltUploading?: string | null;
   frmOpen: boolean; frmCur: string | null; frmDraft: FormSection[] | null; frmName: string | null; frmIsNew: boolean; frmExp: string | null; frmOptIn: Record<string, string>;
   ntfTab: "all" | "unread" | "read"; ntfCat: string; ntfSel: boolean; ntfPick: Record<string, boolean>;
   // Screens the design does not draw (BUILD-NOTES.md)

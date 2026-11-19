@@ -146,6 +146,7 @@ cltFDot
 cltFLabel
 cltFOpen
 cltFOpts
+cltImport
 cltNewT
 cltOpen
 cltReviewUrl

@@ -56,7 +56,7 @@ import { DeskWorkspace } from "./DeskWorkspace";
 import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
 import { DeskOverview } from "./DeskOverview";
-import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
+import { DeskTemplateFormat, DeskTemplateImport, DeskTemplateKind, DeskTemplateParts, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
 import { ${[...new Set([...body.matchAll(/<(Desk\w*4a\w*)\b/g)].map(m => m[1]))].sort().join(", ")} } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";

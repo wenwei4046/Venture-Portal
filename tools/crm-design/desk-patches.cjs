@@ -86,5 +86,10 @@ module.exports = [
     "The editor's preview draws WhatsApp's formatting as the customer will see it (2026-11-04)."],
   [/(\{\(t\.segs\)\.map\(\(g, g_i\) => \(<Fragment key=\{g_i\}>[\s\S]*?)\{!!\(g\.txt\) && \(<>\{g\.t\}<\/>\)\}/, "$1{!!(g.txt) && (<WaText t={g.t} />)}",
     "A template card draws WhatsApp's formatting too (2026-11-04)."],
+  [`<DeskTemplateReview url={v.cltReviewUrl} />`, `<DeskTemplateImport v={v.cltImport} /><DeskTemplateReview url={v.cltReviewUrl} />`,
+    "Import from Meta beside Review status in Meta: the templates approved in WhatsApp Manager come into the CRM (the owner, 2026-11-19: \"做导入功能\")."],
+  [/(\{\(t\.segs\)\.map\(\(g, g_i\) => \(<Fragment key=\{g_i\}>[\s\S]*?<\/Fragment>\)\)\}\s*<\/div>)(\s*<span[\s\S]*?<\/svg>)Edit(<\/span>)/,
+    "$1{!!(t.meta) && (<DeskTemplateParts p={t.meta} />)}$2{t.editWord ?? \"Edit\"}$3",
+    "An imported template's title, picture / video / PDF (attached here), footer and buttons under its message, and its corner says From Meta — its words are WhatsApp Manager's (2026-11-19)."],
 ];
 

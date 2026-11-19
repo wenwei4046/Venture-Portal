@@ -5,7 +5,8 @@
  * showrooms, and which notifications are read. Saved first, as everywhere.
  */
 import type { ApptType } from "@/lib/member/crm-data";
-import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchMetaAds, importCrmTemplates, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import { createClient } from "@/lib/supabase/client";
 import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { adToSync } from "@/lib/member/crm-ad-running";
 import type { CrmData, CrmLeave, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
@@ -62,6 +63,10 @@ export interface PanelActions extends SalesActions {
   deleteTemplate(id: string): Promise<boolean>;
   /** Meta's review brought in (on opening the page); the changes arrive with the next read. */
   refreshTemplates(): Promise<void>;
+  /** Import from Meta (2026-11-19): the account's approved templates made in WhatsApp Manager; null when it failed (said in a toast). */
+  importTemplates(): Promise<{ added: number; skipped: { name: string; reason: string }[] } | null>;
+  /** An imported template's header picture / video / PDF: uploaded to bucket crm-templates, then kept (crm_template_header); null takes it away. */
+  templateHeader(id: string, file: File | null): Promise<boolean>;
   readNotifs(keys: string[], all?: boolean): void;
   /** The saved showroom's id, or false. */
   saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<string | false>;
@@ -296,6 +301,28 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async deleteTemplate(id) {
       if (!(await write("crm_delete_template", { p_id: id }))) return false;
       setData(d => ({ ...d, templates: (d.templates ?? []).filter(y => y.id !== id) }));
+      return true;
+    },
+    async importTemplates() {
+      if (!live) { base.toast("Import from Meta works on the live CRM only."); return null; }
+      const r = await importCrmTemplates();
+      if (!r.ok) { base.toast(r.error); return null; }
+      return { added: r.added, skipped: r.skipped };
+    },
+    async templateHeader(id, file) {
+      if (!live) return false;
+      let path: string | null = null, mime: string | null = null, name: string | null = null;
+      if (file) {
+        mime = (file.type || "").split(";")[0].trim().toLowerCase();
+        name = (file.name || "file").replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "file";
+        const ext = (name.match(/\.([a-z0-9]{1,5})$/i)?.[1] ?? (mime === "application/pdf" ? "pdf" : mime.split("/")[1] ?? "bin")).toLowerCase();
+        path = `${id}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const up = await createClient().storage.from("crm-templates").upload(path, file, { contentType: mime, upsert: false });
+        if (up.error) { base.toast(/mime|type/i.test(up.error.message) ? "This template takes a JPG / PNG picture, an MP4 video or a PDF." : /size|exceed/i.test(up.error.message) ? "That file is too big." : "The file could not be uploaded. Try again."); return false; }
+      }
+      const r = await write("crm_template_header", { p_id: id, p_path: path, p_mime: mime, p_name: name });
+      if (!r) return false;
+      setData(d => ({ ...d, templates: (d.templates ?? []).map(y => (y.id === id ? { ...y, headerName: file ? name : null, on: file ? y.on : false } : y)) }));
       return true;
     },
     async refreshTemplates() {

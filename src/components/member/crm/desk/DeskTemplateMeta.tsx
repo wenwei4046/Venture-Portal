@@ -62,6 +62,64 @@ export function DeskTemplateReview({ url }: { url: string | null | undefined }) 
   </>);
 }
 
+/**
+ * Import from Meta (2026-11-19, the owner: a template approved in WhatsApp Manager never showed in the CRM — "做导入功能"):
+ * beside Review status in Meta, for CRM · Manage. Brings in the account's approved templates made in WhatsApp Manager, Off.
+ */
+export function DeskTemplateImport({ v }: { v: { busy: boolean; run: () => void } | null | undefined }) {
+  if (!v) return null;
+  return (
+    <button type="button" onClick={v.run} disabled={v.busy} style={{ ...PILL, cursor: v.busy ? "progress" : "pointer", opacity: v.busy ? 0.6 : 1 }}
+      title="Bring in the templates approved in WhatsApp Manager">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+      {v.busy ? "Importing…" : "Import from Meta"}
+    </button>
+  );
+}
+
+export interface TplPartsVM {
+  headerText: string; footer: string; buttons: { text: string; kind: string }[];
+  fileKind: "IMAGE" | "VIDEO" | "DOCUMENT" | null; fileName: string | null; accept: string; busy: boolean; can: boolean;
+  attach: (file: File | null) => void;
+}
+
+const FILE_WORD = { IMAGE: "picture", VIDEO: "video", DOCUMENT: "PDF" } as const;
+
+/**
+ * An imported template's other parts under its message, as the customer's WhatsApp draws them: the header (its words,
+ * or the picture / video / PDF attached here — Attach / Replace / Remove for CRM · Manage), the footer, the buttons.
+ */
+export function DeskTemplateParts({ p }: { p: TplPartsVM }) {
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <div onClick={stop} style={{ marginTop: "8px", maxWidth: "520px", display: "flex", flexDirection: "column", gap: "6px", cursor: "default" }}>
+      {!!p.headerText && <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--crm-ink)" }}>Title · {p.headerText}</div>}
+      {!!p.fileKind && (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "8px 10px", borderRadius: "10px", background: "#fff",
+          border: `1px ${p.fileName ? "solid var(--crm-field)" : "dashed var(--crm-rust)"}` }}>
+          <span style={{ flex: "1 1 160px", minWidth: 0, fontSize: "13px", color: p.fileName ? "var(--crm-ink)" : "var(--crm-rust)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {p.fileName ? `${FILE_WORD[p.fileKind] === "PDF" ? "📄" : FILE_WORD[p.fileKind] === "video" ? "🎥" : "🖼️"} ${p.fileName}` : `Starts with a ${FILE_WORD[p.fileKind]} — attach it to switch this on`}
+          </span>
+          {p.can && (<>
+            <label style={{ ...PILL, height: "30px", fontSize: "12.5px", cursor: p.busy ? "progress" : "pointer", opacity: p.busy ? 0.6 : 1 }}>
+              {p.busy ? "Uploading…" : p.fileName ? "Replace" : `Attach ${FILE_WORD[p.fileKind]}`}
+              <input type="file" accept={p.accept} disabled={p.busy} style={{ display: "none" }}
+                onChange={e => { const f = e.target.files?.[0] ?? null; e.target.value = ""; if (f) p.attach(f); }} />
+            </label>
+            {!!p.fileName && !p.busy && <button type="button" onClick={() => p.attach(null)} style={{ ...PILL, height: "30px", fontSize: "12.5px", color: "var(--crm-oxblood)" }}>Remove</button>}
+          </>)}
+        </div>
+      )}
+      {!!p.footer && <div style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{p.footer}</div>}
+      {p.buttons.map((b, i) => (
+        <div key={i} style={{ padding: "8px 10px", borderRadius: "10px", background: "#fff", border: "1px solid var(--crm-field)", textAlign: "center", fontSize: "13.5px", fontWeight: 650, color: "var(--crm-rust)" }}>
+          {b.kind === "URL" ? "↗ " : b.kind === "PHONE_NUMBER" ? "☎ " : "↩ "}{b.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** WhatsApp's own formatting, drawn as the customer will see it: *bold*, _italic_, ~strikethrough~, ```monospace``` (it has no underline). */
 export function WaText({ t }: { t: string }) {
   const parts = t.split(/(```[\s\S]+?```|\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/);

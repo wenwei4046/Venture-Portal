@@ -6,12 +6,13 @@ import { headers } from "next/headers";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
-import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, templatesReviewUrl, reactionMessage, sendWhatsApp, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
+import { cleanText, fetchWhatsAppTemplateStatuses, fetchWhatsAppTemplatesFull, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, templatesReviewUrl, reactionMessage, sendWhatsApp, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
 import { HUMAN_AGENT_APPROVED, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
+import { headerKind, importPlan, type TemplateParts } from "@/lib/whatsapp/template-import";
 import { crmAdNumbers, crmPages, listMetaAds, metaAdBudget, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
@@ -39,6 +40,8 @@ const CRM_WRITES = [
   "crm_save_ads",
   // Cold lead templates (mig 20261011140000); submitting to Meta is submitCrmTemplate.
   "crm_save_template", "crm_template_on", "crm_delete_template",
+  // A template's header file (mig 20261119120000); importing from Meta is importCrmTemplates.
+  "crm_template_header",
   // CRM Desktop rev 1 (mig 20261013100000): reminders, deleted notifications, forms, notes.
   "crm_remind", "crm_delete_notifs", "crm_save_form", "crm_delete_form", "crm_add_note",
   // Starred messages (mig 20261014060000).
@@ -184,7 +187,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_set_up_next",
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
-  "crm_save_template", "crm_template_on", "crm_delete_template",
+  "crm_save_template", "crm_template_on", "crm_delete_template", "crm_template_header",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
   "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order", "crm_save_showroom_draft", "crm_save_reply_library", "crm_partner_link_set", "crm_partner_booking_cancel", "crm_save_leave", "crm_delete_leave",
 ]);
@@ -242,7 +245,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at, team_modes, together")),
       read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
       // Every template for the Control panel; Approved + On for everybody else (the row policy decides).
-      read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason, category").order("created_at")),
+      read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason, category, source, parts, header_path, header_name").order("created_at")),
     ]);
     const more = await desktopRows(db, !!opts.journey);
     const extra = new Map(more.extras.map(x => [x.id, x.extra]));
@@ -459,12 +462,15 @@ export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemp
     const db = await session();
     await requireCrm("edit");
     // rev 1011: only the CRM's own templates the Control panel switched on (Approved + On) — the row policy holds the rest back.
-    const { data, error } = await db.from("crm_templates").select("name, body, meta_name, language, category")
+    const { data, error } = await db.from("crm_templates").select("name, body, meta_name, language, category, parts")
       .eq("channel", "whatsapp").eq("status", "approved").eq("is_on", true).not("meta_name", "is", null).order("created_at");
     if (error) throw new Error(error.message);
     return { ok: true, templates: (data ?? []).map(t => {
       const text = metaTemplateBody(t.body as string);
-      return { name: t.meta_name as string, label: t.name as string, language: t.language as string, category: t.category as string, text, params: text.includes("{{1}}") ? 1 : 0 };
+      const parts = (t.parts ?? {}) as TemplateParts;
+      return { name: t.meta_name as string, label: t.name as string, language: t.language as string, category: t.category as string, text, params: text.includes("{{1}}") ? 1 : 0,
+        ...(parts.footer ? { footer: parts.footer } : {}), ...(parts.buttons?.length ? { buttons: parts.buttons.map(b => b.text) } : {}),
+        ...(parts.header ? { header: parts.header.format === "TEXT" ? parts.header.text ?? "" : parts.header.format.toLowerCase() } : {}) };
     }) };
   } catch (error) {
     return { ok: false, error: friendly(error, "The templates could not be loaded.") };
@@ -512,6 +518,26 @@ export async function refreshCrmTemplates(): Promise<{ ok: true; changed: number
     return { ok: true, changed: Number(data ?? 0) };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's review could not be read.") };
+  }
+}
+
+/**
+ * Import from Meta (2026-11-19): the account's approved templates the CRM can send, made in WhatsApp Manager, kept as
+ * the CRM's own (Approved, Off) — again to bring Meta's new words for ones imported before. CRM · Manage.
+ */
+export async function importCrmTemplates(): Promise<{ ok: true; added: number; skipped: { name: string; reason: string }[] } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("manage");
+    const { token, wabaId } = whatsappAccount();
+    const meta = await fetchWhatsAppTemplatesFull({ wabaId, token });
+    if (!meta.ok) throw new Error(meta.error);
+    const plan = importPlan(meta.rows);
+    const { data, error } = await db.rpc("crm_import_templates", { p_rows: plan.rows });
+    if (error) throw new Error(error.message);
+    return { ok: true, added: Number(data ?? 0), skipped: plan.skipped };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "Meta's templates could not be imported.") };
   }
 }
 
@@ -600,10 +626,22 @@ export async function sendCrmTemplate(contactId: string, template: { name: strin
     const { contact, token } = await reachable(db, contactId, false);
     if (contact.channel !== "whatsapp") throw new Error("Messenger has no templates. Call the customer instead.");
     // Only a template the Control panel switched on (rev 1011), in its own words — never what the browser says it is.
-    const { data: own } = await db.from("crm_templates").select("body, language").eq("meta_name", template.name).eq("status", "approved").eq("is_on", true).maybeSingle();
+    const { data: own } = await db.from("crm_templates").select("body, language, parts, header_path, header_mime, header_name").eq("meta_name", template.name).eq("status", "approved").eq("is_on", true).maybeSingle();
     if (!own) throw new Error("That template is not switched on any more. Close and open the templates again.");
     const text = metaTemplateBody(own.body as string), language = own.language as string;
-    const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, language, params) });
+    // An imported template (2026-11-19): its named variable, and its picture / video / PDF uploaded to WhatsApp for this send.
+    const parts = (own.parts ?? {}) as TemplateParts, kind = headerKind(parts.header?.format);
+    let header: { kind: "image" | "video" | "document"; id: string; filename?: string } | undefined;
+    if (kind) {
+      if (!own.header_path) throw new Error("This template's picture, video or PDF is missing. Ask your manager to attach it.");
+      const got = await db.storage.from("crm-templates").download(own.header_path as string);
+      if (got.error || !got.data) throw new Error("This template's file could not be read. Try again.");
+      const filename = (own.header_name as string | null) || "file";
+      const up = await uploadWhatsAppMedia({ phoneNumberId: contact.account_id, token, file: new Blob([got.data], { type: (own.header_mime as string | null) || got.data.type }), filename });
+      if (!up.ok) throw new Error(up.error);
+      header = { kind, id: up.id, ...(kind === "document" ? { filename } : {}) };
+    }
+    const sent = await sendWhatsApp({ phoneNumberId: contact.account_id, token, message: templateMessage(contact.external_id, template.name, language, params, { named: parts.param, header }) });
     if (!sent.ok) throw new Error(sent.error);
     const message = await recorded(db, { contact: contactId, externalId: sent.wamid, kind: "template", body: fillTemplate(text, params) || template.name });
     if (!message) return { ok: false, error: "Sent to the customer on WhatsApp, but it could not be saved here. Reload before sending again." };
