@@ -19,6 +19,7 @@ import type { PersonBox, TabAction } from '@/lib/permission-tabs'
 import { personReachFromJson, type PersonReach } from '@/lib/sub-department-reach'
 import { sensitiveTicksFromRows, type SensitiveTick } from '@/lib/person-sensitive'
 import { brandTicksFromJson, type BrandTick } from '@/lib/crm-brand-ticks'
+import { personOutletsFromJson, type PersonOutlets } from '@/lib/lead-outlet-ticks'
 
 /**
  * What one account's permissions actually resolve to, and why.
@@ -105,6 +106,8 @@ export type PersonAccessData =
       ownReview: boolean | null
       /** Their CRM brands taken off (2026-11-17) — null: not read (the window offers no brand pills). */
       crmBrands?: BrandTick[] | null
+      /** Their Lead View outlets (2026-11-19) — null: not read (the window offers no outlet pills). */
+      leadOutlets?: PersonOutlets | null
       functions: PermFunction[]
       cellKeys: CellKey[]
     }
@@ -121,7 +124,7 @@ export async function loadPersonAccess(
   }
   // The permission tables postdate database.types.ts.
   const db = supabase as unknown as SupabaseClient
-  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes, reach, ownSens, tplFlags, ownFlags, brands] = await Promise.all([
+  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes, reach, ownSens, tplFlags, ownFlags, brands, outlets] = await Promise.all([
     db.from('permission_templates').select('id, name, base_role').eq('id', title.templateId).maybeSingle(),
     db.from('permission_template_grants').select('function_key, action, scope').eq('template_id', title.templateId),
     db.from('permission_template_sensitive').select('field').eq('template_id', title.templateId),
@@ -141,6 +144,8 @@ export async function loadPersonAccess(
     db.from('user_permission_flags').select('flag, granted').eq('user_id', account.id).then(r => r, () => ({ data: null, error: null })),
     // Their CRM brands (2026-11-17): none until the function is there.
     db.rpc('person_crm_brands', { p_user: account.id }).then(r => r, () => ({ data: null, error: { message: 'not there' } })),
+    // Their Lead View outlets (2026-11-19): none until the function is there.
+    db.rpc('person_lead_outlets', { p_user: account.id }).then(r => r, () => ({ data: null, error: { message: 'not there' } })),
   ])
   for (const [label, res] of [['their template', tpl], ['its cells', grants], ['the permission catalog', fns], ['their own cells', cells], ['its boxes', tabs], ['their own boxes', boxes]] as const) {
     if (res.error) throw new Error(`Could not load ${label}: ${res.error.message}`)
@@ -174,6 +179,7 @@ export async function loadPersonAccess(
     reach: reach.error ? null : personReachFromJson(reach.data),
     ownSensitive: sensitiveTicksFromRows((ownSens.data ?? []) as Array<{ field: string; granted: boolean }>),
     crmBrands: brands.error ? null : brandTicksFromJson(brands.data),
+    leadOutlets: outlets.error ? null : personOutletsFromJson(outlets.data),
     ownReview: ownFlags.error ? null : (((ownFlags.data ?? []) as Array<{ flag: string; granted: boolean }>).find(f => f.flag === 'claims_review')?.granted ?? null),
     functions: functionsFromRows(
       (fns.data ?? []) as Array<{ key: string; label: string; section: string; actions: string[]; scopes: string[]; description: string | null }>,

@@ -27,6 +27,7 @@ import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permiss
 import { isReachTickList, sortedTicks, type ReachTick } from '@/lib/sub-department-reach'
 import { isSensitiveTickList, type SensitiveTick } from '@/lib/person-sensitive'
 import { isBrandTickList, sortedBrandTicks, type BrandTick } from '@/lib/crm-brand-ticks'
+import { isOutletIdList, sortedIds } from '@/lib/lead-outlet-ticks'
 
 /**
  * Writing permission templates (2026-10-08, the People Management revamp;
@@ -288,6 +289,8 @@ export async function setPersonTabs(input: {
   review?: boolean | null
   /** Their CRM brands taken off (2026-11-17): the whole list — none, every brand again. */
   brands?: BrandTick[]
+  /** Their Lead View outlets (2026-11-19): the whole list — none, every outlet again. */
+  outlets?: string[]
 }): Promise<Result> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
@@ -300,7 +303,8 @@ export async function setPersonTabs(input: {
     (input.reach !== undefined && !isReachTickList(input.reach)) ||
     (input.sensitive !== undefined && !isSensitiveTickList(input.sensitive)) ||
     (input.review !== undefined && input.review !== null && typeof input.review !== 'boolean') ||
-    (input.brands !== undefined && !isBrandTickList(input.brands))
+    (input.brands !== undefined && !isBrandTickList(input.brands)) ||
+    (input.outlets !== undefined && !isOutletIdList(input.outlets))
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -334,6 +338,11 @@ export async function setPersonTabs(input: {
   if (input.brands !== undefined) {
     const { error: brandError } = await supabase.rpc('permission_user_crm_brands_set', { p_user: input.userId, p_ticks: sortedBrandTicks(input.brands) })
     if (brandError) return { ok: false, reason: brandError.message }
+  }
+  // Their Lead View outlets (2026-11-19): the whole list of the outlets they are narrowed to.
+  if (input.outlets !== undefined) {
+    const { error: outletError } = await supabase.rpc('permission_user_lead_outlets_set', { p_user: input.userId, p_outlets: sortedIds(input.outlets) })
+    if (outletError) return { ok: false, reason: outletError.message }
   }
   refresh()
   return { ok: true }
