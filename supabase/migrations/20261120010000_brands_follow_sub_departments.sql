@@ -106,6 +106,27 @@ end $b$;$f$;
   execute v_new;
 end $$;
 
+-- 6. Nobody hands a customer to somebody its brand does not open to (Send to, Assign to, an accepted share or move…):
+--    a trigger on the assignment itself, so every way in is held — a person's change only (auth.uid()); the dealer, run
+--    by the webhooks, keeps to the brand by itself (4) and is never refused here, so no delivery is ever lost.
+--    Settings stay one set for IR and DC (the owner, 2026-11-19: "设定跟 IR 几乎相同，只是有 DC permission 的人能看到").
+create or replace function public.crm_contacts_brand_guard()
+ returns trigger language plpgsql security definer set search_path to 'public'
+as $function$
+begin
+  if auth.uid() is not null and new.assigned_to is not null and new.assigned_to is distinct from old.assigned_to
+     and not crm_staff_takes_brand(new.assigned_to, crm_brand_of(new.account_id)) then
+    raise exception '% does not have % in their CRM permissions — tick it for them in People › Permissions first.',
+      coalesce((select s.employee_name from hr_staff_costs s where s.id = new.assigned_to), 'That person'),
+      case crm_brand_of(new.account_id) when 'dc' then 'DC' else 'IR' end
+      using errcode = '42501';
+  end if;
+  return new;
+end $function$;
+revoke all on function public.crm_contacts_brand_guard() from public, anon, authenticated;
+create or replace trigger crm_contacts_brand_guard before update of assigned_to on public.crm_contacts
+  for each row execute function public.crm_contacts_brand_guard();
+
 -- 5. DC in the CRM for the three the owner named.
 insert into public.user_sub_department_reach (user_id, area, sub_department_id, granted)
 select u.id, 'crm', sd.id, true
