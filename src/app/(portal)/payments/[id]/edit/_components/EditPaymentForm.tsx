@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { updatePaymentVoucher } from '../../../actions'
+import { useRouter } from 'next/navigation'
+import { updatePaymentVoucherInWords } from '../../../actions'
 import type { AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, seedRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
@@ -113,6 +114,7 @@ export default function EditPaymentForm({
   }
 
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
 
   const isDebit = voucher.direction === 'debit'
@@ -175,11 +177,18 @@ export default function EditPaymentForm({
   const stored = storedVoucherFields(voucher, initialSources, initialCreditAccountCode)
   const save = (formData: FormData) =>
     startTransition(async () => {
+      // Answered in words (2026-11-19): a thrown error's message is hidden in production — the page showed only
+      // "Minified React error #441" when Pay into's account had a symbol in it. The refusal now shows as it is said.
       try {
-        await updatePaymentVoucher(formData)
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
-        setError(err instanceof Error ? err.message : 'Save failed')
+        const res = await updatePaymentVoucherInWords(formData)
+        if (!res.ok) {
+          setError(res.reason)
+          return
+        }
+        router.push(`/payments/${voucher.id}`)
+        router.refresh()
+      } catch {
+        setError('The voucher could not be saved — check your connection and try again.')
       }
     })
 

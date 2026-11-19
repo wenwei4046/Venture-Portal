@@ -149,6 +149,16 @@ describe('a voucher’s Edit writes only what it is sent', () => {
     expect(writes).toEqual([])
   })
 
+  // 2026-11-19 — HV-PV-202611-0729: the amount was saved, then Pay into refused, and the pools stayed behind.
+  it('Pay into is checked before any write: an account with a symbol leaves the voucher untouched', async () => {
+    const { writes } = database()
+    const res = await updatePaymentVoucherInWords(
+      form({ amount: '1200', source_rows_count: '1', 'source_rows[0][pool]': 'venture_pool', 'source_rows[0][amount]': '1200', 'source_rows[0][account_code]': '9000', payee_bank: 'Maybank', payee_account_no: '5140#1234' }),
+    )
+    expect(res).toEqual({ ok: false, reason: 'An account number is digits only.' })
+    expect(writes).toEqual([])
+  })
+
   it('in words: the same work, no redirect — and a refusal said', async () => {
     database()
     expect(await updatePaymentVoucherInWords(form({ description: 'October ads — Grab' }))).toEqual({ ok: true })

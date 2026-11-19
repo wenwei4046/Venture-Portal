@@ -1520,6 +1520,16 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
 
   if (isNaN(amount) || amount <= 0) throw new Error('Amount must be greater than 0')
   if (!description) throw new Error('Description is required')
+
+  // Pay into is checked with the rest, before anything is written (2026-11-19): it used to be checked after the
+  // voucher was updated, so an account with a symbol left the new amount on the voucher and its pools as they were.
+  const payeeSent = sent('payee_bank') || sent('payee_account_no')
+  const payeeBank = text('payee_bank').trim()
+  const payeeAccount = text('payee_account_no').trim()
+  if (payeeSent) {
+    const bad = payeeProblem(payeeBank, payeeAccount)
+    if (bad) throw new Error(bad)
+  }
   // Mig 242: debit vouchers must declare a bank — same rule as createPaymentVoucher.
   if (current.direction === 'debit' && !bankAccountId) {
     throw new Error('Bank account is required for debit (outgoing) vouchers')
@@ -1662,13 +1672,9 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
     throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
   }
 
-  // Pay into (2026-11-09) — only when Edit changed it.
-  if (sent('payee_bank') || sent('payee_account_no')) {
-    const bank = text('payee_bank').trim()
-    const account = text('payee_account_no').trim()
-    const bad = payeeProblem(bank, account)
-    if (bad) throw new Error(bad)
-    const { error: payeeErr } = await supabase.rpc('voucher_payee_set', { p_voucher: id, p_bank: bank, p_account: account })
+  // Pay into (2026-11-09) — only when Edit changed it; already checked above.
+  if (payeeSent) {
+    const { error: payeeErr } = await supabase.rpc('voucher_payee_set', { p_voucher: id, p_bank: payeeBank, p_account: payeeAccount })
     if (payeeErr) throw new Error(`Pay into was not saved: ${clause(payeeErr.message)}`)
   }
 

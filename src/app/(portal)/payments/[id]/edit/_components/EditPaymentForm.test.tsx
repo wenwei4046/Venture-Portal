@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-const mocks = vi.hoisted(() => ({ updatePaymentVoucher: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('../../../actions', () => ({ updatePaymentVoucher: mocks.updatePaymentVoucher }))
+const mocks = vi.hoisted(() => ({ updatePaymentVoucher: vi.fn().mockResolvedValue({ ok: true }), push: vi.fn(), refresh: vi.fn() }))
+vi.mock('../../../actions', () => ({ updatePaymentVoucherInWords: mocks.updatePaymentVoucher }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }))
 import EditPaymentForm from './EditPaymentForm'
 import { officeDate } from '@/lib/office-clock'
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.updatePaymentVoucher.mockResolvedValue({ ok: true })
+})
 
 describe('statutory voucher editor', () => {
   it('shows fixed financial details and submits only payment date and notes', async () => {
@@ -108,5 +112,20 @@ describe('a voucher saved without a payment date', () => {
     const date = screen.getByLabelText('Payment date') as HTMLInputElement
     expect(date.value).toBe(officeDate())
     expect(date.required).toBe(true)
+  })
+})
+
+// 2026-11-19 — the user, on Edit HV-PV-202611-0729: "Minified React error #441" — the account number had a symbol.
+describe('a refused save', () => {
+  it('says the reason on the page and stays; a saved one goes to the voucher', async () => {
+    const voucher = { id: 'pv', voucher_no: 'TEST-PV', voucher_type: 'salary_payout', direction: 'debit' as const, amount: 600.6, payee_name: 'KWSP', payee_company_id: null, bank_account_id: 'bank', description: 'x', notes: null, payment_method: 'bank_transfer', payment_date: '2026-09-15', target_pool: null, fund_source_id: null, loan_id: null, repayment_breakdown: null }
+    const props = { statutoryDetailsLocked: true, voucher, initialSources: [{ pool: 'dept_pool_hr', amount: '600.60', account_code: '4020' }], initialCreditAccountCode: null, companies: [], bankAccounts: [{ id: 'bank', bank_name: 'Test Bank', account_number: '1234', current_balance: 0 }], glAccounts: [] }
+    mocks.updatePaymentVoucher.mockResolvedValueOnce({ ok: false, reason: 'Account number: letters and digits only.' })
+    render(<EditPaymentForm {...props} />)
+    fireEvent.submit(screen.getByRole('form', { name: 'Edit statutory PV date and notes' }))
+    expect(await screen.findByText('Account number: letters and digits only.')).toBeVisible()
+    expect(mocks.push).not.toHaveBeenCalled()
+    fireEvent.submit(screen.getByRole('form', { name: 'Edit statutory PV date and notes' }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/payments/pv'))
   })
 })
