@@ -26,7 +26,10 @@ export async function openColdTemplates(c: CrmCustomer, act: Pick<SalesActions, 
   openActions({ title: "Send template message", sub: `Only template messages reach ${name} until they write again.`, actions: [
     ...tpls.map(t => {
       const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? name : ""));
-      return { label: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), detail: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
+      // An imported template's other parts (2026-11-19): its picture / video / PDF or title above, footer and buttons below.
+      const head = t.header == null ? "" : t.header === "image" ? "🖼️ Picture\n" : t.header === "video" ? "🎥 Video\n" : t.header === "document" ? "📄 PDF\n" : t.header ? `${t.header}\n` : "";
+      const foot = (t.footer ? `\n${t.footer}` : "") + (t.buttons?.length ? `\n${t.buttons.map(b => `[ ${b} ]`).join(" ")}` : "");
+      return { label: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), detail: head + t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…") + foot,
         run: () => { void oneAtATime(`send:${id}:${t.name}`, () => act.sendTemplate(id, t, params)); } };
     }),
     { label: "Close", run: NONE },

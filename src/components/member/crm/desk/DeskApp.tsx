@@ -15,7 +15,7 @@ import { DeskWorkspace } from "./DeskWorkspace";
 import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
 import { DeskOverview } from "./DeskOverview";
-import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
+import { DeskTemplateFormat, DeskTemplateImport, DeskTemplateKind, DeskTemplateParts, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskChatMenu4a, DeskChatWait4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInfoAudit4a, DeskInsight4a, DeskMetricPicker4a, DeskPartnerPane4a, DeskRail4a, DeskRepPick4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
@@ -487,7 +487,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </span>
                   <span style={{ flex: "1" }}>
                   </span>
-                  <DeskTemplateReview url={v.cltReviewUrl} /><button type="button" onClick={v.cltNewT} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", font: "inherit", fontSize: "13.5px", fontWeight: "650", cursor: "pointer", whiteSpace: "nowrap", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-rust)" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <DeskTemplateImport v={v.cltImport} /><DeskTemplateReview url={v.cltReviewUrl} /><button type="button" onClick={v.cltNewT} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", font: "inherit", fontSize: "13.5px", fontWeight: "650", cursor: "pointer", whiteSpace: "nowrap", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-rust)" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 5v14M5 12h14">
                       </path>
                     </svg>New template</button>
@@ -540,11 +540,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                 </>)}
                                 {!!(g.txt) && (<WaText t={g.t} />)}
                               </Fragment>))}
-                            </div>
+                            </div>{!!(t.meta) && (<DeskTemplateParts p={t.meta} />)}
                             <span style={{ position: "absolute", top: "12px", right: "14px", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z">
                                 </path>
-                              </svg>Edit</span>
+                              </svg>{t.editWord ?? "Edit"}</span>
                           </div>
                         </>)}
                       </div>

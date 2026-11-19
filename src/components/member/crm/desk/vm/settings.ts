@@ -8,6 +8,7 @@
 import { HUMAN_AGENT_APPROVED } from "@/lib/messenger/send";
 import { formFromRow, infoLabel } from "@/lib/crm-partner/model";
 import type { CrmLeave, CrmTemplate } from "@/lib/member/crm-data";
+import { HEADER_ACCEPT, HEADER_MAX, importToast } from "@/lib/whatsapp/template-import";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
 import { DEFAULT_CRM_SETTINGS, type CrmSettings } from "@/lib/member/crm-data";
@@ -76,13 +77,29 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const tpls = (data.templates ?? []).map(t => ({ t, status: stName(t.st), ch: t.ch === "messenger" ? "Messenger" : "WhatsApp" }));
   const f = ui.cltF, ed = ui.cltEdit;
   const segs = (s: string) => s.split(/(\{[a-z_]+\})/).filter(Boolean).map(x => ({ t: x, tag: /^\{[a-z_]+\}$/.test(x), txt: !/^\{[a-z_]+\}$/.test(x) }));
+  // Imported from Meta (2026-11-19): its header, footer and buttons under the message; a header that is a file is attached here.
+  const metaParts = (t: CrmTemplate) => {
+    const p = t.parts ?? {}, f = p.header?.format, fileKind = f === "IMAGE" || f === "VIDEO" || f === "DOCUMENT" ? f : null;
+    return {
+      headerText: f === "TEXT" ? p.header?.text ?? "" : "", footer: p.footer ?? "", buttons: (p.buttons ?? []).map(b => ({ text: b.text, kind: b.type })),
+      fileKind, fileName: t.headerName ?? null, accept: fileKind ? HEADER_ACCEPT[fileKind] : "", busy: ui.cltUploading === t.id, can: !!data.can.manage,
+      attach: (file: File | null) => { if (fileKind && file && file.size > HEADER_MAX[fileKind]) { patch({ toast: `Too big — WhatsApp takes up to ${Math.round(HEADER_MAX[fileKind] / 1048576)} MB here` }); return; }
+        patch({ cltUploading: t.id });
+        void act.templateHeader(t.id, file).then(okd => patch({ cltUploading: null, ...(okd ? { toast: file ? `Attached · ${file.name}` : "File taken off · the template is off" } : {}) })); },
+    };
+  };
   const card = (x: (typeof tpls)[number]) => { const ok = x.status === "Approved", o = ok && x.t.on, editing = ed === x.t.id, draft = editing ? ui.cltDraft ?? x.t.body : x.t.body;
+    const imported = x.t.source === "meta", hf = x.t.parts?.header?.format;
+    const needsFile = imported && (hf === "IMAGE" || hf === "VIDEO" || hf === "DOCUMENT") && !x.t.headerName, canOn = ok && !needsFile;
     const ch = editing ? ui.cltDC ?? x.ch : x.ch;
     // Its language and category (2026-11-04), as Meta names them; the editor's picks until saved.
     const lang = editing ? ui.cltDL ?? x.t.language ?? "en" : x.t.language ?? "en", cat = editing ? ui.cltDK ?? x.t.category ?? "MARKETING" : x.t.category ?? "MARKETING";
     return { name: x.t.name, status: x.status, channel: x.ch, stBg: SC[x.status][0], stFg: SC[x.status][1], chFg: x.ch === "WhatsApp" ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger, chBg: x.ch === "WhatsApp" ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger,
       bd: editing ? "var(--crm-rust)" : "var(--crm-rule)", onLabel: o ? "On" : "Off", onFg: !ok ? "var(--crm-faint)" : o ? "var(--crm-brown)" : "var(--crm-muted)", segs: segs(x.t.body), view: true, editing, draft, dsegs: segs(String(draft)),
-      edit: () => patch({ cltEdit: x.t.id, cltDraft: x.t.body, cltDN: x.t.name, cltDC: x.ch as "WhatsApp" | "Messenger", cltDL: null, cltDK: null, cltIsNew: false, frmOpen: false }),
+      edit: () => (imported ? patch({ toast: "Imported from Meta — change it in WhatsApp Manager, then Import from Meta again" })
+        : patch({ cltEdit: x.t.id, cltDraft: x.t.body, cltDN: x.t.name, cltDC: x.ch as "WhatsApp" | "Messenger", cltDL: null, cltDK: null, cltIsNew: false, frmOpen: false })),
+      editWord: imported ? "From Meta" : "Edit",
+      meta: imported ? metaParts(x.t) : null,
       kind: { langOpts: ([["en", "English"], ["zh_CN", "中文"]] as const).map(([k, l]) => ({ label: l, on: lang === k, pick: () => patch({ cltDL: k }) })),
         catOpts: ([["MARKETING", "Marketing"], ["UTILITY", "Utility"]] as const).map(([k, l]) => ({ label: l, on: cat === k, pick: () => patch({ cltDK: k }) })),
         catHint: cat === "UTILITY" ? "Utility: a plain update about their enquiry, no offer or promotion — cheaper. Meta moves it to Marketing if it reads as one." : "Marketing: an offer, an introduction, an invitation — anything that sells." },
@@ -103,8 +120,9 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
         .map(([v, d]) => ({ v, d, pick: () => set(u => ({ ...u, cltVars: [...u.cltVars, v], cltMore: false })) })),
       moreNone: ["{visit_date}", "{visit_time}", "{ad}", "{phone}"].every(v => ui.cltVars.includes(v)),
       saveHint: x.ch === "WhatsApp" ? "WhatsApp templates go back to In review after a change" : "Saved straight away",
-      track: o ? "var(--crm-brown)" : ok ? "var(--crm-line)" : "var(--crm-rule-soft)", knob: o ? 19 : 3, locked: !ok, cur: ok ? "pointer" : "not-allowed", tip: ok ? "" : "Only approved templates can be switched on",
-      toggle: () => { if (ok) void act.templateOn(x.t.id, !o).then(okt => { if (okt) patch({ toast: `${x.t.name} ${o ? "off" : "on"} for salespeople` }); }); } }; };
+      track: o ? "var(--crm-brown)" : canOn ? "var(--crm-line)" : "var(--crm-rule-soft)", knob: o ? 19 : 3, locked: !canOn && !o, cur: canOn || o ? "pointer" : "not-allowed",
+      tip: !ok ? "Only approved templates can be switched on" : needsFile ? "Attach its picture, video or PDF first" : "",
+      toggle: () => { if (canOn || o) void act.templateOn(x.t.id, !o).then(okt => { if (okt) patch({ toast: `${x.t.name} ${o ? "off" : "on"} for salespeople` }); }); } }; };
   const insertVar = (v: string, body: string) => {
     const el = typeof document !== "undefined" ? document.activeElement as HTMLTextAreaElement | null : null, curB = ui.cltDraft ?? body;
     const p0 = el?.tagName === "TEXTAREA" ? el.selectionStart : curB.length, p1 = el?.tagName === "TEXTAREA" ? el.selectionEnd : curB.length;
@@ -279,6 +297,9 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     cltTaRef: { current: null },
     cltNewT: () => patch({ frmOpen: false, frmDraft: null, cltF: "all", cltEdit: "new", cltDraft: "", cltDN: "", cltDC: "WhatsApp", cltDL: null, cltDK: null, cltIsNew: true }),
     cltReviewUrl: data.templatesUrl ?? null,
+    // Import from Meta (2026-11-19, the owner: a template approved in WhatsApp Manager never showed here — "做导入功能").
+    cltImport: data.can.manage ? { busy: !!ui.cltImporting, run: () => { if (ui.cltImporting) return; patch({ cltImporting: true });
+      void act.importTemplates().then(r => { patch({ cltImporting: false, ...(r ? { cltF: "all", toast: importToast(r) } : {}) }); }); } } : null,
     cltCards: cards, cltEmpty: !cards.length, cltFOpen: ui.cltFOpen, cltToggleF: () => set(u => ({ ...u, cltFOpen: !u.cltFOpen })),
     cltFLabel: f === "all" ? "All statuses" : f, cltFDot: DOT[f] ?? "var(--crm-muted)",
     cltFOpts: [["all", "All statuses"], ["Approved", "Approved"], ["In review", "In review"], ["Draft", "Draft"], ["Rejected", "Rejected"]].map(([k, label]) => ({ label, dot: DOT[k], n: String(tpls.filter(t => k === "all" || t.status === k).length),

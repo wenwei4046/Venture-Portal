@@ -244,7 +244,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // The CRM (crm-actions.ts): each asks who may first — crm_me / crm_can_reply / crm_sees_all, the IR scope (migs 20261002*–20261009230000).
   'crm_can_reply', 'crm_my_can', 'crm_people', 'crm_record_out', 'crm_record_unsent', 'crm_set_reaction',
   // Cold lead templates (mig 20261011140000): both ask crm_manages().
-  'crm_template_statuses', 'crm_template_submitted',
+  'crm_template_statuses', 'crm_template_submitted', 'crm_import_templates', 'crm_template_header',
   // CRM Desktop rev 1 (mig 20261013100000): asks crm_manages().
   'crm_save_showroom_extras',
   // CRM photos, videos and voice notes (mig 20261013240000): asks crm_can_reply().

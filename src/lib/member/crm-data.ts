@@ -9,6 +9,7 @@ import { CRM_LOST_REASONS, type CrmLead, type CrmLostReason, type CrmMessage, ty
 import type { CrmRole } from "./crm-team";
 import { goneAtMeta } from "@/lib/whatsapp/media";
 import type { CrmContactRow, CrmMessageRow, CrmPeopleRow } from "./crm-live";
+import type { TemplateParts } from "@/lib/whatsapp/template-import";
 
 export type CrmChannel = "whatsapp" | "messenger";
 
@@ -454,6 +455,11 @@ export interface CrmTemplate {
   metaName: string | null; language: string; reason: string | null;
   /** Meta's category: MARKETING or UTILITY (2026-11-04; a row read before has none → MARKETING). */
   category?: string;
+  /**
+   * Imported from Meta (2026-11-19): 'meta' — its words are edited in WhatsApp Manager; `parts` = its header, footer and
+   * buttons; `headerName` = the picture / video / PDF attached for a header that is a file (null = none yet).
+   */
+  source?: "crm" | "meta"; parts?: TemplateParts; headerName?: string | null;
 }
 
 /* ── Defaults the design starts with ───────────────────────────────────── */
@@ -582,7 +588,8 @@ export interface CrmDataRows {
   settings?: unknown;
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null; together?: boolean | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
-  templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category?: string }[];
+  templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category?: string;
+    source?: "crm" | "meta"; parts?: TemplateParts | null; header_path?: string | null; header_name?: string | null }[];
   /** crm_my_can()'s answer; null when the database did not give one. */
   can?: unknown;
 }
@@ -773,7 +780,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     apptTypes: apptTypesFrom(rows.apptTypes),
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
-    templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason, category: t.category ?? "MARKETING" })),
+    templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason, category: t.category ?? "MARKETING",
+      ...(t.source === "meta" ? { source: "meta" as const, parts: t.parts ?? {}, headerName: t.header_path ? (t.header_name ?? "file") : null } : {}) })),
     forms: [...(rows.forms ?? [])].filter(x => x.kind !== "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
     bookingForms: [...(rows.forms ?? [])].filter(x => x.kind === "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
     notes: (rows.notes ?? []).map(n => ({ id: n.id, customerId: n.contact_id, by: n.author, text: n.body, at: n.created_at })).sort((a, b) => b.at.localeCompare(a.at)),
