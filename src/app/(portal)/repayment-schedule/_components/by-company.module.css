@@ -169,3 +169,15 @@
 .table th[data-dragging='true'] { opacity: 0.45; }
 .table th[data-drop='true'] { background: rgb(var(--fv-band-line)); box-shadow: inset 2px 0 0 var(--ds-ink); }
 .colReset { margin-left: 8px; padding: 0; border: 0; background: transparent; font-family: inherit; font-size: 11px; color: var(--ds-accent); cursor: pointer; }
+/* Grouped headings and the two sides (2026-11-19 — the user: "有点乱，分不清什么是什么" → A + B): a band names each group of
+   columns (this month, overdue, still to settle, settled so far), a rule stands between groups, collect columns are
+   tinted green and pay red — the tint laid over whatever the row's own background is. */
+.groups th[data-group] { height: 26px; border-bottom: 0; font-size: 10px; text-align: center; color: rgb(var(--hvs-muted)); cursor: default; }
+.groups th[data-group]:not([data-group='more']) { box-shadow: inset 0 -1px 0 rgb(var(--fv-band-rule)); }
+.groups th[data-group]::after { display: none; }
+.table th[data-start='true'], .table td[data-start='true'] { border-left: 1px solid rgb(var(--fv-box)); }
+.table th[data-dir='in'] { box-shadow: inset 0 -3px 0 rgb(var(--fv-chip-ledger-ink) / 0.55); }
+.table th[data-dir='out'] { box-shadow: inset 0 -3px 0 rgb(var(--fv-chip-danger-ink) / 0.5); }
+.table td[data-dir='in'] { box-shadow: inset 0 0 0 999px rgb(var(--fv-chip-ledger) / 0.45); }
+.table td[data-dir='out'] { box-shadow: inset 0 0 0 999px rgb(var(--fv-chip-danger) / 0.45); }
+.table th[data-drop='true'] { box-shadow: inset 2px 0 0 var(--ds-ink); }

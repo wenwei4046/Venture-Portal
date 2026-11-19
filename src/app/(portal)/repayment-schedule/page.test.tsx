@@ -254,7 +254,7 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
     expect(hk[hk.length - 1]).toHaveTextContent('9 Oct')
     // By company counts them as HK's overdue to collect.
     const hkCo = screen.getAllByText('HK').map((el) => el.closest('tr')).find((tr) => tr?.hasAttribute('aria-expanded')) as HTMLElement
-    expect(hkCo.querySelectorAll('td')[2].textContent).toMatch(/^[1-9][\d,]*\.\d\d$/)
+    expect((hkCo.querySelector('td[data-dir="in"][data-start]:not(:nth-child(2))') as HTMLElement).textContent).toMatch(/^[1-9][\d,]*\.\d\d$/)
   })
 
   it('prints the rows on show from a right-click on the header', async () => {
