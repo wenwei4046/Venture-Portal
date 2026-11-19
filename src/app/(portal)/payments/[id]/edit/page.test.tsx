@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react'
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), requirePermission: vi.fn(), notFound: vi.fn(), redirect: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission, requireActionOn: mocks.requirePermission, requireAnyActionOn: mocks.requirePermission, requirePayrollPayoutsActionOn: mocks.requirePermission }))
-vi.mock('next/navigation', () => ({ notFound: mocks.notFound, redirect: mocks.redirect }))
-vi.mock('../../actions', () => ({ updatePaymentVoucher: vi.fn() }))
+vi.mock('next/navigation', () => ({ notFound: mocks.notFound, redirect: mocks.redirect, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }))
+vi.mock('../../actions', () => ({ updatePaymentVoucher: vi.fn(), updatePaymentVoucherInWords: vi.fn() }))
 import EditPaymentPage from './page'
 
 function database(options: { covered?: boolean; error?: boolean; status?: string; reference?: string; rows?: Record<string, unknown[]> } = {}) {
