@@ -15,6 +15,7 @@ import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tok
 import { adRunning } from "@/lib/member/crm-ad-running";
 import { is100, pctOf, pctShow, pctText } from "../../shared/pct";
 import { lockedOf } from "../../shared/locked";
+import { adBrandOf, brandSplit } from "@/lib/member/crm-source";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "Revenue Director" };
@@ -149,9 +150,14 @@ export function assignVM(ctx: PanelCtx) {
   const lastLead = (id: string) => data.customers.filter(c => c.adId === id).reduce<string | null>((m, c) => (!m || c.createdAt > m ? c.createdAt : m), null);
   const running = new Set(adIds.filter(id => adRunning(data.adNames?.[id], lastLead(id), now)));
   const adTab = ui.adTab ?? "running";
-  const nRun = ads.filter(a => running.has(a.id)).length, nPaused = ads.length - nRun;
+  // IR | DC (the owner, 2026-11-19: "assignment 广告的部分，要可以拆分 dc & ir" — shown apart only, the dealer unchanged).
+  const brandOfAd = (id: string) => adBrandOf(id, data);
+  const bt = brandSplit(ads.map(a => a.id), brandOfAd, ui.adBrand);
+  const brandTabs = bt.tabs.map(t => ({ ...t, pick: () => patch({ adBrand: t.key }) }));
+  const inBrand = ads.filter(a => bt.keep(a.id));
+  const nRun = inBrand.filter(a => running.has(a.id)).length, nPaused = inBrand.length - nRun;
   const adTabs = ([["running", "Running", nRun], ["paused", "Paused", nPaused]] as const).map(([k, label, n]) => ({ label, n, on: adTab === k, pick: () => patch({ adTab: k }) }));
-  const shownAds = ads.filter(a => running.has(a.id) === (adTab === "running"));
+  const shownAds = inBrand.filter(a => running.has(a.id) === (adTab === "running"));
   const adsEmpty = shownAds.length ? "" : adTab === "running" ? "No ad is running now." : "No paused ads.";
   // By team from the card (rev 1011 §6.6): each team keeps its inside mode; a team never set is By % with an even split.
   const saveAd = (d: AdDraft) => {
@@ -221,7 +227,7 @@ export function assignVM(ctx: PanelCtx) {
   return {
     onAssign: ui.tab === "assign" && !ui.lead,
     hasWaiting: organic.length > 0, waitingN: organic.length, waitList,
-    adTeams, adRows, adTabs, adsEmpty, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
+    adTeams, adRows, adTabs, brandTabs, adsEmpty, adLegend: adTeams.map(t => ({ name: t.name.replace(/^Team /, ""), c: t.c })), adEdOpen: !!E, ae,
     asgAttSum, asgAtt, openAtt: () => patch({ att: true }),
     ftSum, ftOpen: !!ui.ftEd, fe,
     // The Team Leader's own page (design 1a's TL view) is the salesperson CRM's; never shown here.

@@ -58,6 +58,32 @@ export function adPageInSource(pageId: string | null | undefined, pick: SourcePi
   return !!b && pick.split(":")[0] === b;
 }
 
+/** An ad's brand: its leads' number or Page (the most of them), else the Page Meta named for it; none known, null. */
+export function adBrandOf(adId: string, data: { customers: { adId?: string | null; channel: CrmChannel; accountId?: string | null }[]; adNames?: Record<string, { pageId?: string | null }> }): SourceBrand | null {
+  let conts = 0, dc = 0;
+  for (const c of data.customers) if (c.adId === adId) { const b = brandOf(c.accountId); if (b === "conts") conts++; else if (b === "dc") dc++; }
+  if (conts || dc) return dc > conts ? "dc" : "conts";
+  return brandOf(data.adNames?.[adId]?.pageId);
+}
+
+/**
+ * Assignment's ads split IR | DC (the owner, 2026-11-19: "assignment 广告的部分，要可以拆分 dc & ir", shown apart only — the
+ * dealer is unchanged). IR is The Conts' ads (and an ad whose brand is not known); DC Dream Crafter's. Opens on IR; the
+ * tabs show only while there are ads of both.
+ */
+export type AdBrandPick = "ir" | "dc";
+export function brandSplit(ids: string[], brandOfAd: (id: string) => SourceBrand | null, pick: AdBrandPick | null | undefined) {
+  const side = (id: string): AdBrandPick => (brandOfAd(id) === "dc" ? "dc" : "ir");
+  const n = { ir: ids.filter(id => side(id) === "ir").length, dc: ids.filter(id => side(id) === "dc").length };
+  const both = n.ir > 0 && n.dc > 0;
+  const on: AdBrandPick | null = both ? (pick === "dc" ? "dc" : "ir") : null;
+  return {
+    on,
+    tabs: both ? (["ir", "dc"] as const).map(k => ({ key: k, label: k === "ir" ? "IR" : "DC", n: n[k], on: on === k })) : [],
+    keep: (id: string) => !on || side(id) === on,
+  };
+}
+
 /**
  * The brand a Revenue app view opens the CRM on (2026-11-17 — the owner: "Dream Crafter view 默认打开 dream crafter 的数据，
  * 聊天室等"): the Dream Crafter sub-department (code DC) holds the CRM to Dream Crafter's customers; every other view, every brand.
