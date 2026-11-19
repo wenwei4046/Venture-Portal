@@ -52,7 +52,7 @@ export interface StaffDirectory {
 export const ROLES: Record<TeamRole, [string, string]> = {
   admin: ['Admin', 'Everything, including Settings.'],
   cs: ['Customer service', 'All outlets. Chats, replies and reports. No Settings.'],
-  outlet: ['Outlet staff', 'Only the outlets you pick below, plus chats with no outlet.'],
+  outlet: ['Outlet staff', 'The outlets ticked for them in People › Permissions — every outlet when none is.'],
 }
 
 /** Stopped: out of the active list. Not started yet is still a member, with its date. */
@@ -72,7 +72,7 @@ export function subLine(m: TeamMember, outlets: LeadOutlet[]): string {
   if (m.why === 'erp') return 'Inactive in ERP · access stopped'
   if (m.why === 'people') return 'Not active in People · access stopped'
   if (m.why === 'ended') return `Access ended ${shortDay(m.to)}`
-  if (m.role === 'outlet') return m.outlets.map(id => outlets.find(o => o.id === id)?.name).filter(Boolean).join(', ') || 'No outlet yet'
+  if (m.role === 'outlet') return m.outlets.map(id => outlets.find(o => o.id === id)?.name).filter(Boolean).join(', ') || 'All outlets'
   return ROLES[m.role][0]
 }
 
@@ -105,13 +105,15 @@ export function pickRows(d: StaffDirectory, q: string) {
     .sort((a, b) => Number(!!a.tag) - Number(!!b.tag))
 }
 
-/** Inbox › Preview as (README § 4): does this member see a chat with this outlet? Stopped sees nothing; Outlet staff
- * their outlets plus chats with no outlet; Admin and Customer service every chat. The database decides the same
- * (lead_outlet_ok); this only draws it for whoever previews. */
+/** Inbox › Preview as (README § 4): does this member see a chat with this outlet? Stopped sees nothing; Admin and
+ * Customer service (Lead View · Manage) every chat; Outlet staff their outlets ticked in People › Permissions — every
+ * outlet when none is, and never a chat with no outlet once some are (2026-11-19). The database decides the same
+ * (lead_my_outlets, lead_outlet_ok); this only draws it for whoever previews. */
 export function previewSees(m: TeamMember, outletId: string | null | undefined): boolean {
   if (stopped(m)) return false
   if (m.role !== 'outlet') return true
-  return !outletId || m.outlets.includes(outletId)
+  if (!m.outlets.length) return true
+  return !!outletId && m.outlets.includes(outletId)
 }
 
 /** The banner's second line: what this member sees. */
@@ -120,7 +122,7 @@ export function previewScope(m: TeamMember, outlets: LeadOutlet[]): string {
   if (m.role === 'admin') return 'Admin · everything'
   if (m.role === 'cs') return 'All outlets'
   const names = m.outlets.map(id => outlets.find(o => o.id === id)?.name).filter(Boolean)
-  return [...names, 'no outlet'].join(' + ') + (m.reply ? '' : ' · view only')
+  return (names.length ? names.join(' + ') : 'All outlets') + (m.reply ? '' : ' · view only')
 }
 
 /** May this member reply to a customer? (Outlet staff need Reply ticked.) */

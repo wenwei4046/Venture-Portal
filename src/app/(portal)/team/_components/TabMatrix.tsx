@@ -16,6 +16,7 @@ import {
 } from '@/lib/permission-tabs'
 import { AREA_OF_TAB, reachOf, tickedFor, type PersonReach, type ReachArea, type ReachTick } from '@/lib/sub-department-reach'
 import { CRM_BRANDS, type CrmBrand } from '@/lib/crm-brand-ticks'
+import { byBrand, OUTLET_HINT, OUTLET_TABS, type OutletChoice } from '@/lib/lead-outlet-ticks'
 import s from './tab-matrix.module.css'
 
 /** One person's sub-departments on the rows that carry them (2026-10-16): their reach, their own ticks, a click. */
@@ -45,6 +46,18 @@ export interface MatrixBrands {
   on: ReadonlySet<CrmBrand>
   mine: ReadonlySet<CrmBrand>
   onToggle: (brand: CrmBrand) => void
+}
+
+/**
+ * Lead View's outlets (2026-11-19 — the owner: "在people permission 做这个功能，去设置那个staff 能看到哪个outlet 的讯息，和他们的广告成效"):
+ * under the first Lead View row (Inbox, Leads, Insight) whose View is ticked, *All outlets* and a pill per outlet.
+ * None ticked = every outlet.
+ */
+export interface MatrixOutlets {
+  all: readonly OutletChoice[]
+  ticked: readonly string[]
+  onToggle: (id: string) => void
+  onAll: () => void
 }
 
 const BRAND_HINT = 'Their CRM shows this brand’s customers, chats and ads'
@@ -83,6 +96,7 @@ export default function TabMatrix({
   reach,
   review,
   brands,
+  outlets,
   canEdit,
   compact = false,
 }: {
@@ -105,6 +119,8 @@ export default function TabMatrix({
   review?: MatrixReview
   /** One person's CRM brands, under the CRM's rows. */
   brands?: MatrixBrands
+  /** One person's Lead View outlets, under the first Lead View row with View. */
+  outlets?: MatrixOutlets
   canEdit: boolean
   /** The person window's tighter rail. */
   compact?: boolean
@@ -112,6 +128,7 @@ export default function TabMatrix({
   const open = TAB_VIEWS.find(v => v.id === view) ?? TAB_VIEWS[0]
   const tabs = tabsOfView(open.id)
   const whole = viewTally(ticks, open.id)
+  const outletRow = outlets ? OUTLET_TABS.find(id => tabs.some(t => t.id === id) && ticks.has(grantOf(id, 'view'))) : undefined
   return (
     <div className={`${s.grid} ${compact ? s.gridCompact : ''}`}>
       <div className={s.rail} role="tablist" aria-label="Views">
@@ -185,6 +202,7 @@ export default function TabMatrix({
                     })}
                   </span>
                 ) : null}
+                {outlets && t.id === outletRow ? <OutletPills outlets={outlets} tab={t.label} canEdit={canEdit} /> : null}
                 {review && t.id.endsWith('.my_claims') && ticks.has(grantOf(t.id, 'view')) ? (
                   <span className={s.subs} role="group" aria-label={`${t.label} · routing`}>
                     <button
@@ -282,5 +300,33 @@ function TallyBox({ tally, disabled = false, label, onClick }: { tally: Tally; d
     >
       {tally === 'all' ? '✓' : tally === 'some' ? '–' : ''}
     </button>
+  )
+}
+
+/** One person's Lead View outlets: *All outlets* (none ticked), then each brand's outlets. */
+function OutletPills({ outlets, tab, canEdit }: { outlets: MatrixOutlets; tab: string; canEdit: boolean }) {
+  const pill = (key: string, label: string, checked: boolean, onClick: () => void, mine: boolean) => (
+    <button
+      key={key}
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={`${tab} · ${label}`}
+      title={OUTLET_HINT}
+      disabled={!canEdit}
+      className={`${s.sub} ${checked ? s.subOn : ''}`}
+      onClick={onClick}
+    >
+      <span className={s.subTick} aria-hidden>{checked ? '✓' : ''}</span>
+      {label}
+      {mine ? <span className={s.dot} aria-label="changed for this person" /> : null}
+    </button>
+  )
+  return (
+    <span className={s.subs} role="group" aria-label={`${tab} · outlets`}>
+      {pill('all', 'All outlets', outlets.ticked.length === 0, outlets.onAll, false)}
+      {byBrand(outlets.all).flatMap(g => g.outlets.map(o =>
+        pill(o.id, g.brand ? `${g.brand} · ${o.name}` : o.name, outlets.ticked.includes(o.id), () => outlets.onToggle(o.id), outlets.ticked.includes(o.id))))}
+    </span>
   )
 }

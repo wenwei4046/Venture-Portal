@@ -7,14 +7,17 @@ const m = (p: Partial<TeamMember>): TeamMember => ({ staffId: 's', code: '', nam
 
 // Lead View v3 § 4 · Preview as: what a member sees and may do, as the database decides it.
 describe('Preview as', () => {
-  it('Outlet staff see their outlets and chats with no outlet; others every chat; stopped none', () => {
-    expect([previewSees(m({}), 'kj'), previewSees(m({}), null), previewSees(m({}), 'tm')]).toEqual([true, true, false])
+  // 2026-11-19: the outlets are ticked in People › Permissions; ticked, a chat with no outlet is not theirs; none ticked, every outlet.
+  it('Outlet staff see their ticked outlets only; none ticked, every chat; others every chat; stopped none', () => {
+    expect([previewSees(m({}), 'kj'), previewSees(m({}), null), previewSees(m({}), 'tm')]).toEqual([true, false, false])
+    expect([previewSees(m({ outlets: [] }), 'tm'), previewSees(m({ outlets: [] }), null)]).toEqual([true, true])
     expect(previewSees(m({ role: 'cs' }), 'tm')).toBe(true)
     expect(previewSees(m({ role: 'cs', why: 'erp' }), 'tm')).toBe(false)
   })
   it('the banner says the scope', () => {
-    expect(previewScope(m({}), outlets)).toBe('2990s Kelana Jaya + no outlet')
-    expect(previewScope(m({ reply: false }), outlets)).toBe('2990s Kelana Jaya + no outlet · view only')
+    expect(previewScope(m({}), outlets)).toBe('2990s Kelana Jaya')
+    expect(previewScope(m({ reply: false }), outlets)).toBe('2990s Kelana Jaya · view only')
+    expect(previewScope(m({ outlets: [] }), outlets)).toBe('All outlets')
     expect(previewScope(m({ role: 'cs' }), outlets)).toBe('All outlets')
     expect(previewScope(m({ why: 'ended' }), outlets)).toBe('Access stopped')
   })

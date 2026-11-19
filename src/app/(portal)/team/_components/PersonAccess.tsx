@@ -22,6 +22,7 @@ import {
 } from '@/lib/permission-tabs'
 import { sameReachTicks, toggleReach, type ReachTick } from '@/lib/sub-department-reach'
 import { brandsOn, sameBrandTicks, toggleBrand, type BrandTick } from '@/lib/crm-brand-ticks'
+import { sameOutletTicks, toggleOutlet } from '@/lib/lead-outlet-ticks'
 import { sameSensitiveTicks, sensitiveOf, toggleSensitive, type SensitiveTick } from '@/lib/person-sensitive'
 import { SENSITIVE_FIELDS } from '@/lib/permission-matrix'
 import type { PersonAccessData } from '../_lib/person-permissions'
@@ -112,16 +113,21 @@ function TemplateAccess({
   const [brandDraft, setBrandDraft] = useState<BrandTick[] | null>(null)
   const savedBrands = access.crmBrands ?? []
   const brandTicks = brandDraft ?? savedBrands
+  // Their Lead View outlets (2026-11-19): none ticked = every outlet; null = not read, no pills.
+  const [outletDraft, setOutletDraft] = useState<string[] | null>(null)
+  const savedOutlets = access.leadOutlets?.ticked ?? []
+  const outletTicks = outletDraft ?? savedOutlets
   const [view, setView] = useState<TabView>(() => TAB_VIEWS.find(v => viewCount(v.id, saved).seen > 0)?.id ?? 'hr')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length + (ownReview === null ? 0 : 1) + brandTicks.length
+  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length + (ownReview === null ? 0 : 1) + brandTicks.length + outletTicks.length
   const brandDirty = brandDraft !== null && !sameBrandTicks(brandDraft, savedBrands)
+  const outletDirty = outletDraft !== null && !sameOutletTicks(outletDraft, savedOutlets)
   const reachDirty = reachDraft !== null && !sameReachTicks(reachDraft, savedReach)
   const sensDirty = sensDraft !== null && !sameSensitiveTicks(sensDraft, access.ownSensitive)
   const reviewDirty = reviewDraft !== null && reviewDraft.own !== savedReview
-  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty || reviewDirty || brandDirty
+  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty || reviewDirty || brandDirty || outletDirty
   const who = personName?.trim() || 'this person'
   // Their sensitive fields (the template's with their own over them) and the kind decide what a ticked tab opens.
   const held = useMemo(() => heldTabs(ticks, sensitive, access.template.baseRole, access.cellKeys), [ticks, sensitive, access])
@@ -139,6 +145,7 @@ function TemplateAccess({
         // Only when it moved: their tick is left as it is otherwise.
         ...(reviewDirty ? { review: ownReview } : {}),
         ...(brandDirty ? { brands: brandTicks } : {}),
+        ...(outletDirty ? { outlets: outletTicks } : {}),
       })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
@@ -146,6 +153,7 @@ function TemplateAccess({
       setSensDraft(null)
       setReviewDraft(null)
       setBrandDraft(null)
+      setOutletDraft(null)
       onSaved?.()
       router.refresh()
     })
@@ -164,7 +172,7 @@ function TemplateAccess({
   const actions = canEdit ? (
     <span className={s.footActions}>
       {changes > 0 ? (
-        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]); setReviewDraft({ own: null }); if (access.crmBrands) setBrandDraft([]) }}>Reset to title</button>
+        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]); setReviewDraft({ own: null }); if (access.crmBrands) setBrandDraft([]); if (access.leadOutlets) setOutletDraft([]) }}>Reset to title</button>
       ) : null}
       <button type="button" className={s.footSave} disabled={!dirty || pending} onClick={() => save(boxesOf(base, ticks))}>
         {pending ? 'Saving…' : 'Save'}
@@ -221,6 +229,12 @@ function TemplateAccess({
           on: brandsOn(brandTicks),
           mine: new Set(brandTicks.map(t => t.brand)),
           onToggle: brand => setBrandDraft(toggleBrand(brandTicks, brand)),
+        } : undefined}
+        outlets={access.leadOutlets && access.leadOutlets.outlets.length ? {
+          all: access.leadOutlets.outlets,
+          ticked: outletTicks,
+          onToggle: id => setOutletDraft(toggleOutlet(outletTicks, id)),
+          onAll: () => setOutletDraft([]),
         } : undefined}
         review={{
           on: reviewOn,

@@ -16,7 +16,7 @@ describe('Team', () => {
   it('a row says why it stopped, else the outlets, else the role', () => {
     expect(subLine(m({ why: 'erp' }), outlets)).toBe('Inactive in ERP · access stopped')
     expect(subLine(m({ outlets: ['tm', 'kj'] }), outlets)).toBe('Carress Taman Maluri, 2990s Kelana Jaya')
-    expect(subLine(m({}), outlets)).toBe('No outlet yet')
+    expect(subLine(m({}), outlets)).toBe('All outlets')
     expect(subLine(m({ role: 'cs' }), outlets)).toBe('Customer service')
     expect(subLine(m({ why: 'ended', to: '2026-11-16' }), outlets)).toBe('Access ended 16 Nov')
     expect([stopped(m({ why: 'not_yet' })), stopped(m({ why: 'people' }))]).toEqual([false, true])

@@ -613,6 +613,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // The CRM's brands per person (mig 20261117160000): a person's, to whoever reads their boxes; set by whoever
   // manages permissions.
   'person_crm_brands', 'permission_user_crm_brands_set',
+  // Lead View's outlets per person (mig 20261119200000): read and set as a person's CRM brands are.
+  'person_lead_outlets', 'permission_user_lead_outlets_set',
   // A person's own Salary / NRIC / Bank (mig 20261016210000): by whoever manages permissions.
   'permission_user_sensitive_set',
   'mint_credit_note_no', 'mint_invoice_no', 'next_staff_code', 'payroll_batch_accrual_sums', 'payroll_batch_commission_split', 'payroll_cancel_topup',
