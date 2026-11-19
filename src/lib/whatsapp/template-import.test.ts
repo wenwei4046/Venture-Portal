@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importableTemplate, importPlan, importToast, headerKind, type MetaTemplateRow } from "./template-import";
+import { importableTemplate, importPlan, importToast, headerKind, templateTail, type MetaTemplateRow } from "./template-import";
 import { templateMessage } from "./send";
 
 // The owner's GRR template as Meta answered it on 2026-11-19 (body cut short).
@@ -91,5 +91,13 @@ describe("templateMessage", () => {
       { type: "header", parameters: [{ type: "document", document: { id: "MEDIA1", filename: "GRR.pdf" } }] },
       { type: "body", parameters: [{ type: "text", text: "Sarah", parameter_name: "first_name" }] },
     ] });
+  });
+});
+
+describe("templateTail", () => {
+  it("keeps the footer and each button on a line of its own under the words", () => {
+    expect(templateTail({ buttons: ["想了解更多GRR", "我的unit适合长租/短租"] })).toBe("\n\n↩ 想了解更多GRR\n↩ 我的unit适合长租/短租");
+    expect(templateTail({ footer: "The Conts", buttons: ["Go"] })).toBe("\n\nThe Conts\n↩ Go");
+    expect(templateTail({})).toBe("");
   });
 });
