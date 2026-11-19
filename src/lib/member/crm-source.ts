@@ -88,6 +88,12 @@ export function brandSplit(ids: string[], brandOfAd: (id: string) => SourceBrand
  * The brand a Revenue app view opens the CRM on (2026-11-17 — the owner: "Dream Crafter view 默认打开 dream crafter 的数据，
  * 聊天室等"): the Dream Crafter sub-department (code DC) holds the CRM to Dream Crafter's customers; every other view, every brand.
  */
-export function crmBrandOfView(subCode: string | null | undefined): SourceBrand | null {
-  return (subCode ?? "").trim().toUpperCase() === "DC" ? "dc" : null;
+export function crmBrandOfView(subCode: string | null | undefined, viewCodes: (string | null | undefined)[] = []): SourceBrand | null {
+  const code = (subCode ?? "").trim().toUpperCase(), codes = viewCodes.map(c => (c ?? "").trim().toUpperCase());
+  if (code === "DC") return "dc";
+  // The IR view holds the CRM to IR's (The Conts') — customers, ads, the calendar (2026-11-19, the owner: "IR 只能看到 IR 的数据，
+  // 包含广告，calendar 等") — for whoever can switch to the DC view for DC's; somebody with no DC view keeps every brand they hold
+  // (else a DC customer of theirs would be out of sight everywhere).
+  if (code === "IR" && codes.includes("DC")) return "conts";
+  return null;
 }

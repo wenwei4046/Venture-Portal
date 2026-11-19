@@ -18,7 +18,7 @@ import { STATUS } from "../../shared/palette";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 import { rangeLine } from "./frame4a";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
-import { inSource, type SourcePick } from "@/lib/member/crm-source";
+import { adBrandOf, inSource, type SourcePick } from "@/lib/member/crm-source";
 import type { CrmData } from "@/lib/member/crm-data";
 import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
 import { officeStamp } from "../../shared/leave-cal-data";
@@ -60,7 +60,12 @@ export function activityPeriod(ui: { insPer: DeskCtx["ui"]["insPer"]; insRange: 
 export function inBrand(d: CrmData, src: SourcePick | null | undefined): CrmData {
   if (!src || src === "all") return d;
   const customers = d.customers.filter(c => inSource(c, src)), ids = new Set(customers.map(c => c.id));
-  return { ...d, customers, visits: d.visits.filter(v => ids.has(v.customerId)), events: d.events.filter(e => ids.has(e.customerId)) };
+  // The ads too (2026-11-19, the owner: in the IR view "广告数据还是总体" — an ad is its leads' brand, else its Page's; one
+  // whose brand is not known stays with The Conts (IR), as Assignment's IR | DC split).
+  const brand = src.split(":")[0], keepAd = (id: string) => (adBrandOf(id, d) ?? "conts") === brand;
+  const adNames = d.adNames ? Object.fromEntries(Object.entries(d.adNames).filter(([id]) => keepAd(id))) : d.adNames;
+  return { ...d, customers, visits: d.visits.filter(v => ids.has(v.customerId)), events: d.events.filter(e => ids.has(e.customerId)),
+    adRules: d.adRules ? d.adRules.filter(r => keepAd(r.adId)) : d.adRules, adNames };
 }
 export const INSIGHT_SOURCES: [SourcePick, string][] = [["all", "All"], ["conts", "The Conts"], ["dc", "Dream Crafter"]];
 
