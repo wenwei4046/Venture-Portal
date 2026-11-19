@@ -36,9 +36,13 @@ const sumCols = (a: SegAmounts): number => Math.round(COLS.reduce((s, c) => s + 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
 /** A board figure: a dash for zero, red parentheses below zero, else in the
- *  tone it is given (money in green, pending brown). */
+ *  tone it is given (money in green, pending brown). A pending figure below
+ *  zero is money on its way in — a payroll transfer from another bank, or HR's
+ *  side of one within the bank (2026-11-19) — and shows green with a plus. */
 function Fig({ n, kind, dash = true }: { n: number; kind?: 'in' | 'pend'; dash?: boolean }) {
   if (n === 0 && dash) return <span className="db-dash">—</span>
+  if (kind === 'pend' && n < 0) return <span className="db-in">+{formatMoneyBare(-n)}</span>
+  if (kind === 'pend' && n === 0) return <span className="db-pend">{formatMoneyBare(0)}</span>
   if (kind === 'pend') return <span className="db-pend">({formatMoneyBare(Math.abs(n))})</span>
   if (n < 0) return <span className="db-neg">({formatMoneyBare(Math.abs(n))})</span>
   return <span className={kind === 'in' ? 'db-in' : undefined}>{formatMoneyBare(n)}</span>
@@ -63,7 +67,8 @@ export default function DailyBankView({ data, today, canExport = false }: { data
   const received = sumOver((b) => b.inToday)
   const pending = sumOver((b) => b.pendingTotal)
   const receiptCount = data.banks.reduce((s, b) => s + b.receipts.length, 0)
-  const pendingCount = data.banks.reduce((s, b) => s + b.pending.length, 0)
+  // A transfer between banks is a line at each: counted once (its money-in line is not another voucher).
+  const pendingCount = data.banks.reduce((s, b) => s + b.pending.filter((p) => p.total >= 0 || p.voucherNo === '—').length, 0)
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
   const captureBlob = async (): Promise<Blob | null> => {
