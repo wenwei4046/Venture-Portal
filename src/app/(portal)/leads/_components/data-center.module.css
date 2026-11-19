@@ -271,3 +271,15 @@ button.big { cursor: pointer; }
 .mGo { cursor: pointer; height: 36px; padding: 0 16px; border: none; border-radius: 9px; background: rgb(var(--lv-accent)); font-family: inherit; font-size: 13px; font-weight: 500; line-height: normal; color: rgb(var(--lv-surface)); }
 .mGo:disabled { cursor: default; background: rgb(var(--lv-disabled)); }
 .mSect { display: flex; flex-direction: column; gap: 8px; }
+
+/* New note (improvement pack C, 2026-11-19) */
+.mPath { font-size: 13px; color: rgb(var(--lv-fg-2)); }
+.mArea {
+  width: 100%; box-sizing: border-box; min-height: 240px; resize: vertical; padding: 10px 12px; border: 1px solid rgb(var(--lv-line)); border-radius: 8px;
+  background: rgb(var(--lv-surface)); font-family: inherit; font-size: 13px; line-height: 1.55; color: rgb(var(--lv-fg)); outline: none;
+}
+.mArea:focus { border-color: rgb(var(--lv-focus-line)); }
+.mFoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: -4px; }
+.mWarn { font-size: 12px; color: rgb(var(--lv-accent)); }
+.mCount { flex: none; font-size: 12px; color: rgb(var(--lv-fg-4)); }
+.mCount[data-over] { color: rgb(var(--lv-accent)); font-weight: 600; }

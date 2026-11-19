@@ -2,7 +2,8 @@
 // and Shared, the files in them, web links and their checks. The pure parts — the tree, the drawn "link for AI agent",
 // a file's status, its tile — so the screen, AI Agent's Knowledge and the drafting agent agree.
 
-import type { DataFile } from './agent'
+import { fileStatus, readable, type DataFile, type KnowledgePick } from './agent'
+import type { FileQuestion } from './agent-memory'
 
 export interface DataFolder {
   id: string
@@ -189,4 +190,120 @@ export function readLine(pick: { kind: 'folder' | 'file' | 'link'; ref: string }
     last.skipped = []
   }
   return levels
+}
+
+// ── What the agent reads, said the same on the server and on AI Agent › Knowledge (2026-11-19) ──
+
+/** The model's limits on one reply's attached files: six files, 10 MB each, 24 MB together. */
+export const READ_LIMITS = { files: 6, eachBytes: 10_000_000, totalBytes: 24_000_000 } as const
+
+/** read · too-big (over 10 MB) · over-limit (six already, or 24 MB together) · cannot-read (Word, Excel …) · link (read as a web page). */
+export type ReadState = 'read' | 'too-big' | 'over-limit' | 'cannot-read' | 'link'
+
+export const READ_STATE_LABEL: Record<Exclude<ReadState, 'read' | 'link'>, string> = {
+  'too-big': 'Not read — over 10 MB',
+  'over-limit': 'Not read — over the 6-file limit',
+  'cannot-read': 'Not read — the AI can’t read this type (use PDF, CSV, a note or a picture)',
+}
+
+/**
+ * Which of the agent's files it reads before a reply, in the order it reads them: text first (notes, CSV), then PDFs,
+ * then pictures — each kind in the order it was picked — while the limits hold; the rest say why not.
+ */
+export function readPlan(files: DataFile[]): Array<{ file: DataFile; state: ReadState }> {
+  const rank = { text: 0, pdf: 1, image: 2 } as const
+  const kinds = files.map((file, i) => ({ file, i, how: readable(file) }))
+  const out: Array<{ file: DataFile; state: ReadState }> = []
+  const rest: Array<{ file: DataFile; state: ReadState }> = []
+  let n = 0, total = 0
+  const ranked = kinds.filter(k => k.how === 'text' || k.how === 'pdf' || k.how === 'image')
+    .sort((x, y) => rank[x.how as keyof typeof rank] - rank[y.how as keyof typeof rank] || x.i - y.i)
+  for (const { file } of ranked) {
+    if (!file.path) rest.push({ file, state: 'cannot-read' })
+    else if (file.sizeBytes > READ_LIMITS.eachBytes) rest.push({ file, state: 'too-big' })
+    else if (n >= READ_LIMITS.files || total + file.sizeBytes > READ_LIMITS.totalBytes) rest.push({ file, state: 'over-limit' })
+    else { n++; total += file.sizeBytes; out.push({ file, state: 'read' }) }
+  }
+  for (const k of kinds) {
+    if (k.how === 'link') rest.push({ file: k.file, state: 'link' })
+    else if (k.how === null) rest.push({ file: k.file, state: 'cannot-read' })
+  }
+  return [...out, ...rest]
+}
+
+/** The files a brand's agent reads from its Knowledge picks: picked, the pick not paused, the file usable today. */
+export function agentFiles(picks: KnowledgePick[], files: DataFile[], folders: DataFolder[], today: string): DataFile[] {
+  return knowledgeReads(picks, files, folders).filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
+}
+
+/** "sofa › chiller › push back" — the folders a file sits in, under its brand's folder ("Shared › …" for Shared; '' right in the brand's folder). */
+export function folderPath(f: Pick<DataFile, 'folderId' | 'brandId'>, folders: DataFolder[]): string {
+  const byId = new Map(folders.map(d => [d.id, d]))
+  const names: string[] = []
+  for (let d = f.folderId ? byId.get(f.folderId) : undefined; d && names.length < 50; d = d.parentId ? byId.get(d.parentId) : undefined) names.unshift(d.name)
+  return [...(f.brandId === null ? ['Shared'] : []), ...names].join(' › ')
+}
+
+/** A folder's own id and the ids of each folder above it. */
+function folderIds(id: string | null | undefined, folders: DataFolder[]): string[] {
+  const out: string[] = []
+  for (let d = id ? folders.find(x => x.id === id) : undefined; d && out.length < 50; d = d.parentId ? folders.find(x => x.id === d!.parentId) : undefined) out.push(d.id)
+  return out
+}
+
+/**
+ * Lead View AI Agent improvement pack A (2026-11-19): the agent's files laid out by folder, so it knows the shelves
+ * (`sofa › chiller › push back`) and which file is which — each with its card id and category, its ASKED ABOUT
+ * instructions under it and a folder's under the folder. Files it could not read this time are listed as such: the
+ * agent knows they exist, never their contents. Only folders with files appear — an empty folder is no product.
+ */
+export function knowledgeOutline(plan: Array<{ file: DataFile; state: ReadState }>, folders: DataFolder[], fileQs: FileQuestion[]): string {
+  const files = plan.filter(p => p.state !== 'link')
+  if (!files.length) return ''
+  const notes = (refs: string[], kind: 'file' | 'folder') => fileQs.filter(q => q.kind === kind && refs.includes(q.ref) && q.instruction.trim()).map(q => `When asked "${q.question}": ${q.instruction.trim()}`)
+  const groups = new Map<string, { path: string; folderId: string | null; rows: string[] }>()
+  for (const { file: f, state } of files) {
+    const path = folderPath(f, folders)
+    const key = `${f.brandId ?? 'shared'}|${f.folderId ?? ''}`
+    if (!groups.has(key)) groups.set(key, { path, folderId: f.folderId ?? null, rows: [] })
+    const how = state === 'read'
+      ? (readable(f) === 'image' ? 'picture, attached' : 'attached')
+      : 'NOT read this time — you have not seen its contents'
+    const meta = [`file-${f.id}`, (f.category ?? '').trim(), how].filter(Boolean).join(' · ')
+    const own = notes([f.id], 'file')
+    groups.get(key)!.rows.push(`- ${f.name} (${meta})${own.map(n => `\n  - ${n}`).join('')}`)
+  }
+  const blocks = [...groups.values()].sort((x, y) => x.path.localeCompare(y.path)).map(g => {
+    const fNotes = notes(folderIds(g.folderId, folders), 'folder')
+    return [`## ${g.path || '(the brand’s folder itself)'}`, ...(fNotes.length ? [`How to answer about this folder:\n${fNotes.map(n => `  - ${n}`).join('\n')}`] : []), ...g.rows].join('\n')
+  })
+  return [
+    '# The brand’s files, by folder',
+    'Each heading is a Data Center folder, from the top down (a product line, then its kind, then the model); the names say what is inside. Use them to know what the brand sells and how it is grouped, and cite a file by its card id (file-…). A file marked NOT read exists, but say a colleague will confirm its details rather than guess them.',
+    ...blocks,
+  ].join('\n\n')
+}
+
+// ── Data Center › New note (improvement pack C, 2026-11-19) ──
+
+/** A note's words at most — the agent reads up to 200,000 characters of a text file. */
+export const NOTE_MAX = 20_000
+
+/** "Chiller models" → "Chiller models.txt"; a name that already ends .txt or .md keeps it. */
+export function noteFileName(name: string): string {
+  const n = name.replace(/[\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150)
+  return /\.(txt|md)$/i.test(n) ? n : `${n}.txt`
+}
+
+/** A note is a plain text file kept in the Data Center (a .txt or .md, not a CSV): it opens to edit. */
+export function isNote(f: Pick<DataFile, 'kind' | 'name' | 'mime'>): boolean {
+  return f.kind === 'file' && (/\.(txt|md)$/i.test(f.name) || (/^text\/plain\b/.test(f.mime) && !/\.csv$/i.test(f.name)))
+}
+
+/** Why a note cannot be saved yet, or ''. */
+export function noteProblem(name: string, body: string): string {
+  if (!name.trim()) return 'Give the note a name.'
+  if (!body.trim()) return 'Write something in the note.'
+  if (body.length > NOTE_MAX) return `A note holds ${NOTE_MAX.toLocaleString('en-US')} characters at most — this one has ${body.length.toLocaleString('en-US')}.`
+  return ''
 }

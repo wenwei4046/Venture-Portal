@@ -10,7 +10,7 @@ import {
   type AgentMore, type AgentSettings, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation,
 } from '@/lib/leads/agent'
 import { FAQ_CATS, PLAY_CATS, brandRowState, endsWarn, faqCat, knowledgeLog, pbCat, type LogRow } from '@/lib/leads/agent-page'
-import { dayMon, dcState, dcTree, extOf, hostOf, placeOf, readLine, type DataFolder, type Place, type ReadLevel } from '@/lib/leads/data-center'
+import { agentFiles, dayMon, dcState, dcTree, extOf, hostOf, placeOf, readLine, readPlan, READ_LIMITS, READ_STATE_LABEL, type DataFolder, type Place, type ReadLevel, type ReadState } from '@/lib/leads/data-center'
 import { DEFAULT_LEARN, memoryMeta, moveSource, rateOf, readEntries, type FileQuestion, type LearnSettings, type MemoryLine, type MemorySuggestion } from '@/lib/leads/agent-memory'
 import type { LeadOutlet } from '@/lib/leads/outlets'
 import { INFO_KIND_LABEL, forBrand, infoKind, type LeadInfo } from '@/lib/leads/info'
@@ -460,6 +460,11 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
   ]
   const title = CATS.find(c => c.k === cat)!.l
   const stOf = (k: KnowledgePick) => (k.paused ? { l: 'Paused', t: 'paused' } : { l: 'In use', t: 'on' })
+  // Improvement pack B (2026-11-19): what the AI really reads before a reply — the server's own plan (`readPlan`).
+  const reads = useMemo(() => new Map(readPlan(agentFiles(d.knowledge, files, folders, today)).map(p => [p.file.id, p.state])), [d.knowledge, files, folders, today])
+  const unread = [...reads.values()].filter(s => s !== 'read' && s !== 'link')
+  const readN = [...reads.values()].filter(s => s === 'read').length
+  const unreadIn = (k: KnowledgePick) => (k.kind === 'file' ? [k.ref] : readLine(k, files, folders).at(-1)?.files.map(f => f.id) ?? []).filter(id => { const s = reads.get(id); return s && s !== 'read' && s !== 'link' }).length
 
   return (
     <div className={a.split}>
@@ -486,6 +491,12 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
         {cat === 'files' ? (
           <div className={a.listGrid}>
             <div className={a.listCol}>
+              {unread.length ? (
+                <div className={a.readNote} role="note">
+                  <LeadIcon name="triangle-alert" size={14} />
+                  <span>The AI reads {readN} of {readN + unread.length} files before each reply — at most {READ_LIMITS.files} files and {READ_LIMITS.totalBytes / 1e6} MB, notes and PDFs before pictures. {unread.length} {unread.length === 1 ? 'is' : 'are'} not read; each is marked below.</span>
+                </div>
+              ) : null}
               <div className={a.th}><span>File</span><span>Folder</span><span>Ends</span><span>Status</span></div>
               {fileRows.map(k => {
                 const f = k.kind === 'file' ? fileOf(k.ref)! : null, node = k.kind === 'folder' ? t.get(k.ref)! : null
@@ -493,10 +504,14 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
                 // v3 § 5: the folders it also reads, under its name ("Also reads Sofa › 3 seater › Pushback").
                 const line = readLine(k, files, folders)
                 const trail = line.slice(1, k.kind === 'file' ? undefined : -1).map(l => l.name)
+                const nUnread = k.paused ? 0 : unreadIn(k)
+                const fState = f && !k.paused ? reads.get(f.id) : undefined
                 return (
                   <div key={pickKey(k)} className={a.kRow} role="option" aria-selected={cur ? pickKey(cur) === pickKey(k) : false} onClick={() => setSel(pickKey(k))}>
                     <span className={a.kName}><span className={a.ext}>{f ? extOf(f.name, f.mime).ext : 'DIR'}</span>
-                      <span className={a.kNames}><span className={a.kTitle}>{f ? f.name : node!.name}</span>{trail.length ? <span className={a.kTrail}>Also reads {trail.join(' › ')}</span> : null}</span></span>
+                      <span className={a.kNames}><span className={a.kTitle}>{f ? f.name : node!.name}</span>{trail.length ? <span className={a.kTrail}>Also reads {trail.join(' › ')}</span> : null}
+                        {fState && fState !== 'read' && fState !== 'link' ? <span className={a.kTrail} data-unread="">{READ_STATE_LABEL[fState]}</span>
+                          : !f && nUnread ? <span className={a.kTrail} data-unread="">{nUnread} {nUnread === 1 ? 'file' : 'files'} not read</span> : null}</span></span>
                     <span className={a.dim}>{brandFor(f ? f.brandId : node!.brandId)}</span>
                     <span className={a.dim} data-mid={f?.validUntil ? '' : undefined} data-none={f?.validUntil ? undefined : ''}>{f?.validUntil ? dayMon(f.validUntil) : '—'}</span>
                     <span className={a.st} data-t={st.t}>{st.l}</span>
@@ -530,7 +545,7 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
                     <div className={a.stat}><span>—</span><span>of AI replies</span></div>
                   </div>
                   <div className={a.sBody}>
-                    <ReadPath line={readLine(cur, files, folders)} brandName={brandFor(f ? f.brandId : node!.brandId)} />
+                    <ReadPath line={readLine(cur, files, folders)} brandName={brandFor(f ? f.brandId : node!.brandId)} reads={cur.paused ? undefined : reads} />
                     <AskedAbout key={pickKey(cur)} pick={cur} d={d} set={set} dis={dis || !memoryReady}
                       asked={f ? asked[f.id] ?? [] : [...new Set(readLine(cur, files, folders).at(-1)?.files.flatMap(x => asked[x.id] ?? []) ?? [])].slice(0, 3)} />
                     <div className={a.sSect} data-tight="">
@@ -628,10 +643,14 @@ function KnowTab({ brandId, brandName, d, set, dis, t, files, folders, foldersRe
   )
 }
 
-/** WHAT THE AI READS · N files (v3 § 5): the brand down to the pick, the files read at each level, the folders beside it not read. */
-function ReadPath({ line, brandName }: { line: ReadLevel[]; brandName: string }) {
+/**
+ * WHAT THE AI READS · N files (v3 § 5): the brand down to the pick, the files read at each level, the folders beside it
+ * not read — and since 2026-11-19 each file the limits or its type keep out, struck through with why (`readPlan`).
+ */
+function ReadPath({ line, brandName, reads }: { line: ReadLevel[]; brandName: string; reads?: Map<string, ReadState> }) {
   if (line.length < 2) return null
-  const n = line.reduce((s, l) => s + l.files.length, 0)
+  const off = (id: string) => { const s = reads?.get(id); return s && s !== 'read' && s !== 'link' ? s : null }
+  const n = line.reduce((s, l) => s + l.files.filter(f => !off(f.id)).length, 0)
   return (
     <div className={a.sSect}>
       <span className={a.kicker}>WHAT THE AI READS · {n} {n === 1 ? 'file' : 'files'}</span>
@@ -643,7 +662,15 @@ function ReadPath({ line, brandName }: { line: ReadLevel[]; brandName: string })
               <div className={a.pRail}><span className={a.pDot} /><span className={a.pLine} /></div>
               <div className={a.pBody}>
                 <span className={a.pName}>{i === 0 ? brandName : l.name}</span>
-                {l.files.map(f => <span key={f.id} className={a.pFile}><span className={a.pExt}>{extOf(f.name, f.mime).ext}</span><span className={a.pFileName}>{f.name}</span></span>)}
+                {l.files.map(f => {
+                  const why = off(f.id)
+                  return (
+                    <span key={f.id} style={{ display: 'contents' }}>
+                      <span className={a.pFile} data-unread={why ? '' : undefined}><span className={a.pExt}>{extOf(f.name, f.mime).ext}</span><span className={a.pFileName}>{f.name}</span></span>
+                      {why ? <span className={a.pUnread}>{READ_STATE_LABEL[why]}</span> : null}
+                    </span>
+                  )
+                })}
                 {!l.files.length ? <span className={a.pNone}>No files here</span> : null}
                 {l.skipped.length ? <span className={a.pSkip}><LeadIcon name="circle-minus" size={12} />Not read: {l.skipped.join(', ')}</span> : null}
               </div>

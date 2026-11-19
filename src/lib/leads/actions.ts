@@ -15,7 +15,7 @@ import { fetchMetaAds } from './ads-server'
 import { managedPages, subscribePage } from './pages-server'
 import type { ManagedPage, PageChannel, StaffLeave } from './pages'
 import { quickProblem, type QuickReply } from './quick'
-import type { FolderColor } from './data-center'
+import { NOTE_MAX, type FolderColor } from './data-center'
 import { readLink } from './link-read'
 import { deliver, deliverFile, sendReaction } from './messenger'
 import { markSeen } from './meta-sync'
@@ -530,6 +530,16 @@ export async function openDataFile(path: string): Promise<LeadOutcome<string>> {
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.storage.from('lead-data').createSignedUrl(path, 120)
   return error || !data ? { ok: false, reason: 'The file could not be opened.' } : { ok: true, data: data.signedUrl }
+}
+
+/** Data Center › a note's words, to edit it (improvement pack C, 2026-11-19): read with the session's own storage access. */
+export async function readDataNote(path: string): Promise<LeadOutcome<string>> {
+  await requireActionOn('/leads/knowledge', 'leads', 'view')
+  if (!/^files\/[0-9a-f-]{36}\//.test(path)) return { ok: false, reason: 'That note is not in the Data Center.' }
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data, error } = await supabase.storage.from('lead-data').download(path)
+  if (error || !data) return { ok: false, reason: 'The note could not be read.' }
+  return { ok: true, data: (await data.text()).slice(0, NOTE_MAX) }
 }
 
 // ── Settings ────────────────────────────────────────────────────────────────

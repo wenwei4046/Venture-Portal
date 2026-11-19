@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { checkLink, openDataFile, removeDataFile, removeDataFolder, saveDataFile, saveDataFolder, saveQuickReplies, setDataFileUntil } from '@/lib/leads/actions'
+import { checkLink, openDataFile, readDataNote, removeDataFile, removeDataFolder, saveDataFile, saveDataFolder, saveQuickReplies, setDataFileUntil } from '@/lib/leads/actions'
 import { cleanShortcut, quickProblem, type QuickReply } from '@/lib/leads/quick'
 import type { DataFile } from '@/lib/leads/agent'
 import {
-  CHECK_EVERY, FOLDER_COLORS, checkedLabel, dayMon, dcState, dcTree, extOf, freeName, hostOf, isBrandPlace, placeOf,
+  CHECK_EVERY, FOLDER_COLORS, NOTE_MAX, checkedLabel, dayMon, dcState, dcTree, extOf, freeName, hostOf, isBrandPlace, isNote, noteFileName, noteProblem, placeOf,
   type CheckEvery, type DataFolder, type FolderColor, type Place,
 } from '@/lib/leads/data-center'
 import { LeadIcon } from '@/components/layout/lead-icons'
@@ -213,6 +213,43 @@ export default function DataCenterView({ files: allFiles, folders, foldersReady,
       router.refresh()
     })
   }
+  // New note (improvement pack C, 2026-11-19): a name and words, kept as a text file in the open folder; editing one
+  // uploads the words again as its next version, as Replace file does. The AI reads text files as they are.
+  const [note, setNote] = useState<{ id: string | null; place: Place; name: string; body: string; note: string } | null>(null)
+  const newNote = () => { if (curOk) setNote({ id: null, place: curOk, name: '', body: '', note: '' }) }
+  // Reading the note back takes a few seconds: its button says so meanwhile.
+  const [opening, setOpening] = useState<string | null>(null)
+  const editNote = (f: DataFile) => {
+    if (!f.path) return
+    setOpening(f.id)
+    start(async () => {
+      setError('')
+      const r = await readDataNote(f.path!)
+      setOpening(null)
+      if (!r.ok) { setError(r.reason); return }
+      setNote({ id: f.id, place: placeOf(f), name: f.name.replace(/\.(txt|md)$/i, ''), body: r.data, note: '' })
+    })
+  }
+  const saveNote = () => {
+    if (!note) return
+    const problem = noteProblem(note.name, note.body)
+    if (problem) { setNote({ ...note, note: problem }); return }
+    const node = t.get(note.place)
+    const f = note.id ? files.find(x => x.id === note.id) : null
+    if (!node || (note.id && !f)) return
+    start(async () => {
+      const name = noteFileName(note.name)
+      const file = new File([note.body], name, { type: 'text/plain' })
+      const u = await upload(file)
+      if ('error' in u) { setNote(n => (n ? { ...n, note: u.error } : n)); return }
+      const r = f
+        ? await saveDataFile(f.id, fileData(f, { name, path: u.path, mime: 'text/plain', sizeBytes: file.size }))
+        : await saveDataFile(null, { kind: 'file', name, brandId: node.brandId, folderId: isBrandPlace(note.place) ? null : note.place, category: '', path: u.path, mime: 'text/plain', sizeBytes: file.size, status: 'active' })
+      if (!r.ok) { setNote(n => (n ? { ...n, note: r.reason } : n)); return }
+      setNote(null); setCur(note.place); setSel(f ? f.id : (r as { ok: true; data: string }).data)
+      router.refresh()
+    })
+  }
   const usedBy = (f: DataFile) => [...new Set((f.usedBy ?? []).map(u => brandName(u.brandId)))].map(n => `AI Agent · ${n}`)
   const flat: Array<{ place: Place; name: string; depth: number }> = []
   const walkAll = (p: Place | null, depth: number) => { for (const k of t.kids(p)) { flat.push({ place: k.place, name: k.name, depth }); walkAll(k.place, depth + 1) } }
@@ -357,6 +394,7 @@ export default function DataCenterView({ files: allFiles, folders, foldersReady,
                   {canManage ? (
                     <>
                       <button type="button" className={d.sq} title={curOk ? 'New folder' : 'Open a brand’s folder or Shared to add a folder'} aria-label="New folder" disabled={!can || busy || !curOk} onClick={newFolder}><LeadIcon name="folder-plus" size={16} /></button>
+                      <button type="button" className={d.sq} title={curOk ? 'New note' : 'Open a folder to write a note in it'} aria-label="New note" disabled={!can || busy || !curOk} onClick={newNote}><LeadIcon name="file-pen" size={16} /></button>
                       <button type="button" className={d.sqRust} title="Upload" aria-label="Upload" disabled={!ready} onClick={() => setUp({ place: curOk, file: null })}><LeadIcon name="upload" size={16} /></button>
                     </>
                   ) : null}
@@ -475,7 +513,8 @@ export default function DataCenterView({ files: allFiles, folders, foldersReady,
                     <div className={d.sect2}>
                       <div className={d.verHead}>
                         <span className={d.verKicker}>VERSIONS</span>
-                        {canManage ? <button type="button" className={d.replace} disabled={!ready || busy} onClick={() => replaceFile(f.id)}><LeadIcon name="refresh-cw" size={12} />Replace file</button> : null}
+                        {canManage && isNote(f) ? <button type="button" className={d.replace} disabled={!can || busy} onClick={() => editNote(f)}><LeadIcon name="file-pen" size={12} />{opening === f.id ? 'Opening…' : 'Edit note'}</button>
+                          : canManage ? <button type="button" className={d.replace} disabled={!ready || busy} onClick={() => replaceFile(f.id)}><LeadIcon name="refresh-cw" size={12} />Replace file</button> : null}
                       </div>
                       {vers.map((v, i) => (
                         <div key={v.ver} className={d.ver}>
@@ -683,6 +722,23 @@ export default function DataCenterView({ files: allFiles, folders, foldersReady,
           <LeadIcon name="upload" size={18} />{up?.file?.name ?? 'Choose a file'}
           <input type="file" onChange={e => { const fl = e.target.files?.[0]; if (fl) setUp(u => (u ? { ...u, file: fl } : u)) }} />
         </label>
+      </Modal>
+
+      <Modal open={!!note} onClose={() => setNote(null)} title={note?.id ? 'Edit note' : 'New note'} width={560}
+        foot={<><button type="button" className={d.mCancel} onClick={() => setNote(null)}>Cancel</button><button type="button" className={d.mGo} disabled={busy} onClick={saveNote}>{busy ? 'Saving…' : note?.id ? 'Save as new version' : 'Save note'}</button></>}>
+        <div className={d.mSect}>
+          <span className={d.mLabel}>IN FOLDER</span>
+          <span className={d.mPath}>{note ? t.pathOf(note.place) : ''}</span>
+        </div>
+        <input className={d.mInput} value={note?.name ?? ''} placeholder="Name, e.g. Chiller models and prices" autoFocus={!note?.id} maxLength={150} aria-label="Note name"
+          onChange={e => setNote(n => (n ? { ...n, name: e.target.value, note: '' } : n))} />
+        <textarea className={d.mArea} value={note?.body ?? ''} aria-label="Note" rows={14}
+          placeholder={'What the AI should know, e.g.\nsitter = a sofa with no function\nchiller = a sofa with a function (push back, slide out)\nModel A · push back · 3 seater · RM 2,990'}
+          onChange={e => setNote(n => (n ? { ...n, body: e.target.value, note: '' } : n))} />
+        <div className={d.mFoot}>
+          <span className={d.mWarn} role={note?.note ? 'alert' : undefined}>{note?.note}</span>
+          <span className={d.mCount} data-over={(note?.body.length ?? 0) > NOTE_MAX || undefined}>{(note?.body.length ?? 0).toLocaleString('en-US')} / {NOTE_MAX.toLocaleString('en-US')}</span>
+        </div>
       </Modal>
 
       <Modal open={!!newLink} onClose={() => setNewLink(null)} title="Add link" width={440}

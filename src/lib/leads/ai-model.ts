@@ -18,11 +18,15 @@ export const AI_NOT_CONNECTED =
 
 export type ModelAnswer = { ok: true; text: string; model: string } | { ok: false; reason: string }
 
-/** A file the agent reads (AI Agent v2, mig 20261023200000): a PDF, a picture or plain text from the Data Center. */
+/**
+ * A file the agent reads (AI Agent v2, mig 20261023200000): a PDF, a picture or plain text from the Data Center. Since
+ * 2026-11-19 the title is the file's folder path and name (`sofa › chiller › model A.pdf`) and `context` its card id and
+ * category, so the agent knows where each file sits and can name it.
+ */
 export type AgentDocument =
-  | { kind: 'pdf'; title: string; base64: string }
-  | { kind: 'image'; title: string; base64: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' }
-  | { kind: 'text'; title: string; text: string }
+  | { kind: 'pdf'; title: string; context?: string; base64: string }
+  | { kind: 'image'; title: string; context?: string; base64: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' }
+  | { kind: 'text'; title: string; context?: string; text: string }
 
 /**
  * Ask the model for a draft. `more` (AI Agent v2) is the settings, fixed answers and playbook — a second system block —
@@ -62,12 +66,19 @@ export async function askModel(system: string, user: string, more?: { system?: s
   }
 }
 
-/** The files as the API takes them: a PDF and a text file as documents (titled, so the agent can name them), a picture as an image; the last one cached. */
+/**
+ * The files as the API takes them: a PDF and a text file as documents (titled with their folder path, the card id as
+ * context), a picture as an image after a line naming it — an image block has no title; the last block cached.
+ */
 function documentBlocks(docs: AgentDocument[]): Anthropic.Beta.Messages.BetaContentBlockParam[] {
-  return docs.map((d, i): Anthropic.Beta.Messages.BetaContentBlockParam => {
+  return docs.flatMap((d, i): Anthropic.Beta.Messages.BetaContentBlockParam[] => {
     const cache = i === docs.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}
-    if (d.kind === 'pdf') return { type: 'document', title: d.title, source: { type: 'base64', media_type: 'application/pdf', data: d.base64 }, ...cache }
-    if (d.kind === 'text') return { type: 'document', title: d.title, source: { type: 'text', media_type: 'text/plain', data: d.text }, ...cache }
-    return { type: 'image', source: { type: 'base64', media_type: d.mediaType, data: d.base64 }, ...cache }
+    const context = d.context ? { context: d.context } : {}
+    if (d.kind === 'pdf') return [{ type: 'document', title: d.title, ...context, source: { type: 'base64', media_type: 'application/pdf', data: d.base64 }, ...cache }]
+    if (d.kind === 'text') return [{ type: 'document', title: d.title, ...context, source: { type: 'text', media_type: 'text/plain', data: d.text }, ...cache }]
+    return [
+      { type: 'text', text: `Picture: ${d.title}${d.context ? ` (${d.context})` : ''}` },
+      { type: 'image', source: { type: 'base64', media_type: d.mediaType, data: d.base64 }, ...cache },
+    ]
   })
 }
