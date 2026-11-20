@@ -527,7 +527,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     status: string,
     payments: Array<{ date: string; type: string; amount: number }>,
     compounding: boolean,
-    head: Pick<DealFacts, 'side' | 'company' | 'companyKey' | 'tag' | 'words' | 'bf'>,
+    head: Pick<DealFacts, 'side' | 'company' | 'companyKey' | 'tag' | 'words' | 'bf' | 'ahead'>,
   ): DealFacts => {
     const { byMonth, last } = actualsOf(payments)
     const months: Record<string, DealMonth> = {}
@@ -547,19 +547,22 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       months,
     }
   }
-  // Overdue as the month began (2026-11-20 — the user: "Overdue (这个月之前的overdue，不扣这个月还的)"): the plan read with
-  // the repayments before the 1st only, its earlier months' instalments still owed then. A deal repaid since is read as
-  // running (its plan then); once repaid, an instalment still owing now — interest never recorded, not shown as owed
-  // (shownForStatus) — is no overdue either.
+  // As the month began (2026-11-20 — the user: "Overdue (这个月之前的overdue，不扣这个月还的)"): the plan read with the
+  // repayments before the 1st only. bf — its earlier months' instalments still owed then, in cash; ahead — what had come
+  // in before the 1st on this month's own (2026-11-20 — "11月分期10月就付了，那么11月应该就显示balance"). A deal whose
+  // unpaid interest rolls into the balance owes no overdue (its earlier months rolled, as the lists say). A deal repaid
+  // since is read as running (its plan then); once repaid, an instalment still owing now — interest never recorded, not
+  // shown as owed (shownForStatus) — is no overdue either.
   const monthStart = `${currentYM}-01`
-  const bfOf = (input: PlanInput, plan: RepaymentPlan, deal: Parameters<typeof monthEvents>[1]): number => {
-    if (!isCurrentMonth) return 0
+  const atStart = (input: PlanInput, plan: RepaymentPlan, deal: Parameters<typeof monthEvents>[1], compounding: boolean): { bf: number; ahead: number } => {
+    if (!isCurrentMonth || compounding) return { bf: 0, ahead: 0 }
     const repaid = input.status === 'fully_repaid' || input.status === 'repaid'
     const before = input.payments.filter((p) => p.date < monthStart)
     const then = buildRepaymentPlan({ ...input, payments: before, status: repaid && before.length < input.payments.length ? 'active' : input.status })
     const owedNow = new Map(plan.rows.map((r) => [r.no, r.outstanding]))
-    const rows = arrearsBefore(then, deal, currentYM, today).filter((e) => !repaid || (owedNow.get(e.no) ?? 0) <= 0.005)
-    return Math.round((rows.reduce((t, e) => t + e.outstanding, 0) + Number.EPSILON) * 100) / 100
+    const late = arrearsBefore(then, deal, currentYM, today).filter((e) => !repaid || (owedNow.get(e.no) ?? 0) <= 0.005)
+    const own = monthEvents(then, deal, currentYM, today).filter((e) => e.rolled <= 0.005)
+    return { bf: r2(late.reduce((t, e) => t + e.outstanding, 0)), ahead: r2(own.reduce((t, e) => t + e.paid, 0)) }
   }
   const dealTag = (text: unknown) => /\[((?:LO|BI)[^\]]{0,20})\]/.exec(String(text ?? ''))?.[1]?.trim() ?? null
   // A deal agreed a year's rate is said per year, as on its own page (v4.256).
@@ -594,7 +597,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
         companyKey: l.company_id ? `co:${l.company_id}` : `loan:${l.id}`,
         tag: dealTag(l.repayment_terms),
         words: dealWords(Number(l.principal), Number(l.effective_rate), (l as { rate_basis?: unknown }).rate_basis, plan.months, compound),
-        bf: bfOf(planInput, plan, deal),
+        ...atStart(planInput, plan, deal, collectCompoundIds.has(l.id as string)),
       }),
     )
   }
@@ -654,7 +657,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
                 : `fs:${id}`,
         tag: dealTag(m.notes),
         words: dealWords(Number(m.amount), Number(m.cost_rate), m.rate_basis, plan.months, m.compound_interest === true),
-        bf: bfOf(planInput, plan, deal),
+        ...atStart(planInput, plan, deal, repayCompoundIds.has(id)),
       }),
     )
   }

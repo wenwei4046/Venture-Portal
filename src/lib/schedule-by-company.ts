@@ -4,11 +4,15 @@
 // we collect from it, what we pay it, the net, the interest profit — its deals under it, each marked Collect or Pay.
 //
 // One reading of the month (2026-11-20 — the user: "这样我就认为不需要分actual 和by right 了吧"), each side adding up:
-//   This month + Overdue at the month's 1st = Settled so far + Still to settle.
-//   This month      — the month's own instalments (a compounding month that rolls into the balance asks no cash).
-//   Overdue         — what earlier months still owed as the month began: the plan read with the repayments before the
-//                     1st only, so what came in this month does not take it down (the office's month only).
-//   Settled so far  — repaid in the month, a contra (netting) with it; a penalty is no instalment and stays out.
+//   This month + Principal repaid early + Overdue at the month's 1st = Settled so far + Still to settle.
+//   This month      — the cash the month's own instalments still asked as it began (a month that rolls into the balance
+//                     asks none; what came in on it before the 1st is off — 2026-11-20).
+//   Repaid early    — what was settled in the month beyond its instalments: principal a deal with no fixed term repays
+//                     when it likes, principal paid down ahead of the plan (2026-11-20 — the user: "照这个做").
+//   Overdue         — what earlier months still owed in cash as the month began: the plan read with the repayments before
+//                     the 1st only, so what came in this month does not take it down (the office's month only); a deal
+//                     whose unpaid interest rolls into the balance owes none (it is in the balance).
+//   Settled so far  — all repaid in the month, a contra (netting) with it; a penalty is no instalment and stays out.
 //   Still to settle — this month's and earlier months' instalments still owed now.
 // Net and Interest + penalty read the cash: what came in − what went out, a contra left out, being no cash.
 // A company is who the deal is with BY ID (2026-11-15): two deals that only share a name — a lender typed as text, a
@@ -61,6 +65,8 @@ export interface DealFacts {
   months: Record<string, DealMonth>
   /** What earlier months still owed in cash as the page's month began (the office's month only; 0 otherwise). */
   bf?: number
+  /** What had come in on the month's own instalments before it began (the office's month only; 0 otherwise). */
+  ahead?: number
 }
 
 export interface CoDeal {
@@ -69,8 +75,10 @@ export interface CoDeal {
   tag: string | null
   words: string
   href: string
-  /** This month's own instalments in cash. */
+  /** The cash this month's own instalments still asked as it began. */
   now: number
+  /** Settled in the month beyond its instalments (principal repaid early) — settled − (now + bf − open). */
+  early: number
   /** What earlier months still owed as the month began. */
   bf: number
   /** Still owed from months before this one, now (the Still overdue filter). */
@@ -105,6 +113,9 @@ export interface Figures {
   /** This month's own instalments. */
   nowCollect: number
   nowPay: number
+  /** Principal repaid early: settled beyond the instalments. */
+  earlyCollect: number
+  earlyPay: number
   /** Overdue as the month began. */
   bfCollect: number
   bfPay: number
@@ -204,7 +215,10 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
       tag: f.tag,
       words: f.words,
       href: f.href,
-      now: r2(now.filter((r) => r.status !== 'rolled').reduce((s, r) => s + r.due, 0)),
+      // A row's cash: what came in on it and what is still owed (a 利滚利 instalment's rolled interest is none), no
+      // more than it asks; less what came in before the month began.
+      now: r2(Math.max(0, now.filter((r) => r.status !== 'rolled').reduce((s, r) => s + Math.min(r.due, r.received + (r.owed ?? 0)), 0) - (f.ahead ?? 0))),
+      early: 0,
       bf: r2(f.bf ?? 0),
       earlier: r2(before.reduce((s, r) => s + (r.owed ?? 0), 0)),
       settled: act.settled,
@@ -216,6 +230,7 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
       owe: f.owe,
       pending: rows.some((r) => r.pending),
     }
+    d.early = r2(d.settled - (d.now + d.bf - d.open))
     if (rows.length === 0 && d.now < EPS && d.bf < EPS && d.settled < EPS && d.got < EPS) continue
     deals.set(f.companyKey, [...(deals.get(f.companyKey) ?? []), d])
     if (!nameOf.has(f.companyKey)) nameOf.set(f.companyKey, f.company)
@@ -238,13 +253,15 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
 /** Deals' figures: each side's this month, overdue as the month began, settled and still to settle; the cash net
  *  and its interest. */
 export function figuresOf(deals: CoDeal[]): Figures {
-  const sum = (side: Side, k: 'now' | 'bf' | 'settled' | 'open' | 'got' | 'gotInterest') =>
+  const sum = (side: Side, k: 'now' | 'early' | 'bf' | 'settled' | 'open' | 'got' | 'gotInterest') =>
     r2(deals.filter((d) => d.side === side).reduce((s, d) => s + d[k], 0))
   const interestIn = sum('collect', 'gotInterest')
   const interestOut = sum('pay', 'gotInterest')
   return {
     nowCollect: sum('collect', 'now'),
     nowPay: sum('pay', 'now'),
+    earlyCollect: sum('collect', 'early'),
+    earlyPay: sum('pay', 'early'),
     bfCollect: sum('collect', 'bf'),
     bfPay: sum('pay', 'bf'),
     settledCollect: sum('collect', 'settled'),

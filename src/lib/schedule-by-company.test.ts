@@ -139,3 +139,45 @@ describe('historyOf', () => {
     expect(h[1].act).toEqual({ interestIn: 50, interestOut: 800, cashIn: 1000, cashOut: 800 })
   })
 })
+
+// 2026-11-20 — checked on the live month: each side must add up, This month + Principal repaid early + Overdue =
+// Settled + Still to settle.
+describe('byCompany — a month that adds up', () => {
+  const nov = (got: number, settled = got) => ({ '2026-11': { due: 0, dueInterest: 0, got, gotInterest: 0, settled } })
+  const cos = byCompany({
+    facts: [
+      // A compounding instalment: of its 36,115.62 only 6,000 is asked in cash (the interest rolls in); 30,000 of
+      // principal came in, which no instalment asked.
+      fact('car', 'collect', 'CAR', { bf: 30000, months: nov(30000) }),
+      // November's 3,008 was 2,784 paid in October: 224 is what November asked as it began.
+      fact('hc', 'pay', 'HC', { ahead: 2784, months: nov(0) }),
+      // A deal with no fixed term repaid in full: 600 of October's interest and its 30,000.
+      fact('fs', 'pay', 'CAR', { bf: 600, months: nov(30600) }),
+    ],
+    collectList: [
+      ...[6, 7, 8, 9, 10].map((m) => row('car', `2026-${String(m).padStart(2, '0')}-15`, { due: 31930, received: 0, owed: 6000, status: 'partial' })),
+      row('car', '2026-11-15', { due: 36115.62, received: 0, owed: 6000, status: 'partial' }),
+    ],
+    payList: [row('hc', '2026-11-05', { due: 3008, received: 2784, owed: 224, status: 'partial' })],
+    month: '2026-11',
+  })
+  const deal = (id: string) => cos.flatMap((c) => c.deals).find((d) => d.id === id)!
+
+  it('asks a compounding instalment’s cash only, and counts principal beyond it as repaid early', () => {
+    expect(deal('car')).toMatchObject({ now: 6000, bf: 30000, settled: 30000, open: 36000, early: 30000 })
+  })
+
+  it('leaves out of this month what came in on it before the month', () => {
+    expect(deal('hc')).toMatchObject({ now: 224, bf: 0, settled: 0, open: 224, early: 0 })
+  })
+
+  it('puts a no-fixed-term deal’s principal under repaid early', () => {
+    expect(deal('fs')).toMatchObject({ now: 0, bf: 600, settled: 30600, open: 0, early: 30000 })
+    const car = figuresOf(cos.find((c) => c.name === 'CAR')!.deals)
+    for (const [now, early, bf, settled, open] of [
+      [car.nowCollect, car.earlyCollect, car.bfCollect, car.settledCollect, car.openCollect],
+      [car.nowPay, car.earlyPay, car.bfPay, car.settledPay, car.openPay],
+    ])
+      expect(now + early + bf).toBeCloseTo(settled + open, 2)
+  })
+})
