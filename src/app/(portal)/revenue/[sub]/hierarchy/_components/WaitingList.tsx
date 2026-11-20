@@ -121,6 +121,7 @@ export default function WaitingList({
   const [confirmFail, setConfirmFail] = useState(false)
   const [failing, setFailing] = useState(false)
   const [failError, setFailError] = useState<string | null>(null)
+  const [failReason, setFailReason] = useState('')
 
   const full = capacity !== null && capacity.free !== null && capacity.free <= 0
   const fullWords = full && capacity ? `${subDeptName} is full — ${capacity.occupied + capacity.reserved} of ${capacity.capacity} places are taken.` : null
@@ -133,6 +134,7 @@ export default function WaitingList({
     setOpenId(id)
     setConfirmFail(false)
     setFailError(null)
+    setFailReason('')
     setDraft(null)
     setSaving(false)
     setAwaitingFresh(false)
@@ -170,7 +172,7 @@ export default function WaitingList({
     if (!open || failing) return
     setFailing(true)
     setFailError(null)
-    const done = await failWaitingApplicant(open.id)
+    const done = await failWaitingApplicant(open.id, failReason)
     setFailing(false)
     if (!done.ok) {
       setFailError(done.reason)
@@ -260,7 +262,19 @@ export default function WaitingList({
                 </button>
               </>
             ) : confirmFail ? (
-              <>
+              <div className={w.failConfirm}>
+                {/* The reason (2026-11-20): Lee Chin Ying joined IR instead and
+                    the history could only say "Did not come when called". Left
+                    blank, the database still writes that. */}
+                <input
+                  className={`${hv.input} ${w.failReason}`}
+                  aria-label="Reason for failing"
+                  placeholder="Reason (optional)"
+                  value={failReason}
+                  onChange={e => setFailReason(e.target.value)}
+                  maxLength={200}
+                  disabled={failing}
+                />
                 <span className={w.confirm}>Take {open.newPerson ?? 'them'} off the waiting list?</span>
                 <button type="button" className={btn('outline')} onClick={() => setConfirmFail(false)} disabled={failing}>
                   Keep
@@ -268,7 +282,7 @@ export default function WaitingList({
                 <button type="button" className={btn('dangerSolid')} onClick={fail} disabled={failing}>
                   {failing ? 'Failing…' : 'Fail'}
                 </button>
-              </>
+              </div>
             ) : (
               <>
                 <button

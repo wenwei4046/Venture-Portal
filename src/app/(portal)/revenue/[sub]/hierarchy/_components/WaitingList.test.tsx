@@ -161,9 +161,25 @@ describe('an applicant’s drawer', () => {
     await act(async () => {
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fail' }))
     })
-    expect(actions.failWaitingApplicant).toHaveBeenCalledWith('amelia')
+    expect(actions.failWaitingApplicant).toHaveBeenCalledWith('amelia', '')
     expect(flash).toHaveBeenCalledWith('Amelia Tan removed from the waiting list — the next in line moves up')
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  // The regression (2026-11-20): Lee Chin Ying joined IR instead, and Fail
+  // could only write "Did not come when called" — it had no reason box.
+  it('Fail sends the reason HR types', async () => {
+    actions.failWaitingApplicant.mockResolvedValue({ ok: true })
+    show()
+    fireEvent.click(screen.getAllByRole('row')[1])
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fail' }))
+    fireEvent.change(within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Reason for failing' }), {
+      target: { value: 'Joined IR instead (HV063)' },
+    })
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Fail' }))
+    })
+    expect(actions.failWaitingApplicant).toHaveBeenCalledWith('amelia', 'Joined IR instead (HV063)')
   })
 
   it('keeps the drawer open with the refusal when Fail is refused', async () => {

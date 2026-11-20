@@ -6,6 +6,9 @@ import { sees } from '@/lib/sensitive'
 import { letterChoicesOn } from '@/lib/documentation/letter-choices'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
 import { listSubDepartments } from '../../../revenue/_lib/sub-departments'
+import { loadSubDepartmentRequests } from '../../../revenue/_lib/sub-department-requests'
+import { waitingList } from '@/lib/commission/sales-group-requests'
+import type { WaitingApplicant } from '@/lib/people/waiting-match'
 import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
 import WaitingTransfer from './_components/WaitingTransfer'
 
@@ -17,6 +20,13 @@ export default async function NewStaffPage({ searchParams }: { searchParams: Pro
   const { waiting } = await searchParams
   if (waiting) return <WaitingTransfer requestId={waiting} viewer={viewer} />
   const supabase = await createClient()
+  // Add Staff remembers the waiting list (2026-11-20): who is still waiting,
+  // so filing one of them here says to Transfer them instead. Read only for
+  // whoever may Transfer (the waiting list's own door); a refusal costs the
+  // reminder and nothing else.
+  const waitingRead = viewer.permissions.includes('member_requests_manage')
+    ? loadWaitingApplicants()
+    : Promise.resolve([] as WaitingApplicant[])
 
   // is_internal=false excludes the hidden 'Venture Office' pseudo-department —
   // staff can't be assigned to it. payroll_source says which department the
@@ -69,6 +79,8 @@ export default async function NewStaffPage({ searchParams }: { searchParams: Pro
     letterChoicesOn(supabase, '/team/people/new'),
   ])
 
+  const waitingApplicants = await waitingRead
+
   const titlesByScheme = new Map<string, string[]>()
   for (const rung of (rungs ?? []) as Array<{ scheme_id: string; title_id: string }>) {
     titlesByScheme.set(rung.scheme_id, [...(titlesByScheme.get(rung.scheme_id) ?? []), rung.title_id])
@@ -119,7 +131,25 @@ export default async function NewStaffPage({ searchParams }: { searchParams: Pro
         nextCode={nextCode}
         canSeeBank={sees(viewer, 'bank')}
         letterTypes={letterTypes}
+        waitingApplicants={waitingApplicants}
       />
     </div>
   )
+}
+
+/** Everybody still on a sub-department's waiting list; never throws. */
+async function loadWaitingApplicants(): Promise<WaitingApplicant[]> {
+  try {
+    const subs = await listSubDepartments()
+    const reads = await Promise.all(subs.map(async sub => ({ sub, read: await loadSubDepartmentRequests(sub.id) })))
+    return reads.flatMap(({ sub, read }) =>
+      read.ok
+        ? waitingList(read.rows).map(r => ({
+            id: r.id, requestNo: r.requestNo, name: r.newPerson, contact: r.contact, subName: sub.name, position: r.position,
+          }))
+        : [],
+    )
+  } catch {
+    return []
+  }
 }

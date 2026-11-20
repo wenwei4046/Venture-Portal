@@ -484,10 +484,15 @@ export async function editWaitingApplicant(requestId: string, raw: unknown): Pro
   return { ok: true }
 }
 
-/** Fail: they didn't come when called — off the waiting list, and the next moves up. */
-export async function failWaitingApplicant(requestId: string): Promise<WaitingOutcome> {
+/**
+ * Fail: off the waiting list, and the next moves up. The reason HR types
+ * (2026-11-20) goes into the request and its history; blank, the database
+ * writes "Did not come when called".
+ */
+export async function failWaitingApplicant(requestId: string, reason?: string | null): Promise<WaitingOutcome> {
   if (!(await manages())) return { ok: false, reason: NO_ACCESS }
-  const { error } = await (await client()).rpc('member_fail_waiting', { p_request: requestId, p_note: null })
+  const note = (reason ?? '').trim().slice(0, 200) || null
+  const { error } = await (await client()).rpc('member_fail_waiting', { p_request: requestId, p_note: note })
   if (error) return { ok: false, reason: refusal(error, 'The applicant could not be taken off the list. Please try again.') }
   revalidateWaiting()
   return { ok: true }

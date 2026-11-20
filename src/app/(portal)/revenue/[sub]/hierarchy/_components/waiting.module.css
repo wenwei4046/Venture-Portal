@@ -428,3 +428,8 @@
 .viewFrame { flex: 1; width: 100%; min-height: 560px; border: 0; background: rgb(255 255 255); box-shadow: 0 1px 3px rgb(var(--hv-dark) / 0.12); }
 .viewImg { width: 100%; height: auto; background: rgb(255 255 255); box-shadow: 0 1px 3px rgb(var(--hv-dark) / 0.12); }
 .viewNone { margin: auto; text-align: center; color: rgb(var(--hv-body-2)); font-size: 13px; line-height: 1.6; }
+
+/* Fail's confirm with its reason (2026-11-20): the box on a line of its own,
+   the question and the two buttons under it. */
+.failConfirm { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; width: 100%; }
+.failReason { flex-basis: 100%; }

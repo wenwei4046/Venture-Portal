@@ -37,6 +37,7 @@ import { FLASH_LONG, flash } from '@/components/hrv/toast'
 import { failedWords, filedWords, lettersRefusal, lettersToFile, startingLetters, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
 import { fileLetters } from '@/lib/documentation/file-letters'
 import AttachLetters from './AttachLetters'
+import { waitingMatches, type WaitingApplicant } from '@/lib/people/waiting-match'
 
 export interface AddStaffDepartment {
   id: string
@@ -71,6 +72,9 @@ interface Props {
    * file one (Documentation · Create), and none is asked.
    */
   letterTypes?: readonly LetterChoice[] | null
+  /** Everybody still on a waiting list, read for whoever may Transfer them
+   *  (2026-11-20): filing one of them here says to Transfer them instead. */
+  waitingApplicants?: WaitingApplicant[]
 }
 
 const ZERO = '0.00'
@@ -118,7 +122,7 @@ const tickTile = (on: boolean) =>
  * number plus one. The form shows which that will be and nothing more — a
  * disabled input is not submitted, which is the point.
  */
-export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode, canSeeBank = true, letterTypes = null }: Props) {
+export default function AddStaffForm({ departments, titles, subDepartments, managers, nextCode, canSeeBank = true, letterTypes = null, waitingApplicants = [] }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -131,6 +135,12 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
   const [fullCommission, setFullCommission] = useState(false)
   const [variablePay, setVariablePay] = useState(false)
   const [pay, setPay] = useState({ basic: '', allowances: ZERO, nonStat: ZERO })
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const onWaitingList = useMemo(
+    () => waitingMatches(name, phone, waitingApplicants),
+    [name, phone, waitingApplicants],
+  )
   const [address, setAddress] = useState<Address>(EMPTY_ADDRESS)
   // When they start, and Probation / Contract / Permanent / Part time (2026-10-23; Contract 2026-10-24): a probation or
   // a contract asks its period, and its last day — the hire date plus the months — is shown as the database will keep it.
@@ -264,12 +274,13 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
       action={handleSubmit}
       className="bg-surface-2 border border-hairline rounded-card p-6 max-w-2xl"
     >
+      <WaitingListNotice matches={onWaitingList} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="staff-name" className={labelBase}>
             Name
           </label>
-          <input id="staff-name" name="name" required className={textInput} />
+          <input id="staff-name" name="name" required className={textInput} onChange={e => setName(e.target.value)} />
         </div>
         <div>
           <label htmlFor="staff-department" className={labelBase}>
@@ -720,6 +731,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
             id="staff-phone"
             name="contact_number"
             type="tel"
+            onChange={e => setPhone(e.target.value)}
             placeholder="012-345 6789"
             className={monoInput}
           />
@@ -799,6 +811,7 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
 
       {/* A refusal is the sheet's red callout, on a line of its own under the
           button so a long database message has the width to be read. */}
+      {onWaitingList.length > 0 && <div className="mt-6"><WaitingListNotice matches={onWaitingList} /></div>}
       <div className="flex flex-wrap items-center gap-3 mt-6">
         <button
           type="submit"
@@ -810,5 +823,32 @@ export default function AddStaffForm({ departments, titles, subDepartments, mana
         {error && <p className="sheet-danger basis-full m-0">{error}</p>}
       </div>
     </form>
+  )
+}
+
+/**
+ * The person being filed is still on a waiting list (2026-11-20): only
+ * Transfer closes their request, so the notice says where to file them from.
+ * Shown above the form and again by the button.
+ */
+function WaitingListNotice({ matches }: { matches: WaitingApplicant[] }) {
+  if (matches.length === 0) return null
+  return (
+    <div role="alert" className="border border-alert bg-alert-bg rounded-card p-3 mb-4 text-sm">
+      {matches.map(m => (
+        <div key={m.id} className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            <strong>{m.name ?? 'This person'}</strong> is #{m.position} on {m.subName}&rsquo;s waiting list
+            {m.requestNo ? ` (${m.requestNo})` : ''}. Transfer them from the waiting list so the list is closed too.
+          </span>
+          <Link
+            href={`/team/people/new?waiting=${encodeURIComponent(m.id)}`}
+            className="bg-surface hover:bg-alert-bg border border-alert text-xs font-medium px-3 py-1.5 rounded-control transition-colors whitespace-nowrap"
+          >
+            Transfer from waiting list
+          </Link>
+        </div>
+      ))}
+    </div>
   )
 }
