@@ -30,6 +30,8 @@ import { customerForm } from "../../sales/vm/customer";
 import { DAY, day0 } from "../../sales/vm/common";
 import { openCustomerPick } from "../../shared/customer-pick";
 import type { KeyboardEvent } from "react";
+import { allClosedDeals, dealsView } from "../../sales/vm/deals";
+import { createClient } from "@/lib/supabase/client";
 import { DIRECTOR, first, ini, periodRange, type PanelCtx } from "./common";
 import type { PhoneOverviewProps } from "../../shared/phone-overview";
 
@@ -65,8 +67,25 @@ function profile6(ctx: PanelCtx, house: boolean) {
       { label: "Ads Performance", icon: "arrow-up-right" as const, open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
       // IR Quote's settings (the handoff: "CRM → Profile → below Ads performance → Quotation settings").
       ...(ctx.openQuoteSettings ? [{ label: "Quotation settings", icon: "file-text" as const, open: ctx.openQuoteSettings, n: "", badge: false }] : []),
-    ] : [] }],
+    ] : [] }, { title: "Sales", rows: [
+      // Closed deals: every deal the Team side reads, each with who closed it (the owner, 2026-11-20: "principal 也能看到").
+      { label: "Closed deals", icon: "trending-up" as const, open: () => patch({ pDeals: true }), n: n(allClosedDeals(data).length), badge: false },
+    ] }],
   };
+}
+
+/** Profile › Closed deals on the Team side: every deal the panel reads, Everyone or one seller, a tap into the Team chat. */
+function deals6(ctx: PanelCtx) {
+  const { ui, patch, data } = ctx;
+  return dealsView({ deals: allClosedDeals(data), per: ui.pDealsPer ?? "all", setPer: k => patch({ pDealsPer: k }), now: ctx.now,
+    roomName: id => data.rooms.find(r => r.id === id)?.name ?? "", back: () => patch({ pDeals: false }), ownBack: true,
+    fileUrl: async path => {
+      if (!ctx.live || path.startsWith("blob:")) return path;
+      const r = await createClient().storage.from("crm-media").createSignedUrl(path, 3600);
+      return r.error || !r.data?.signedUrl ? null : r.data.signedUrl;
+    },
+    openChat: id => (data.customers.some(c => c.id === id) ? () => patch({ pDeals: false, lead: id }) : null),
+    nameOf: ctx.nameOf, who: ui.pDealsWho ?? null, setWho: id => patch({ pDealsWho: id }) });
 }
 
 /** v3 T01 · Insight's head, on both of its sides. */
@@ -160,6 +179,7 @@ export function panelAppVM(ctx: PanelCtx) {
     upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs && !ctx.wideView ? ctx.me.id : null, canAct: !ctx.viewingAs } : null,
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
+    deals6: show.pf && ctx.ui.pDeals ? deals6(ctx) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
     adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: readsAds(ctx.data.can),
       // Insight's period and its sheet (the owner, 2026-10-24: "日曆顏色有點突兀，換成跟insight 一樣的 … 無法自定義要對比的時間段").

@@ -14,7 +14,7 @@ import { PhoneShowrooms } from "./PhoneShowrooms";
 import { InfoValue } from "../shared/AdLink";
 import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight, Phone4aLabelSheet, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead, Phone4aTeamInbox, Phone4aTeamOverview } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aCustomBook, Phone4aDeals, Phone4aKeepHeight, Phone4aLabelSheet, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead, Phone4aTeamInbox, Phone4aTeamOverview } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -1213,7 +1213,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.pf) && (<>
       {!!(v.pf.onProfile) && (<>
-        {!!(v.pf6) && (<Phone4aProfile p={v.pf6} />)}
+        {v.deals6 ? (<Phone4aDeals v={v.deals6} />) : !!(v.pf6) && (<Phone4aProfile p={v.pf6} />)}
       </>)}
     </>)}
     {!!(v.rm.rmDelOpen) && (<>

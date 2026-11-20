@@ -15,6 +15,10 @@ const BTN = { border: 0, background: "none", padding: 0, margin: 0, font: "inher
 
 export interface DealsVM {
   back: () => void;
+  /** Drawn on a page with no top bar of its own (the Team side). */
+  ownBack?: boolean;
+  /** The Team side: Everyone and each seller with a deal. */
+  people?: { label: string; on: boolean; pick: () => void }[];
   periods: { label: string; on: boolean; pick: () => void }[];
   total: string; count: string; avg: string;
   months: { key: string; label: string; total: string; n: number; rows: DealRow[] }[];
@@ -29,7 +33,10 @@ export interface DealRow {
 export function Phone4aDeals({ v }: { v: DealsVM }) {
   return (
     // "‹ Profile" is the shell's own top bar above every Profile sub-page.
-    <main data-closed-deals="" style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "16px" }}>
+    // On the Team side it stands in the Profile's place and pads itself, as Phone4aProfile does.
+    <main data-closed-deals="" style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "16px",
+      ...(v.ownBack ? { padding: "14px 20px 24px", background: "var(--crm-cream)" } : {}) }}>
+      {v.ownBack && <button type="button" onClick={v.back} style={{ ...BTN, alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "4px", fontSize: fs(14), fontWeight: 500, color: "var(--crm-rust)" }}><Ic name="chevron-left" size={16} />Profile</button>}
       <h1 style={{ margin: 0, fontFamily: TIGHT, fontSize: fs(28), fontWeight: 500, letterSpacing: "-0.02em", color: "var(--crm-ink)" }}>Closed deals</h1>
 
       <div role="tablist" style={{ display: "flex", gap: "4px", padding: "3px", borderRadius: "999px", background: "var(--crm-tint-cold)" }}>
@@ -41,6 +48,16 @@ export function Phone4aDeals({ v }: { v: DealsVM }) {
         ))}
       </div>
 
+      {v.people && (
+        <div data-deals-people="" style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>
+          {v.people.map(p => (
+            <button key={p.label} type="button" aria-pressed={p.on} onClick={p.pick}
+              style={{ ...BTN, flex: "none", height: "32px", padding: "0 12px", borderRadius: "999px", border: "1px solid " + (p.on ? "var(--crm-ink)" : "var(--crm-rule)"), background: p.on ? "var(--crm-ink)" : "#fff", color: p.on ? "#fff" : "var(--crm-ink)", fontSize: fs(13), fontWeight: 500, whiteSpace: "nowrap" }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
       <section style={{ borderRadius: "20px", padding: "18px 20px", background: "var(--crm-ink)", color: "#fff", display: "flex", flexDirection: "column", gap: "6px" }}>
         <span style={{ fontSize: fs(12), letterSpacing: ".08em", textTransform: "uppercase", color: "var(--crm-peach-soft)" }}>Total closed</span>
         <span data-deals-total="" style={{ fontFamily: TIGHT, fontSize: fs(32), fontWeight: 600, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>{v.total}</span>
