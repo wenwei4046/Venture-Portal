@@ -55,6 +55,7 @@ import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
+import { DeskDeals } from "./DeskDeals";
 import { DeskOverview } from "./DeskOverview";
 import { DeskTemplateFormat, DeskTemplateImport, DeskTemplateKind, DeskTemplateParts, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
 import { ${[...new Set([...body.matchAll(/<(Desk\w*4a\w*)\b/g)].map(m => m[1]))].sort().join(", ")} } from "./Desk4a";
