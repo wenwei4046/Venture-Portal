@@ -893,3 +893,4 @@ export function Phone4aActiveSave({ v }: { v: ActiveVM }) {
 /** Won's quotation and bank slip (the owner, 2026-11-19) — named here so the generators'
  * IMPORT picks them up with the rest of the Phone4a parts. */
 export { WonFiles as Phone4aWonFiles } from "./won-files";
+export { Phone4aDeals } from "./closed-deals";

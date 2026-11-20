@@ -119,7 +119,9 @@ export interface SalesUi {
   insList: { kind: "leads" | "appts" | "up"; h: string } | null;
   insInfo: string | null;
   // Profile
-  profSub: null | "notif" | "auto" | "quick";
+  profSub: null | "notif" | "auto" | "quick" | "deals";
+  /** Profile › Closed deals' period (2026-11-20). */
+  dealsPer?: "month" | "3m" | "year" | "all";
   teamOpen: boolean;
   swOpen: boolean;
   tp: { k: "from" | "to"; h: number; m: number; ap: "AM" | "PM" } | null;

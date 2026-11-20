@@ -5,7 +5,7 @@
 // ./vm/profile.ts. To change the look, change the design and regenerate.
 import { Fragment } from "react";
 import H from "../crm.module.css";
-import { Phone4aAutoReply, Phone4aProfile } from "../shared/phone4a";
+import { Phone4aAutoReply, Phone4aDeals, Phone4aProfile } from "../shared/phone4a";
 import type { ProfileVM } from "./vm/profile";
 
 /** Profile: card, View my team, workspace, Notifications (Unread | Read), Quick replies, Auto-reply. */
@@ -14,6 +14,7 @@ export default function SalesProfile({ v }: { v: ProfileVM }) {
             
     <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "14px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
       {!!(v.profMain) && (<Phone4aProfile p={v.pf12} />)}
+      {!!(v.profDeals) && (<Phone4aDeals v={v.deals} />)}
       {!!(v.teamOpen) && (<>
         <div onClick={v.closeTeam} style={{ position: "absolute", inset: "0", zIndex: "9", background: "rgba(42,22,12,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
           <div onClick={v.stopTeam} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 26px", display: "flex", flexDirection: "column", gap: "4px" }}>

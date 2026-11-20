@@ -258,7 +258,8 @@ function sales(name, body) {
     body = body.slice(0, a) + "{!!(v.profAuto) && (<Phone4aAutoReply a={v.ar12} />)}" + body.slice(e + "\n      </>)}".length); }
   // v3 M12 (the owner, 2026-10-23: "要" — Mine's Profile as the prototype too): the main page is Phone4aProfile.
   if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profMain) && (<>"), b = body.indexOf("{!!(v.teamOpen) && (<>", a); if (a < 0 || b < 0) throw new Error("phone-4a: mine profile main");
-    body = body.slice(0, a) + "{!!(v.profMain) && (<Phone4aProfile p={v.pf12} />)}\n      " + body.slice(b); }
+    // Profile › Closed deals (the owner, 2026-11-20): one's own Won customers (shared/closed-deals.tsx).
+    body = body.slice(0, a) + "{!!(v.profMain) && (<Phone4aProfile p={v.pf12} />)}\n      {!!(v.profDeals) && (<Phone4aDeals v={v.deals} />)}\n      " + body.slice(b); }
   if (name === "SalesCalendar") body = calendar(body);
   if (name === "SalesContacts") body = contacts(body);
   // M11 · Insight (change list 19): the page itself is 4a's; its sheets (Range, the lists, Customer info, the form) stay.
