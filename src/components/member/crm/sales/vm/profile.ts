@@ -7,7 +7,10 @@
 import type { ChangeEvent } from "react";
 import { autoReplySet, DEFAULT_QUICK_REPLIES, type CrmAutoReplySet } from "@/lib/member/crm-data";
 import { downlineOf, jobTitle, teamName, teamOf, titleOf } from "../../shared/people";
-import { CHANNEL, firstName, ini, stop, type SalesCtx } from "./common";
+import { CHANNEL, firstName, ini, money, stop, type SalesCtx } from "./common";
+import { closedDeals, dealsByMonth, dealsIn, DEAL_PERIODS } from "./deals";
+import { openViewer } from "../../shared/viewer";
+import type { DealsVM } from "../../shared/closed-deals";
 import { openSummary } from "../../shared/notif-summary";
 import { lastWordsOf, summaryFor } from "../../shared/notif-summary-data";
 import { isReadNotif, salesNotifs } from "./notifs";
@@ -58,11 +61,32 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
   const sel = (on: boolean) => ({ bg: on ? "var(--crm-ink)" : "var(--crm-field)", fg: on ? "#fff" : "var(--crm-ink)", weight: on ? 700 : 500 });
   const openTp = (k: "from" | "to") => () => { const t = to12(k === "from" ? A.from : A.to); patch({ tp: { k, ...t, m: [0, 15, 30, 45].includes(t.m) ? t.m : 0 } }); };
 
+  // Profile › Closed deals (the owner, 2026-11-20: "让业务看到自己过往的成交记录"): sales/vm/deals.ts.
+  const deals = closedDeals(data, owner.id), per = ui.dealsPer ?? "all", shown = dealsIn(deals, per, ctx.now);
+  const sum = shown.reduce((t, d) => t + (d.amount ?? 0), 0), priced = shown.filter(d => d.amount != null).length;
+  const roomName = (id: string) => data.rooms.find(r => r.id === id)?.name ?? "";
+  const fileOpen = (path: string, name: string) => () => {
+    void act.keyPhotoUrl(path).then(url => { if (url) openViewer([{ kind: /.(jpe?g|png|webp|heic|gif)$/i.test(path) ? "image" : "file", url, name, ...(/.pdf$/i.test(path) ? { mime: "application/pdf" } : {}) }], 0); });
+  };
+  const dealsV: DealsVM = {
+    back: () => patch({ profSub: null }),
+    periods: DEAL_PERIODS.map(([k, label]) => ({ label, on: per === k, pick: () => patch({ dealsPer: k }) })),
+    total: money(sum), count: String(shown.length), avg: priced ? money(Math.round(sum / priced)) : "—",
+    empty: deals.length ? "No deals closed in this period." : "No closed deals yet. A visit marked Won, with its amount, quotation and bank slip, shows here.",
+    months: dealsByMonth(shown).map(m => ({ key: m.key, label: m.label, total: money(m.total), n: m.deals.length, rows: m.deals.map(d => ({
+      key: d.customerId, name: d.name, ini: ini(d.name), amount: d.amount != null ? money(d.amount) : "—",
+      when: "Won " + new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+      where: d.visit ? (d.visit.kind ? d.visit.label || d.visit.place || "" : roomName(d.visit.showroomId)) : "",
+      files: d.visit?.wonFiles ? [{ label: "Quotation", file: d.visit.wonFiles.quote, open: fileOpen(d.visit.wonFiles.quote.path, d.visit.wonFiles.quote.name) },
+        { label: "Bank slip", file: d.visit.wonFiles.slip, open: fileOpen(d.visit.wonFiles.slip.path, d.visit.wonFiles.slip.name) }] : [],
+      open: ctx.mine.some(x => x.id === d.customerId) ? () => { set(u => ({ ...u, profSub: null, tab: "inbox", chat: d.customerId, hist: [...u.hist, u.tab].slice(-20) })); act.openChat(d.customerId); } : null,
+    })) })),
+  };
   return {
     stop, stopTeam: stop,
     // Auto-reply one page at a time, Save to keep it (shared/auto-reply-pages.tsx; the owner, 2026-10-24).
     ar12: { ar: AR, readOnly: viewingOther, who: firstName(owner.name), upload: act.uploadAutoReplyImage, save: (s: CrmAutoReplySet) => { act.saveAutoReplies(s); act.toast("Auto-reply saved"); } },
-    profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick",
+    profMain: !ui.profSub, profNotif: ui.profSub === "notif", profAuto: ui.profSub === "auto", profQuick: ui.profSub === "quick", profDeals: ui.profSub === "deals", deals: dealsV,
     meNameX: owner.name, meTitleX: jobTitle(owner), meIniX: ini(owner.name),
     // v3 M12: the main page — the avatar centred, its line, MESSAGES (Notifications, Auto-reply, Quick replies).
     pf12: {
@@ -72,6 +96,8 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
         { label: "Notifications", icon: "bell" as const, open: () => patch({ profSub: "notif", nTab: "all" }), n: unread ? String(unread) : "", badge: true },
         { label: "Auto-reply", icon: "bot" as const, open: () => patch({ profSub: "auto" }), n: AR.welcome.on || AR.after.on || AR.kws.some(k => k.on) ? "On" : "Off", badge: false },
         { label: "Quick replies", icon: "message-square-text" as const, open: () => patch({ profSub: "quick" }), n: String(qrs.length), badge: false },
+      ] }, { title: "Sales", rows: [
+        { label: "Closed deals", icon: "trending-up" as const, open: () => patch({ profSub: "deals" }), n: deals.length ? String(deals.length) : "", badge: false },
       ] }],
     },
     meRankX: owner.role === "rs" ? (owner.fullTime ? "Full time" : "Part time") : "—",
