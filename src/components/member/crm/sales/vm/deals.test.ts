@@ -36,3 +36,19 @@ describe("Profile › Closed deals", () => {
     expect(m[0].label).toBe("November 2026");
   });
 });
+
+describe("Profile › Closed deals on the Team side (the owner, 2026-11-20: \"principal 也能看到\")", () => {
+  it("lists everybody's deals with who closed each, and narrows to one seller", async () => {
+    const { allClosedDeals, dealsView } = await import("./deals");
+    const withC = { ...data, events: [...data.events, { id: 3, kind: "status", customerId: "c", actor: "other", owner: "other", data: { to: "won" }, at: "2026-11-01T02:00:00Z" }] } as unknown as typeof data;
+    const all = allClosedDeals(withC);
+    expect(all.map(d => [d.customerId, d.seller])).toEqual([["a", "me"], ["c", "other"], ["e", "me"], ["b", "me"]]);
+    const names = (id: string | null | undefined) => (id === "me" ? "Jia Hui" : "Kelvin");
+    const base = { deals: all, per: "all" as const, setPer: () => {}, now: new Date("2026-11-20T04:00:00Z"), roomName: () => "KL", fileUrl: async () => null, openChat: () => null, back: () => {}, nameOf: names, setWho: () => {} };
+    const v = dealsView({ ...base, who: null });
+    expect(v.people?.map(p => p.label)).toEqual(["Everyone", "Jia Hui", "Kelvin"]);
+    expect(v.count).toBe("4");
+    expect(v.months[0].rows[0].when).toContain("· Jia Hui");
+    expect(dealsView({ ...base, who: "other" }).count).toBe("1");
+  });
+});

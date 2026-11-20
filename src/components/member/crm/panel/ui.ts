@@ -106,6 +106,10 @@ export interface PanelUi {
   viewAs: boolean;
   vaQ: string;
   nfOpen: boolean;
+  /** Profile › Closed deals (2026-11-20): open, its period, the seller picked. */
+  pDeals?: boolean;
+  pDealsPer?: "month" | "3m" | "year" | "all";
+  pDealsWho?: string | null;
   nfF: string;
   /** Notifications: Unread (default) | Read (rev 1011). */
   nfR: "all" | "unread" | "read";

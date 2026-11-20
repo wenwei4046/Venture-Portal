@@ -648,7 +648,7 @@ function panel(body) {
   // v3 T06 (the owner, 2026-10-23: "我的profile 應該長這樣才對"): Profile is the prototype's — Phone4aProfileTeam.
   { const a = body.indexOf("{!!(v.pf.onProfile) && (<>"); if (a < 0) throw new Error("phone-4a: team profile");
     const m = body.indexOf("<main ", a); const [x, y] = el(body.slice(m), body.slice(m, m + 60), "main", "team profile main");
-    body = body.slice(0, m + x) + "{!!(v.pf6) && (<Phone4aProfile p={v.pf6} />)}" + body.slice(m + y); }
+    body = body.slice(0, m + x) + "{v.deals6 ? (<Phone4aDeals v={v.deals6} />) : !!(v.pf6) && (<Phone4aProfile p={v.pf6} />)}" + body.slice(m + y); }
   return nameCase(body);
 }
 
