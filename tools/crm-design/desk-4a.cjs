@@ -307,7 +307,7 @@ module.exports = function desk4a(body) {
   body = once(body, 'gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)',
     // v4 D5a: the Inbox chat's messages 10 px apart (its padding, v.chatPadB, is 28 px a side).
     'gap: "10px", padding: v.chatPadB, backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)', "chat wall clears the cold row");
-  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.deals) && (<DeskDeals v={v.deals} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
   // Team activity (docs/design_handoff_crm, 2026-11-08): a sidebar page of its own, DeskTeamActivity.tsx.
   // Workspace (2026-10-27, the owner: "workspace 可以放在左边report的下方（独立）"): one's own Weekly / Monthly reports, DeskWorkspace.tsx.
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.

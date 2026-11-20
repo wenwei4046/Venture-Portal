@@ -12,6 +12,7 @@ import { peopleBook } from "../../shared/people-book";
 import { upNextOpen } from "../../shared/up-next-data";
 import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
+import { deskDealsVM } from "./deals";
 import { activityPeriod, clistVM, insightCompareVM, insightVM } from "./insight";
 import { deskOverviewVM } from "./overview";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
@@ -97,6 +98,8 @@ export function deskVM(ctx: DeskCtx) {
     ...(ap => ({ ...ap, insCmp: ap.insCmp ?? insightCompareVM(ctx) }))(adsPerfVM(ctx)),
     ...reportsVM(ctx),
     // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
+    // Closed deals (2026-11-20): the phone Profile's page, under REPORTS (DeskDeals.tsx, vm/deals.ts).
+    deals: deskDealsVM(ctx),
     kWorkspace: false, // My reports left Reports (2026-11-09); a stored "workspace" tab shows Reports
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
     leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,

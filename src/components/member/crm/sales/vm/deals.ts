@@ -93,9 +93,11 @@ export function dealsView(o: {
     months: dealsByMonth(shown).map(m => ({ key: m.key, label: m.label, total: money(m.total), n: m.deals.length, rows: m.deals.map(d => {
       const deal = d as ClosedDeal & { seller?: string | null };
       const by = o.nameOf && deal.seller ? o.nameOf(deal.seller) : "";
+      const day = new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
       return {
+        day, by,
         key: d.customerId, name: d.name, ini: initials(d.name), amount: d.amount != null ? money(d.amount) : "—",
-        when: "Won " + new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + (by ? ` · ${by}` : ""),
+        when: "Won " + day + (by ? ` · ${by}` : ""),
         where: d.visit ? (d.visit.kind ? d.visit.label || d.visit.place || "" : o.roomName(d.visit.showroomId)) : "",
         files: d.visit?.wonFiles ? [{ label: "Quotation", file: d.visit.wonFiles.quote, open: fileOpen(d.visit.wonFiles.quote.path, d.visit.wonFiles.quote.name) },
           { label: "Bank slip", file: d.visit.wonFiles.slip, open: fileOpen(d.visit.wonFiles.slip.path, d.visit.wonFiles.slip.name) }] : [],

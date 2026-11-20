@@ -23,7 +23,7 @@ export interface F4Head { /** Insight's comparison, a pill that turns it off and
 
 const CRM_ICON: Record<DeskTab, Icon4a> = {
   insight: "trending-up", inbox: "inbox", people: "contact", calendar: "calendar", adsperf: "arrow-up-right", assignment: "users",
-  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text", workspace: "file-text", activity: "activity",
+  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text", workspace: "file-text", activity: "activity", deals: "circle-check",
 };
 
 /** "Sun, 18 Oct 2026" — the top bar's date, as the frames write it. */
@@ -47,7 +47,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
   const hidden = new Set(app.hidden ?? []);
   const inboxUnread = data.customers.reduce((n, c) => n + (c.unread || 0), 0);
   const ids: Record<string, DeskTab> = { Insight: "insight", Inbox: "inbox", Contacts: "people", Calendar: "calendar", "Ads Performance": "adsperf", Assignment: "assignment",
-    Showrooms: "showrooms", "Customer form": "forms", Forms: "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports", Workspace: "workspace", "Team activity": "activity" };
+    Showrooms: "showrooms", "Customer form": "forms", Forms: "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports", Workspace: "workspace", "Team activity": "activity", "Closed deals": "deals" };
   const crmNav = fr.crmGroups.map(g => ({ head: g.label ?? "", items: g.items.map((n): F4Item => {
     const id = ids[n.label] ?? "insight";
     return { label: n.label, icon: CRM_ICON[id], on: n.on, pick: n.pick, badge: id === "inbox" && inboxUnread ? (inboxUnread > 99 ? "99+" : String(inboxUnread)) : "" };
@@ -98,7 +98,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     })(),
     // v4 frames D1a–D4b: Insight keeps the prototype’s 32 px gutter (head, tab row and body); every other page keeps 36.
     gut: tab === "insight" ? "32px" : "36px",
-    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 32px 32px" : tab === "insight" && ui.insTab !== "activity" ? "0 32px 32px" : (tab === "reports" || tab === "workspace") && ui.rpCat !== "ads" ? "0" : tab === "inbox" || tab === "calendar" || tab === "activity" || (tab === "insight" && ui.insTab === "activity") ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", ownHead: tab === "calendar" || tab === "activity" || tab === "reports" || tab === "workspace", bodyTop: ["inbox", "people", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
+    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 32px 32px" : tab === "insight" && ui.insTab !== "activity" ? "0 32px 32px" : (tab === "reports" || tab === "workspace") && ui.rpCat !== "ads" ? "0" : tab === "inbox" || tab === "calendar" || tab === "activity" || tab === "deals" || (tab === "insight" && ui.insTab === "activity") ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", ownHead: tab === "calendar" || tab === "activity" || tab === "reports" || tab === "workspace" || tab === "deals", bodyTop: ["inbox", "people", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;

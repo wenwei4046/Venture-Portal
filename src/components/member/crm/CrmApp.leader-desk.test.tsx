@@ -40,3 +40,15 @@ describe("the desktop for a team leader", () => {
     expect(nav("Showrooms")).toBe(false);
   });
 });
+
+describe("Closed deals on the desktop (the owner, 2026-11-20: \"电脑版也做 closed deals\")", () => {
+  it("is a page under REPORTS for the Principal and a leader, and opens", async () => {
+    await open("lkv");
+    expect(nav("Closed deals")).toBe(true);
+    cleanup();
+    await open("boss");
+    await act(async () => { screen.getAllByText("Closed deals", { exact: true })[0].closest("button")!.click(); });
+    expect(document.querySelector("[data-desk-deals]")).toBeTruthy();
+    expect(document.querySelector('[data-deals-tile="Total closed"]')).toBeTruthy();
+  });
+});

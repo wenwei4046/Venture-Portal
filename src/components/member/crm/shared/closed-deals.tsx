@@ -26,6 +26,8 @@ export interface DealsVM {
 }
 export interface DealRow {
   key: string; name: string; ini: string; when: string; where: string; amount: string;
+  /** The desktop's columns: the day ("18 Nov") and who closed it (the Team side). */
+  day?: string; by?: string;
   files: { label: string; file: CrmWonFile; open: () => void }[];
   open: (() => void) | null;
 }

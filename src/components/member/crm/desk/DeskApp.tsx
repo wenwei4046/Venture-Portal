@@ -14,6 +14,7 @@ import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
+import { DeskDeals } from "./DeskDeals";
 import { DeskOverview } from "./DeskOverview";
 import { DeskTemplateFormat, DeskTemplateImport, DeskTemplateKind, DeskTemplateParts, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskChatMenu4a, DeskChatWait4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInfoAudit4a, DeskInsight4a, DeskMetricPicker4a, DeskPartnerPane4a, DeskRail4a, DeskRepPick4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
@@ -2490,7 +2491,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}
-              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>
+              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.deals) && (<DeskDeals v={v.deals} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>
                 <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: v.apStrip ? "20px 0" : "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "7px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "8px", border: "0", background: "var(--crm-field)", font: "500 13.5px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
