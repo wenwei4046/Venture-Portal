@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actualsOf, byCompany, dueOfEntries, figuresOf, historyOf, monthsTo, openOf, type DealFacts } from './schedule-by-company'
+import { actualsOf, byCompany, dueOfEntries, figuresOf, historyOf, monthsTo, type DealFacts } from './schedule-by-company'
 import type { CalendarEntry } from './repayment-calendar'
 import type { ListRow } from './schedule-list'
 
@@ -24,15 +24,15 @@ describe('monthsTo', () => {
 })
 
 describe('actualsOf', () => {
-  it('counts cash by month — a contra is none — and the interest among it', () => {
+  it('counts cash by month — a contra is none — the interest among it, and what was settled (a contra, no penalty)', () => {
     const a = actualsOf([
       { date: '2026-10-05', type: 'principal', amount: 1000 },
       { date: '2026-10-05', type: 'interest', amount: 120 },
       { date: '2026-11-02', type: 'netting', amount: 5000 },
       { date: '2026-11-03', type: 'penalty', amount: 30 },
     ])
-    expect(a.byMonth['2026-10']).toEqual({ got: 1120, gotInterest: 120 })
-    expect(a.byMonth['2026-11']).toEqual({ got: 30, gotInterest: 30 })
+    expect(a.byMonth['2026-10']).toEqual({ got: 1120, gotInterest: 120, settled: 1120 })
+    expect(a.byMonth['2026-11']).toEqual({ got: 30, gotInterest: 30, settled: 5000 })
     expect(a.last).toBe('2026-11-03')
   })
 })
@@ -47,13 +47,14 @@ describe('dueOfEntries', () => {
 
 describe('byCompany', () => {
   const facts = [
-    fact('l1', 'collect', 'CONTS', { tag: 'LO#5', owe: 90000, months: { '2026-11': { due: 0, dueInterest: 0, got: 1500, gotInterest: 500 } } }),
-    fact('f1', 'pay', 'CONTS', { tag: 'BI#9', owe: 60000, months: { '2026-11': { due: 0, dueInterest: 0, got: 0, gotInterest: 0 } } }),
-    fact('l2', 'collect', 'HK', { months: { '2026-11': { due: 0, dueInterest: 0, got: 0, gotInterest: 0 } } }),
+    fact('l1', 'collect', 'CONTS', { tag: 'LO#5', owe: 90000, months: { '2026-11': { due: 0, dueInterest: 0, got: 1500, gotInterest: 500, settled: 1500 } } }),
+    fact('f1', 'pay', 'CONTS', { tag: 'BI#9', owe: 60000, months: { '2026-11': { due: 0, dueInterest: 0, got: 0, gotInterest: 0, settled: 0 } } }),
+    // HK: October's 1,100 all owed as November began; 500 of it came in on 3 Nov.
+    fact('l2', 'collect', 'HK', { bf: 1100, months: { '2026-11': { due: 0, dueInterest: 0, got: 500, gotInterest: 500, settled: 500 } } }),
     fact('l3', 'collect', 'QUIET', { owe: 5000 }),
   ]
   const collectList = [
-    row('l1', '2026-11-05', { received: 1500, owed: 0, status: 'paid' }),
+    row('l1', '2026-11-05', { due: 1500, received: 1500, owed: 0, status: 'paid' }),
     // October's, 600 still owed: of its 700 interest, 500 came in (interest first), so 200 unpaid.
     row('l2', '2026-10-09', { received: 500, owed: 600, status: 'partial', interest: 700 }),
     row('l2', '2026-11-09'),
@@ -74,36 +75,25 @@ describe('byCompany', () => {
     expect(cos.find((c) => c.name === 'QUIET')).toBeUndefined()
   })
 
-  it('reads by right: this month’s instalments + what is still owed from before, its unpaid interest first', () => {
+  it('reads this month’s own, overdue as the month began, settled and still to settle', () => {
     const hk = cos[1].deals[0]
-    expect(hk.earlier).toBe(600)
-    expect(hk.due).toBe(1700)
-    // This month's 100 + the earlier one's unpaid interest: 700 − 500 received = 200 (within the 600 owed).
-    expect(hk.dueInterest).toBe(300)
-    expect(hk.open).toBe(1700)
+    expect(hk).toMatchObject({ now: 1100, bf: 1100, earlier: 600, settled: 500, open: 1700 })
   })
 
-  it('reads actual off the repayments, and both bases sum to the page', () => {
-    const all = cos.flatMap((c) => c.deals)
-    const act = figuresOf(all, 'act')
-    expect(act).toMatchObject({ collect: 1500, pay: 0, net: 1500, interestIn: 500, interestOut: 0, profit: 500 })
-    const due = figuresOf(all, 'due')
-    expect(due).toMatchObject({ collect: 2800, pay: 800, net: 2000, interestIn: 400, interestOut: 800, profit: -400, earlier: 600 })
-    // Each side split: this month's own + overdue from before (2026-11-16) — the same whichever basis is read.
-    expect(due).toMatchObject({ nowCollect: 2200, earlierCollect: 600, nowPay: 800, earlierPay: 0 })
-    expect(act).toMatchObject({ nowCollect: 2200, earlierCollect: 600, nowPay: 800, earlierPay: 0 })
-    const open = openOf(all)
-    expect(open.collect).toBe(1700)
-    expect(open.pay).toBe(800)
-    expect(open.settledShare).toBeCloseTo((3600 - 2500) / 3600)
-    // Of what is still open, HK's 600 is overdue from October; the rest is November's (2026-11-18).
-    expect(open).toMatchObject({ collectNow: 1100, collectEarlier: 600, payNow: 800, payEarlier: 0 })
-    expect(due).toMatchObject({ openCollect: 1700, openPay: 800 })
+  // 2026-11-20 — the user: "This month + Overdue = Settled so far + Still to settle".
+  it('adds up each side: this month + overdue = settled + still to settle', () => {
+    const f = figuresOf(cos.flatMap((c) => c.deals))
+    expect(f).toMatchObject({ nowCollect: 2600, bfCollect: 1100, settledCollect: 2000, openCollect: 1700 })
+    expect(f.nowCollect + f.bfCollect).toBeCloseTo(f.settledCollect + f.openCollect)
+    expect(f).toMatchObject({ nowPay: 800, bfPay: 0, settledPay: 0, openPay: 800 })
+    expect(f.nowPay + f.bfPay).toBeCloseTo(f.settledPay + f.openPay)
+    // The cash: 2,000 in, nothing out; its interest 1,000.
+    expect(f).toMatchObject({ net: 2000, interestIn: 1000, interestOut: 0, profit: 1000, earlier: 600 })
   })
 })
 
 describe('byCompany — who a deal is with, by id (2026-11-15, the user: "按 id")', () => {
-  const m = { '2026-11': { due: 0, dueInterest: 0, got: 100, gotInterest: 10 } }
+  const m = { '2026-11': { due: 0, dueInterest: 0, got: 100, gotInterest: 10, settled: 100 } }
   const cos = byCompany({
     facts: [
       fact('l1', 'collect', 'ABC', { companyKey: 'co:abc', owe: 5000, months: m }),
@@ -139,8 +129,8 @@ describe('historyOf', () => {
   it('sums each month’s two sides, by right and actual', () => {
     const h = historyOf(
       [
-        fact('a', 'collect', 'A', { months: { '2026-10': { due: 1100, dueInterest: 100, got: 1000, gotInterest: 50 } } }),
-        fact('b', 'pay', 'B', { months: { '2026-10': { due: 800, dueInterest: 800, got: 800, gotInterest: 800 } } }),
+        fact('a', 'collect', 'A', { months: { '2026-10': { due: 1100, dueInterest: 100, got: 1000, gotInterest: 50, settled: 1000 } } }),
+        fact('b', 'pay', 'B', { months: { '2026-10': { due: 800, dueInterest: 800, got: 800, gotInterest: 800, settled: 800 } } }),
       ],
       ['2026-09', '2026-10'],
     )

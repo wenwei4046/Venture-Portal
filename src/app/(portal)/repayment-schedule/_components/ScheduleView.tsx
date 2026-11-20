@@ -9,8 +9,7 @@ import MonthList from './MonthList'
 import ByCompany, { ByCompanyCards } from './ByCompany'
 import InOutChart from './InOutChart'
 import type { ListRow } from '@/lib/schedule-list'
-import type { Basis, Company, HistMonth } from '@/lib/schedule-by-company'
-import bc from './by-company.module.css'
+import type { Company, HistMonth } from '@/lib/schedule-by-company'
 
 export interface SchedRow {
   key: string
@@ -167,8 +166,6 @@ export default function ScheduleView({
 }) {
   const [mode, setMode] = useState<Mode>('all')
   const [tab, setTab] = useState<Tab>('cal')
-  // Actual is the default (the user: "Actual 就好").
-  const [basis, setBasis] = useState<Basis>('act')
   const [side, setSide] = useState<Side>('collect')
 
   const visible = (rows: SchedRow[]) => (mode === 'all' ? rows : rows.filter((r) => !r.done))
@@ -183,7 +180,7 @@ export default function ScheduleView({
 
   return (
     <div>
-      {tab === 'company' ? <ByCompanyCards companies={companies} basis={basis} month={month} /> : (cards?.[tab] ?? null)}
+      {tab === 'company' ? <ByCompanyCards companies={companies} month={month} /> : (cards?.[tab] ?? null)}
 
       <div className="sch-tabrow">
         <SlidingTabs
@@ -195,18 +192,8 @@ export default function ScheduleView({
           onTabChange={(key) => setTab(key as Tab)}
           variant="control"
         />
-        {tab === 'company' || tools ? (
+        {tools ? (
           <div className="sch-tabrow-tools">
-            {tab === 'company' ? (
-              <div className={bc.seg} role="group" aria-label="Actual or by right">
-                <button type="button" aria-pressed={basis === 'act'} onClick={() => setBasis('act')} title="What really came in and went out">
-                  Actual
-                </button>
-                <button type="button" aria-pressed={basis === 'due'} onClick={() => setBasis('due')} title="What the month asks, paid or not">
-                  By right
-                </button>
-              </div>
-            ) : null}
             {tools}
           </div>
         ) : null}
@@ -216,8 +203,8 @@ export default function ScheduleView({
         <RepayCalendar month={month} today={today} events={events} />
       ) : (
         <>
-          <InOutChart history={history} basis={basis} />
-          <ByCompany companies={companies} basis={basis} monthLong={first.format('MMMM YYYY')} canRecord={canRecord} />
+          <InOutChart history={history} />
+          <ByCompany companies={companies} month={month} monthLong={first.format('MMMM YYYY')} canRecord={canRecord} />
 
           <details className="fin-fold">
             <summary>

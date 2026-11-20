@@ -173,20 +173,38 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
     })
   const heads = (sec: HTMLElement) => Array.from(sec.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim())
 
-  it('By company’s cards follow Actual / By right', async () => {
+  // 2026-11-20 — one reading, no Actual / By right: the table's four groups, each side.
+  it('By company’s cards say this month, overdue, settled and still to settle', async () => {
     await page()
     fireEvent.click(tab(/^By company/))
-    // Actual (the default): what came in this month — HC 11,200 and HD 5,000.
-    expect(card('Received · Oct')).toHaveTextContent('RM 16,200.00')
-    expect(card('Paid · Oct')).toBeInTheDocument()
-    // Actual counts a penalty paid with the interest, and says so (2026-11-15).
-    expect(card('Interest + penalty · Oct')).toBeInTheDocument()
+    expect(card('This month · Oct')).toBeInTheDocument()
+    expect(card('Overdue at 1 Oct')).toBeInTheDocument()
+    // What came in this month — HC 11,200 and HD 5,000.
+    expect(card('Settled so far · Oct')).toHaveTextContent(/^.*16,200\.00 \//)
+    expect(card('Still to settle · Oct')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'By right' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Done so far' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'By right' }))
-    expect(card('To collect · Oct')).toBeInTheDocument()
-    expect(card('Settled so far · Oct')).toBeInTheDocument()
-    expect(card('Interest profit · Oct')).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Received · Oct' })).toBeNull()
+  })
+
+  // 2026-11-20 — the user: "Overdue (这个月之前的overdue，不扣这个月还的)": what came in this month does not take the
+  // overdue down; it is settled, and each side adds up.
+  it('By company’s overdue is as the month began, and each side adds up', async () => {
+    const hkRow = () => {
+      const tr = screen.getAllByText('HK').map((el) => el.closest('tr')).find((r) => r?.hasAttribute('aria-expanded')) as HTMLElement
+      return Array.from(tr.querySelectorAll('td')).slice(1, 9).map((td) => (td.textContent === '—' ? 0 : Number(td.textContent!.replace(/,/g, ''))))
+    }
+    await page()
+    fireEvent.click(tab(/^By company/))
+    const [, , before] = hkRow()
+    expect(before).toBeGreaterThan(0)
+    document.body.innerHTML = ''
+    database({ repayments: [...TABLES.repayments, { loan_id: 'l1', amount: 2000, payment_date: '2026-10-02', payment_type: 'interest' }] })
+    await page()
+    fireEvent.click(tab(/^By company/))
+    const [now, , bf, , settled, , open] = hkRow()
+    expect(bf).toBe(before)
+    expect(settled).toBe(2000)
+    expect(now + bf).toBeCloseTo(settled + open, 2)
   })
 
   it('is one row an instalment, sorted by its day, with its status and the day it was paid', async () => {

@@ -3,25 +3,24 @@
 import { useState } from 'react'
 import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
-import type { Basis, HistMonth } from '@/lib/schedule-by-company'
+import type { HistMonth } from '@/lib/schedule-by-company'
 import s from './by-company.module.css'
 
 // The six months to this one (2026-11-13 — the user: "我需要很清晰的看到每个月we pay 和we collect 后的公司是赚还是亏",
 // "两个都可以做成我去选择要看什么", "6个月"): what we collect up in green, what we pay down in red, the net a dashed line
-// with its figure over each month; Interest only (principal left out) or Cash (principal + interest); actual or by right
-// as the page's switch says.
+// with its figure over each month; Interest only (principal left out) or Cash (principal + interest); what really came
+// in and went out (2026-11-20: the page reads one way now, no Actual / By right).
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const k = (n: number) => (Math.abs(n) >= 1000 ? `${(n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1)}k` : String(Math.round(n)))
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${formatMoney(Math.abs(n))}`
 
-export default function InOutChart({ history, basis }: { history: HistMonth[]; basis: Basis }) {
+export default function InOutChart({ history }: { history: HistMonth[] }) {
   const [view, setView] = useState<'interest' | 'cash'>('interest')
   const [tip, setTip] = useState<{ i: number; x: number; y: number } | null>(null)
   const isI = view === 'interest'
-  const isA = basis === 'act'
   const rows = history.map((h) => {
-    const v = h[basis]
+    const v = h.act
     return { ym: h.ym, i: isI ? v.interestIn : v.cashIn, o: isI ? v.interestOut : v.cashOut }
   })
 
@@ -53,10 +52,10 @@ export default function InOutChart({ history, basis }: { history: HistMonth[]; b
       <div className={s.trendHead}>
         <div>
           <h3 className={s.trendTitle}>
-            {isI ? 'Interest profit' : 'Cash in and out'}, last {rows.length} months · {isA ? 'actual' : 'by right'}
+            {isI ? 'Interest profit' : 'Cash in and out'}, last {rows.length} months
           </h3>
           <div className={s.trendSub}>
-            {isA ? 'What really came in and went out in each month' : 'What fell due in each month, paid or not'} ·{' '}
+            What really came in and went out in each month ·{' '}
             {isI ? 'interest only, principal left out' : 'principal + interest'}
           </div>
         </div>
@@ -116,7 +115,7 @@ export default function InOutChart({ history, basis }: { history: HistMonth[]; b
                 <rect className={s.barOut} x={cx + 2} y={mid} width={bw} height={Math.max(0, y(-r.o) - mid)} rx={4} />
                 <text className={cur ? s.monCur : s.mon} x={cx} y={H - 8} textAnchor="middle">
                   {dayjs(`${r.ym}-01`).format('MMM')}
-                  {cur ? (isA ? ' · so far' : ' · now') : ''}
+                  {cur ? ' · so far' : ''}
                 </text>
               </g>
             )
