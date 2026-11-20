@@ -275,6 +275,13 @@ the ERP's side; this is the portal's half, so a month deleted here stays
 deleted whatever the ERP is configured to send. It is edited on the *Houzs ERP
 link* card, beside the key.
 
+Since 2026-11-21 the ERP sends an order dated before `vp.since` on its save, and the
+receiver, still answering it `skipped`, keeps the bill as it was settled by hand the
+first time it sees it (the lines keyed before the month the portal pays from) and asks
+every later change in what earns as an upsell or a drop on the month still open —
+`erp_sync_old_bill_change()`, mig `20261121100000`; the rule in
+`.claude/rules/revenue/comm-cal.md` › AN OLD BILL CHANGED.
+
 **An old bill topped up (2026-11-07).** One kind of order from before the
 window does come in. The user, of ZNT4813 (Junie's bill of 10 Mar 2026, RM 800
 of RM 6,000 paid; Junie gone; Shawn collected RM 3,200 on 2 Nov): a departed
