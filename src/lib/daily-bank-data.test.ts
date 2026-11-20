@@ -122,7 +122,8 @@ describe('Daily Bank — reads', () => {
     // Requests → their vouchers → those vouchers' sources, and the day's
     // receipts, all asked before the GL lines have answered.
     await vi.waitFor(() => expect(asked).toContain('payment_voucher_sources'))
-    expect(asked.filter((t) => t === 'payment_vouchers')).toHaveLength(2)
+    // The pending vouchers, the day's receipts, and the approved payroll rounds (2026-11-20).
+    expect(asked.filter((t) => t === 'payment_vouchers')).toHaveLength(3)
     release()
     expect((await day).banks[0].pending).toHaveLength(3)
   })
@@ -234,5 +235,63 @@ describe('Daily Bank — a pending payroll funding transfer', () => {
     expect(folded.abb.pendingTotal).toEqual(open.abb.pendingTotal)
     expect(folded.hlb.pendingTotal).toEqual(open.hlb.pendingTotal)
     expect(folded.data.totals).toEqual(open.data.totals)
+  })
+})
+
+// 2026-11-20 — the user: "revenue 不应该negative吧" → "做". A round Revenue funded inside
+// Alliance was booked under HR on both lines, so Alliance's Revenue column kept the money.
+describe('Daily Bank — an approved payroll funding transfer, by the departments that paid it', () => {
+  const run = (roundDate: string) => {
+    const banks = [
+      { id: 'hlb', bank_name: 'Hong Leong Bank', gl_account_code: '3000', is_primary: true },
+      { id: 'abb', bank_name: 'Alliance Bank', gl_account_code: '3010', is_primary: false },
+    ]
+    const lines = [
+      // Revenue's money came into Alliance; a round of 1,000 then went to HR custody in the same bank.
+      { account_code: '3010', debit: 2500, credit: 0, journal_entries: { transaction_date: '2026-01-02', segment: 'revenue_department' } },
+      { account_code: '3010', debit: 1000, credit: 0, journal_entries: { transaction_date: roundDate, segment: 'hr' } },
+      { account_code: '3010', debit: 0, credit: 1000, journal_entries: { transaction_date: roundDate, segment: 'hr' } },
+    ]
+    const rounds = [{ id: 'v-round', bank_account_id: 'abb', journal_entries: { transaction_date: roundDate, segment: 'hr' } }]
+    const sources = [{ voucher_id: 'v-round', pool: 'dept_pool_revenue_department', amount: 1000, role: 'primary' }]
+    const from = (table: string) => {
+      let rounding = false
+      let ids: string[] | null = null
+      const rows = (): unknown[] =>
+        table === 'bank_accounts' ? banks
+          : table === 'departments' ? [{ name: 'Revenue Department', segment_key: 'revenue_department' }]
+          : table === 'journal_lines' ? lines
+          : table === 'payment_vouchers' ? (rounding ? rounds : [])
+          : table === 'payment_voucher_sources' ? sources.filter((s) => ids?.includes(s.voucher_id))
+          : []
+      const q = {
+        select: () => q, not: () => q, order: () => q, lte: () => q, neq: () => q, range: () => q,
+        eq: (column: string, value: unknown) => {
+          if (table === 'payment_vouchers' && column === 'voucher_type' && value === 'payroll_bank_transfer') rounding = true
+          return q
+        },
+        in: (column: string, values: string[]) => {
+          if (column === 'voucher_id') ids = values
+          return q
+        },
+        then: (resolve: (value: { data: unknown[]; error: null }) => unknown) => Promise.resolve(resolve({ data: rows(), error: null })),
+      }
+      return q
+    }
+    return fetchDailyBank({ from } as unknown as SupabaseClient, DAY, { seesPayroll: true })
+  }
+
+  it('takes the round off Revenue’s column, not HR’s, in the bank that paid it — the bank’s total unchanged', async () => {
+    const data = await run('2026-01-05')
+    const abb = data.banks.find((b) => b.bankId === 'abb')!
+    expect(abb.bf).toMatchObject({ revenue_department: 1500, hr: 1000 })
+    expect(Object.values(abb.bf).reduce((s, n) => s + n, 0)).toBe(2500)
+  })
+
+  it('a round dated the day itself: its outgoing line under Revenue', async () => {
+    const data = await run(DAY)
+    const abb = data.banks.find((b) => b.bankId === 'abb')!
+    expect(abb.outToday).toMatchObject({ revenue_department: 1000, hr: 0 })
+    expect(abb.inToday).toMatchObject({ hr: 1000 })
   })
 })

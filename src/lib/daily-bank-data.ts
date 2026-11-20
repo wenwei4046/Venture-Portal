@@ -184,6 +184,41 @@ export async function fetchDailyBank(
       .eq('payment_date', date),
   )
 
+  // ── Approved payroll funding transfers up to D (2026-11-20) ──
+  // Their journal entry carries one segment (HR's, or the director's for a
+  // director round) on both bank lines, but the money left the paying
+  // departments' pools in the paying bank. Read here so that bank's columns
+  // can say so (below).
+  const roundsRead = startRead(
+    (async () => {
+      const rounds = (await fetchAllRows((lo, hi) =>
+        supabase
+          .from('payment_vouchers')
+          .select('id, bank_account_id, journal_entries!payment_vouchers_journal_entry_id_fkey!inner(transaction_date, segment, is_reversed)')
+          .eq('voucher_type', 'payroll_bank_transfer')
+          .eq('status', 'paid')
+          .lte('journal_entries.transaction_date', date)
+          .eq('journal_entries.is_reversed', false)
+          .order('id')
+          .range(lo, hi),
+      )) as unknown as Array<{
+        id: string
+        bank_account_id: string | null
+        journal_entries: { transaction_date: string; segment: string | null }
+      }>
+      if (rounds.length === 0) return { rounds, sources: [] }
+      const sources = (await fetchAllRows((lo, hi) =>
+        supabase
+          .from('payment_voucher_sources')
+          .select('voucher_id, pool, amount, role')
+          .in('voucher_id', rounds.map(r => r.id))
+          .order('id')
+          .range(lo, hi),
+      )) as unknown as Array<{ voucher_id: string; pool: string | null; amount: number; role: string | null }>
+      return { rounds, sources }
+    })(),
+  )
+
   // TODAY only: the pool balances whose gap is folded into the primary bank
   // (below). Asked now when D is today; whether to fold is still decided at
   // the end, as before.
@@ -207,6 +242,7 @@ export async function fetchDailyBank(
   }
 
   const glRows = await glRowsRead
+  const paidRounds = await roundsRead
   const pending = await pendingRead
   const { data: orRows } = await orRead
   const todayAnswers =
@@ -230,6 +266,41 @@ export async function fetchDailyBank(
       // dated D — split into in (debits) / out (credits)
       if (Number(l.debit ?? 0) > 0) addAmounts(bucket.inToday, col, Number(l.debit ?? 0))
       if (Number(l.credit ?? 0) > 0) addAmounts(bucket.outToday, col, Number(l.credit ?? 0))
+    }
+  }
+
+  // ── A payroll funding transfer, by the departments that paid it ──
+  // (2026-11-20 — the user: "revenue 不应该negative吧" → "做".) The staging
+  // entry takes the paying bank's money off under its one segment (HR's), so a
+  // round Revenue funded inside Alliance left Revenue's RM 261k standing in
+  // Alliance and the pool gap put it back as −273k on Hong Leong. The paying
+  // bank's line is read again by the pools that paid: the segment's column
+  // gets its amount back, each paying pool's column gives its share. The
+  // funded bank's line stays HR's (custody). Totals per bank do not move.
+  {
+    const srcByRound = new Map<string, Array<{ pool: string | null; amount: number }>>()
+    for (const s of paidRounds.sources) {
+      if (s.role === 'mirror') continue
+      const list = srcByRound.get(s.voucher_id) ?? []
+      list.push({ pool: s.pool, amount: Number(s.amount) })
+      srcByRound.set(s.voucher_id, list)
+    }
+    const codeByBank = new Map(banks.map(b => [b.id, b.gl_account_code as string]))
+    for (const r of paidRounds.rounds) {
+      const srcs = srcByRound.get(r.id) ?? []
+      const code = r.bank_account_id ? codeByBank.get(r.bank_account_id) : undefined
+      const bucket = code ? byCode.get(code) : undefined
+      if (!bucket || srcs.length === 0) continue
+      const segCol = columnForSegment(r.journal_entries.segment)
+      const total = r2(srcs.reduce((s, x) => s + x.amount, 0))
+      if (r.journal_entries.transaction_date < date) {
+        // Out of the bank: the segment's column gets it back, the pools give it.
+        addAmounts(bucket.bf, segCol, total)
+        for (const s of srcs) addAmounts(bucket.bf, columnForPool(s.pool), -s.amount)
+      } else {
+        addAmounts(bucket.outToday, segCol, -total)
+        for (const s of srcs) addAmounts(bucket.outToday, columnForPool(s.pool), s.amount)
+      }
     }
   }
 
