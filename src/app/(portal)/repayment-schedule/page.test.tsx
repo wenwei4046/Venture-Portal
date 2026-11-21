@@ -191,20 +191,23 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
   it('By company’s overdue is as the month began, and each side adds up', async () => {
     const hkRow = () => {
       const tr = screen.getAllByText('HK').map((el) => el.closest('tr')).find((r) => r?.hasAttribute('aria-expanded')) as HTMLElement
-      return Array.from(tr.querySelectorAll('td')).slice(1, 9).map((td) => (td.textContent === '—' ? 0 : Number(td.textContent!.replace(/,/g, ''))))
+      return Array.from(tr.querySelectorAll('td')).slice(1, 11).map((td) => (td.textContent === '—' ? 0 : Number(td.textContent!.replace(/,/g, ''))))
     }
     await page()
     fireEvent.click(tab(/^By company/))
-    const [, , before] = hkRow()
+    const [, , , , before] = hkRow()
     expect(before).toBeGreaterThan(0)
+    // HM compounds: its unpaid interest rolls into the balance — no overdue.
+    const hm = screen.getAllByText('HM').map((el) => el.closest('tr')).find((r) => r?.hasAttribute('aria-expanded'))
+    if (hm) expect(hm.querySelectorAll('td')[5]).toHaveTextContent('—')
     document.body.innerHTML = ''
     database({ repayments: [...TABLES.repayments, { loan_id: 'l1', amount: 2000, payment_date: '2026-10-02', payment_type: 'interest' }] })
     await page()
     fireEvent.click(tab(/^By company/))
-    const [now, , bf, , settled, , open] = hkRow()
+    const [now, , early, , bf, , settled, , open] = hkRow()
     expect(bf).toBe(before)
     expect(settled).toBe(2000)
-    expect(now + bf).toBeCloseTo(settled + open, 2)
+    expect(now + early + bf).toBeCloseTo(settled + open, 2)
   })
 
   it('is one row an instalment, sorted by its day, with its status and the day it was paid', async () => {
@@ -272,7 +275,7 @@ describe('We collect / We pay, a month at a time (2026-11-04)', () => {
     expect(hk[hk.length - 1]).toHaveTextContent('9 Oct')
     // By company counts them as HK's overdue to collect.
     const hkCo = screen.getAllByText('HK').map((el) => el.closest('tr')).find((tr) => tr?.hasAttribute('aria-expanded')) as HTMLElement
-    expect((hkCo.querySelector('td[data-dir="in"][data-start]:not(:nth-child(2))') as HTMLElement).textContent).toMatch(/^[1-9][\d,]*\.\d\d$/)
+    expect((hkCo.querySelectorAll('td')[5] as HTMLElement).textContent).toMatch(/^[1-9][\d,]*\.\d\d$/)
   })
 
   it('prints the rows on show from a right-click on the header', async () => {

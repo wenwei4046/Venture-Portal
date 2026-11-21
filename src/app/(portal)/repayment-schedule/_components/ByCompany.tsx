@@ -10,9 +10,9 @@ import s from './by-company.module.css'
 
 // We collect and We pay as one table, a row a company (2026-11-13, the mockup approved: "照这个做"); ▸ opens its deals,
 // each marked Collect or Pay. One reading, no Actual / By right (2026-11-20 — the user: "这样我就认为不需要分actual 和by
-// right 了吧"): each side's This month (its own instalments), Overdue as the month began, Settled so far (cash and
-// contra) and Still to settle — This month + Overdue = Settled + Still, each side — then the cash Net and its Interest +
-// penalty. More columns from Columns: the interest each way, the next instalment, the last repayment, what is owed both
+// right 了吧"): each side's This month (its own instalments), Principal repaid early (settled beyond them), Overdue as
+// the month began, Settled so far (all of it, cash and contra) and Still to settle — This month + Repaid early + Overdue
+// = Settled + Still, each side — then the cash Net and its Interest + penalty. More columns from Columns: the interest each way, the next instalment, the last repayment, what is owed both
 // ways (a sign to contra).
 
 const EPS = 0.005
@@ -29,17 +29,17 @@ const EXTRAS: Array<{ key: Extra; label: string }> = [
 ]
 const COLS_KEY = 'repayment.by-company.columns'
 // The order the figures stand in (2026-11-13 — the user: "我不能自己拖着排？"): drag a heading onto another, as the hub
-// tables do; kept by the browser. Company stays first, the row's button last. v3 (2026-11-20): the columns are new, so
+// tables do; kept by the browser. Company stays first, the row's button last. v4 (2026-11-20): the columns are new, so
 // an order kept before starts again from this one.
-const ORDER_KEY = 'repayment.by-company.order.v3'
+const ORDER_KEY = 'repayment.by-company.order.v4'
 // Grouped, collect then pay in each (2026-11-19 — the user: "有点乱，分不清什么是什么" → A + B), in the order they add
 // up (2026-11-20): this month, overdue, settled so far, still to settle, then the cash; a band names each group.
-const DEFAULT_ORDER = ['nowCollect', 'nowPay', 'bfCollect', 'bfPay', 'settledCollect', 'settledPay', 'openCollect', 'openPay', 'net', 'profit', 'pi', 'next', 'last', 'pos'] as const
+const DEFAULT_ORDER = ['nowCollect', 'nowPay', 'earlyCollect', 'earlyPay', 'bfCollect', 'bfPay', 'settledCollect', 'settledPay', 'openCollect', 'openPay', 'net', 'profit', 'pi', 'next', 'last', 'pos'] as const
 type ColKey = (typeof DEFAULT_ORDER)[number]
-type Group = 'month' | 'overdue' | 'sofar' | 'open' | 'cash' | 'more'
+type Group = 'month' | 'early' | 'overdue' | 'sofar' | 'open' | 'cash' | 'more'
 
 type Filter = 'all' | 'both' | 'late' | 'loss'
-type FigKey = 'nowCollect' | 'nowPay' | 'bfCollect' | 'bfPay' | 'settledCollect' | 'settledPay' | 'openCollect' | 'openPay' | 'net' | 'profit'
+type FigKey = 'nowCollect' | 'nowPay' | 'earlyCollect' | 'earlyPay' | 'bfCollect' | 'bfPay' | 'settledCollect' | 'settledPay' | 'openCollect' | 'openPay' | 'net' | 'profit'
 type SortKey = 'name' | FigKey
 
 /** The cards over the tabs: the table's four groups, each side (2026-11-20). */
@@ -51,6 +51,7 @@ export function ByCompanyCards({ companies, month }: { companies: Company[]; mon
   return (
     <StatCards label="Repayment Schedule" size="small">
       <StatCard key="now" label={`This month · ${mon}`} value={pair(f.nowCollect, f.nowPay)} icon="inbox" note="Collect / pay · the month’s own instalments" />
+      <StatCard key="early" label={`Principal repaid early · ${mon}`} value={pair(f.earlyCollect, f.earlyPay)} icon="swap" note="Collect / pay · repaid beyond the instalments" />
       <StatCard
         key="bf"
         tone={f.bfCollect + f.bfPay >= EPS ? 'danger' : undefined}
@@ -59,7 +60,7 @@ export function ByCompanyCards({ companies, month }: { companies: Company[]; mon
         icon="alert"
         note="Collect / pay · owed from months before, as the month began"
       />
-      <StatCard key="settled" tone="ledger" label={`Settled so far · ${mon}`} value={pair(f.settledCollect, f.settledPay)} icon="check" note="Received / paid · a contra with it" />
+      <StatCard key="settled" tone="ledger" label={`Settled so far · ${mon}`} value={pair(f.settledCollect, f.settledPay)} icon="check" note="Received / paid · all of it, a contra with it" />
       <StatCard key="open" label={`Still to settle · ${mon}`} value={pair(f.openCollect, f.openPay)} icon="clock" note="Collect / pay · this month’s and overdue" />
     </StatCards>
   )
@@ -178,7 +179,7 @@ export default function ByCompany({
   // A side's figure: the company's, a deal's (on its own side only), the foot's — collect green, pay red, overdue red.
   const side = (key: FigKey & ColKey, group: Group, dir: 'in' | 'out', label: string, of: (d: CoDeal) => number, late = false): Col => {
     const mine = (d: CoDeal) => d.side === (dir === 'in' ? 'collect' : 'pay')
-    const ink = (v: number) => (v < EPS ? s.quiet : late || dir === 'out' ? s.bad : s.good)
+    const ink = (v: number) => (Math.abs(v) < EPS ? s.quiet : late || dir === 'out' ? s.bad : s.good)
     return {
       key, group, dir, label, num: true, sort: key,
       co: (_, f) => cell(`${s.num} ${ink(f[key])}`, bare(f[key])),
@@ -189,6 +190,8 @@ export default function ByCompany({
   const COLS: Record<ColKey, Col> = {
     nowCollect: side('nowCollect', 'month', 'in', 'Collect', (d) => d.now),
     nowPay: side('nowPay', 'month', 'out', 'Pay', (d) => d.now),
+    earlyCollect: side('earlyCollect', 'early', 'in', 'Collect', (d) => d.early),
+    earlyPay: side('earlyPay', 'early', 'out', 'Pay', (d) => d.early),
     bfCollect: side('bfCollect', 'overdue', 'in', 'Collect', (d) => d.bf, true),
     bfPay: side('bfPay', 'overdue', 'out', 'Pay', (d) => d.bf, true),
     settledCollect: side('settledCollect', 'sofar', 'in', 'Received', (d) => d.settled),
@@ -243,6 +246,7 @@ export default function ByCompany({
   const cols = order.map((k) => COLS[k]).filter((c) => !c.extra || has(c.extra))
   const GROUP: Record<Group, string> = {
     month: 'This month',
+    early: 'Principal repaid early',
     overdue: `Overdue at ${dayjs(`${month}-01`).format('D MMM')}`,
     sofar: 'Settled so far',
     open: 'Still to settle',
@@ -445,11 +449,12 @@ export default function ByCompany({
         </div>
       </div>
       <p className={s.note}>
-        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Green columns are money coming to us, red going out. This month = the month&rsquo;s own
-        instalments. Overdue = what months before still owed as the month began; what came in since does not take it down. Settled so far = repaid this
-        month, a contra with it. Still to settle = this month&rsquo;s and overdue not yet settled. Each side: This month + Overdue = Settled + Still to
-        settle — a repayment ahead of its day, or principal repaid early, makes Settled more. Net = cash received − cash paid this month (a contra is
-        no cash). Interest + penalty = interest and penalty received − paid this month.
+        ▸ opens a company&rsquo;s deals, each marked Collect or Pay. Green columns are money coming to us, red going out. This month = what the month&rsquo;s
+        own instalments still asked as it began (a compounding month&rsquo;s unpaid interest rolls into the balance and asks none). Principal repaid early = what
+        was repaid beyond the instalments — principal on a deal with no fixed term, or paid down ahead of the plan. Overdue = what months before still owed
+        as the month began; what came in since does not take it down. Settled so far = all repaid this month, a contra with it. Still to settle = this
+        month&rsquo;s and overdue not yet settled. Each side: This month + Principal repaid early + Overdue = Settled + Still to settle. Net = cash
+        received − cash paid this month (a contra is no cash). Interest + penalty = interest and penalty received − paid this month.
       </p>
     </section>
   )

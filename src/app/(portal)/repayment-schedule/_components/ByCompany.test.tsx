@@ -6,7 +6,7 @@ import type { CoDeal, Company } from '@/lib/schedule-by-company'
 // 2026-11-13 — the user: "我不能自己拖着排？" — a heading dragged onto another moves there, and the order is kept.
 
 const deal = (over: Partial<CoDeal> & Pick<CoDeal, 'id' | 'side'>): CoDeal => ({
-  tag: 'LO#1', words: 'RM 1', href: `/x/${over.id}`, now: 0, bf: 0, earlier: 0, settled: 0, got: 0, gotInterest: 0, open: 0, next: null, last: null, owe: 0, pending: false,
+  tag: 'LO#1', words: 'RM 1', href: `/x/${over.id}`, now: 0, early: 0, bf: 0, earlier: 0, settled: 0, got: 0, gotInterest: 0, open: 0, next: null, last: null, owe: 0, pending: false,
   ...over,
 })
 const companies: Company[] = [
@@ -23,7 +23,7 @@ const companies: Company[] = [
 ]
 const heads = () => Array.from(document.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim()).filter(Boolean)
 const groups = () => Array.from(document.querySelectorAll('thead th[data-group]')).map((th) => [th.textContent, Number(th.getAttribute('colspan'))])
-const ALL = ['Company', 'Collect', 'Pay', 'Collect', 'Pay', 'Received', 'Paid', 'Collect', 'Pay', 'Net', 'Interest + penalty']
+const ALL = ['Company', 'Collect', 'Pay', 'Collect', 'Pay', 'Collect', 'Pay', 'Received', 'Paid', 'Collect', 'Pay', 'Net', 'Interest + penalty']
 
 beforeEach(() => window.localStorage.clear())
 
@@ -50,11 +50,12 @@ describe('By company’s headings', () => {
 
   // 2026-11-19 — the user: "有点乱，分不清什么是什么" → A + B; 2026-11-20 — one reading, in the order they add up.
   it('stand in named groups, collect tinted apart from pay', () => {
-    window.localStorage.setItem('repayment.by-company.order.v2', JSON.stringify(['net', 'earlierCollect', 'collect']))
+    window.localStorage.setItem('repayment.by-company.order.v3', JSON.stringify(['net', 'earlierCollect', 'collect']))
     render(<ByCompany companies={companies} month="2026-11" monthLong="November 2026" />)
     // An order kept before is not read: this one shows.
     expect(groups()).toEqual([
       ['This month', 2],
+      ['Principal repaid early', 2],
       ['Overdue at 1 Nov', 2],
       ['Settled so far', 2],
       ['Still to settle', 2],
@@ -62,9 +63,9 @@ describe('By company’s headings', () => {
     ])
     const row = screen.getByText('CAR').closest('tr') as HTMLElement
     const td = row.querySelectorAll('td')
-    expect([1, 2, 3, 4, 9].map((i) => td[i].getAttribute('data-dir'))).toEqual(['in', 'out', 'in', 'out', null])
+    expect([1, 2, 3, 4, 11].map((i) => td[i].getAttribute('data-dir'))).toEqual(['in', 'out', 'in', 'out', null])
     // A rule at each group's first column.
-    expect([1, 3, 5, 7, 9].map((i) => td[i].getAttribute('data-start'))).toEqual(['true', 'true', 'true', 'true', 'true'])
+    expect([1, 3, 5, 7, 9, 11].map((i) => td[i].getAttribute('data-start'))).toEqual(['true', 'true', 'true', 'true', 'true', 'true'])
     expect(td[2].hasAttribute('data-start')).toBe(false)
   })
 })
@@ -81,26 +82,27 @@ describe('By company adds up', () => {
       deals: [
         // 1,100 this month + 1,000 overdue at the 1st; 400 came in → 1,700 still to collect.
         deal({ id: 'l1', side: 'collect', now: 1100, bf: 1000, earlier: 600, settled: 400, got: 400, gotInterest: 100, open: 1700, owe: 5000 }),
-        // 800 this month, nothing overdue; 800 paid by contra → nothing still to pay, and no cash.
-        deal({ id: 'f1', side: 'pay', tag: 'BI#1', now: 800, settled: 800, open: 0, owe: 1000 }),
+        // 800 this month, nothing overdue; 800 paid by contra and 5,000 of principal ahead → nothing still to pay, no cash.
+        deal({ id: 'f1', side: 'pay', tag: 'BI#1', now: 800, early: 5000, settled: 5800, open: 0, owe: 1000 }),
       ],
     },
   ]
-  it('shows each side’s four figures and the cash net', () => {
+  it('shows each side’s five figures and the cash net', () => {
     render(<ByCompany companies={hk} month="2026-11" monthLong="November 2026" />)
     const td = (screen.getByText('HK').closest('tr') as HTMLElement).querySelectorAll('td')
-    expect(Array.from(td).slice(1, 9).map((c) => c.textContent)).toEqual(['1,100.00', '800.00', '1,000.00', '—', '400.00', '800.00', '1,700.00', '—'])
+    expect(Array.from(td).slice(1, 11).map((c) => c.textContent)).toEqual(['1,100.00', '800.00', '—', '5,000.00', '1,000.00', '—', '400.00', '5,800.00', '1,700.00', '—'])
     // Net is the cash only: 400 in, the contra none.
-    expect(td[9]).toHaveTextContent('+400.00')
-    expect(td[10]).toHaveTextContent('+100.00')
+    expect(td[11]).toHaveTextContent('+400.00')
+    expect(td[12]).toHaveTextContent('+100.00')
   })
 
-  it('says the four on the cards', () => {
+  it('says the five on the cards', () => {
     render(<ByCompanyCards companies={hk} month="2026-11" />)
     const card = (name: string) => screen.getByRole('group', { name })
     expect(card('This month · Nov')).toHaveTextContent('1,100.00 / 800.00')
     expect(card('Overdue at 1 Nov')).toHaveTextContent('1,000.00 / 0.00')
-    expect(card('Settled so far · Nov')).toHaveTextContent('400.00 / 800.00')
+    expect(card('Principal repaid early · Nov')).toHaveTextContent('0.00 / 5,000.00')
+    expect(card('Settled so far · Nov')).toHaveTextContent('400.00 / 5,800.00')
     expect(card('Still to settle · Nov')).toHaveTextContent('1,700.00 / 0.00')
   })
 
