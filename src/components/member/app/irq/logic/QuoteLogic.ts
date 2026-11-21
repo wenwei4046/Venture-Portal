@@ -332,6 +332,9 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           isSelect: sel, isMoney: money, isSqft: sqft, sqftD: area ? "block" : "none", sqftMode: area ? "decimal" : "text", sqftPad: area ? "52px" : "12px", isPlain: !sel && !money && !sqft, selInk: value ? "#1F1F1C" : "#97978F", selLabel: value || "Select",
           open: sel && st.selOpen === f.id, selBorder: sel && st.selOpen === f.id ? "#111111" : "rgba(20,20,18,.12)", selRing: sel && st.selOpen === f.id ? "0 0 0 3px rgba(17,17,17,.12)" : "none",
           toggle: () => this.setState(s => ({ selOpen: s.selOpen === f.id ? null : f.id })), close: () => this.setState({ selOpen: null }),
+          // A phone picks through its own picker (2026-11-21): the native select over the button (dc-to-tsx.mjs).
+          nativeD: sel && this.touch() ? "block" : "none",
+          onNative: e => { const o = PROPERTY_TYPES.includes(e.target.value) ? e.target.value : ""; this.setState(s => ({ selOpen: null, crm: { ...(s.crm || {}), [f.id]: o }, cust: { ...s.cust, ptype: o } })); },
           opts: sel ? PROPERTY_TYPES.map(o => ({ label: o, on: o === value, bg: o === value ? "#FFF5EC" : "transparent", fw: o === value ? 650 : 500, pick: () => this.setState(s => ({ selOpen: null, crm: { ...(s.crm || {}), [f.id]: o }, cust: { ...s.cust, ptype: o } })) })) : [] }; }),
       // v10: Billing address is asked only while the Principal ticks it to print (2026-11-09; `billOn`).
       ...(ci.own || []).filter(f => f.id !== "bill" || (lib && lib.billOn(this.cfg))).map(f => { const core = ["unit", "bill", "building", "date", "by"].includes(f.id), key = "ci_" + f.id;

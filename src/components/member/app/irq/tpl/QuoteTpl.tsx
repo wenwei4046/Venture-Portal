@@ -922,6 +922,18 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                   <path d={"m6 9 6 6 6-6"} />
                                 </svg>
                               </button>
+                              <select aria-label={L_f_c?.["label"]} value={dcValue(L_f_c?.["value"])} onChange={L_f_c?.["onNative"]} style={dcCss(`display:${dcS(L_f_c?.["nativeD"])};position:absolute;left:0;top:0;width:100%;height:42px;margin:0;opacity:0;font-size:16px;cursor:pointer`)}>
+                                <option value={""}>
+                                  {"Select"}
+                                </option>
+                                {dcList(L_f_c?.["opts"]).map((L_no_d, L_no_d_i) => (
+                                  <Fragment key={L_no_d_i}>
+                                    <option value={dcValue(L_no_d?.["label"])}>
+                                      {dcText(L_no_d?.["label"])}
+                                    </option>
+                                  </Fragment>
+                                ))}
+                              </select>
                               {"\n                      "}
                               {(L_f_c?.["open"]) ? (<>
                                 {"\n                        "}
@@ -929,12 +941,12 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                 {"\n                        "}
                                 <span role={"listbox"} style={{"position":"absolute","left":"0","right":"0","top":"46px","zIndex":"41","display":"flex","flexDirection":"column","padding":"4px","borderRadius":"10px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)","boxShadow":"0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.1)"}}>
                                   {"\n                          "}
-                                  {dcList(L_f_c?.["opts"]).map((L_o_d, L_o_d_i) => (
-                                    <Fragment key={L_o_d_i}>
+                                  {dcList(L_f_c?.["opts"]).map((L_o_e, L_o_e_i) => (
+                                    <Fragment key={L_o_e_i}>
                                       {"\n                            "}
-                                      <button type={"button"} role={"option"} onClick={L_o_d?.["pick"]} style={dcCss(`display:flex;align-items:center;justify-content:space-between;height:38px;padding:0 10px;border:0;border-radius:8px;background:${dcS(L_o_d?.["bg"])};color:var(--irq-c-1f1f1c);font-size:14.5px;font-weight:${dcS(L_o_d?.["fw"])};font-family:inherit;text-align:left;cursor:pointer`)} className={"irq-p1"}>
-                                        {dcText(L_o_d?.["label"])}
-                                        {(L_o_d?.["on"]) ? (<>
+                                      <button type={"button"} role={"option"} onClick={L_o_e?.["pick"]} style={dcCss(`display:flex;align-items:center;justify-content:space-between;height:38px;padding:0 10px;border:0;border-radius:8px;background:${dcS(L_o_e?.["bg"])};color:var(--irq-c-1f1f1c);font-size:14.5px;font-weight:${dcS(L_o_e?.["fw"])};font-family:inherit;text-align:left;cursor:pointer`)} className={"irq-p1"}>
+                                        {dcText(L_o_e?.["label"])}
+                                        {(L_o_e?.["on"]) ? (<>
                                           <svg width={"15"} height={"15"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2.6"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{"stroke":"var(--irq-c-d96e0b)"}}>
                                             <path d={"m5 12 5 5 9-10"} />
                                           </svg>
@@ -974,47 +986,47 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {"\n                "}
                     <div style={{"display":"grid","gridTemplateColumns":"repeat(auto-fit,minmax(min(100%,220px),1fr))","gap":"10px"}}>
                       {"\n                  "}
-                      {dcList(v["extraFields"]).map((L_xf_e, L_xf_e_i) => (
-                        <Fragment key={L_xf_e_i}>
-                          <div style={dcCss(`display:flex;flex-direction:column;gap:5px;min-width:0;grid-column:${dcS(L_xf_e?.["span"])}`)}>
+                      {dcList(v["extraFields"]).map((L_xf_f, L_xf_f_i) => (
+                        <Fragment key={L_xf_f_i}>
+                          <div style={dcCss(`display:flex;flex-direction:column;gap:5px;min-width:0;grid-column:${dcS(L_xf_f?.["span"])}`)}>
                             {"\n  "}
                             <span style={{"fontSize":"12.5px","fontWeight":"700","color":"var(--irq-c-34342f)"}}>
-                              {dcText(L_xf_e?.["label"])}
-                              {(L_xf_e?.["required"]) ? (<>
+                              {dcText(L_xf_f?.["label"])}
+                              {(L_xf_f?.["required"]) ? (<>
                                 <span style={{"color":"var(--irq-c-111111)"}}>
                                   {" *"}
                                 </span>
                               </>) : null}
                             </span>
                             {"\n  "}
-                            {(L_xf_e?.["isInput"]) ? (<>
+                            {(L_xf_f?.["isInput"]) ? (<>
                               {"\n    "}
-                              <input type={L_xf_e?.["inputType"]} value={dcValue(L_xf_e?.["value"])} onChange={L_xf_e?.["onChange"]} placeholder={L_xf_e?.["ph"]} style={{"height":"42px","padding":"0 12px","borderRadius":"10px","border":"1px solid rgba(20,20,18,.12)","background":"var(--irq-c-ffffff)","fontSize":"15px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} className={"irq-p4"} />
+                              <input type={L_xf_f?.["inputType"]} value={dcValue(L_xf_f?.["value"])} onChange={L_xf_f?.["onChange"]} placeholder={L_xf_f?.["ph"]} style={{"height":"42px","padding":"0 12px","borderRadius":"10px","border":"1px solid rgba(20,20,18,.12)","background":"var(--irq-c-ffffff)","fontSize":"15px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} className={"irq-p4"} />
                               {"\n  "}
                             </>) : null}
                             {"\n  "}
-                            {(L_xf_e?.["isLong"]) ? (<>
+                            {(L_xf_f?.["isLong"]) ? (<>
                               {"\n    "}
-                              <textarea value={dcValue(L_xf_e?.["value"])} onChange={L_xf_e?.["onChange"]} rows={"3"} style={{"width":"100%","boxSizing":"border-box","padding":"10px 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"15px","lineHeight":"1.5","color":"var(--irq-c-1f1f1c)","resize":"vertical","outline":"none","fontFamily":"inherit"}} />
+                              <textarea value={dcValue(L_xf_f?.["value"])} onChange={L_xf_f?.["onChange"]} rows={"3"} style={{"width":"100%","boxSizing":"border-box","padding":"10px 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"15px","lineHeight":"1.5","color":"var(--irq-c-1f1f1c)","resize":"vertical","outline":"none","fontFamily":"inherit"}} />
                               {"\n  "}
                             </>) : null}
                             {"\n  "}
-                            {(L_xf_e?.["isImage"]) ? (<>
+                            {(L_xf_f?.["isImage"]) ? (<>
                               {"\n    "}
                               <div style={{"display":"flex","alignItems":"center","gap":"10px","flexWrap":"wrap"}}>
                                 {"\n      "}
-                                <div role={"img"} aria-label={L_xf_e?.["label"]} style={dcCss(`flex:0 0 72px;width:72px;height:72px;border-radius:10px;border:1px dashed var(--irq-c-deded8);background:var(--irq-c-ffffff) url('${dcS(L_xf_e?.["img"])}') center/contain no-repeat;display:grid;place-items:center;font-size:11px;color:var(--irq-c-97978f)`)}>
-                                  {dcText(L_xf_e?.["imgEmpty"])}
+                                <div role={"img"} aria-label={L_xf_f?.["label"]} style={dcCss(`flex:0 0 72px;width:72px;height:72px;border-radius:10px;border:1px dashed var(--irq-c-deded8);background:var(--irq-c-ffffff) url('${dcS(L_xf_f?.["img"])}') center/contain no-repeat;display:grid;place-items:center;font-size:11px;color:var(--irq-c-97978f)`)}>
+                                  {dcText(L_xf_f?.["imgEmpty"])}
                                 </div>
                                 {"\n      "}
-                                {(L_xf_e?.["canUpload"]) ? (<>
+                                {(L_xf_f?.["canUpload"]) ? (<>
                                   <label style={{"display":"flex","alignItems":"center","height":"36px","padding":"0 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","cursor":"pointer"}}>
                                     {"Upload image"}
-                                    <input type={"file"} accept={"image/*"} onChange={L_xf_e?.["onUpload"]} style={{"display":"none"}} />
+                                    <input type={"file"} accept={"image/*"} onChange={L_xf_f?.["onUpload"]} style={{"display":"none"}} />
                                   </label>
                                   {"\n      "}
-                                  {(L_xf_e?.["hasImg"]) ? (<>
-                                    <button onClick={L_xf_e?.["clear"]} style={{"height":"36px","padding":"0 10px","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"13px","fontWeight":"650"}}>
+                                  {(L_xf_f?.["hasImg"]) ? (<>
+                                    <button onClick={L_xf_f?.["clear"]} style={{"height":"36px","padding":"0 10px","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"13px","fontWeight":"650"}}>
                                       {"Remove"}
                                     </button>
                                   </>) : null}
@@ -1024,18 +1036,18 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                               {"\n  "}
                             </>) : null}
                             {"\n  "}
-                            {(L_xf_e?.["isTable"]) ? (<>
+                            {(L_xf_f?.["isTable"]) ? (<>
                               {"\n    "}
                               <div style={{"overflowX":"auto","border":"1px solid var(--irq-c-deded8)","borderRadius":"10px","background":"var(--irq-c-ffffff)"}}>
                                 {"\n      "}
-                                <div style={dcCss(`min-width:${dcS(L_xf_e?.["minW"])}`)}>
+                                <div style={dcCss(`min-width:${dcS(L_xf_f?.["minW"])}`)}>
                                   {"\n        "}
-                                  <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_xf_e?.["grid"])};background:var(--irq-c-f0f0ed);border-bottom:1px solid var(--irq-c-e7e7e2);font-size:11.5px;font-weight:700;letter-spacing:.05em;color:var(--irq-c-6b6b66)`)}>
+                                  <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_xf_f?.["grid"])};background:var(--irq-c-f0f0ed);border-bottom:1px solid var(--irq-c-e7e7e2);font-size:11.5px;font-weight:700;letter-spacing:.05em;color:var(--irq-c-6b6b66)`)}>
                                     {"\n          "}
-                                    {dcList(L_xf_e?.["cols"]).map((L_xvh_f, L_xvh_f_i) => (
-                                      <Fragment key={L_xvh_f_i}>
-                                        <span style={dcCss(`padding:8px 10px;text-align:${dcS(L_xvh_f?.["align"])}`)}>
-                                          {dcText(L_xvh_f?.["label"])}
+                                    {dcList(L_xf_f?.["cols"]).map((L_xvh_g, L_xvh_g_i) => (
+                                      <Fragment key={L_xvh_g_i}>
+                                        <span style={dcCss(`padding:8px 10px;text-align:${dcS(L_xvh_g?.["align"])}`)}>
+                                          {dcText(L_xvh_g?.["label"])}
                                         </span>
                                       </Fragment>
                                     ))}
@@ -1043,25 +1055,25 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                     {"\n        "}
                                   </div>
                                   {"\n        "}
-                                  {dcList(L_xf_e?.["rows"]).map((L_xvr_g, L_xvr_g_i) => (
-                                    <Fragment key={L_xvr_g_i}>
+                                  {dcList(L_xf_f?.["rows"]).map((L_xvr_h, L_xvr_h_i) => (
+                                    <Fragment key={L_xvr_h_i}>
                                       {"\n          "}
-                                      <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_xf_e?.["grid"])};align-items:center;border-bottom:1px solid rgba(20,20,18,.06)`)}>
+                                      <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_xf_f?.["grid"])};align-items:center;border-bottom:1px solid rgba(20,20,18,.06)`)}>
                                         {"\n            "}
-                                        {dcList(L_xvr_g?.["cells"]).map((L_xvc_h, L_xvc_h_i) => (
-                                          <Fragment key={L_xvc_h_i}>
+                                        {dcList(L_xvr_h?.["cells"]).map((L_xvc_i, L_xvc_i_i) => (
+                                          <Fragment key={L_xvc_i_i}>
                                             {"\n              "}
                                             <span style={{"padding":"3px 4px","minWidth":"0"}}>
                                               {"\n                "}
-                                              {(L_xvc_h?.["isInput"]) ? (<>
-                                                <input type={L_xvc_h?.["type"]} value={dcValue(L_xvc_h?.["value"])} onChange={L_xvc_h?.["onChange"]} placeholder={L_xvc_h?.["ph"]} style={dcCss(`width:100%;box-sizing:border-box;height:34px;padding:0 8px;border:0;border-radius:6px;outline:none;background:transparent;font-size:13.5px;color:var(--irq-c-1f1f1c);text-align:${dcS(L_xvc_h?.["align"])}`)} className={"irq-p5"} />
+                                              {(L_xvc_i?.["isInput"]) ? (<>
+                                                <input type={L_xvc_i?.["type"]} value={dcValue(L_xvc_i?.["value"])} onChange={L_xvc_i?.["onChange"]} placeholder={L_xvc_i?.["ph"]} style={dcCss(`width:100%;box-sizing:border-box;height:34px;padding:0 8px;border:0;border-radius:6px;outline:none;background:transparent;font-size:13.5px;color:var(--irq-c-1f1f1c);text-align:${dcS(L_xvc_i?.["align"])}`)} className={"irq-p5"} />
                                               </>) : null}
                                               {"\n                "}
-                                              {(L_xvc_h?.["isImg"]) ? (<>
-                                                <label title={L_xvc_h?.["tip"]} style={dcCss(`display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed var(--irq-c-deded8);background:var(--irq-c-ffffff) url('${dcS(L_xvc_h?.["img"])}') center/cover no-repeat;color:var(--irq-c-111111);font-size:16px;cursor:${dcS(L_xvc_h?.["cursor"])}`)}>
-                                                  {dcText(L_xvc_h?.["imgEmpty"])}
-                                                  {(L_xvc_h?.["canUpload"]) ? (<>
-                                                    <input type={"file"} accept={"image/*"} onChange={L_xvc_h?.["onUpload"]} style={{"display":"none"}} />
+                                              {(L_xvc_i?.["isImg"]) ? (<>
+                                                <label title={L_xvc_i?.["tip"]} style={dcCss(`display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed var(--irq-c-deded8);background:var(--irq-c-ffffff) url('${dcS(L_xvc_i?.["img"])}') center/cover no-repeat;color:var(--irq-c-111111);font-size:16px;cursor:${dcS(L_xvc_i?.["cursor"])}`)}>
+                                                  {dcText(L_xvc_i?.["imgEmpty"])}
+                                                  {(L_xvc_i?.["canUpload"]) ? (<>
+                                                    <input type={"file"} accept={"image/*"} onChange={L_xvc_i?.["onUpload"]} style={{"display":"none"}} />
                                                   </>) : null}
                                                 </label>
                                               </>) : null}
@@ -1071,7 +1083,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                           </Fragment>
                                         ))}
                                         {"\n            "}
-                                        <button aria-label={"Remove row"} onClick={L_xvr_g?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
+                                        <button aria-label={"Remove row"} onClick={L_xvr_h?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
                                           {"×"}
                                         </button>
                                         {"\n          "}
@@ -1084,7 +1096,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                 {"\n    "}
                               </div>
                               {"\n    "}
-                              <button onClick={L_xf_e?.["addRow"]} style={{"alignSelf":"flex-start","height":"30px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"13px","fontWeight":"650"}}>
+                              <button onClick={L_xf_f?.["addRow"]} style={{"alignSelf":"flex-start","height":"30px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"13px","fontWeight":"650"}}>
                                 {"+ Add row"}
                               </button>
                               {"\n  "}
@@ -1121,11 +1133,11 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {"\n                "}
                     <div style={{"display":"flex","gap":"8px","overflowX":"auto","scrollbarWidth":"none","margin":"0 -20px","padding":"0 20px"}}>
                       {"\n                  "}
-                      {dcList(v["styleCards"]).map((L_sc_i, L_sc_i_i) => (
-                        <Fragment key={L_sc_i_i}>
+                      {dcList(v["styleCards"]).map((L_sc_j, L_sc_j_i) => (
+                        <Fragment key={L_sc_j_i}>
                           {"\n                    "}
-                          <button onClick={L_sc_i?.["pick"]} style={dcCss(`flex:0 0 auto;height:40px;padding:0 18px;border-radius:20px;border:1px solid ${dcS(L_sc_i?.["chipBorder"])};background:${dcS(L_sc_i?.["chipBg"])};color:${dcS(L_sc_i?.["chipInk"])};font-size:14px;font-weight:650;white-space:nowrap`)}>
-                            {dcText(L_sc_i?.["name"])}
+                          <button onClick={L_sc_j?.["pick"]} style={dcCss(`flex:0 0 auto;height:40px;padding:0 18px;border-radius:20px;border:1px solid ${dcS(L_sc_j?.["chipBorder"])};background:${dcS(L_sc_j?.["chipBg"])};color:${dcS(L_sc_j?.["chipInk"])};font-size:14px;font-weight:650;white-space:nowrap`)}>
+                            {dcText(L_sc_j?.["name"])}
                           </button>
                           {"\n                  "}
                         </Fragment>
@@ -1137,20 +1149,20 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                   {"\n              "}
                   <div style={dcCss(`display:${dcS(v["stGridD"])};grid-template-columns:${dcS(v["stWrap"]?.["tc"])};grid-auto-flow:${dcS(v["stWrap"]?.["flow"])};grid-auto-columns:${dcS(v["stWrap"]?.["col"])};overflow-x:${dcS(v["stWrap"]?.["ox"])};scrollbar-width:none;scroll-snap-type:x mandatory;margin:0 ${dcS(v["stWrap"]?.["m"])};padding:0 ${dcS(v["stWrap"]?.["p"])};gap:10px`)}>
                     {"\n                "}
-                    {dcList(v["styleCards"]).map((L_sc_j, L_sc_j_i) => (
-                      <Fragment key={L_sc_j_i}>
+                    {dcList(v["styleCards"]).map((L_sc_k, L_sc_k_i) => (
+                      <Fragment key={L_sc_k_i}>
                         {"\n                  "}
-                        <button onClick={L_sc_j?.["pick"]} style={dcCss(`display:flex;flex-direction:column;padding:6px;border-radius:12px;border:1px solid ${dcS(L_sc_j?.["border"])};box-shadow:${dcS(L_sc_j?.["ring"])};background:var(--irq-c-ffffff);text-align:left;color:var(--irq-c-1f1f1c)`)}>
+                        <button onClick={L_sc_k?.["pick"]} style={dcCss(`display:flex;flex-direction:column;padding:6px;border-radius:12px;border:1px solid ${dcS(L_sc_k?.["border"])};box-shadow:${dcS(L_sc_k?.["ring"])};background:var(--irq-c-ffffff);text-align:left;color:var(--irq-c-1f1f1c)`)}>
                           {"\n                    "}
-                          <span style={dcCss(`position:relative;display:block;aspect-ratio:4/3;border-radius:11px;background:var(--irq-c-eeeeea) url('${dcS(L_sc_j?.["cover"])}') center/cover no-repeat`)}>
+                          <span style={dcCss(`position:relative;display:block;aspect-ratio:4/3;border-radius:11px;background:var(--irq-c-eeeeea) url('${dcS(L_sc_k?.["cover"])}') center/cover no-repeat`)}>
                             {"\n                      "}
-                            {(L_sc_j?.["noCover"]) ? (<>
+                            {(L_sc_k?.["noCover"]) ? (<>
                               <span style={{"position":"absolute","inset":"0","display":"grid","placeItems":"center","fontFamily":"var(--font-space-grotesk),var(--font-manrope),sans-serif","fontSize":"26px","fontWeight":"700","letterSpacing":"-.02em","color":"var(--irq-c-d2d2cb)"}}>
-                                {dcText(L_sc_j?.["name"])}
+                                {dcText(L_sc_k?.["name"])}
                               </span>
                             </>) : null}
                             {"\n                      "}
-                            {(L_sc_j?.["on"]) ? (<>
+                            {(L_sc_k?.["on"]) ? (<>
                               <span style={{"position":"absolute","top":"8px","right":"8px","display":"grid","placeItems":"center","width":"28px","height":"28px","borderRadius":"50%","background":"var(--irq-c-f5871f)","color":"var(--irq-c-1f1f1c)"}}>
                                 <svg width={"14"} height={"14"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.8"} strokeLinecap={"round"} strokeLinejoin={"round"}>
                                   <path d={"m5 12 5 5 9-10"} />
@@ -1164,15 +1176,15 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                             {"\n                      "}
                             <span style={{"display":"flex","alignItems":"baseline","justifyContent":"space-between","gap":"8px"}}>
                               <span style={{"fontSize":"15px","fontWeight":"650"}}>
-                                {dcText(L_sc_j?.["name"])}
+                                {dcText(L_sc_k?.["name"])}
                               </span>
                               <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
-                                {dcText(L_sc_j?.["count"])}
+                                {dcText(L_sc_k?.["count"])}
                               </span>
                             </span>
                             {"\n                      "}
                             <span style={dcCss(`display:${dcS(v["stWrap"]?.["desc"])};font-size:12.5px;line-height:1.4;color:var(--irq-c-6b6b66);text-wrap:pretty`)}>
-                              {dcText(L_sc_j?.["desc"])}
+                              {dcText(L_sc_k?.["desc"])}
                             </span>
                             {"\n                    "}
                           </span>
@@ -1231,11 +1243,11 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                           {"\n                      "}
                           <div style={{"display":"flex","gap":"6px","overflowX":"auto","padding":"12px 12px 0","scrollbarWidth":"none"}}>
                             {"\n                        "}
-                            {dcList(v["sv"]?.["secs"]).map((L_se_k, L_se_k_i) => (
-                              <Fragment key={L_se_k_i}>
+                            {dcList(v["sv"]?.["secs"]).map((L_se_l, L_se_l_i) => (
+                              <Fragment key={L_se_l_i}>
                                 {"\n                          "}
-                                <button onClick={L_se_k?.["pick"]} style={dcCss(`flex:0 0 auto;height:32px;padding:0 14px;border-radius:8px;border:1px solid ${dcS(L_se_k?.["border"])};background:${dcS(L_se_k?.["bg"])};color:${dcS(L_se_k?.["ink"])};font-size:13px;font-weight:650;white-space:nowrap`)}>
-                                  {dcText(L_se_k?.["label"])}
+                                <button onClick={L_se_l?.["pick"]} style={dcCss(`flex:0 0 auto;height:32px;padding:0 14px;border-radius:8px;border:1px solid ${dcS(L_se_l?.["border"])};background:${dcS(L_se_l?.["bg"])};color:${dcS(L_se_l?.["ink"])};font-size:13px;font-weight:650;white-space:nowrap`)}>
+                                  {dcText(L_se_l?.["label"])}
                                 </button>
                                 {"\n                        "}
                               </Fragment>
@@ -1249,10 +1261,10 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                           {"\n                      "}
                           <div style={dcCss(`display:${dcS(v["svCard"]?.["thumbs"])};gap:6px;overflow-x:auto;padding:10px 12px;border-bottom:1px solid rgba(20,20,18,.06);scrollbar-width:none`)}>
                             {"\n                        "}
-                            {dcList(v["sv"]?.["thumbs"]).map((L_th_l, L_th_l_i) => (
-                              <Fragment key={L_th_l_i}>
+                            {dcList(v["sv"]?.["thumbs"]).map((L_th_m, L_th_m_i) => (
+                              <Fragment key={L_th_m_i}>
                                 {"\n                          "}
-                                <button onClick={L_th_l?.["pick"]} aria-label={"Show image"} style={dcCss(`flex:0 0 72px;width:72px;height:50px;border-radius:8px;border:0;padding:0;background:var(--irq-c-eeeeea) url('${dcS(L_th_l?.["src"])}') center/cover no-repeat;box-shadow:${dcS(L_th_l?.["ring"])};opacity:${dcS(L_th_l?.["op"])}`)} />
+                                <button onClick={L_th_m?.["pick"]} aria-label={"Show image"} style={dcCss(`flex:0 0 72px;width:72px;height:50px;border-radius:8px;border:0;padding:0;background:var(--irq-c-eeeeea) url('${dcS(L_th_m?.["src"])}') center/cover no-repeat;box-shadow:${dcS(L_th_m?.["ring"])};opacity:${dcS(L_th_m?.["op"])}`)} />
                                 {"\n                        "}
                               </Fragment>
                             ))}
@@ -1315,11 +1327,11 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                             {"\n                        "}
                             <div data-irq-tabs={v["styleTabs"]?.["length"]} style={dcCss(`flex:${dcS(v["svCard"]?.["segFlex"])};display:flex;gap:2px;padding:3px;border-radius:11px;background:var(--irq-c-eeeeea)`)}>
                               {"\n                          "}
-                              {dcList(v["styleTabs"]).map((L_tb_m, L_tb_m_i) => (
-                                <Fragment key={L_tb_m_i}>
+                              {dcList(v["styleTabs"]).map((L_tb_n, L_tb_n_i) => (
+                                <Fragment key={L_tb_n_i}>
                                   {"\n                            "}
-                                  <button onClick={L_tb_m?.["pick"]} style={dcCss(`flex:1;height:34px;padding:0 12px;border-radius:8px;border:0;background:${dcS(L_tb_m?.["bg"])};color:${dcS(L_tb_m?.["ink"])};font-size:12.5px;font-weight:650;box-shadow:${dcS(L_tb_m?.["shadow"])};white-space:nowrap`)}>
-                                    {dcText(L_tb_m?.["label"])}{" · "}{dcText(L_tb_m?.["price"])}
+                                  <button onClick={L_tb_n?.["pick"]} style={dcCss(`flex:1;height:34px;padding:0 12px;border-radius:8px;border:0;background:${dcS(L_tb_n?.["bg"])};color:${dcS(L_tb_n?.["ink"])};font-size:12.5px;font-weight:650;box-shadow:${dcS(L_tb_n?.["shadow"])};white-space:nowrap`)}>
+                                    {dcText(L_tb_n?.["label"])}{" · "}{dcText(L_tb_n?.["price"])}
                                   </button>
                                   {"\n                          "}
                                 </Fragment>
@@ -1368,21 +1380,21 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                               {"\n                        "}
                               <div style={{"display":"flex","flexDirection":"column","padding":"2px 14px 6px","borderTop":"1px solid var(--irq-c-eeeeea)"}}>
                                 {"\n                          "}
-                                {dcList(v["sv"]?.["furn"]).map((L_fu_n, L_fu_n_i) => (
-                                  <Fragment key={L_fu_n_i}>
+                                {dcList(v["sv"]?.["furn"]).map((L_fu_o, L_fu_o_i) => (
+                                  <Fragment key={L_fu_o_i}>
                                     {"\n                            "}
-                                    <div onClick={L_fu_n?.["view"]} style={dcCss(`display:flex;align-items:center;gap:10px;min-height:30px;font-size:13px;border-bottom:1px solid var(--irq-c-f2f2ef);cursor:${dcS(L_fu_n?.["cur"])}`)}>
+                                    <div onClick={L_fu_o?.["view"]} style={dcCss(`display:flex;align-items:center;gap:10px;min-height:30px;font-size:13px;border-bottom:1px solid var(--irq-c-f2f2ef);cursor:${dcS(L_fu_o?.["cur"])}`)}>
                                       {"\n                              "}
                                       <span style={{"flex":"1","minWidth":"0","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                                        {dcText(L_fu_n?.["name"])}
+                                        {dcText(L_fu_o?.["name"])}
                                       </span>
                                       {"\n                              "}
                                       <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
-                                        {dcText(L_fu_n?.["qty"])}
+                                        {dcText(L_fu_o?.["qty"])}
                                       </span>
                                       {"\n                              "}
                                       <span style={{"minWidth":"76px","textAlign":"right","fontWeight":"600","fontVariantNumeric":"tabular-nums"}}>
-                                        {dcText(L_fu_n?.["price"])}
+                                        {dcText(L_fu_o?.["price"])}
                                       </span>
                                       {"\n                            "}
                                     </div>
@@ -1424,30 +1436,30 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                 {"\n                            "}
                                 <div style={{"display":"flex","flexDirection":"column","gap":"10px","padding":"4px 14px 12px","borderTop":"1px solid var(--irq-c-eeeeea)"}}>
                                   {"\n                              "}
-                                  {dcList(v["sv"]?.["serv"]?.["cats"]).map((L_sc_o, L_sc_o_i) => (
-                                    <Fragment key={L_sc_o_i}>
+                                  {dcList(v["sv"]?.["serv"]?.["cats"]).map((L_sc_p, L_sc_p_i) => (
+                                    <Fragment key={L_sc_p_i}>
                                       {"\n                                "}
                                       <div style={{"display":"flex","flexDirection":"column"}}>
                                         {"\n                                  "}
                                         <span style={{"fontSize":"11px","fontWeight":"700","letterSpacing":".1em","color":"var(--irq-c-97978f)","padding":"8px 0 2px"}}>
-                                          {dcText(L_sc_o?.["name"])}
+                                          {dcText(L_sc_p?.["name"])}
                                         </span>
                                         {"\n                                  "}
-                                        {dcList(L_sc_o?.["rows"]).map((L_r_p, L_r_p_i) => (
-                                          <Fragment key={L_r_p_i}>
+                                        {dcList(L_sc_p?.["rows"]).map((L_r_q, L_r_q_i) => (
+                                          <Fragment key={L_r_q_i}>
                                             {"\n                                    "}
                                             <div style={{"display":"flex","alignItems":"center","gap":"10px","minHeight":"28px","fontSize":"12.5px"}}>
                                               {"\n                                      "}
                                               <span style={{"flex":"1","minWidth":"0","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                                                {dcText(L_r_p?.["name"])}
+                                                {dcText(L_r_q?.["name"])}
                                               </span>
                                               {"\n                                      "}
                                               <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
-                                                {dcText(L_r_p?.["qty"])}
+                                                {dcText(L_r_q?.["qty"])}
                                               </span>
                                               {"\n                                      "}
                                               <span style={{"minWidth":"76px","textAlign":"right","fontWeight":"600","fontVariantNumeric":"tabular-nums"}}>
-                                                {dcText(L_r_p?.["price"])}
+                                                {dcText(L_r_q?.["price"])}
                                               </span>
                                               {"\n                                    "}
                                             </div>
@@ -1518,15 +1530,15 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                   {"\n              "}
                   <div style={{"position":"sticky","top":"0","zIndex":"5","display":"flex","gap":"2px","padding":"2px","borderRadius":"10px","background":"var(--irq-c-eeeeea)","margin":"0 0 2px","boxShadow":"0 0 0 6px var(--irq-c-f7f7f5)"}}>
                     {"\n                "}
-                    {dcList(v["czTabs"]).map((L_zt_q, L_zt_q_i) => (
-                      <Fragment key={L_zt_q_i}>
+                    {dcList(v["czTabs"]).map((L_zt_r, L_zt_r_i) => (
+                      <Fragment key={L_zt_r_i}>
                         {"\n                  "}
-                        <button onClick={L_zt_q?.["pick"]} style={dcCss(`flex:1 1 0;min-width:0;display:flex;flex-direction:${dcS(L_zt_q?.["dir"])};align-items:center;justify-content:center;gap:${dcS(L_zt_q?.["gap"])};height:${dcS(L_zt_q?.["h"])};padding:0 6px;border-radius:8px;border:0;background:${dcS(L_zt_q?.["bg"])};color:${dcS(L_zt_q?.["ink"])};box-shadow:${dcS(L_zt_q?.["shadow"])};white-space:nowrap`)}>
+                        <button onClick={L_zt_r?.["pick"]} style={dcCss(`flex:1 1 0;min-width:0;display:flex;flex-direction:${dcS(L_zt_r?.["dir"])};align-items:center;justify-content:center;gap:${dcS(L_zt_r?.["gap"])};height:${dcS(L_zt_r?.["h"])};padding:0 6px;border-radius:8px;border:0;background:${dcS(L_zt_r?.["bg"])};color:${dcS(L_zt_r?.["ink"])};box-shadow:${dcS(L_zt_r?.["shadow"])};white-space:nowrap`)}>
                           <span style={{"fontSize":"13px","fontWeight":"700"}}>
-                            {dcText(L_zt_q?.["label"])}
+                            {dcText(L_zt_r?.["label"])}
                           </span>
-                          <span style={dcCss(`font-size:11.5px;font-weight:600;color:${dcS(L_zt_q?.["sub"])};font-variant-numeric:tabular-nums`)}>
-                            {dcText(L_zt_q?.["sum"])}
+                          <span style={dcCss(`font-size:11.5px;font-weight:600;color:${dcS(L_zt_r?.["sub"])};font-variant-numeric:tabular-nums`)}>
+                            {dcText(L_zt_r?.["sum"])}
                           </span>
                         </button>
                         {"\n                "}
@@ -1537,39 +1549,39 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                   {"\n            "}
                 </>) : null}
                 {"\n            "}
-                {dcList(v["catGroupsShown"]).map((L_cg_r, L_cg_r_i) => (
-                  <Fragment key={L_cg_r_i}>
+                {dcList(v["catGroupsShown"]).map((L_cg_s, L_cg_s_i) => (
+                  <Fragment key={L_cg_s_i}>
                     {"\n            "}
                     <div style={dcCss(`display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:${dcS(v["cgPad"])}`)}>
                       {"\n              "}
                       <span style={{"fontSize":"11.5px","fontWeight":"700","letterSpacing":".12em","color":"var(--irq-c-6b6b66)"}}>
-                        {dcText(L_cg_r?.["label"])}
+                        {dcText(L_cg_s?.["label"])}
                       </span>
                       {"\n              "}
                       <span style={{"fontSize":"12.5px","color":"var(--irq-c-6b6b66)","fontVariantNumeric":"tabular-nums"}}>
-                        {dcText(L_cg_r?.["sum"])}
+                        {dcText(L_cg_s?.["sum"])}
                       </span>
                       {"\n            "}
                     </div>
                     {"\n            "}
-                    {dcList(L_cg_r?.["cats"]).map((L_c_s, L_c_s_i) => (
-                      <Fragment key={L_c_s_i}>
+                    {dcList(L_cg_s?.["cats"]).map((L_c_t, L_c_t_i) => (
+                      <Fragment key={L_c_t_i}>
                         {"\n              "}
                         <section style={dcCss(`padding:${dcS(v["cz"]?.["pad"])};border-radius:${dcS(v["cz"]?.["r"])};border:${dcS(v["cz"]?.["b"])};background:${dcS(v["cz"]?.["bg"])};box-shadow:${dcS(v["cz"]?.["sh"])}`)}>
                           {"\n                "}
                           <div style={dcCss(`display:flex;align-items:center;gap:10px;margin:${dcS(v["cz"]?.["hMargin"])};padding:${dcS(v["cz"]?.["hPad"])};border-radius:${dcS(v["cz"]?.["hR"])};position:${dcS(v["cz"]?.["hPos"])};top:40px;z-index:3;background:${dcS(v["cz"]?.["hBg"])}`)}>
                             {"\n                  "}
                             <h2 style={dcCss(`margin:0;font-family:var(--font-space-grotesk),var(--font-manrope),sans-serif;font-size:${dcS(v["cz"]?.["h"])};font-weight:700;letter-spacing:-.02em`)}>
-                              {dcText(L_c_s?.["label"])}
+                              {dcText(L_c_t?.["label"])}
                             </h2>
                             {"\n                  "}
                             <span style={dcCss(`margin-left:auto;min-width:${dcS(v["cz"]?.["cntW"])};height:${dcS(v["cz"]?.["cntH"])};padding:0 ${dcS(v["cz"]?.["cntP"])};border-radius:11px;background:${dcS(v["cz"]?.["cntBg"])};box-sizing:border-box;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--irq-c-55554f);font-variant-numeric:tabular-nums`)}>
-                              {dcText(L_c_s?.["countOrSum"])}
+                              {dcText(L_c_t?.["countOrSum"])}
                             </span>
                             {"\n                  "}
                             {(v["cz"]?.["plus"]) ? (<>
-                              {(L_c_s?.["canAdd"]) ? (<>
-                                <button onClick={L_c_s?.["add"]} aria-label={"Add item"} style={{"width":"24px","height":"24px","borderRadius":"50%","border":"0","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-d96e0b)","display":"grid","placeItems":"center","padding":"0"}}>
+                              {(L_c_t?.["canAdd"]) ? (<>
+                                <button onClick={L_c_t?.["add"]} aria-label={"Add item"} style={{"width":"24px","height":"24px","borderRadius":"50%","border":"0","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-d96e0b)","display":"grid","placeItems":"center","padding":"0"}}>
                                   <svg width={"14"} height={"14"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.6"} strokeLinecap={"round"}>
                                     <path d={"M12 5v14M5 12h14"} />
                                   </svg>
@@ -1579,50 +1591,50 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                             {"\n                "}
                           </div>
                           {"\n                "}
-                          {dcList(L_c_s?.["lines"]).map((L_l_t, L_l_t_i) => (
-                            <Fragment key={L_l_t_i}>
+                          {dcList(L_c_t?.["lines"]).map((L_l_u, L_l_u_i) => (
+                            <Fragment key={L_l_u_i}>
                               {"\n                  "}
                               <div style={dcCss(`display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:${dcS(v["cz"]?.["rowPad"])};border-bottom:1px solid rgba(20,20,18,.06)`)}>
                                 {"\n                    "}
-                                <span onClick={L_l_t?.["lView"]} style={dcCss(`display:${dcS(v["thumbD"])};flex:0 0 52px;width:52px;height:52px;border-radius:10px;background:var(--irq-c-f4f4f1) url('${dcS(L_l_t?.["lImg"])}') center/contain no-repeat;box-shadow:inset 0 0 0 1px rgba(20,20,18,.05);cursor:${dcS(L_l_t?.["lCursor"])}`)} />
+                                <span onClick={L_l_u?.["lView"]} style={dcCss(`display:${dcS(v["thumbD"])};flex:0 0 52px;width:52px;height:52px;border-radius:10px;background:var(--irq-c-f4f4f1) url('${dcS(L_l_u?.["lImg"])}') center/contain no-repeat;box-shadow:inset 0 0 0 1px rgba(20,20,18,.05);cursor:${dcS(L_l_u?.["lCursor"])}`)} />
                                 {"\n                    "}
-                                <div onClick={L_l_t?.["lView"]} style={dcCss(`flex:1 1 ${dcS(v["nameBasis"])};min-width:0;cursor:${dcS(L_l_t?.["lCursor"])}`)}>
+                                <div onClick={L_l_u?.["lView"]} style={dcCss(`flex:1 1 ${dcS(v["nameBasis"])};min-width:0;cursor:${dcS(L_l_u?.["lCursor"])}`)}>
                                   {"\n                      "}
-                                  <span style={dcCss(`display:block;font-size:14.5px;font-weight:600;letter-spacing:-.005em;text-decoration:${dcS(L_l_t?.["strike"])};color:${dcS(L_l_t?.["nameColor"])}`)}>
-                                    {dcText(L_l_t?.["title"])}
+                                  <span style={dcCss(`display:block;font-size:14.5px;font-weight:600;letter-spacing:-.005em;text-decoration:${dcS(L_l_u?.["strike"])};color:${dcS(L_l_u?.["nameColor"])}`)}>
+                                    {dcText(L_l_u?.["title"])}
                                   </span>
                                   {"\n                      "}
-                                  <span style={dcCss(`display:${dcS(v["priceIn"])};margin-top:2px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:${dcS(L_l_t?.["nameColor"])}`)}>
-                                    {(L_l_t?.["locked"]) ? (<>
+                                  <span style={dcCss(`display:${dcS(v["priceIn"])};margin-top:2px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:${dcS(L_l_u?.["nameColor"])}`)}>
+                                    {(L_l_u?.["locked"]) ? (<>
                                       <svg aria-label={"Fixed price"} width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{"marginRight":"4px","verticalAlign":"-1px","stroke":"var(--irq-c-97978f)"}}>
                                         <path d={"M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"} />
                                       </svg>
                                     </>) : null}
-                                    {dcText(L_l_t?.["sumText"])}
+                                    {dcText(L_l_u?.["sumText"])}
                                     <span style={{"fontWeight":"500","color":"var(--irq-c-97978f)"}}>
-                                      {" "}{dcText(L_l_t?.["eachText"])}
+                                      {" "}{dcText(L_l_u?.["eachText"])}
                                     </span>
                                   </span>
                                   {"\n                      "}
-                                  {(L_l_t?.["meta"]) ? (<>
+                                  {(L_l_u?.["meta"]) ? (<>
                                     <span style={dcCss(`display:${dcS(v["cz"]?.["meta"])};font-size:12px;color:var(--irq-c-6b6b66);margin-top:1px`)}>
-                                      {dcText(L_l_t?.["meta"])}
+                                      {dcText(L_l_u?.["meta"])}
                                     </span>
                                   </>) : null}
                                   {"\n                      "}
-                                  {(L_l_t?.["tag"]) ? (<>
+                                  {(L_l_u?.["tag"]) ? (<>
                                     {"\n                        "}
                                     <span style={{"display":"flex","alignItems":"center","gap":"8px","marginTop":"5px","flexWrap":"wrap"}}>
                                       {"\n                          "}
-                                      <span style={dcCss(`font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:3px 6px;color:${dcS(L_l_t?.["tagInk"])};background:${dcS(L_l_t?.["tagBg"])}`)}>
-                                        {dcText(L_l_t?.["tag"])}
+                                      <span style={dcCss(`font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:3px 6px;color:${dcS(L_l_u?.["tagInk"])};background:${dcS(L_l_u?.["tagBg"])}`)}>
+                                        {dcText(L_l_u?.["tag"])}
                                       </span>
                                       {"\n                          "}
-                                      <span style={dcCss(`font-size:12.5px;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_l_t?.["tagInk"])}`)}>
-                                        {dcText(L_l_t?.["delta"])}
+                                      <span style={dcCss(`font-size:12.5px;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_l_u?.["tagInk"])}`)}>
+                                        {dcText(L_l_u?.["delta"])}
                                       </span>
                                       {"\n                          "}
-                                      <button onClick={L_l_t?.["undo"]} style={{"height":"24px","padding":"0 4px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"12.5px","fontWeight":"600"}}>
+                                      <button onClick={L_l_u?.["undo"]} style={{"height":"24px","padding":"0 4px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"12.5px","fontWeight":"600"}}>
                                         {"Undo"}
                                       </button>
                                       {"\n                        "}
@@ -1632,9 +1644,9 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                   {"\n                    "}
                                 </div>
                                 {"\n                    "}
-                                {(L_l_t?.["canSwap"]) ? (<>
+                                {(L_l_u?.["canSwap"]) ? (<>
                                   {"\n                      "}
-                                  <button onClick={L_l_t?.["swap"]} title={"Change"} aria-label={"Change"} style={dcCss(`flex:0 0 auto;margin-left:auto;height:${dcS(v["cz"]?.["stepH"])};padding:0 ${dcS(v["chgPad"])};border-radius:8px;border:0;background:${dcS(v["cz"]?.["swapBg"])};color:var(--irq-c-111111);font-size:12.5px;font-weight:650`)} className={"irq-p6"}>
+                                  <button onClick={L_l_u?.["swap"]} title={"Change"} aria-label={"Change"} style={dcCss(`flex:0 0 auto;margin-left:auto;height:${dcS(v["cz"]?.["stepH"])};padding:0 ${dcS(v["chgPad"])};border-radius:8px;border:0;background:${dcS(v["cz"]?.["swapBg"])};color:var(--irq-c-111111);font-size:12.5px;font-weight:650`)} className={"irq-p6"}>
                                     <span style={dcCss(`display:${dcS(v["chgTxt"])}`)}>
                                       {"Change"}
                                     </span>
@@ -1647,47 +1659,47 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                                 {"\n                    "}
                                 <div style={dcCss(`flex:0 0 auto;margin-left:auto;display:grid;grid-template-columns:${dcS(v["cz"]?.["stepCols"])};align-items:center;height:${dcS(v["cz"]?.["stepH"])};border-radius:8px;border:1px solid rgba(20,20,18,.1);background:var(--irq-c-ffffff)`)}>
                                   {"\n                      "}
-                                  <button aria-label={"Remove one"} onClick={L_l_t?.["minus"]} style={dcCss(`height:${dcS(v["cz"]?.["stepH"])};border:0;background:transparent;color:var(--irq-c-111111);font-size:18px;font-weight:600;padding:0`)}>
+                                  <button aria-label={"Remove one"} onClick={L_l_u?.["minus"]} style={dcCss(`height:${dcS(v["cz"]?.["stepH"])};border:0;background:transparent;color:var(--irq-c-111111);font-size:18px;font-weight:600;padding:0`)}>
                                     {"−"}
                                   </button>
                                   {"\n                      "}
-                                  <input inputMode={"numeric"} aria-label={"Quantity"} value={dcValue(L_l_t?.["qty"])} onChange={L_l_t?.["onQty"]} onFocus={v["selAll"]} style={{"width":"100%","minWidth":"0","padding":"0","border":"0","outline":"none","background":"transparent","textAlign":"center","fontSize":"14px","fontWeight":"700","color":"var(--irq-c-1f1f1c)","fontFamily":"inherit","fontVariantNumeric":"tabular-nums"}} />
+                                  <input inputMode={"numeric"} aria-label={"Quantity"} value={dcValue(L_l_u?.["qty"])} onChange={L_l_u?.["onQty"]} onFocus={v["selAll"]} style={{"width":"100%","minWidth":"0","padding":"0","border":"0","outline":"none","background":"transparent","textAlign":"center","fontSize":"14px","fontWeight":"700","color":"var(--irq-c-1f1f1c)","fontFamily":"inherit","fontVariantNumeric":"tabular-nums"}} />
                                   {"\n                      "}
-                                  <button aria-label={"Add one"} onClick={L_l_t?.["plus"]} style={dcCss(`height:${dcS(v["cz"]?.["stepH"])};border:0;background:transparent;color:var(--irq-c-111111);font-size:18px;font-weight:600;padding:0`)}>
+                                  <button aria-label={"Add one"} onClick={L_l_u?.["plus"]} style={dcCss(`height:${dcS(v["cz"]?.["stepH"])};border:0;background:transparent;color:var(--irq-c-111111);font-size:18px;font-weight:600;padding:0`)}>
                                     {"+"}
                                   </button>
                                   {"\n                    "}
                                 </div>
                                 {"\n                    "}
-                                {(L_l_t?.["adj"]) ? (<>
+                                {(L_l_u?.["adj"]) ? (<>
                                   <label title={"Adjustable price"} style={{"flex":"0 0 auto","display":"flex","alignItems":"center","gap":"4px","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-ffc999)","background":"var(--irq-c-fff5ec)"}}>
                                     <span style={{"fontSize":"11.5px","fontWeight":"700","color":"var(--irq-c-b35a00)"}}>
                                       {"RM"}
                                     </span>
-                                    <input inputMode={"decimal"} value={dcValue(L_l_t?.["costV"])} onChange={L_l_t?.["onCost"]} style={{"width":"64px","border":"0","outline":"0","background":"transparent","textAlign":"right","fontSize":"13.5px","fontWeight":"700","color":"var(--irq-c-1f1f1c)","fontVariantNumeric":"tabular-nums"}} />
+                                    <input inputMode={"decimal"} value={dcValue(L_l_u?.["costV"])} onChange={L_l_u?.["onCost"]} style={{"width":"64px","border":"0","outline":"0","background":"transparent","textAlign":"right","fontSize":"13.5px","fontWeight":"700","color":"var(--irq-c-1f1f1c)","fontVariantNumeric":"tabular-nums"}} />
                                   </label>
                                 </>) : null}
                                 {"\n                    "}
                                 <span style={dcCss(`flex:0 0 auto;min-width:72px;display:${dcS(v["thumbD"])};flex-direction:column;align-items:flex-end;gap:1px;text-align:right;font-variant-numeric:tabular-nums`)}>
                                   {"\n                      "}
-                                  <span style={dcCss(`display:flex;align-items:center;font-size:14px;font-weight:650;color:${dcS(L_l_t?.["nameColor"])};text-decoration:${dcS(L_l_t?.["strike"])}`)}>
-                                    {(L_l_t?.["locked"]) ? (<>
+                                  <span style={dcCss(`display:flex;align-items:center;font-size:14px;font-weight:650;color:${dcS(L_l_u?.["nameColor"])};text-decoration:${dcS(L_l_u?.["strike"])}`)}>
+                                    {(L_l_u?.["locked"]) ? (<>
                                       <svg aria-label={"Fixed price"} width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{"marginRight":"4px","verticalAlign":"-1px","stroke":"var(--irq-c-97978f)"}}>
                                         <path d={"M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"} />
                                       </svg>
                                     </>) : null}
-                                    {dcText(L_l_t?.["sumText"])}
+                                    {dcText(L_l_u?.["sumText"])}
                                   </span>
                                   {"\n                      "}
                                   <span style={{"fontSize":"11.5px","color":"var(--irq-c-6b6b66)"}}>
-                                    {dcText(L_l_t?.["eachText"])}
+                                    {dcText(L_l_u?.["eachText"])}
                                   </span>
                                   {"\n                    "}
                                 </span>
                                 {"\n                    "}
-                                {(L_l_t?.["remarkOn"]) ? (<>
+                                {(L_l_u?.["remarkOn"]) ? (<>
                                   {"\n                      "}
-                                  <input value={dcValue(L_l_t?.["remarkV"])} onChange={L_l_t?.["onRemark"]} placeholder={"Remarks (shown on quotation)"} aria-label={"Remarks"} style={{"flex":"1 0 100%","height":"34px","padding":"0 10px","borderRadius":"8px","border":"1px solid rgba(20,20,18,.1)","background":"var(--irq-c-f7f7f5)","fontSize":"13px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","fontFamily":"inherit"}} className={"irq-p7"} />
+                                  <input value={dcValue(L_l_u?.["remarkV"])} onChange={L_l_u?.["onRemark"]} placeholder={"Remarks (shown on quotation)"} aria-label={"Remarks"} style={{"flex":"1 0 100%","height":"34px","padding":"0 10px","borderRadius":"8px","border":"1px solid rgba(20,20,18,.1)","background":"var(--irq-c-f7f7f5)","fontSize":"13px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","fontFamily":"inherit"}} className={"irq-p7"} />
                                   {"\n                    "}
                                 </>) : null}
                                 {"\n                  "}
@@ -1697,9 +1709,9 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                           ))}
                           {"\n                "}
                           {(v["cz"]?.["addRow"]) ? (<>
-                            {(L_c_s?.["canAdd"]) ? (<>
+                            {(L_c_t?.["canAdd"]) ? (<>
                               {"\n                  "}
-                              <button onClick={L_c_s?.["add"]} style={dcCss(`margin-top:4px;width:100%;display:flex;align-items:center;gap:8px;height:${dcS(v["cz"]?.["add"])};padding:0 4px;border:0;background:transparent;color:var(--irq-c-111111);font-size:14px;font-weight:650;text-align:left`)}>
+                              <button onClick={L_c_t?.["add"]} style={dcCss(`margin-top:4px;width:100%;display:flex;align-items:center;gap:8px;height:${dcS(v["cz"]?.["add"])};padding:0 4px;border:0;background:transparent;color:var(--irq-c-111111);font-size:14px;font-weight:650;text-align:left`)}>
                                 {"\n                    "}
                                 <span style={{"width":"28px","height":"28px","borderRadius":"50%","background":"var(--irq-c-ffebd9)","display":"grid","placeItems":"center"}}>
                                   <svg width={"15"} height={"15"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.2"} strokeLinecap={"round"}>
@@ -1734,32 +1746,32 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {"\n                "}
                     <div style={{"display":"grid","gridTemplateColumns":"repeat(auto-fit,minmax(min(100%,240px),1fr))","gap":"10px"}}>
                       {"\n                  "}
-                      {dcList(v["sigSlots"]).map((L_sg_u, L_sg_u_i) => (
-                        <Fragment key={L_sg_u_i}>
+                      {dcList(v["sigSlots"]).map((L_sg_v, L_sg_v_i) => (
+                        <Fragment key={L_sg_v_i}>
                           {"\n                    "}
                           <div style={{"display":"flex","alignItems":"center","gap":"12px","padding":"12px 14px","borderRadius":"12px","border":"1px solid var(--irq-c-e7e7e2)","background":"var(--irq-c-ffffff)"}}>
                             {"\n                      "}
-                            <div role={"img"} aria-label={L_sg_u?.["label"]} style={dcCss(`flex:0 0 96px;width:96px;height:52px;border-radius:10px;border:1px dashed var(--irq-c-deded8);background:var(--irq-c-ffffff) url('${dcS(L_sg_u?.["img"])}') center/contain no-repeat;display:grid;place-items:center;font-size:11.5px;color:var(--irq-c-97978f)`)}>
-                              {dcText(L_sg_u?.["empty"])}
+                            <div role={"img"} aria-label={L_sg_v?.["label"]} style={dcCss(`flex:0 0 96px;width:96px;height:52px;border-radius:10px;border:1px dashed var(--irq-c-deded8);background:var(--irq-c-ffffff) url('${dcS(L_sg_v?.["img"])}') center/contain no-repeat;display:grid;place-items:center;font-size:11.5px;color:var(--irq-c-97978f)`)}>
+                              {dcText(L_sg_v?.["empty"])}
                             </div>
                             {"\n                      "}
                             <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px"}}>
                               <span style={{"fontSize":"14.5px","fontWeight":"600"}}>
-                                {dcText(L_sg_u?.["label"])}
+                                {dcText(L_sg_v?.["label"])}
                               </span>
                               <span style={{"fontSize":"12.5px","color":"var(--irq-c-6b6b66)"}}>
-                                {dcText(L_sg_u?.["status"])}
+                                {dcText(L_sg_v?.["status"])}
                               </span>
                             </span>
                             {"\n                      "}
                             <div style={{"display":"flex","flexDirection":"column","gap":"4px","alignItems":"flex-end"}}>
                               {"\n                        "}
-                              <button onClick={L_sg_u?.["open"]} style={{"height":"36px","padding":"0 14px","borderRadius":"10px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"650"}}>
-                                {dcText(L_sg_u?.["cta"])}
+                              <button onClick={L_sg_v?.["open"]} style={{"height":"36px","padding":"0 14px","borderRadius":"10px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"650"}}>
+                                {dcText(L_sg_v?.["cta"])}
                               </button>
                               {"\n                        "}
-                              {(L_sg_u?.["signed"]) ? (<>
-                                <button onClick={L_sg_u?.["clear"]} style={{"height":"24px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"12.5px","fontWeight":"600"}}>
+                              {(L_sg_v?.["signed"]) ? (<>
+                                <button onClick={L_sg_v?.["clear"]} style={{"height":"24px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"12.5px","fontWeight":"600"}}>
                                   {"Clear"}
                                 </button>
                               </>) : null}
@@ -2008,24 +2020,24 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                       {"Changes"}
                     </h3>
                     {"\n                "}
-                    {dcList(v["changeList"]).map((L_ch_v, L_ch_v_i) => (
-                      <Fragment key={L_ch_v_i}>
+                    {dcList(v["changeList"]).map((L_ch_w, L_ch_w_i) => (
+                      <Fragment key={L_ch_w_i}>
                         {"\n                  "}
-                        <div onClick={L_ch_v?.["view"]} title={L_ch_v?.["tip"]} style={dcCss(`display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(20,20,18,.06);font-size:13.5px;cursor:${dcS(L_ch_v?.["cursor"])}`)}>
+                        <div onClick={L_ch_w?.["view"]} title={L_ch_w?.["tip"]} style={dcCss(`display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(20,20,18,.06);font-size:13.5px;cursor:${dcS(L_ch_w?.["cursor"])}`)}>
                           {"\n                    "}
-                          <span style={dcCss(`flex:0 0 40px;width:40px;height:38px;border-radius:9px;background:var(--irq-c-eeeeea) url('${dcS(L_ch_v?.["img"])}') center/cover no-repeat`)} />
+                          <span style={dcCss(`flex:0 0 40px;width:40px;height:38px;border-radius:9px;background:var(--irq-c-eeeeea) url('${dcS(L_ch_w?.["img"])}') center/cover no-repeat`)} />
                           {"\n                    "}
                           <span style={{"flex":"1","minWidth":"0"}}>
                             <span style={{"display":"block","fontWeight":"600"}}>
-                              {dcText(L_ch_v?.["title"])}
+                              {dcText(L_ch_w?.["title"])}
                             </span>
                             <span style={{"display":"block","fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
-                              {dcText(L_ch_v?.["note"])}
+                              {dcText(L_ch_w?.["note"])}
                             </span>
                           </span>
                           {"\n                    "}
-                          <span style={dcCss(`flex:0 0 auto;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_ch_v?.["ink"])}`)}>
-                            {dcText(L_ch_v?.["delta"])}
+                          <span style={dcCss(`flex:0 0 auto;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_ch_w?.["ink"])}`)}>
+                            {dcText(L_ch_w?.["delta"])}
                           </span>
                           {"\n                  "}
                         </div>
@@ -2066,17 +2078,17 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                       {"\n                  "}
                     </button>
                     {"\n                "}
-                    {dcList(v["exportsDesk"]).map((L_ex_w, L_ex_w_i) => (
-                      <Fragment key={L_ex_w_i}>
+                    {dcList(v["exportsDesk"]).map((L_ex_x, L_ex_x_i) => (
+                      <Fragment key={L_ex_x_i}>
                         {"\n                  "}
-                        <button onClick={L_ex_w?.["run"]} style={{"display":"flex","alignItems":"center","gap":"12px","minHeight":"46px","padding":"6px 14px","borderRadius":"12px","border":"1px solid var(--irq-c-e7e7e2)","background":"var(--irq-c-ffffff)","textAlign":"left","color":"var(--irq-c-1f1f1c)"}}>
+                        <button onClick={L_ex_x?.["run"]} style={{"display":"flex","alignItems":"center","gap":"12px","minHeight":"46px","padding":"6px 14px","borderRadius":"12px","border":"1px solid var(--irq-c-e7e7e2)","background":"var(--irq-c-ffffff)","textAlign":"left","color":"var(--irq-c-1f1f1c)"}}>
                           {"\n                    "}
                           <svg width={"18"} height={"18"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"1.9"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{"stroke":"var(--irq-c-111111)"}}>
-                            <path d={L_ex_w?.["d"]} />
+                            <path d={L_ex_x?.["d"]} />
                           </svg>
                           {"\n                    "}
                           <span style={{"flex":"1","minWidth":"0","fontSize":"14.5px","fontWeight":"650"}}>
-                            {dcText(L_ex_w?.["label"])}
+                            {dcText(L_ex_x?.["label"])}
                           </span>
                           {"\n                  "}
                         </button>
@@ -2207,19 +2219,19 @@ export function renderQuote(v: DcVals, C: DcComponents) {
             {"\n        "}
             <div style={{"display":"grid","gridTemplateColumns":"repeat(5,minmax(0,1fr))","alignItems":"end","height":"62px","padding":"0 4px"}}>
               {"\n          "}
-              {dcList(v["navLeft"]).map((L_n_x, L_n_x_i) => (
-                <Fragment key={L_n_x_i}>
+              {dcList(v["navLeft"]).map((L_n_y, L_n_y_i) => (
+                <Fragment key={L_n_y_i}>
                   {"\n            "}
-                  <button onClick={L_n_x?.["go"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"3px","padding":"6px 0 8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)"}}>
+                  <button onClick={L_n_y?.["go"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"3px","padding":"6px 0 8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)"}}>
                     {"\n              "}
                     <span style={{"width":"56px","height":"30px","display":"grid","placeItems":"center"}}>
                       <svg width={"24"} height={"24"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.65"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                        <path d={L_n_x?.["d"]} />
+                        <path d={L_n_y?.["d"]} />
                       </svg>
                     </span>
                     {"\n              "}
                     <span style={{"fontSize":"10.5px","fontWeight":"500"}}>
-                      {dcText(L_n_x?.["label"])}
+                      {dcText(L_n_y?.["label"])}
                     </span>
                     {"\n            "}
                   </button>
@@ -2241,19 +2253,19 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                 {"\n          "}
               </button>
               {"\n          "}
-              {dcList(v["navRight"]).map((L_n_y, L_n_y_i) => (
-                <Fragment key={L_n_y_i}>
+              {dcList(v["navRight"]).map((L_n_z, L_n_z_i) => (
+                <Fragment key={L_n_z_i}>
                   {"\n            "}
-                  <button onClick={L_n_y?.["go"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"3px","padding":"6px 0 8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)"}}>
+                  <button onClick={L_n_z?.["go"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"3px","padding":"6px 0 8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)"}}>
                     {"\n              "}
                     <span style={{"width":"56px","height":"30px","display":"grid","placeItems":"center"}}>
                       <svg width={"24"} height={"24"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.65"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                        <path d={L_n_y?.["d"]} />
+                        <path d={L_n_z?.["d"]} />
                       </svg>
                     </span>
                     {"\n              "}
                     <span style={{"fontSize":"10.5px","fontWeight":"500"}}>
-                      {dcText(L_n_y?.["label"])}
+                      {dcText(L_n_z?.["label"])}
                     </span>
                     {"\n            "}
                   </button>
@@ -2340,11 +2352,11 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {"\n                "}
                     <div style={{"display":"flex","gap":"2px","padding":"3px","margin":"10px 0 4px","borderRadius":"12px","background":"var(--irq-c-eeeeea)"}}>
                       {"\n                  "}
-                      {dcList(v["sheetTabs"]).map((L_stb_z, L_stb_z_i) => (
-                        <Fragment key={L_stb_z_i}>
+                      {dcList(v["sheetTabs"]).map((L_stb_10, L_stb_10_i) => (
+                        <Fragment key={L_stb_10_i}>
                           {"\n                    "}
-                          <button onClick={L_stb_z?.["pick"]} style={dcCss(`flex:1;height:36px;padding:0 10px;border-radius:9px;border:0;background:${dcS(L_stb_z?.["bg"])};color:${dcS(L_stb_z?.["ink"])};font-size:13px;font-weight:650;box-shadow:${dcS(L_stb_z?.["shadow"])};white-space:nowrap`)}>
-                            {dcText(L_stb_z?.["label"])}
+                          <button onClick={L_stb_10?.["pick"]} style={dcCss(`flex:1;height:36px;padding:0 10px;border-radius:9px;border:0;background:${dcS(L_stb_10?.["bg"])};color:${dcS(L_stb_10?.["ink"])};font-size:13px;font-weight:650;box-shadow:${dcS(L_stb_10?.["shadow"])};white-space:nowrap`)}>
+                            {dcText(L_stb_10?.["label"])}
                           </button>
                           {"\n                  "}
                         </Fragment>
@@ -2381,20 +2393,20 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {"\n                "}
                     <div style={{"display":"flex","flexDirection":"column","paddingTop":"4px"}}>
                       {"\n                  "}
-                      {dcList(v["colList"]).map((L_cl_10, L_cl_10_i) => (
-                        <Fragment key={L_cl_10_i}>
+                      {dcList(v["colList"]).map((L_cl_11, L_cl_11_i) => (
+                        <Fragment key={L_cl_11_i}>
                           {"\n                    "}
-                          <button onClick={L_cl_10?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"12px","padding":"10px 0","border":"0","borderBottom":"1px solid rgba(20,20,18,.06)","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)","width":"100%"}}>
+                          <button onClick={L_cl_11?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"12px","padding":"10px 0","border":"0","borderBottom":"1px solid rgba(20,20,18,.06)","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)","width":"100%"}}>
                             {"\n                      "}
-                            <span style={dcCss(`flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:var(--irq-c-eeeeea) url('${dcS(L_cl_10?.["img"])}') center/cover no-repeat`)} />
+                            <span style={dcCss(`flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:var(--irq-c-eeeeea) url('${dcS(L_cl_11?.["img"])}') center/cover no-repeat`)} />
                             {"\n                      "}
                             <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px"}}>
                               {"\n                        "}
                               <span style={{"display":"flex","alignItems":"center","gap":"8px"}}>
                                 <span style={{"fontSize":"14.5px","fontWeight":"650","letterSpacing":".03em"}}>
-                                  {dcText(L_cl_10?.["name"])}
+                                  {dcText(L_cl_11?.["name"])}
                                 </span>
-                                {(L_cl_10?.["cur"]) ? (<>
+                                {(L_cl_11?.["cur"]) ? (<>
                                   <span style={{"height":"20px","padding":"0 7px","borderRadius":"10px","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-b35a00)","fontSize":"10.5px","fontWeight":"700","lineHeight":"20px"}}>
                                     {"Current"}
                                   </span>
@@ -2402,7 +2414,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                               </span>
                               {"\n                        "}
                               <span style={{"fontSize":"12.5px","color":"var(--irq-c-6b6b66)"}}>
-                                {dcText(L_cl_10?.["sub"])}
+                                {dcText(L_cl_11?.["sub"])}
                               </span>
                               {"\n                      "}
                             </span>
@@ -2428,11 +2440,11 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                         {"COLOUR"}
                       </span>
                       {"\n                  "}
-                      {dcList(v["clrChips"]).map((L_cc_11, L_cc_11_i) => (
-                        <Fragment key={L_cc_11_i}>
+                      {dcList(v["clrChips"]).map((L_cc_12, L_cc_12_i) => (
+                        <Fragment key={L_cc_12_i}>
                           {"\n                    "}
-                          <button onClick={L_cc_11?.["pick"]} style={dcCss(`flex:0 0 auto;height:32px;padding:0 12px;border-radius:12px;border:1px solid ${dcS(L_cc_11?.["border"])};background:${dcS(L_cc_11?.["bg"])};color:${dcS(L_cc_11?.["ink"])};font-size:12.5px;font-weight:600;white-space:nowrap`)}>
-                            {dcText(L_cc_11?.["label"])}
+                          <button onClick={L_cc_12?.["pick"]} style={dcCss(`flex:0 0 auto;height:32px;padding:0 12px;border-radius:12px;border:1px solid ${dcS(L_cc_12?.["border"])};background:${dcS(L_cc_12?.["bg"])};color:${dcS(L_cc_12?.["ink"])};font-size:12.5px;font-weight:600;white-space:nowrap`)}>
+                            {dcText(L_cc_12?.["label"])}
                           </button>
                           {"\n                  "}
                         </Fragment>
@@ -2463,14 +2475,14 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {"\n              "}
                   </>) : null}
                   {"\n              "}
-                  {dcList(v["options"]).map((L_o_12, L_o_12_i) => (
-                    <Fragment key={L_o_12_i}>
+                  {dcList(v["options"]).map((L_o_13, L_o_13_i) => (
+                    <Fragment key={L_o_13_i}>
                       {"\n                "}
-                      <button onClick={L_o_12?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"12px","padding":"10px 0","border":"0","borderBottom":"1px solid rgba(20,20,18,.06)","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)","width":"100%"}}>
+                      <button onClick={L_o_13?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"12px","padding":"10px 0","border":"0","borderBottom":"1px solid rgba(20,20,18,.06)","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)","width":"100%"}}>
                         {"\n                  "}
-                        <span onClick={L_o_12?.["zoom"]} title={L_o_12?.["zoomTitle"]} style={dcCss(`position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:var(--irq-c-eeeeea) url('${dcS(L_o_12?.["img"])}') center/cover no-repeat;display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--irq-c-34342f);letter-spacing:.04em;cursor:${dcS(L_o_12?.["zoomCursor"])}`)}>
-                          {dcText(L_o_12?.["initials"])}{"\n                    "}
-                          {(L_o_12?.["img"]) ? (<>
+                        <span onClick={L_o_13?.["zoom"]} title={L_o_13?.["zoomTitle"]} style={dcCss(`position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:var(--irq-c-eeeeea) url('${dcS(L_o_13?.["img"])}') center/cover no-repeat;display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--irq-c-34342f);letter-spacing:.04em;cursor:${dcS(L_o_13?.["zoomCursor"])}`)}>
+                          {dcText(L_o_13?.["initials"])}{"\n                    "}
+                          {(L_o_13?.["img"]) ? (<>
                             <span style={{"position":"absolute","right":"3px","bottom":"3px","width":"18px","height":"18px","borderRadius":"50%","background":"rgba(255,255,255,.92)","display":"grid","placeItems":"center","boxShadow":"0 1px 3px rgba(20,20,18,0.15)"}}>
                               <svg width={"11"} height={"11"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2.4"} strokeLinecap={"round"} style={{"stroke":"var(--irq-c-34342f)"}}>
                                 <path d={"M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"} />
@@ -2483,18 +2495,18 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                         <span style={{"flex":"1","minWidth":"0"}}>
                           {"\n                    "}
                           <span style={{"display":"block","fontSize":"14.5px","fontWeight":"600","lineHeight":"1.3"}}>
-                            {dcText(L_o_12?.["name"])}
+                            {dcText(L_o_13?.["name"])}
                           </span>
                           {"\n                    "}
-                          {(L_o_12?.["hasVars"]) ? (<>
+                          {(L_o_13?.["hasVars"]) ? (<>
                             {"\n                      "}
                             <span style={{"display":"flex","flexWrap":"wrap","gap":"4px","margin":"5px 0 2px"}}>
                               {"\n                        "}
-                              {dcList(L_o_12?.["vars"]).map((L_ov_13, L_ov_13_i) => (
-                                <Fragment key={L_ov_13_i}>
+                              {dcList(L_o_13?.["vars"]).map((L_ov_14, L_ov_14_i) => (
+                                <Fragment key={L_ov_14_i}>
                                   {"\n                          "}
-                                  <span role={"button"} onClick={L_ov_13?.["pick"]} style={dcCss(`display:inline-flex;align-items:center;box-sizing:border-box;max-width:100%;min-width:0;min-height:26px;overflow-wrap:anywhere;padding:3px 9px;border-radius:13px;border:1px solid ${dcS(L_ov_13?.["border"])};background:${dcS(L_ov_13?.["bg"])};color:${dcS(L_ov_13?.["ink"])};font-size:11.5px;font-weight:600;cursor:pointer`)}>
-                                    {dcText(L_ov_13?.["label"])}
+                                  <span role={"button"} onClick={L_ov_14?.["pick"]} style={dcCss(`display:inline-flex;align-items:center;box-sizing:border-box;max-width:100%;min-width:0;min-height:26px;overflow-wrap:anywhere;padding:3px 9px;border-radius:13px;border:1px solid ${dcS(L_ov_14?.["border"])};background:${dcS(L_ov_14?.["bg"])};color:${dcS(L_ov_14?.["ink"])};font-size:11.5px;font-weight:600;cursor:pointer`)}>
+                                    {dcText(L_ov_14?.["label"])}
                                   </span>
                                   {"\n                        "}
                                 </Fragment>
@@ -2506,16 +2518,16 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                           {"\n                    "}
                           <span style={{"display":"flex","gap":"6px","alignItems":"center","marginTop":"2px","flexWrap":"wrap"}}>
                             <span style={{"minWidth":"0","overflowWrap":"anywhere","fontFamily":"ui-monospace,Menlo,monospace","fontSize":"11.5px","color":"var(--irq-c-6b6b66)"}}>
-                              {dcText(L_o_12?.["code"])}
+                              {dcText(L_o_13?.["code"])}
                             </span>
                             {"\n                      "}
-                            {(L_o_12?.["collection"]) ? (<>
+                            {(L_o_13?.["collection"]) ? (<>
                               <span style={{"fontSize":"11px","fontWeight":"600","borderRadius":"6px","padding":"2px 6px","color":"var(--irq-c-55554f)","background":"var(--irq-c-f0f0ed)"}}>
-                                {dcText(L_o_12?.["collection"])}
+                                {dcText(L_o_13?.["collection"])}
                               </span>
                             </>) : null}
                             {"\n                      "}
-                            {(L_o_12?.["sample"]) ? (<>
+                            {(L_o_13?.["sample"]) ? (<>
                               <span style={{"fontSize":"10.5px","fontWeight":"700","letterSpacing":".04em","borderRadius":"6px","padding":"2px 6px","color":"var(--irq-c-b35a00)","background":"var(--irq-c-ffebd9)"}}>
                                 {"SAMPLE PRICE"}
                               </span>
@@ -2526,12 +2538,12 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                         </span>
                         {"\n                  "}
                         <span style={{"flex":"0 0 auto","display":"flex","flexDirection":"column","alignItems":"flex-end","gap":"8px"}}>
-                          <span style={dcCss(`flex:0 0 auto;font-size:13.5px;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_o_12?.["ink"])}`)}>
-                            {dcText(L_o_12?.["delta"])}
+                          <span style={dcCss(`flex:0 0 auto;font-size:13.5px;font-weight:650;font-variant-numeric:tabular-nums;color:${dcS(L_o_13?.["ink"])}`)}>
+                            {dcText(L_o_13?.["delta"])}
                           </span>
-                          {(L_o_12?.["canUse"]) ? (<>
-                            <span role={"button"} onClick={L_o_12?.["use"]} style={{"display":"inline-flex","alignItems":"center","height":"32px","padding":"0 14px","borderRadius":"10px","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650","cursor":"pointer"}}>
-                              {dcText(L_o_12?.["useLabel"])}
+                          {(L_o_13?.["canUse"]) ? (<>
+                            <span role={"button"} onClick={L_o_13?.["use"]} style={{"display":"inline-flex","alignItems":"center","height":"32px","padding":"0 14px","borderRadius":"10px","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650","cursor":"pointer"}}>
+                              {dcText(L_o_13?.["useLabel"])}
                             </span>
                           </>) : null}
                         </span>
@@ -2682,30 +2694,30 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                 </button>
               </div>
               {"\n          "}
-              {dcList(v["draftList"]).map((L_dr_14, L_dr_14_i) => (
-                <Fragment key={L_dr_14_i}>
+              {dcList(v["draftList"]).map((L_dr_15, L_dr_15_i) => (
+                <Fragment key={L_dr_15_i}>
                   {"\n            "}
                   <div style={{"display":"flex","alignItems":"center","gap":"6px","borderBottom":"1px solid var(--irq-c-eeeeea)"}}>
                     {"\n              "}
-                    <button onClick={L_dr_14?.["open"]} style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px","padding":"12px 4px","border":"0","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)"}}>
+                    <button onClick={L_dr_15?.["open"]} style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px","padding":"12px 4px","border":"0","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)"}}>
                       {"\n                "}
                       <span style={{"display":"flex","justifyContent":"space-between","gap":"8px"}}>
                         <span style={{"fontSize":"15px","fontWeight":"650"}}>
-                          {dcText(L_dr_14?.["name"])}
+                          {dcText(L_dr_15?.["name"])}
                         </span>
                         <span style={{"fontSize":"14px","fontWeight":"700"}}>
-                          {dcText(L_dr_14?.["total"])}
+                          {dcText(L_dr_15?.["total"])}
                         </span>
                       </span>
                       {"\n                "}
                       <span style={{"fontSize":"12.5px","color":"var(--irq-c-6b6b66)"}}>
-                        {dcText(L_dr_14?.["sub"])}
+                        {dcText(L_dr_15?.["sub"])}
                       </span>
                       {"\n              "}
                     </button>
                     {"\n              "}
-                    <button onClick={L_dr_14?.["remove"]} style={{"height":"34px","padding":"0 8px","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"12.5px","fontWeight":"650"}}>
-                      {dcText(L_dr_14?.["delLabel"])}
+                    <button onClick={L_dr_15?.["remove"]} style={{"height":"34px","padding":"0 8px","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"12.5px","fontWeight":"650"}}>
+                      {dcText(L_dr_15?.["delLabel"])}
                     </button>
                     {"\n            "}
                   </div>
@@ -2775,21 +2787,21 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                 {"\n            "}
                 <div style={{"display":"flex","flexDirection":"column","gap":"1px","maxHeight":"min(44vh,340px)","overflowY":"auto","overscrollBehavior":"contain","margin":"0 -6px","padding":"0 6px"}}>
                   {"\n              "}
-                  {dcList(v["crmSend"]?.["hits"]).map((L_ch_15, L_ch_15_i) => (
-                    <Fragment key={L_ch_15_i}>
+                  {dcList(v["crmSend"]?.["hits"]).map((L_ch_16, L_ch_16_i) => (
+                    <Fragment key={L_ch_16_i}>
                       {"\n                "}
-                      <button onClick={L_ch_15?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"10px","minHeight":"48px","padding":"6px 10px","border":"0","borderRadius":"10px","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)"}} className={"irq-p1"}>
+                      <button onClick={L_ch_16?.["pick"]} style={{"display":"flex","alignItems":"center","gap":"10px","minHeight":"48px","padding":"6px 10px","border":"0","borderRadius":"10px","background":"transparent","textAlign":"left","color":"var(--irq-c-1f1f1c)"}} className={"irq-p1"}>
                         {"\n                  "}
                         <span style={{"flex":"0 0 32px","display":"grid","placeItems":"center","width":"32px","height":"32px","borderRadius":"50%","background":"var(--irq-c-eeeeea)","fontSize":"11.5px","fontWeight":"700"}}>
-                          {dcText(L_ch_15?.["initials"])}
+                          {dcText(L_ch_16?.["initials"])}
                         </span>
                         {"\n                  "}
                         <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column"}}>
                           <span style={{"fontSize":"14px","fontWeight":"600"}}>
-                            {dcText(L_ch_15?.["name"])}
+                            {dcText(L_ch_16?.["name"])}
                           </span>
                           <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
-                            {dcText(L_ch_15?.["sub"])}
+                            {dcText(L_ch_16?.["sub"])}
                           </span>
                         </span>
                         {"\n                "}
@@ -2865,19 +2877,19 @@ export function renderQuote(v: DcVals, C: DcComponents) {
               {"\n          "}
               <div style={{"display":"grid","gridTemplateColumns":"repeat(4,1fr)","gap":"8px"}}>
                 {"\n            "}
-                {dcList(v["shareSheet"]?.["apps"]).map((L_sa_16, L_sa_16_i) => (
-                  <Fragment key={L_sa_16_i}>
+                {dcList(v["shareSheet"]?.["apps"]).map((L_sa_17, L_sa_17_i) => (
+                  <Fragment key={L_sa_17_i}>
                     {"\n              "}
-                    <button onClick={L_sa_16?.["run"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"6px","padding":"6px 0","border":"0","background":"transparent","color":"var(--irq-c-1f1f1c)"}}>
+                    <button onClick={L_sa_17?.["run"]} style={{"display":"flex","flexDirection":"column","alignItems":"center","gap":"6px","padding":"6px 0","border":"0","background":"transparent","color":"var(--irq-c-1f1f1c)"}}>
                       {"\n                "}
-                      <span style={dcCss(`display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:${dcS(L_sa_16?.["bg"])};color:${dcS(L_sa_16?.["ink"])}`)}>
+                      <span style={dcCss(`display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:${dcS(L_sa_17?.["bg"])};color:${dcS(L_sa_17?.["ink"])}`)}>
                         <svg width={"24"} height={"24"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.9"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                          <path d={L_sa_16?.["d"]} />
+                          <path d={L_sa_17?.["d"]} />
                         </svg>
                       </span>
                       {"\n                "}
                       <span style={{"fontSize":"12px","fontWeight":"600"}}>
-                        {dcText(L_sa_16?.["label"])}
+                        {dcText(L_sa_17?.["label"])}
                       </span>
                       {"\n              "}
                     </button>
