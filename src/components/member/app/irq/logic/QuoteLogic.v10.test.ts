@@ -132,3 +132,33 @@ describe("the quotation adds up", async () => {
     expect(total).toBe(printed - 500);
   });
 });
+
+// The user, 2026-11-21, an iPhone video: Property type picked with the keyboard just closed, the menu stayed open and no tap
+// reached anything. A phone now picks through its own picker — a native select over the button; a computer keeps the menu.
+describe("Property type on a phone", async () => {
+  const { QuoteLogic } = await import("./QuoteLogic");
+  const lib = await import("../lib/quote-doc");
+  const view = (touch: boolean) => {
+    const self = {
+      states: [] as Record<string, unknown>[], lib, cfg: null,
+      state: { cust: { att: "", ptype: "" }, crm: {}, extra: {}, selOpen: null },
+      touch: () => touch,
+      setState(u: unknown) { self.states.push(typeof u === "function" ? (u as (s: unknown) => Record<string, unknown>)(self.state) : (u as Record<string, unknown>)); },
+    };
+    const v = (QuoteLogic.prototype as unknown as { custView: (this: unknown, s: unknown) => { custFields: { label: string; nativeD?: string; onNative?: (e: unknown) => void }[] } }).custView.call(self, () => () => {});
+    return { self, field: v.custFields.find(f => f.label === "Property type")! };
+  };
+
+  it("draws the native picker on a phone and picks with it, the menu closed", () => {
+    const { self, field } = view(true);
+    expect(field.nativeD).toBe("block");
+    field.onNative!({ target: { value: "Condo" } });
+    expect(self.states[0]).toMatchObject({ selOpen: null, crm: { type: "Condo" }, cust: { ptype: "Condo" } });
+    field.onNative!({ target: { value: "" } });
+    expect(self.states[1]).toMatchObject({ crm: { type: "" }, cust: { ptype: "" } });
+  });
+
+  it("keeps the design's menu on a computer", () => {
+    expect(view(false).field.nativeD).toBe("none");
+  });
+});
