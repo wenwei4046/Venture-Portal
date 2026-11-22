@@ -120,6 +120,11 @@ export interface SalesUi {
   insInfo: string | null;
   // Profile
   profSub: null | "notif" | "auto" | "quick" | "deals";
+  /**
+   * Profile › Quick replies as being edited (2026-11-22): held on the screen while the page is open, so a row still half
+   * typed — which the database does not keep — is not wiped by the 5 s re-read.
+   */
+  qrDraft?: { id: string; shortcut: string; message: string }[] | null;
   /** Profile › Closed deals' period (2026-11-20). */
   dealsPer?: "month" | "3m" | "year" | "all";
   teamOpen: boolean;
