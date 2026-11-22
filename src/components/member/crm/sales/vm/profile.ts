@@ -43,8 +43,13 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
   const K = { share: ["var(--crm-rust)", "var(--crm-tint-attention)", "M16 11a4 4 0 1 0-8 0M4 20a8 8 0 0 1 16 0M19 8v6M16 11h6"], move: ["var(--crm-ink-soft)", "var(--crm-tint-cold)", "M5 12h14m-5-5 5 5-5 5"] } as const;
 
   // Quick replies: the person's list, or the design's starters until they keep their own.
-  const qrs = data.quickReplies.length ? data.quickReplies : DEFAULT_QUICK_REPLIES.map((q, i) => ({ id: "d" + i, ...q }));
-  const setQ = (i: number, p: { shortcut?: string; message?: string }) => act.editQuickReplies(qrs.map((q, j) => (j === i ? { ...q, ...p } : q)));
+  // While the page is open it edits its own copy (ui.qrDraft): the database keeps only rows with a shortcut AND a message,
+  // so the 5 s re-read used to take a new row away mid-typing — the keyboard closed and the page jumped (the owner,
+  // 2026-11-22, a video: "crm quick reply 有问题").
+  const kept = data.quickReplies.length ? data.quickReplies : DEFAULT_QUICK_REPLIES.map((q, i) => ({ id: "d" + i, ...q }));
+  const qrs = ui.profSub === "quick" && ui.qrDraft ? ui.qrDraft : kept;
+  const editQs = (items: typeof qrs) => { patch({ qrDraft: items }); act.editQuickReplies(items); };
+  const setQ = (i: number, p: { shortcut?: string; message?: string }) => editQs(qrs.map((q, j) => (j === i ? { ...q, ...p } : q)));
 
   // Auto-replies.
   // Viewing somebody: their auto-replies, read only (the owner, 2026-10-24: "View as 时读被查看的那个人的设定，只看不能改").
@@ -78,7 +83,7 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
       groups: [{ title: "Messages", rows: [
         { label: "Notifications", icon: "bell" as const, open: () => patch({ profSub: "notif", nTab: "all" }), n: unread ? String(unread) : "", badge: true },
         { label: "Auto-reply", icon: "bot" as const, open: () => patch({ profSub: "auto" }), n: AR.welcome.on || AR.after.on || AR.kws.some(k => k.on) ? "On" : "Off", badge: false },
-        { label: "Quick replies", icon: "message-square-text" as const, open: () => patch({ profSub: "quick" }), n: String(qrs.length), badge: false },
+        { label: "Quick replies", icon: "message-square-text" as const, open: () => patch({ profSub: "quick", qrDraft: null }), n: String(qrs.length), badge: false },
       ] }, { title: "Sales", rows: [
         { label: "Closed deals", icon: "trending-up" as const, open: () => patch({ profSub: "deals" }), n: deals.length ? String(deals.length) : "", badge: false },
       ] }],
@@ -97,7 +102,7 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
     canMarkAll: nTab !== "read" && notifs.some(n => !n.pending && !isRead(n)),
     markAll: () => act.readNotifs(notifs.filter(n => !n.pending && !isRead(n)).map(n => n.id), true),
     nEmpty: !vis.length, nEmptyText: nTab === "unread" ? "You're all caught up." : nTab === "read" ? "Nothing read yet." : "No notifications yet.",
-    openAuto: () => patch({ profSub: "auto" }), openQuick: () => patch({ profSub: "quick" }),
+    openAuto: () => patch({ profSub: "auto" }), openQuick: () => patch({ profSub: "quick", qrDraft: null }),
     // Pending invitations stay as cards; once answered they move into Updates.
     hasInv: vis.some(n => n.pending),
     notifInv: vis.filter(n => n.pending).map(n => ({
@@ -123,9 +128,9 @@ export function profileVM(ctx: SalesCtx, onExit?: () => void) {
       title: q.shortcut, text: q.message,
       setTitle: (e: ChangeEvent<HTMLInputElement>) => setQ(i, { shortcut: e.target.value }),
       setText: (e: ChangeEvent<HTMLTextAreaElement>) => setQ(i, { message: e.target.value }),
-      remove: () => act.editQuickReplies(qrs.filter((_, j) => j !== i)),
+      remove: () => editQs(qrs.filter((_, j) => j !== i)),
     })),
-    qrRowAdd: () => act.editQuickReplies([...qrs, { id: "n" + Date.now(), shortcut: "", message: "" }]),
+    qrRowAdd: () => editQs([...qrs, { id: "n" + Date.now(), shortcut: "", message: "" }]),
     arW: { ...imgOf(W, p => setAR(a => ({ ...a, welcome: { ...a.welcome, ...p } }))), text: W.text, op: W.on ? 1 : 0.5, ...swv(W.on),
       toggle: () => setAR(a => ({ ...a, welcome: { ...a.welcome, on: !a.welcome.on } })),
       type: (e: ChangeEvent<HTMLTextAreaElement>) => { const text = e.target.value; setAR(a => ({ ...a, welcome: { ...a.welcome, text } })); } },

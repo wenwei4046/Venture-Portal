@@ -382,7 +382,8 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
     editQuickReplies: (() => {
       let timer: ReturnType<typeof setTimeout> | null = null;
       return (items: CrmQuickReply[]) => {
-        setData(d => ({ ...d, quickReplies: items }));
+        // The rest of the CRM (the chat's "/") sees only finished rows, as the database keeps them; the page keeps its draft.
+        setData(d => ({ ...d, quickReplies: items.filter(i => i.shortcut.trim() && i.message.trim()) }));
         if (!live) return;
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => { void crmWrite("crm_save_quick_replies", { p_items: items.map(i => ({ shortcut: i.shortcut, message: i.message })) }).then(r => { if (!r.ok) toast(r.error); }); }, 700);
