@@ -560,7 +560,9 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       const ls = st.lines.filter(l => l.ci === ci);
       return {
         _ci: ci, countOrSum: phone ? String(ls.filter(l => l.qty > 0).length) : `${ls.filter(l => l.qty > 0).length} item${ls.filter(l => l.qty > 0).length === 1 ? "" : "s"}`, label: c.label, count: `${ls.filter(l => l.qty > 0).length} item${ls.filter(l => l.qty > 0).length === 1 ? "" : "s"}`,
-        canAdd: c.items.some(i => i.kind),
+        // Every category can add (the owner, 2026-11-22: a first quotation kept low, furniture added after meeting the
+        // customer — "我搜寻哪个品项就能直接可以搜到家私 … 不管它在哪个 catalogue 里").
+        canAdd: true,
         add: () => this.openSheet({ mode: "add", ci }),
         lines: ls.map(l => {
           const ch = changes.find(x => x.l.id === l.id);
@@ -609,7 +611,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         const c = pkg.cats[st.sheet.ci];
         const ks = [...new Set(c.items.map(i => i.kind).filter(Boolean))];
         sheet = { eyebrow: "ADD ITEM", title: c.label, sub: "Priced at cost × " + m, url: (kinds[ks[0]] || {}).url || "https://www.b2bfurnituresupply.com" };
-        options = st.catalog.items.filter(it => ks.includes(it.kind) && it.cost != null && !it.noPrice && match(it)).map(it => ({ ...it, item: it, delta: signed(Math.round(it.cost * m)), ink: "#1F1F1C" }));
+        // A search reads the whole catalogue, whatever its category; with nothing typed, the category's own kinds as before.
+        options = st.catalog.items.filter(it => (q ? true : ks.includes(it.kind)) && it.cost != null && !it.noPrice && match(it)).map(it => ({ ...it, item: it, delta: signed(Math.round(it.cost * m)), ink: "#1F1F1C" }));
       }
       const VAR = /\s*\(#\)|\s+\d{2,4}\/\d{2,5}(?:\/\d{1,5})*$|\b(?:LEFT|RIGHT|LHF|RHF|LHS|RHS|LH|RH|REVERSIBLE)(?:\s+(?:FACING|HAND|ARM|CHAISE|SIDE))?\b/gi;
       const lead = /^[\d\/\s-]{6,}(?=[A-Z])/i;
@@ -624,6 +627,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       options = groups.map(g => { const vs = g.list; const selId = (st.vsel || {})[g.k]; const o = vs.find(v => v.id === selId) || vs.find(v => v.cur) || vs[0]; const same = shared(vs);
         const vars = vs.length > 1 ? vs.map(v => { const on = v === o; return { label: (v.group ? title(words(v.name).slice(same).join(" ")) : vl(v.name)) || v.code || "—", bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: e => { e.stopPropagation(); this.setState(s => ({ vsel: { ...(s.vsel || {}), [g.k]: v.id } })); } }; }) : [];
         return { ...o, vars, hasVars: vars.length > 1, varCount: vars.length > 1 ? vars.length + " options" : "", gname: vs.length > 1 ? (o.group ? words(o.name).slice(0, same).join(" ") || o.name : g.k) : o.name }; });
+      // A search over the whole catalogue draws its first 150 (a phone stays quick); typing more narrows it.
+      if (st.sheet.mode !== "swap" && q && options.length > 150) options = options.slice(0, 150);
       const zl = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return im ? { img: im, name: title(o.name), code: [o.code, o.color].filter(Boolean).join(" · "), delta: o.delta, item: o.item } : null; }).filter(Boolean);
       options = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return {
         name: title(o.gname), code: [o.code || "—", o.color].filter(Boolean).join(" · "), img: im, initials: im ? "" : (o.name.match(/\b[A-Z]/g) || []).slice(0, 2).join(""),
