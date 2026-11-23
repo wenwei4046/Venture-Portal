@@ -114,7 +114,7 @@ beforeEach(() => {
 describe('a department’s own P&L under Dept Pool', () => {
   it('heads with the department, the statement and its period, the P&L picked', async () => {
     render(await page('marketing', { view: 'pnl' }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · MARKETING · JAN – OCT 2026')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · MARKETING · JUL – OCT 2026')
     // 2026-10-25 (round 11): the title names the statement on show.
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Marketing - Profit & Loss')
     expect(within(views()).getByRole('link', { name: 'P&L' })).toHaveAttribute('aria-current', 'page')
@@ -130,13 +130,13 @@ describe('a department’s own P&L under Dept Pool', () => {
     expect(card('Revenue · Oct (to date)')).toHaveTextContent('RM 40,000.00')
     expect(card('Expenses · Oct (to date)')).toHaveTextContent('RM 5,000.00')
     expect(card('Net profit · accumulated')).toHaveTextContent('RM 80,000.00')
-    expect(statementCount('Monthly P&L')).toHaveTextContent('MARKETING · JAN – OCT 2026')
+    expect(statementCount('Monthly P&L')).toHaveTextContent('MARKETING · JUL – OCT 2026')
   })
 
   it('has the period to choose, the switch beside it, but no Segment — the page is the department', async () => {
     render(await page('marketing'))
     const period = screen.getByRole('group', { name: 'Period' })
-    expect(within(period).getByRole('combobox', { name: 'From' })).toHaveValue('2026-01')
+    expect(within(period).getByRole('combobox', { name: 'From' })).toHaveValue('2026-07')
     expect(within(period).getByRole('combobox', { name: 'To' })).toHaveValue('2026-10')
     expect(within(period).getByRole('group', { name: 'Statement' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Segment' })).toBeNull()
@@ -205,7 +205,7 @@ describe('a department’s own Cash Flow under Dept Pool', () => {
     // Money out as the charts draw it: a positive figure, in orange — no longer a red bracket.
     expect(card('Money out')).toHaveTextContent('RM 45,000.00')
     expect(card('Closing cash')).toHaveTextContent('RM 115,000.00')
-    expect(statementCount('Monthly cash flow')).toHaveTextContent('MARKETING · JAN – OCT 2026')
+    expect(statementCount('Monthly cash flow')).toHaveTextContent('MARKETING · JUL – OCT 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/reports/monthly-cash-flow/export?format=xlsx&period=2026-10&segment=marketing')
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['In vs Out', 'Where the money came from and went', 'Monthly cash flow'])
   })

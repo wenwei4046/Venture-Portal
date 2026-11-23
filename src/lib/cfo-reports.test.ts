@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { classifyRows, buildTrialBalance, fetchTrialBalance, buildLedger, foldPayrollLedgerLines, resolveSourceDescriptions, groupRevenueByAccount, isCalendarDay } from './cfo-reports'
+import { classifyRows, buildTrialBalance, closePriorYears, fetchTrialBalance, buildLedger, foldPayrollLedgerLines, resolveSourceDescriptions, groupRevenueByAccount, isCalendarDay } from './cfo-reports'
+import type { AccountType } from './coa'
 import type { RawPvSourceRow, RawInvoiceRow, RawTreasury, CoaLeafAccount, RawLedgerLine, FoldableLedgerLine } from './cfo-reports'
 
 const pv = (o: Partial<RawPvSourceRow>): RawPvSourceRow => ({
@@ -705,5 +706,26 @@ describe('isCalendarDay', () => {
     expect(isCalendarDay('abc')).toBe(false)
     expect(isCalendarDay(undefined)).toBe(false)
     expect(isCalendarDay('')).toBe(false)
+  })
+})
+
+// 2026-11-24 — the year closed in the reports (lib/fiscal-year): the trial balance keeps each P&L account's own year
+// and carries what came before in Retained Earnings.
+describe('closePriorYears', () => {
+  const types: Record<string, AccountType> = { '5000': 'revenue', '9000': 'expense', '3000': 'asset', '1510': 'equity' }
+  it('moves the P&L before the year into Retained Earnings and leaves the rest', () => {
+    const now = new Map([['5000', -3000], ['9000', 1200], ['3000', 1800]])
+    const before = new Map([['5000', -1000], ['9000', 400], ['3000', 600]])
+    const out = closePriorYears(now, before, (c) => types[c])
+    expect(out.get('5000')).toBe(-2000)
+    expect(out.get('9000')).toBe(800)
+    expect(out.get('3000')).toBe(1800)
+    expect(out.get('1510')).toBe(-600)
+    // Still balances.
+    expect([...out.values()].reduce((s, v) => s + v, 0)).toBe(0)
+  })
+  it('changes nothing when nothing came before', () => {
+    const now = new Map([['5000', -3000], ['3000', 3000]])
+    expect(closePriorYears(now, new Map(), (c) => types[c])).toEqual(now)
   })
 })

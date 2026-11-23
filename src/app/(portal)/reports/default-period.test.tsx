@@ -84,7 +84,7 @@ describe("reports open on the office's month", () => {
     render(await asTheServer(() => MonthlyPnlPage({ searchParams: Promise.resolve({}) })))
     expect(mocks.buildPnlAccounts).toHaveBeenCalledWith([], [], expect.objectContaining({ year: 2026, throughMonth: 11 }))
     expect(screen.getByTestId('months')).toHaveTextContent('2026-11 · now 2026-11')
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('JAN – NOV 2026')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('JUL – NOV 2026')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', expect.stringContaining('period=2026-11'))
   })
 

@@ -169,6 +169,17 @@ describe('buildBalanceSheet', () => {
     expect(bs.check.current).toBe(0)
     expect(bs.check.previous).toBe(0)
   })
+
+  // 2026-11-24 — the year closed in the reports (lib/fiscal-year): June's is the first year's, all of it the year's;
+  // a July sheet has it all brought forward and the new year at nothing.
+  it('splits the earnings at the financial year’s start', () => {
+    expect(bs.broughtForward.current).toBe(0)
+    expect(bs.forYear.current).toBe(2050)
+    const july = buildBalanceSheet(LINES, ACCOUNTS, { ...FILTER, current: { from: '2026-07-01', to: '2026-07-31' } })
+    expect(july.broughtForward.current).toBe(2050)
+    expect(july.forYear.current).toBe(0)
+    expect(july.check.current).toBe(0)
+  })
 })
 
 describe('buildCashFlow', () => {

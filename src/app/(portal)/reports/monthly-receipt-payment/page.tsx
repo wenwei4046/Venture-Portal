@@ -58,6 +58,10 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   const segment = params.segment ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
+  // The period's months start where the financial year does (2026-11-24, lib/fiscal-year).
+  const nowYM = officeMonth()
+  const range = reportRange({ from: params.from, period }, nowYM)
+  const buildFrom = range.buildFrom
 
   const consolidated = !segment
   // The bridge starts beside the journal read with the bank codes still
@@ -83,10 +87,10 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
     [...lines, ...ibLines],
     [...accounts, interBillTransferAccount, payrollCustodyAccount],
     bankCodes,
-    { year, throughMonth, segment: segmentFilterFor(segment) },
+    { year, throughMonth, segment: segmentFilterFor(segment), ...(buildFrom ? { from: buildFrom } : {}) },
   )
 
-  const { months, accPeriod } = monthColumns(year, throughMonth)
+  const { months, accPeriod } = monthColumns(year, throughMonth, buildFrom)
   const companyLabelById = new Map<string, string>(
     ((companyRows ?? []) as Array<{ id: string; name: string; short_code: string | null }>).map(
       (c) => [c.id, c.short_code ?? c.name],
@@ -108,8 +112,6 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
   // The page (2026-10-09, the user's Claude Design handoff): the period From –
   // To, the two views and the exports in the head, the cards, one control row,
   // the months separated.
-  const nowYM = officeMonth()
-  const range = reportRange({ from: params.from, period }, nowYM)
   const cut = sliceMatrixMonths(data.columns, rows, range.from)
   // A card reads the Accumulated of its line as cut to From: a flow adds up, an
   // opening reads its first month, a closing or a balance its last.

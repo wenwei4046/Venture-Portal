@@ -42,13 +42,14 @@ export default async function MonthlyCashFlowPage({ searchParams }: Props) {
   const consolidated = !segment
   // The read a department's own page under Dept Pool makes for its segment
   // too (2026-10-09, lib/monthly-statements): one Cash Flow, two places.
-  const { data, rows } = await loadMonthlyCashFlow(supabase, { year, throughMonth, segment: segmentFilterFor(segment), consolidated })
+  // The period's months start where the financial year does (2026-11-24, lib/fiscal-year).
+  const nowYM = officeMonth()
+  const range = reportRange({ from: params.from, period }, nowYM)
+  const { data, rows } = await loadMonthlyCashFlow(supabase, { year, throughMonth, segment: segmentFilterFor(segment), consolidated, ...(range.buildFrom ? { from: range.buildFrom } : {}) })
 
   // The page (2026-10-09, the user's Claude Design handoff): the period From –
   // To, the two views and the exports in the head, the cards, one control row,
   // the months separated.
-  const nowYM = officeMonth()
-  const range = reportRange({ from: params.from, period }, nowYM)
   const segments = [...REPORT_SEGMENTS, ...extraReportSegments(primedRegistryRows())]
   const segName = (segments.find((s) => s.value === segment) ?? segments[0]).label
   const exportHref = (format: 'xlsx' | 'pdf') => {

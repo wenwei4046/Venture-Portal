@@ -12,6 +12,7 @@ import type { CardTone, HubCardItem } from '@/components/finv/Hub'
 import type { HrIconName } from '@/components/hrv/icons'
 import type { AccountNode, BalanceSheetReport, CashFlowReport, PnlReport, ReportSection } from '@/lib/gl-reports'
 import { DAY_BUCKETS, type AgingView } from '@/lib/debtor-aging'
+import { earningsNodes } from '@/lib/gl-report-blocks'
 import type { DueRow, LoanMonitorData, MonitorSide, OutstandingRow } from '@/lib/loan-monitor'
 
 export type ReportHub = 'pnl' | 'cf' | 'debtor' | 'loan' | 'bs'
@@ -74,7 +75,7 @@ export function sectionLines(section: Pick<ReportSection, 'nodes' | 'root'>, sig
       return
     }
     if (Math.abs(n.current) < 0.005) return
-    out.push({ key: n.code, label: n.name, sub: n.code === '—' ? undefined : n.code, value: f2(sign * n.current), tone: sign * n.current < 0 ? 'out' : null })
+    out.push({ key: n.code, label: n.name, sub: n.code.startsWith('—') ? undefined : n.code, value: f2(sign * n.current), tone: sign * n.current < 0 ? 'out' : null })
   }
   section.nodes.forEach(walk)
   return out
@@ -148,7 +149,7 @@ export function balanceSheetModel(bs: BalanceSheetReport, period: string, segmen
   const asAt = dayName(end)
   const equity: ReportSection = {
     ...bs.equity,
-    nodes: [...bs.equity.nodes, { code: '—', name: 'Retained & current earnings (cumulative P&L)', current: bs.earnings.current, previous: bs.earnings.previous, txns: [], children: [] }],
+    nodes: [...bs.equity.nodes, ...earningsNodes(bs)],
     current: r2(bs.equity.current + bs.earnings.current),
     previous: r2(bs.equity.previous + bs.earnings.previous),
   }

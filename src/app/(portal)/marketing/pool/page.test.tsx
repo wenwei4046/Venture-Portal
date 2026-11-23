@@ -114,7 +114,7 @@ describe('Marketing’s own pool', () => {
 
   it('is Finance’s Marketing page: the Cash Flow first, the P&L a click away on this page', async () => {
     render(await page())
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · MARKETING · JAN – OCT 2026')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('DEPARTMENTS · MARKETING · JUL – OCT 2026')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Marketing - Cash Flow')
     expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('aria-current', 'page')
     expect(within(views()).getByRole('link', { name: 'P&L' })).toHaveAttribute('href', '/marketing/pool?view=pnl')

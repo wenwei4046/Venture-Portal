@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { fyStartOf } from './fiscal-year'
 
 // The month-by-month reports' period (2026-10-09, the user's Claude Design
 // handoff): From – To within one fiscal year, To by default this month and
@@ -8,6 +9,10 @@ import dayjs from 'dayjs'
 // A department's page (2026-10-25, its charts) also reaches back across the
 // year — its "12 months" is Nov – Oct — so From may stand up to eleven months
 // before To there (`crossYear`); the builders then start at From.
+//
+// The year is the financial year (2026-11-24, lib/fiscal-year): From by default
+// its first month — July, or January 2025 in the first, eighteen-month year —
+// and no earlier. A From before To's January has the builders start there.
 
 const YM = /^\d{4}-\d{2}$/
 
@@ -17,7 +22,7 @@ export interface ReportRange {
   year: number
   /** To's month, 1–12 — what the matrix builders take. */
   throughMonth: number
-  /** From is January: the matrix is used as built. */
+  /** From is the financial year's first month — the period as it opens, nothing asked. */
   wholeYear: boolean
   /** From before To's January (`crossYear` only): where the builders start, the matrix then used as built. */
   buildFrom?: string
@@ -32,10 +37,18 @@ export function reportRange(params: { from?: string; period?: string }, nowYM: s
   const to = YM.test(params.period ?? '') ? (params.period as string) : nowYM
   const year = Number(to.slice(0, 4))
   const jan = `${year}-01`
-  const asked = YM.test(params.from ?? '') ? (params.from as string) : jan
-  const earliest = opts.crossYear ? shiftMonth(to, -11) : jan
-  const from = asked >= earliest && asked <= to ? asked : jan
-  return { from, to, year, throughMonth: Number(to.slice(5, 7)), wholeYear: from === jan, ...(from < jan ? { buildFrom: from } : {}) }
+  const fy = fyStartOf(to)
+  const asked = YM.test(params.from ?? '') ? (params.from as string) : fy
+  const earliest = earliestFrom(to, opts.crossYear)
+  const from = asked >= earliest && asked <= to ? asked : fy
+  return { from, to, year, throughMonth: Number(to.slice(5, 7)), wholeYear: from === fy, ...(from < jan ? { buildFrom: from } : {}) }
+}
+
+/** How far back From may go: the financial year's first month, or eleven months before To on a department's page if that is earlier. */
+function earliestFrom(to: string, crossYear?: boolean): string {
+  const fy = fyStartOf(to)
+  const twelve = shiftMonth(to, -11)
+  return crossYear && twelve < fy ? twelve : fy
 }
 
 /** "Jan – Oct 2026", "Oct 2026" when one month, "Nov 2025 – Oct 2026" across a year. */
@@ -58,14 +71,18 @@ export function toChoices(nowYM: string, years = 2): string[] {
   return out
 }
 
-/** From's choices: January to To, in To's year. */
-export function fromChoices(to: string): string[] {
-  const year = to.slice(0, 4)
-  const last = Number(to.slice(5, 7))
-  return Array.from({ length: last }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`)
+const monthsFrom = (first: string, last: string): string[] => {
+  const out: string[] = []
+  for (let m = first; m <= last; m = shiftMonth(m, 1)) out.push(m)
+  return out
 }
 
-/** A department's From choices: the twelve months up to To, oldest first. */
+/** From's choices: the financial year's first month to To. */
+export function fromChoices(to: string): string[] {
+  return monthsFrom(earliestFrom(to), to)
+}
+
+/** A department's From choices: the twelve months up to To, oldest first — from the financial year's start when that is further back. */
 export function crossYearFromChoices(to: string): string[] {
-  return Array.from({ length: 12 }, (_, i) => shiftMonth(to, i - 11))
+  return monthsFrom(earliestFrom(to, true), to)
 }
