@@ -1152,7 +1152,7 @@ interface AdsBits {
   /** v4 D2a: the figure strip (absent in the prototype harness, which keeps the old table). */
   apStrip?: AdsStripBits;
 }
-interface AdsStripBits { items: { key: string; label: string; total: string; color: string; remove: (() => void) | null; sub?: string[]; title?: string }[]; canAdd: boolean; add: () => void; open: boolean; toggle: () => void }
+interface AdsStripBits { items: { key: string; label: string; total: string; color: string; remove: (() => void) | null; sub?: string[]; title?: string; open?: () => void }[]; canAdd: boolean; add: () => void; open: boolean; toggle: () => void }
 
 /**
  * An ad's name in Ads Performance: a small ↗ beside it opens the ad (the owner, 2026-10-24: "電腦版也要有可以導入看該廣告");
@@ -1303,8 +1303,9 @@ export function DeskAdsStrip({ S }: { S: AdsStripBits }) {
     <div data-ads-strip="" style={{ flex: "none", display: "flex", alignItems: "stretch", height: "86px", boxSizing: "border-box", borderRadius: "14px", border: "1px solid var(--crm-rule)" }}>
       <div style={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${Math.max(1, S.items.length)},minmax(0,1fr))`, alignItems: "center" }}>
         {S.items.map((f, i) => (
-          <div key={f.key} data-ads-figure={f.key} title={f.sub?.length ? undefined : f.title} onMouseEnter={() => setHov(f.key)} onMouseLeave={() => setHov(h => (h === f.key ? null : h))}
-            style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: 0, padding: busy ? "0 4px" : "0 8px", borderLeft: i ? "1px solid var(--crm-fig-div)" : undefined }}>
+          <div key={f.key} data-ads-figure={f.key} title={f.sub?.length ? undefined : f.open ? "Click to see these customers" : f.title} onMouseEnter={() => setHov(f.key)} onMouseLeave={() => setHov(h => (h === f.key ? null : h))}
+            role={f.open ? "button" : undefined} tabIndex={f.open ? 0 : undefined} onClick={f.open} onKeyDown={f.open ? e => { if (e.key === "Enter") f.open!(); } : undefined}
+            style={{ cursor: f.open ? "pointer" : undefined, position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: 0, padding: busy ? "0 4px" : "0 8px", borderLeft: i ? "1px solid var(--crm-fig-div)" : undefined }}>
             <span style={{ display: "flex", alignItems: "center", gap: "6px", maxWidth: "100%", font: "500 12.5px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
               <span style={{ width: "8px", height: "8px", flex: "none", borderRadius: "50%", background: f.color }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{f.label}</span>
             </span>

@@ -96,8 +96,9 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
               {t.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>{o.vs}</span>{t.sub && <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {t.sub}</span>}
             </span>
             {/* How the figure is worked out and what it is compared with, on hover — Ads Performance's card, directly under the
-                figure from the tile's left edge (the owner, 2026-11-17: "鼠标指向，出现在数据下方"); the row's last tile right-aligned. */}
-            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} at="8px" last={i % 4 === 3 || i === o.tiles.length - 1} />}
+                figure from the tile's left edge (the owner, 2026-11-17: "鼠标指向，出现在数据下方"); the row's last tile too, as Ads spend's
+                (the owner, 2026-11-23, of Leads' card drawn at the tile's right edge: "改成像 ads spend 提示的显示方式"). */}
+            {hov === t.label && <DeskFigureTip sub={t.tip.sub} title={t.tip.title} at="8px" />}
           </div>
         ))}
       </div>

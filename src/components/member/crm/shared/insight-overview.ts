@@ -102,6 +102,14 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const repeats = noAdRepeats(data.customers);
   const adCs = data.customers.filter(c => !repeats.has(c.id));
+  // Leads count each PERSON once, everywhere (the owner, 2026-11-23: 185 / 180 / 186 → "能不能统一"; picked "一人只算一次"):
+  // a "no ad" chat that is already an ad's lead (noAdRepeats) is not a lead again — its visits and its sale still count.
+  const workAll = (cs: CrmCustomer[], rr: OvRange): OvWork => {
+    const w = workOf(cs, data, rr, now), extra = cs.filter(c => repeats.has(c.id) && inRange(c.createdAt, rr)).length;
+    if (!extra) return w;
+    const leads = Math.max(0, w.leads - extra);
+    return { ...w, leads, apptRate: leads ? (w.booked / leads) * 100 : null };
+  };
 
   // Every ad: those that brought leads (in this brand) and those added before their first lead whose Page is the brand's.
   const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added && !n.hidden && adPageInSource(n.pageId, p.src)).map(([id]) => id);
@@ -173,12 +181,12 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   ];
   const ofIds = (pids: string[]) => data.customers.filter(c => c.assignedTo && pids.includes(c.assignedTo));
   const teams: OvTeamRow[] = groups.map(g => ({
-    key: g.key, name: g.name, ...workOf(ofIds(g.people.map(x => x.id)), data, r, now),
-    people: g.people.map(x => ({ id: x.id, name: x.name, ...workOf(ofIds([x.id]), data, r, now) })).sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name)),
+    key: g.key, name: g.name, ...workAll(ofIds(g.people.map(x => x.id)), r),
+    people: g.people.map(x => ({ id: x.id, name: x.name, ...workAll(ofIds([x.id]), r) })).sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name)),
   }));
   const placed = new Set(groups.flatMap(g => g.people.map(x => x.id)));
   const nobody = data.customers.filter(c => !c.assignedTo || !placed.has(c.assignedTo));
-  const nobodyW = workOf(nobody, data, r, now);
+  const nobodyW = workAll(nobody, r);
   if (nobodyW.leads) teams.push({ key: "", name: NOBODY, ...nobodyW, people: [] });
 
   // Ad → teams: each ad's leads of the period, by the team that has them now.
@@ -206,7 +214,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     .map(([a, b]) => ({ key: metaKey(a, b), since: isoOf(a), until: isoOf(b), ids: paidIds.filter(id => !(id in (meta?.[metaKey(a, b)] ?? {}))) }))
     .filter(n => n.ids.length);
 
-  return { ads, adsPrev, work: workOf(data.customers, data, r, now), workPrev: workOf(data.customers, data, prev, now), brands, adRows, teams, adTeams, need };
+  return { ads, adsPrev, work: workAll(data.customers, r), workPrev: workAll(data.customers, prev), brands, adRows, teams, adTeams, need };
 }
 
 /* ── Words, the same on both screens ───────────────────────────────────── */

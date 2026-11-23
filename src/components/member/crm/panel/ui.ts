@@ -108,7 +108,7 @@ export interface PanelUi {
   nfOpen: boolean;
   /** Profile › Closed deals (2026-11-20): open, its period, the seller picked. */
   pDeals?: boolean;
-  pDealsPer?: "month" | "3m" | "year" | "all";
+  pDealsPer?: import("../sales/vm/deals").DealPeriod;
   pDealsWho?: string | null;
   nfF: string;
   /** Notifications: Unread (default) | Read (rev 1011). */

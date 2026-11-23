@@ -28,6 +28,8 @@ export interface DealRow {
   key: string; name: string; ini: string; when: string; where: string; amount: string;
   /** The desktop's columns: the day ("18 Nov") and who closed it (the Team side). */
   day?: string; by?: string;
+  /** First contact ("3 Nov"), how long it took ("18 days"), unit size, where the lead came from (the owner, 2026-11-23). */
+  first?: string; took?: string; unit?: string; ad?: string;
   files: { label: string; file: CrmWonFile; open: () => void }[];
   open: (() => void) | null;
 }

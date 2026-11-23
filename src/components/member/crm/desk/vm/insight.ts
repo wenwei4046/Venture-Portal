@@ -309,7 +309,10 @@ export function clistVM(ctx: DeskCtx) {
   const stLabel: Record<string, string> = { "st:New": "New", "st:Overdue": "Attention", "st:Appointment": "Appointment", "st:Follow up": "Follow up", "st:Cold": "Cold leads" };
   type Row = { id: string; name: string; ini: string; sub: string; status: string; ord: number; rep: string };
   let rows: Row[];
-  if (key.startsWith("st:")) {
+  if (ui.clistIds && key === "Appointments") {
+    const want = new Set(ui.clistIds);
+    rows = all.filter(x => want.has(x.id)).map((x, i) => ({ id: x.id, name: x.name, ini: x.ini, sub: `${x.ad} · ${x.owner}`, status: x.status, ord: i, rep: x.owner }));
+  } else if (key.startsWith("st:")) {
     const want = key.slice(3), match = (k: string) => want === "Overdue" ? ["Overdue", "Urgent", "Reply soon"].includes(k) : k === want;
     rows = all.filter(x => inR(x.c.createdAt) && match(x.key)).map((x, i) => ({ id: x.id, name: x.name, ini: x.ini, sub: `${x.ad} · ${x.owner}`, status: x.status, ord: i, rep: x.owner }));
   } else if (key === "Leads" || key === "Booked" || key === "Reply 24 h") {
@@ -353,7 +356,7 @@ export function clistVM(ctx: DeskCtx) {
         : k === "Salesperson" ? (a, b) => (a.rep || "~").localeCompare(b.rep || "~") || a.ord - b.ord
           : k === "Name A–Z" ? (a, b) => a.name.localeCompare(b.name)
             : (a, b) => lastOf(b.id) - lastOf(a.id));
-  const isList = key.startsWith("st:") || key === "Leads" || key === "Booked" || key === "Reply 24 h" || key === "Won";
+  const isList = key.startsWith("st:") || key === "Appointments" || key === "Leads" || key === "Booked" || key === "Reply 24 h" || key === "Won";
   return {
     clistN: isList ? `${rows.length} ${rows.length === 1 ? "customer" : "customers"}` : `${rows.length} ${rows.length === 1 ? "visit" : "visits"}`,
     clistEmpty: ui.kind === "clist" && !rows.length,

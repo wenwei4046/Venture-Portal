@@ -10,7 +10,7 @@ import { activityVM, type ActivityUi, type AssignedRow } from "./team-activity";
 const P = (id: string, name: string, uplineId: string | null, role: CrmPerson["role"] = "rs"): CrmPerson => ({ id, name, role, uplineId, fullTime: true, login: true });
 const people = [P("tl", "Stanley", null, "tl"), P("a", "Chea Huan", "tl"), P("b", "Alvin", "tl")];
 const at = (hhmm: string) => new Date(`2026-11-06T${hhmm}:00+08:00`).toISOString();
-const cust = (id: string, adId: string | null, ad: string) => ({ id, name: `Cust ${id}`, ad, adId, status: "new", messages: [{ id: `${id}0`, kind: "text", text: "", from: "lead", at: at("10:00") }] } as unknown as CrmCustomer);
+const cust = (id: string, adId: string | null, ad: string) => ({ id, name: `Cust ${id}`, ad, adId, status: "new", createdAt: at("10:00"), messages: [{ id: `${id}0`, kind: "text", text: "", from: "lead", at: at("10:00") }] } as unknown as CrmCustomer);
 const d = { people, customers: [cust("1", "AD1", "Skyline"), cust("2", "AD2", "Astrum"), cust("3", "AD1", "Skyline"), cust("4", null, "")], visits: [], events: [], leaves: [], ftRules: [], lockedStaff: [],
   settings: DEFAULT_CRM_SETTINGS, adNames: { AD1: { name: "Skyline Embassy" } }, can: { viewAll: true, editAll: true, editOwn: true, manage: true } } as unknown as CrmData;
 const rows: AssignedRow[] = [
@@ -51,5 +51,19 @@ describe("Team activity by ad", () => {
     const list = (who: string) => vm().groups.flatMap(g => g.rows).find(r => r.name === who)!.list.map(l => [l.name, l.ad]);
     expect(list("Chea Huan").sort()).toEqual([["Cust 1", "Skyline"], ["Cust 4", "WhatsApp · no ad"]]);
     expect(list("Alvin").sort()).toEqual([["Cust 2", "Astrum"], ["Cust 3", "Skyline"]]);
+  });
+});
+
+// One Leads figure everywhere (the owner, 2026-11-23): Team activity counts the leads that FIRST CAME IN in the period, each
+// person once — one handed over today but first in yesterday stays in the list and is no lead of today's.
+describe("Team activity's Leads are Overview's", () => {
+  it("counts by the day a customer first came in, not by the day it was handed over", () => {
+    const old = { ...cust("9", "AD1", "Skyline"), createdAt: new Date("2026-11-05T10:00:00+08:00").toISOString() } as CrmCustomer;
+    const d2 = { ...d, customers: [...d.customers, old] } as CrmData;
+    const v = activityVM({ data: d2, book: peopleBook(d2, [{ id: "tl", name: "Team Stanley", tl: people[0], people: people.slice(1) }], []),
+      rows: [...rows, { contact_id: "9", actor: "tl", data: { to: "a" }, at: at("11:00") }], now: new Date(at("18:00")),
+      ui: { team: "all", who: null, menu: false, per: "Today", from: "2026-11-06", to: "2026-11-06", open: {}, lead: null, sort: null, pMenu: false, pOpen: {}, pLead: null } as ActivityUi,
+      set: () => {}, nameOf: id => people.find(p => p.id === id)?.name ?? "", roleOf: () => "", openChat: () => {} });
+    expect(leads(v)).toMatchObject(leads(vm()));
   });
 });
