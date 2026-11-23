@@ -15,8 +15,10 @@
 -- lands anywhere else. A new showroom, form or template takes crm_cur_sub() by its column's default.
 --
 -- Every sub-department starts as the CRM is today: its settings and appointment types copied from crm_settings (which is
--- kept, frozen, for crm_scope()'s sub_department_id), IR's forms copied to each other sub-department, IR's templates to
--- Dream Crafter's (one WhatsApp Business account sends from both numbers). The showrooms and the booking link stay IR's.
+-- kept, frozen, for crm_scope()'s sub_department_id), IR's forms copied to each other sub-department. The templates, the
+-- showrooms and the booking link stay IR's: IR's four templates are The Conts' own words (its GRR rental scheme), not
+-- Dream Crafter's — DC imports its own from Meta (one WhatsApp Business account sends from both numbers) or writes them.
+-- (Applied 2026-11-24 01:01 with the four copied onto DC's list, switched off at once; deleted at 01:10, never used.)
 
 CREATE OR REPLACE FUNCTION pg_temp.swap_once(p_sig regprocedure, p_old text, p_new text)
 RETURNS void
@@ -299,23 +301,13 @@ create unique index crm_templates_meta_name on public.crm_templates (sub_departm
 drop index if exists public.crm_showrooms_name_key;
 create unique index crm_showrooms_name_key on public.crm_showrooms (sub_department_id, lower(trim(name))) nulls not distinct;
 
--- Every other sub-department starts with IR's forms; Dream Crafter keeps the templates it can send today.
+-- Every other sub-department starts with IR's forms (its templates are its own: none to start with).
 insert into public.crm_forms (name, kind, sections, sort_order, created_by, updated_by, sub_department_id)
 select f.name, f.kind, f.sections, f.sort_order, f.created_by, f.updated_by, sd.id
   from public.crm_forms f
   cross join public.comm_sub_departments sd
  where f.sub_department_id = public.crm_scope() and sd.is_active and sd.id <> public.crm_scope()
    and not exists (select 1 from public.crm_forms g where g.sub_department_id = sd.id);
--- A template's picture / video / PDF is kept under its own id (crm_template_header): a copy starts with none — and Off, if
--- its original had one (today none has).
-insert into public.crm_templates (name, channel, body, status, is_on, meta_name, meta_id, language, category, reject_reason,
-  created_by, updated_by, source, parts, header_path, header_mime, header_name, sub_department_id)
-select t.name, t.channel, t.body, t.status, t.is_on and t.header_path is null, t.meta_name, t.meta_id, t.language, t.category, t.reject_reason,
-       t.created_by, t.updated_by, t.source, t.parts, null, null, null, sd.id
-  from public.crm_templates t
-  cross join public.comm_sub_departments sd
- where t.sub_department_id = public.crm_scope() and sd.is_active and sd.id = public.crm_brand_sub('dc')
-   and not exists (select 1 from public.crm_templates u where u.sub_department_id = sd.id);
 
 -- Forms: a kind's "in use" (the first by sort order) is its sub-department's.
 create or replace function public.crm_booking_form_of(p_sub uuid)

@@ -2,8 +2,9 @@
 // "Management 这边也不是统一的，IR 是 IR，DC 是 DC，包括 setting 等等都要分开"; "每个 segment 分开就对了"). The migration swaps
 // statements into production's bodies (pg_temp.swap_once), so the 22 functions it touches are loaded from
 // crm-management-apart-production.sql — production's own definitions, read through the CLI — and the migration runs VERBATIM,
-// twice. Under test: every sub-department starts as the CRM is (its settings copied, IR's forms to each, IR's templates to
-// DC's); a write through the "…_in" functions lands on that sub-department alone and asks CRM · Manage and its reach; a
+// twice. Under test: every sub-department starts as the CRM is (its settings copied, IR's forms to each; the templates —
+// The Conts' words — stay IR's); a write through the "…_in" functions lands on that sub-department alone and asks CRM ·
+// Manage and its reach; a
 // sub-department with no row of its own reads IR's and, written once, starts as a copy of IR's; a customer reads its own
 // sub-department's settings; showroom names are one sub-department's, a new showroom's draft too; each kind of form's in-use
 // one is its sub-department's; Import from Meta fills that list alone. No live I/O.
@@ -108,10 +109,9 @@ check(await q(`select sub_department_id::text as sub, reply_soon_h as s, auto_as
 check(await one(`select count(*)::int from fx_audit where tbl = 'crm_sub_settings'`), 2, 'the new table is in the audit (once a run)')
 check(await q(`select sub_department_id::text as sub, kind, count(*)::int as n from crm_forms group by 1, 2 order by 1, 2`),
   [FAIR, IR, DC].flatMap(s => [{ sub: s, kind: 'booking', n: 1 }, { sub: s, kind: 'customer', n: 1 }]), "IR's forms copied to each other sub-department, once")
-check(await q(`select sub_department_id::text as sub, meta_name, is_on, header_path from crm_templates order by 1, 2`),
-  [{ sub: IR, meta_name: 'hello', is_on: true, header_path: null }, { sub: IR, meta_name: null, is_on: false, header_path: null },
-   { sub: DC, meta_name: 'hello', is_on: true, header_path: null }, { sub: DC, meta_name: null, is_on: false, header_path: null }],
-  "IR's templates copied to DC's (one WhatsApp Business account sends from both numbers), each name once a list")
+check(await q(`select sub_department_id::text as sub, meta_name, is_on from crm_templates order by 1, 2`),
+  [{ sub: IR, meta_name: 'hello', is_on: true }, { sub: IR, meta_name: null, is_on: false }],
+  "the templates stay IR's — The Conts' own words; DC's list starts empty")
 check(await q(`select distinct sub_department_id::text as sub from crm_showrooms union all select distinct sub_department_id::text from crm_partner_links`),
   [{ sub: IR }, { sub: IR }], 'the showrooms and the booking link stay IR’s')
 
@@ -185,10 +185,14 @@ await refuses(`select crm_save_form_in('${DC}', '${irBooking}', 'X', ${sections}
 
 // ── Templates: Import from Meta fills one list ────────────────────────────
 await as([FAIR, IR, DC])
-check(await one(`select crm_import_templates_in('${DC}', '[{"name":"hello","body":"Hello again","language":"en"},{"name":"promo","body":"Sale"}]')`), 1, 'one new on DC’s list')
-check(await q(`select sub_department_id::text as sub, meta_name, body from crm_templates where meta_name is not null order by 1, 2`),
-  [{ sub: IR, meta_name: 'hello', body: 'Hi {{1}}' }, { sub: DC, meta_name: 'hello', body: 'Hello again' }, { sub: DC, meta_name: 'promo', body: 'Sale' }],
-  "DC's import brings Meta's words to DC's copy alone, and a new one onto DC's list")
+check(await one(`select crm_import_templates_in('${DC}', '[{"name":"hello","body":"Hello again","language":"en"},{"name":"promo","body":"Sale"}]')`), 2, 'both new on DC’s list')
+check(await q(`select sub_department_id::text as sub, meta_name, body, is_on from crm_templates where meta_name is not null order by 1, 2`),
+  [{ sub: IR, meta_name: 'hello', body: 'Hi {{1}}', is_on: true }, { sub: DC, meta_name: 'hello', body: 'Hello again', is_on: false }, { sub: DC, meta_name: 'promo', body: 'Sale', is_on: false }],
+  "DC's import puts Meta's templates on DC's list, Off — the name IR's list has too stays as IR's")
+await as([FAIR, IR, DC])
+check(await one(`select crm_import_templates_in('${DC}', '[{"name":"hello","body":"Hello, newer","language":"en"}]')`), 0, 'imported again: none new')
+check(await q(`select sub_department_id::text as sub, body from crm_templates where meta_name = 'hello' order by 1`),
+  [{ sub: IR, body: 'Hi {{1}}' }, { sub: DC, body: 'Hello, newer' }], "…and Meta's new words reach DC's copy alone")
 await as([FAIR, IR, DC])
 const dcTpl = await one(`select (crm_save_template_in('${DC}', null, 'DC hello', 'whatsapp', 'Hi from DC', 'en', 'MARKETING')).sub_department_id::text`)
 check(dcTpl, DC, "a template made in DC's view is DC's")
