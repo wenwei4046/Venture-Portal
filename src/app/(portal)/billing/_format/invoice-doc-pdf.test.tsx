@@ -64,7 +64,7 @@ describe('an invoice’s document', () => {
       'HOUZS Venture Holding Sdn Bhd', 'Internal banking · Shared services', 'Director salary distribution', 'hello@houzsventure.com',
       'Bill to', 'Hookka', 'Subsidiary · HK', 'Venture (HV) OPEX',
       'RM 63,440.00 due 15 October 2026', 'Director Remuneration & Operation Management Fees',
-      'Description', 'Qty', 'Unit price', 'Amount', 'Director Remuneration', 'Oct 1 – Oct 31, 2026', 'RM 50,000.00', 'RM 13,440.00',
+      'Description', 'Qty', 'Unit price', 'Amount', 'Director Remuneration', 'RM 50,000.00', 'RM 13,440.00',
       'Subtotal', 'Total', 'Amount due', 'RM 63,440.00',
       'Payment details', 'Account name', 'Houzs Venture Holding Sdn Bhd', 'Hong Leong Bank Berhad', '23600599248', 'Kindly quote the invoice number as your payment reference.',
       'HV-INV-202610-0024 · RM 63,440.00 due 15 October 2026', 'Page 1 of 1',
@@ -74,6 +74,8 @@ describe('an invoice’s document', () => {
     // The issuer is Holding, no s, its email (the user's, 2026-10-16) the last line under its
     // lines of work, in its column; no status on an issued one.
     expect(content).not.toContain('Holdings')
+    // No period under a line (2026-11-23 — the user: "invoice pdf 可以不要显示这个吗"): the Period above says the month.
+    expect(content).not.toContain('Oct 1 – Oct 31, 2026')
     const issuer = at(page, 'HOUZS Venture Holding Sdn Bhd')
     const mail = at(page, 'hello@houzsventure.com')
     expect(mail.x).toBeCloseTo(issuer.x, 2)

@@ -13,7 +13,6 @@ import {
   docDay,
   docMoney,
   docMonth,
-  docPeriod,
   type DocLine,
   type DocRow,
 } from '@/lib/export/doc-sheet'
@@ -22,7 +21,8 @@ import {
 // *Invoice* and the H; Invoice number · Date of issue · Date due · Period;
 // HOUZS Venture beside *Bill to*; *RM 63,440.00 due 15 October 2026* over its
 // description; Description · Qty · Unit price · Amount (each line one unit at
-// its amount, the invoice's month under it); Subtotal · Total · Amount due;
+// its amount — no period under it since 2026-11-23, the user: "invoice pdf 可以不要显示这个吗"; the
+// Period above says the month); Subtotal · Total · Amount due;
 // the payment details; the footer. One A4 page an invoice — a batch prints
 // each on its own, its own *Page 1 of 1*. A consolidated payroll invoice keeps
 // its lines grouped by department with a subtotal each.
@@ -85,7 +85,6 @@ export function invoiceHeadline(inv: Pick<InvoiceDocData, 'status' | 'total' | '
 function InvoicePage({ inv }: { inv: InvoiceDocData }) {
   const no = inv.invoice_no ?? 'Draft'
   const headline = invoiceHeadline(inv)
-  const period = docPeriod(inv.period_month)
   const meta: DocLine[] = [
     { label: 'Invoice number', value: no, strong: true },
     { label: 'Date of issue', value: docDay(inv.invoice_date) ?? '—' },
@@ -100,7 +99,6 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
   const lines = inv.lines.length > 0 ? inv.lines : [{ description: firstLine(inv.description) || 'Invoice amount', amount: inv.total, segment: null }]
   const row = (l: InvoiceLineData): DocRow => ({
     cells: [l.description?.trim() || '—', '1', docMoney(l.amount), docMoney(l.amount)],
-    second: period,
   })
   // By department (lib/invoice-departments — the invoice's page reads the same groups, 2026-11-05).
   const groups = linesByDepartment(lines)?.map((g) => ({

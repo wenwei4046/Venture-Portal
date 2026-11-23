@@ -147,7 +147,6 @@ export const docStyles = s
 
 // ── Words the documents share ──
 
-const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 /** "RM 63,440.00"; a negative "–RM 220.40" (an en dash: Helvetica's WinAnsi has no minus sign). */
@@ -169,15 +168,6 @@ export function docMonth(iso: string | null | undefined): string | null {
   if (!iso) return null
   const [y, m] = iso.slice(0, 7).split('-').map(Number)
   return y && m ? `${MONTH[m - 1]} ${y}` : null
-}
-
-/** "Oct 1 – Oct 31, 2026" — a month as a line's period. */
-export function docPeriod(iso: string | null | undefined): string | null {
-  if (!iso) return null
-  const [y, m] = iso.slice(0, 7).split('-').map(Number)
-  if (!y || !m) return null
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
-  return `${MON[m - 1]} 1 – ${MON[m - 1]} ${last}, ${y}`
 }
 
 /** "6 Oct 2026, 09:12" — an instant on the office's clock. */
