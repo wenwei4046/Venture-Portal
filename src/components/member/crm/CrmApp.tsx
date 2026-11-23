@@ -69,12 +69,12 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, view = null, onViewOf }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brands (lib/member/crm-view.ts › crmBrandsOfView: IR → The Conts, DC → Dream Crafter, Fair → none); null — no view, every brand one holds. */ view?: SourceBrand[] | null;
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, view = null, viewSub = null, onViewOf }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brands (lib/member/crm-view.ts › crmBrandsOfView: IR → The Conts, DC → Dream Crafter, Fair → none); null — no view, every brand one holds. */ view?: SourceBrand[] | null;
+  /** The view's sub-department (its membership's id): whose Management — settings, showrooms, forms, templates, booking link — the CRM reads and writes (mig 20261124210000). */
+  viewSub?: string | null;
   /** A tapped notice of a customer another view holds: the Revenue app moves to that brand's view (false — it has none of it). */
   onViewOf?: (brand: SourceBrand) => boolean }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
-  // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
-  setUrgencyThresholds(data?.settings);
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
   const [problem, setProblem] = useState("");
@@ -98,7 +98,12 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // 可以看到 DC，同等的 fair 也只能看到 fair"; lib/member/crm-view.ts): every screen below reads the view's customers, their
   // chats, visits and journey, its ads and its people alone. Kept by the view's brands, not the array the app hands in anew.
   const viewKey = view ? view.join(",") : null;
-  const shownAll = useMemo(() => (data ? inView(data, viewKey === null ? null : viewKey ? (viewKey.split(",") as SourceBrand[]) : []) : null), [data, viewKey]);
+  const shownAll = useMemo(() => (data ? inView(data, viewKey === null ? null : viewKey ? (viewKey.split(",") as SourceBrand[]) : [], viewSub) : null), [data, viewKey, viewSub]);
+  // Its writes name it too (panel/actions.ts › makePanelActions' `sub`): read when they run, so a switch needs no new actions.
+  const subRef = useRef<string | null>(null);
+  subRef.current = shownAll?.view?.sub ?? null;
+  // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency) — the view's own.
+  setUrgencyThresholds(shownAll?.settings ?? data?.settings);
   // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
   // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen). Keep it: without it every switch to
   // the CRM holds about 8s on the curtain (CrmApp.ready.test.tsx).
@@ -193,10 +198,10 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // The panel's own copy of the chat's actions, so what they say (a failed send, a 4 MB file) shows on the panel.
   const panelAct = useMemo(() => makePanelActions(
     makeSalesActions({ live, me: data?.viewerId ?? "", data: () => dataRef.current!, setData: setDataSafe, toast: panelToast }),
-    { live, data: () => dataRef.current!, setData: setDataSafe }), [panelToast, live, data?.viewerId, setDataSafe]);
+    { live, data: () => dataRef.current!, setData: setDataSafe, sub: () => subRef.current }), [panelToast, live, data?.viewerId, setDataSafe]);
 
-  // Book visit greys a full slot: the showroom's booked counts around the chosen day.
-  const book = ui.book, rooms = data?.rooms.filter(r => r.active) ?? [];
+  // Book visit greys a full slot: the showroom's booked counts around the chosen day — of the view's showrooms, as the sheet lists them.
+  const book = ui.book, rooms = shownAll?.rooms.filter(r => r.active) ?? [];
   const bookRoom = book ? (rooms[book.room] ?? rooms[0])?.id : undefined;
   const bookMonth = book ? `${new Date(book.day).getFullYear()}-${new Date(book.day).getMonth()}` : "";
   useEffect(() => {

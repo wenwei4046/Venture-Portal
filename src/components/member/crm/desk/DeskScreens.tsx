@@ -31,7 +31,7 @@ import { MessageMenu } from "../shared/msg-menu";
 import { ActionSheetHost } from "../shared/action-sheet";
 import { inBrand } from "./vm/insight";
 import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
-import { pickedSource } from "@/lib/member/crm-view";
+import { newRoomDraftKey, pickedSource } from "@/lib/member/crm-view";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -120,6 +120,8 @@ export default function DeskScreens(p: DeskScreensProps) {
     return () => { current = false; };
   }, [bookRoom, bookWeek, act, data.visits.length]);
 
+  // The view's sub-department (mig 20261124210000): a form saved here is its, and so is a new showroom's draft.
+  const viewSub = data.view?.sub && data.scope ? data.view.sub : null, newDraftKey = newRoomDraftKey(data, viewSub);
   // The desktop's own writes. Each says what went wrong in the toast and changes the screen only once saved.
   const deskAct = useMemo<DeskActions>(() => {
     const call = async (name: Parameters<typeof crmWrite>[0], args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | null> => {
@@ -156,13 +158,15 @@ export default function DeskScreens(p: DeskScreensProps) {
         return true;
       },
       async saveForm(form, kind = "customer") {
-        const r = await call("crm_save_form", { p_id: form.id, p_name: form.name, p_sections: form.sections, p_kind: kind });
+        const args = { p_id: form.id, p_name: form.name, p_sections: form.sections, p_kind: kind };
+        const r = await (viewSub ? call("crm_save_form_in", { p_sub: viewSub, ...args }) : call("crm_save_form", args));
         if (!r) return false;
-        const id = (r.data as { id?: string } | null)?.id ?? form.id ?? `f${Date.now()}`;
-        const saved: CrmForm = { id, name: form.name, sections: form.sections };
+        const row = r.data as { id?: string; sub_department_id?: string | null } | null;
+        const id = row?.id ?? form.id ?? `f${Date.now()}`;
         const key = kind === "booking" ? "bookingForms" : "forms";
         setData(d => {
-          const list = d[key] ?? [];
+          const list = d[key] ?? [], fsub = row?.sub_department_id ?? list.find(x => x.id === id)?.sub ?? viewSub;
+          const saved: CrmForm = { id, name: form.name, sections: form.sections, ...(fsub ? { sub: fsub } : {}) };
           return { ...d, [key]: list.some(x => x.id === id) ? list.map(x => (x.id === id ? saved : x)) : [...list, saved] };
         });
         return id;
@@ -194,7 +198,9 @@ export default function DeskScreens(p: DeskScreensProps) {
         setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, remarks } : r)) }));
         return true;
       },
-      async saveRoomDraft(room, draft) {
+      async saveRoomDraft(room0, draft) {
+        // A new showroom's draft is the view's sub-department's own (crm-view.ts › newRoomDraftKey).
+        const room = room0 === "new" ? newDraftKey : room0;
         if (!(await call("crm_save_showroom_draft", { p_room: room, p_draft: draft }))) return false;
         setData(d => {
           const next = { ...(d.roomDrafts ?? {}) };
@@ -254,7 +260,7 @@ export default function DeskScreens(p: DeskScreensProps) {
         return true;
       },
     };
-  }, [live, patch, setData, data.customers, p.me.id]);
+  }, [live, patch, setData, data.customers, p.me.id, viewSub, newDraftKey]);
 
   // Channels: what Meta answers, read when Channels opens and again on Refresh / after a save.
   const [metaData, setMetaData] = useState<MetaChannels | null>(null);

@@ -73,10 +73,12 @@ begin
 end $function$;
 
 revoke all on function public.crm_cur_sub() from public, anon, authenticated;
-revoke all on function public.crm_sub_of(text) from public, anon, authenticated;
+revoke all on function public.crm_sub_of(text) from public, anon;
 revoke all on function public.crm_set_sub(uuid) from public, anon, authenticated;
 grant execute on function public.crm_cur_sub() to service_role;
-grant execute on function public.crm_sub_of(text) to service_role;
+-- The app asks it too: which sub-department's templates a customer is sent (sendCrmTemplate) — a number's or Page's
+-- sub-department, nothing more.
+grant execute on function public.crm_sub_of(text) to authenticated, service_role;
 grant execute on function public.crm_set_sub(uuid) to service_role;
 
 -- ── 1. Settings › General and the appointment types, each sub-department's ──
@@ -145,12 +147,29 @@ begin
     from crm_sub_settings s), '{}'::jsonb);
 end $function$;
 
+create or replace function public.crm_sub_settings_ensure(p_sub uuid)
+ returns void language plpgsql security definer set search_path to 'public'
+as $function$
+declare f crm_sub_settings := crm_settings_of_sub(crm_scope());
+begin
+  -- A sub-department's own row, made the first time it is written as a copy of the CRM's own (IR's) — so saving one part
+  -- (the reply lines, the appointment types) leaves the rest as it read before.
+  insert into crm_sub_settings (sub_department_id, reply_soon_h, reply_urgent_h, reply_overdue_h, suggest_template, auto_assign,
+    push_messages, reminders, team_alerts, send_auto_reply, ft_even, appt_types, updated_by, updated_at)
+  values (p_sub, coalesce(f.reply_soon_h, 3), coalesce(f.reply_urgent_h, 6), coalesce(f.reply_overdue_h, 9), coalesce(f.suggest_template, true),
+    coalesce(f.auto_assign, true), coalesce(f.push_messages, true), coalesce(f.reminders, true), coalesce(f.team_alerts, false),
+    coalesce(f.send_auto_reply, true), coalesce(f.ft_even, false), f.appt_types, crm_me(), now())
+  on conflict (sub_department_id) do nothing;
+end $function$;
+
 revoke all on function public.crm_settings_of_sub(uuid) from public, anon, authenticated;
 revoke all on function public.crm_settings_of(text) from public, anon, authenticated;
 revoke all on function public.crm_sub_settings_json() from public, anon, authenticated;
+revoke all on function public.crm_sub_settings_ensure(uuid) from public, anon, authenticated;
 grant execute on function public.crm_settings_of_sub(uuid) to service_role;
 grant execute on function public.crm_settings_of(text) to service_role;
 grant execute on function public.crm_sub_settings_json() to service_role;
+grant execute on function public.crm_sub_settings_ensure(uuid) to service_role;
 
 -- Read: the current sub-department's (IR's unless a write set another), and every sub-department's, by id.
 SELECT pg_temp.swap_once('public.crm_settings_read()', $q$declare s crm_settings;$q$, $q$declare s crm_sub_settings;$q$);
@@ -168,12 +187,11 @@ SELECT pg_temp.swap_once('public.crm_save_settings(integer, integer, integer, bo
     push_messages = excluded.push_messages, reminders = excluded.reminders, team_alerts = excluded.team_alerts, send_auto_reply = excluded.send_auto_reply,
     updated_by = excluded.updated_by, updated_at = now();$q$,
   $q$-- The sub-department's own (2026-11-23, mig 20261124210000): crm_cur_sub(), IR's unless crm_save_settings_in named another.
-  insert into crm_sub_settings (sub_department_id, reply_soon_h, reply_urgent_h, reply_overdue_h, suggest_template, auto_assign, push_messages, reminders, team_alerts, send_auto_reply, updated_by, updated_at)
-  values (public.crm_cur_sub(), p_soon, p_urgent, p_overdue, p_suggest, p_auto, p_push, p_reminders, p_team_alerts, p_send_auto, crm_me(), now())
-  on conflict (sub_department_id) do update set reply_soon_h = excluded.reply_soon_h, reply_urgent_h = excluded.reply_urgent_h,
-    reply_overdue_h = excluded.reply_overdue_h, suggest_template = excluded.suggest_template, auto_assign = excluded.auto_assign,
-    push_messages = excluded.push_messages, reminders = excluded.reminders, team_alerts = excluded.team_alerts, send_auto_reply = excluded.send_auto_reply,
-    updated_by = excluded.updated_by, updated_at = now();$q$);
+  perform public.crm_sub_settings_ensure(public.crm_cur_sub());
+  update crm_sub_settings set reply_soon_h = p_soon, reply_urgent_h = p_urgent, reply_overdue_h = p_overdue, suggest_template = p_suggest,
+    auto_assign = p_auto, push_messages = p_push, reminders = p_reminders, team_alerts = p_team_alerts, send_auto_reply = p_send_auto,
+    updated_by = crm_me(), updated_at = now()
+   where sub_department_id = public.crm_cur_sub();$q$);
 SELECT pg_temp.swap_once('public.crm_save_settings(integer, integer, integer, boolean, boolean, boolean, boolean)',
   $q$insert into crm_settings (id, reply_soon_h, reply_urgent_h, reply_overdue_h, suggest_template, auto_assign, push_messages, reminders, updated_by, updated_at)
   values (true, p_soon, p_urgent, p_overdue, p_suggest, p_auto, p_push, p_reminders, crm_me(), now())
@@ -182,20 +200,18 @@ SELECT pg_temp.swap_once('public.crm_save_settings(integer, integer, integer, bo
     push_messages = excluded.push_messages, reminders = excluded.reminders,
     updated_by = excluded.updated_by, updated_at = now();$q$,
   $q$-- The sub-department's own (2026-11-23, mig 20261124210000).
-  insert into crm_sub_settings (sub_department_id, reply_soon_h, reply_urgent_h, reply_overdue_h, suggest_template, auto_assign, push_messages, reminders, updated_by, updated_at)
-  values (public.crm_cur_sub(), p_soon, p_urgent, p_overdue, p_suggest, p_auto, p_push, p_reminders, crm_me(), now())
-  on conflict (sub_department_id) do update set reply_soon_h = excluded.reply_soon_h, reply_urgent_h = excluded.reply_urgent_h,
-    reply_overdue_h = excluded.reply_overdue_h, suggest_template = excluded.suggest_template, auto_assign = excluded.auto_assign,
-    push_messages = excluded.push_messages, reminders = excluded.reminders,
-    updated_by = excluded.updated_by, updated_at = now();$q$);
+  perform public.crm_sub_settings_ensure(public.crm_cur_sub());
+  update crm_sub_settings set reply_soon_h = p_soon, reply_urgent_h = p_urgent, reply_overdue_h = p_overdue, suggest_template = p_suggest,
+    auto_assign = p_auto, push_messages = p_push, reminders = p_reminders, updated_by = crm_me(), updated_at = now()
+   where sub_department_id = public.crm_cur_sub();$q$);
 SELECT pg_temp.swap_once('public.crm_save_appt_types(jsonb)',
   $q$update crm_settings set appt_types = p_types, updated_by = crm_me(), updated_at = now() where id = true;$q$,
-  $q$insert into crm_sub_settings (sub_department_id, appt_types, updated_by, updated_at) values (public.crm_cur_sub(), p_types, crm_me(), now())
-  on conflict (sub_department_id) do update set appt_types = excluded.appt_types, updated_by = excluded.updated_by, updated_at = now();$q$);
+  $q$perform public.crm_sub_settings_ensure(public.crm_cur_sub());
+  update crm_sub_settings set appt_types = p_types, updated_by = crm_me(), updated_at = now() where sub_department_id = public.crm_cur_sub();$q$);
 SELECT pg_temp.swap_once('public.crm_set_ft_even(boolean)',
   $q$update crm_settings set ft_even = coalesce(p_on, false), updated_by = crm_me(), updated_at = now() where id = true;$q$,
-  $q$insert into crm_sub_settings (sub_department_id, ft_even, updated_by, updated_at) values (public.crm_cur_sub(), coalesce(p_on, false), crm_me(), now())
-  on conflict (sub_department_id) do update set ft_even = excluded.ft_even, updated_by = excluded.updated_by, updated_at = now();$q$);
+  $q$perform public.crm_sub_settings_ensure(public.crm_cur_sub());
+  update crm_sub_settings set ft_even = coalesce(p_on, false), updated_by = crm_me(), updated_at = now() where sub_department_id = public.crm_cur_sub();$q$);
 
 -- The appointment types in force: the current sub-department's — a booking sets it from its customer (below).
 SELECT pg_temp.swap_once('public.crm_appt_types_in_force()',
@@ -287,10 +303,12 @@ select f.name, f.kind, f.sections, f.sort_order, f.created_by, f.updated_by, sd.
   cross join public.comm_sub_departments sd
  where f.sub_department_id = public.crm_scope() and sd.is_active and sd.id <> public.crm_scope()
    and not exists (select 1 from public.crm_forms g where g.sub_department_id = sd.id);
+-- A template's picture / video / PDF is kept under its own id (crm_template_header): a copy starts with none — and Off, if
+-- its original had one (today none has).
 insert into public.crm_templates (name, channel, body, status, is_on, meta_name, meta_id, language, category, reject_reason,
   created_by, updated_by, source, parts, header_path, header_mime, header_name, sub_department_id)
-select t.name, t.channel, t.body, t.status, t.is_on, t.meta_name, t.meta_id, t.language, t.category, t.reject_reason,
-       t.created_by, t.updated_by, t.source, t.parts, t.header_path, t.header_mime, t.header_name, sd.id
+select t.name, t.channel, t.body, t.status, t.is_on and t.header_path is null, t.meta_name, t.meta_id, t.language, t.category, t.reject_reason,
+       t.created_by, t.updated_by, t.source, t.parts, null, null, null, sd.id
   from public.crm_templates t
   cross join public.comm_sub_departments sd
  where t.sub_department_id = public.crm_scope() and sd.is_active and sd.id = public.crm_brand_sub('dc')
@@ -321,6 +339,17 @@ SELECT pg_temp.swap_once('public.crm_delete_form(uuid)',
   $q$(select id from crm_forms where kind = v_kind
       and coalesce(sub_department_id, crm_scope()) = (select coalesce(f.sub_department_id, crm_scope()) from crm_forms f where f.id = p_id)
       order by sort_order, created_at limit 1)$q$);
+
+-- Showrooms: a name is one sub-department's (Dream Crafter may list a show unit The Conts lists too); a new showroom's
+-- unsaved draft is its sub-department's — 'new' IR's as before, 'new:<sub-department>' another's.
+SELECT pg_temp.swap_once('public.crm_save_showroom_full(text, text, text, text[], integer, integer[], jsonb, boolean)',
+  $q$if exists (select 1 from crm_showrooms where lower(trim(name)) = lower(trim(p_name)) and id is distinct from p_id and active) then$q$,
+  $q$if exists (select 1 from crm_showrooms where lower(trim(name)) = lower(trim(p_name)) and id is distinct from p_id and active
+       and coalesce(sub_department_id, crm_scope()) = coalesce((select x.sub_department_id from crm_showrooms x where x.id = p_id), public.crm_cur_sub())) then$q$);
+SELECT pg_temp.swap_once('public.crm_save_showroom_draft(text, jsonb)',
+  $q$if p_room is null or (p_room <> 'new' and not exists (select 1 from crm_showrooms where id = p_room and deleted_at is null)) then$q$,
+  $q$if p_room is null or (p_room <> 'new' and p_room !~ '^new:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       and not exists (select 1 from crm_showrooms where id = p_room and deleted_at is null)) then$q$);
 
 -- Templates: one imported from Meta is the sub-department's own (another sub-department may hold the same Meta template).
 SELECT pg_temp.swap_once('public.crm_import_templates(jsonb)',
