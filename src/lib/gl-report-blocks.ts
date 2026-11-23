@@ -90,21 +90,18 @@ export function pnlBlocks(pnl: PnlReport): ReportBlock[] {
   ]
 }
 
+/** The two lines the P&L puts into Equity: what earlier financial years made, and what this one has. */
+export function earningsNodes(bs: BalanceSheetReport): ReportSection['nodes'] {
+  const line = (code: string, name: string, v: { current: number; previous: number }) => ({ code, name, current: v.current, previous: v.previous, txns: [], children: [] })
+  return [line('—bf', 'Retained earnings brought forward', bs.broughtForward), line('—fy', 'Profit / (loss) for the financial year', bs.forYear)]
+}
+
 export function balanceSheetBlocks(bs: BalanceSheetReport, segment?: string): ReportBlock[] {
-  // Surface cumulative earnings as a row inside Equity so the sheet ties.
+  // Surface cumulative earnings inside Equity so the sheet ties — split at the financial year's start (2026-11-24,
+  // lib/fiscal-year): brought forward, and the year's own.
   const equityWithEarnings: ReportSection = {
     ...bs.equity,
-    nodes: [
-      ...bs.equity.nodes,
-      {
-        code: '—',
-        name: 'Retained & current earnings (cumulative P&L)',
-        current: bs.earnings.current,
-        previous: bs.earnings.previous,
-        txns: [],
-        children: [],
-      },
-    ],
+    nodes: [...bs.equity.nodes, ...earningsNodes(bs)],
     current: r2(bs.equity.current + bs.earnings.current),
     previous: r2(bs.equity.previous + bs.earnings.previous),
   }
@@ -263,7 +260,7 @@ export function flattenGlReport(
 
   const pushNode = (n: AccountNode, depth: number) => {
     rows.push(
-      cells(`${'    '.repeat(depth)}${n.code === '—' ? '' : `${n.code} `}${n.name}`, n.current, n.previous),
+      cells(`${'    '.repeat(depth)}${n.code.startsWith('—') ? '' : `${n.code} `}${n.name}`, n.current, n.previous),
     )
     for (const c of n.children) pushNode(c, depth + 1)
   }

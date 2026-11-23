@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.buildBalanceSheet.mockReturnValue({
     fixedAssets: sect(0), assets: sect(6800000), liabilities: sect(4500000), equity: sect(1000000),
-    earnings: { current: 1300000, previous: 0 },
+    earnings: { current: 1300000, previous: 0 }, broughtForward: { current: 0, previous: 0 }, forYear: { current: 1300000, previous: 0 },
     totalAssets: { current: 6800000, previous: 0 }, totalLiabEquity: { current: 6800000, previous: 0 }, check: { current: 0, previous: 0 },
   })
   mocks.fetchTrialBalance.mockResolvedValue({

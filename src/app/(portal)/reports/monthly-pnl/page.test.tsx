@@ -72,7 +72,7 @@ beforeEach(() => {
 describe('the Monthly P&L, company-wide', () => {
   it('heads with the period, the two views, Edit layout, Excel and PDF', async () => {
     render(await page())
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · P&L · JAN – OCT 2026')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · P&L · JUL – OCT 2026')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('P&L')
     expect(screen.getByRole('link', { name: 'Monthly P&L' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Single month · P&L' })).toHaveAttribute('href', '/reports/income-statement?period=2026-10')
@@ -98,7 +98,7 @@ describe('the Monthly P&L, company-wide', () => {
   it('puts the period, find, segment and level on one row, with no consolidated note', async () => {
     render(await page())
     const row = screen.getByRole('group', { name: 'Report controls' })
-    expect(within(row).getByRole('combobox', { name: 'From' })).toHaveValue('2026-01')
+    expect(within(row).getByRole('combobox', { name: 'From' })).toHaveValue('2026-07')
     expect(within(row).getByRole('combobox', { name: 'To' })).toHaveValue('2026-10')
     expect(within(row).getByRole('combobox', { name: 'Segment' })).toHaveValue('')
     expect(within(row).getByRole('searchbox', { name: 'Find account by code or name' })).toBeInTheDocument()

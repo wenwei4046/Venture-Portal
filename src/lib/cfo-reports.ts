@@ -19,6 +19,7 @@
 // Supabase); the `fetch*` functions are thin wrappers that gather rows and
 // call it.
 
+import { fyFirstDay } from './fiscal-year'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import dayjs from 'dayjs'
 import { officeDay, officeTime } from './office-time'
@@ -1570,8 +1571,8 @@ export async function fetchBalanceSheet(
   internalFundLines.sort((a, b) => a.code.localeCompare(b.code))
   const internalFundsTotal = internalFundLines.reduce((s, l) => s + l.balance, 0)
 
-  // ── 9: Retained earnings YTD — net profit from start-of-fiscal-year to asOf.
-  const fiscalFrom = dayjs(asOf).startOf('year').format('YYYY-MM-DD')
+  // ── 9: Retained earnings YTD — net profit from the financial year's first day to asOf (lib/fiscal-year).
+  const fiscalFrom = fyFirstDay(asOf)
   const ytd = await fetchIncomeStatement(supabase, { from: fiscalFrom, to: asOf })
   const retainedEarnings = ytd.groupNetProfit
 
@@ -1641,6 +1642,32 @@ const TB_TYPE_ORDER = [
   'revenue', 'cost', 'other_income', 'expense',
 ] as const satisfies readonly AccountType[]
 
+/** The Retained Earnings account the trial balance carries earlier financial years' P&L in. */
+export const RETAINED_EARNINGS_CODE = '1510'
+const PL_TYPES: ReadonlySet<AccountType> = new Set(['revenue', 'cost', 'other_income', 'expense'])
+
+/**
+ * The year closed in the reports (2026-11-24, lib/fiscal-year — no closing entry): each P&L account keeps only what it
+ * made since the financial year began, and what the P&L made before it — `priorByCode`, every account's Dr − Cr before
+ * that first day — stands in Retained Earnings.
+ */
+export function closePriorYears(
+  netByCode: ReadonlyMap<string, number>,
+  priorByCode: ReadonlyMap<string, number>,
+  typeOf: (code: string) => AccountType | undefined,
+): Map<string, number> {
+  const out = new Map(netByCode)
+  let prior = 0
+  for (const [code, net] of priorByCode) {
+    const t = typeOf(code)
+    if (!t || !PL_TYPES.has(t) || Math.abs(net) < 0.005) continue
+    out.set(code, r2((out.get(code) ?? 0) - net))
+    prior += net
+  }
+  if (Math.abs(prior) >= 0.005) out.set(RETAINED_EARNINGS_CODE, r2((out.get(RETAINED_EARNINGS_CODE) ?? 0) + prior))
+  return out
+}
+
 export function buildTrialBalance(args: {
   accounts: CoaLeafAccount[]
   netByCode: Map<string, number> // signed: Dr − Cr (positive = debit balance)
@@ -1703,10 +1730,19 @@ export async function fetchTrialBalance(
   // one after another). The COA's failure is still the one reported first.
   // One segment (2026-10-10) sums its own lines — the database's per-account
   // sum knows no segment.
+  // What stood before the financial year began (2026-11-24, lib/fiscal-year) — its P&L goes to Retained Earnings.
+  const yearStart = fyFirstDay(asOf)
+  const dayBefore = dayjs(yearStart).subtract(1, 'day').format('YYYY-MM-DD')
+  const segmentLines = segment && segment.length > 0 ? fetchAllJournalLines(supabase) : null
   const netRead = startedEarly(
-    segment && segment.length > 0
-      ? fetchAllJournalLines(supabase).then((lines) => netByAccountFromLines(lines, asOf, segment))
+    segmentLines
+      ? segmentLines.then((lines) => netByAccountFromLines(lines, asOf, segment!))
       : fetchNetByAccount(supabase, dayjs(asOf).add(1, 'day').format('YYYY-MM-DD'), null, 'fetchTrialBalance lines'),
+  )
+  const priorRead = startedEarly(
+    segmentLines
+      ? segmentLines.then((lines) => netByAccountFromLines(lines, dayBefore, segment!))
+      : fetchNetByAccount(supabase, yearStart, null, 'fetchTrialBalance earlier years'),
   )
 
   // ── 1: Resolve the set of leaf accounts. A leaf is an account that is NOT
@@ -1734,8 +1770,10 @@ export async function fetchTrialBalance(
   //    lines → TB short by ~RM 100k) has nothing left to cut: one row per
   //    account.
   const leafSet = new Set(leafAccounts.map((a) => a.code))
+  const typeByCode = new Map(allCoa.map((r) => [r.code as string, r.type as AccountType]))
+  const closed = closePriorYears(await netRead, await priorRead, (code) => typeByCode.get(code))
   const netByCode = new Map<string, number>()
-  for (const [code, net] of await netRead) {
+  for (const [code, net] of closed) {
     if (leafSet.has(code)) netByCode.set(code, net)
   }
 

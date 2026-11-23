@@ -63,10 +63,10 @@ export async function GET(req: Request) {
     [...lines, ...ibLines],
     [...accounts, interBillTransferAccount, payrollCustodyAccount],
     bankCodes,
-    { year, throughMonth, segment: segmentFilterFor(segment) },
+    { year, throughMonth, segment: segmentFilterFor(segment), ...(range.buildFrom ? { from: range.buildFrom } : {}) },
   )
 
-  const { months, accPeriod } = monthColumns(year, throughMonth)
+  const { months, accPeriod } = monthColumns(year, throughMonth, range.buildFrom)
   const companyLabelById = new Map<string, string>(
     ((companyRows ?? []) as Array<{ id: string; name: string; short_code: string | null }>).map(
       (c) => [c.id, c.short_code ?? c.name],

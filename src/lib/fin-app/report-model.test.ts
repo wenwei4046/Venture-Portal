@@ -116,19 +116,21 @@ describe('balanceSheetModel', () => {
     liabilities: section('liability', 'Liabilities', [node('4030', 'Director savings payable', 865000)]),
     equity: section('equity', 'Equity', [node('3000', 'Share capital', 100000)]),
     earnings: { current: 184528.95, previous: 0 },
+    broughtForward: { current: 4528.95, previous: 0 },
+    forYear: { current: 180000, previous: 0 },
     totalAssets: { current: 1149528.95, previous: 0 },
     totalLiabEquity: { current: 1149528.95, previous: 0 },
     check: { current: 0, previous: 0 },
   }
 
-  it('heads with the total assets as at the month’s end; equity carries the cumulative P&L', () => {
+  it('heads with the total assets as at the month’s end; equity carries the P&L brought forward and the year’s', () => {
     const m = balanceSheetModel(bs, '2026-10', '')
     expect(m.hero).toEqual({ value: 'RM 1,149,528.95', label: 'Total assets · 31 Oct 2026' })
     expect(m.chip).toBeNull()
     expect(m.cards.map((c) => c.label)).toEqual(['Current Assets', 'Liabilities', 'Equity']) // no fixed assets, no card
     const equity = m.cards[2]
     expect(equity.value).toBe('RM 284,528.95')
-    expect(equity.groups[0].lines.map((l) => l.label)).toEqual(['Share capital', 'Retained & current earnings (cumulative P&L)', 'Total equity'])
+    expect(equity.groups[0].lines.map((l) => l.label)).toEqual(['Share capital', 'Retained earnings brought forward', 'Profit / (loss) for the financial year', 'Total equity'])
   })
 
   it('says a segment’s slice will not balance, and an out-of-balance ledger', () => {

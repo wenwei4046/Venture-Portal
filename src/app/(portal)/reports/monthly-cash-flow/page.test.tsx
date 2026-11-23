@@ -80,7 +80,7 @@ beforeEach(() => {
 describe('the month-by-month Cash Flow, company-wide', () => {
   it('heads with its views and shows opening, in, out, net and closing', async () => {
     render(await MonthlyCashFlowPage({ searchParams: Promise.resolve({}) }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · CASH FLOW · JAN – OCT 2026')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · CASH FLOW · JUL – OCT 2026')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Cash Flow')
     expect(screen.getByRole('link', { name: 'Month by month' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Single month' })).toHaveAttribute('href', '/reports/cash-flow?period=2026-10')
@@ -108,7 +108,7 @@ describe('the month-by-month Cash Flow, company-wide', () => {
 describe('the month-by-month Receipt & Payment, company-wide', () => {
   it('shows receipts, payments, the net and what is still unpaid', async () => {
     render(await MonthlyReceiptPaymentPage({ searchParams: Promise.resolve({}) }))
-    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · RECEIPT & PAYMENT · JAN – OCT 2026')
+    expect(document.querySelector('.page-eyebrow')).toHaveTextContent('REPORTS · RECEIPT & PAYMENT · JUL – OCT 2026')
     expect(screen.getByRole('link', { name: 'Month by month' })).toHaveAttribute('href', '/reports/monthly-receipt-payment?period=2026-10')
     expect(card('Receipts')).toHaveTextContent('RM 60,000.00')
     expect(card('Payments')).toHaveTextContent('RM (45,000.00)')

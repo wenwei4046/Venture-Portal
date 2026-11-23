@@ -11,6 +11,7 @@ import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlow
 import { fetchAllRows, fetchAllRowsParallel } from './paginate'
 import { payrollFoldOf, type PayrollVoucherText } from './payroll-vouchers'
 import { lineWords } from './line-words'
+import { fyFirstDay } from './fiscal-year'
 import { reportsCompanyWide } from '@/lib/surfaces'
 import type { ActionHolder } from '@/lib/permission-actions'
 
@@ -779,6 +780,11 @@ export interface BalanceSheetReport {
   equity: ReportSection
   /** Cumulative P&L through each period end (shown inside Equity). */
   earnings: { current: number; previous: number }
+  /** The part of it made before the financial year of each period end began — retained earnings brought forward
+   *  (2026-11-24, lib/fiscal-year: the year closed in the reports, no closing entry). */
+  broughtForward: { current: number; previous: number }
+  /** The rest: the profit, or the loss, of the financial year so far. */
+  forYear: { current: number; previous: number }
   totalAssets: { current: number; previous: number }
   totalLiabEquity: { current: number; previous: number }
   /** totalAssets − totalLiabEquity. 0.00 when the ledger balances. */
@@ -805,6 +811,11 @@ export function buildBalanceSheet(
   const byCode = new Map(accounts.map((a) => [a.code, a]))
   let earnCur = 0
   let earnPrev = 0
+  let bfCur = 0
+  let bfPrev = 0
+  // Each period end's financial year begins here; what the P&L made before it is brought forward.
+  const yearCur = fyFirstDay(filter.current.to)
+  const yearPrev = fyFirstDay(filter.previous.to)
   for (const l of lines) {
     if (!segPass(l, filter.segment)) continue
     const t = typeOf(l.account_code, byCode)
@@ -813,8 +824,12 @@ export function buildBalanceSheet(
     const amt = l.credit - l.debit
     if (l.date <= filter.current.to) earnCur = r2(earnCur + amt)
     if (l.date <= filter.previous.to) earnPrev = r2(earnPrev + amt)
+    if (l.date < yearCur) bfCur = r2(bfCur + amt)
+    if (l.date < yearPrev) bfPrev = r2(bfPrev + amt)
   }
   const earnings = { current: earnCur, previous: earnPrev }
+  const broughtForward = { current: bfCur, previous: bfPrev }
+  const forYear = { current: r2(earnCur - bfCur), previous: r2(earnPrev - bfPrev) }
 
   const totalAssets = {
     current: r2(fixedAssets.current + assets.current),
@@ -830,6 +845,8 @@ export function buildBalanceSheet(
     liabilities,
     equity,
     earnings,
+    broughtForward,
+    forYear,
     totalAssets,
     totalLiabEquity,
     check: {

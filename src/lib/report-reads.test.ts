@@ -415,9 +415,11 @@ describe('fetchTrialBalance — the chart and the summed balances at once', () =
       expect(row && row.debit - row.credit).toBeCloseTo(balance, 2)
     }
     expect(tb.reconciles).toBe(true)
-    // As at the 15th = every entry dated BEFORE the 16th; the chart beside it.
+    // As at the 15th = every entry dated BEFORE the 16th, and before the financial year's first day (its P&L brought
+    // forward, 2026-11-24); the chart beside them.
     expect(db.log.map((r) => [r.table, r.args])).toEqual([
       ['rpc:gl_net_by_account', { p_before: '2026-06-16' }],
+      ['rpc:gl_net_by_account', { p_before: '2025-01-01' }],
       ['chart_of_accounts', undefined],
     ])
   })

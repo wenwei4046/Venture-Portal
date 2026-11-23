@@ -169,7 +169,7 @@ export function sheetFromMatrix(rows: MatrixRow[]): SheetRow[] {
 }
 
 function accountLabel(n: AccountNode): string {
-  return n.code && n.code !== '—' ? `${n.code} ${n.name}` : n.name
+  return n.code && !n.code.startsWith('—') ? `${n.code} ${n.name}` : n.name
 }
 
 function txnsOf(rowKey: string, n: AccountNode): SheetTxn[] | undefined {
@@ -188,7 +188,7 @@ export function sheetFromBlocks(blocks: ReportBlock[], withCompare: boolean): Sh
     out.push({
       key,
       label: accountLabel(n),
-      code: n.code !== '—' ? n.code : undefined,
+      code: !n.code.startsWith('—') ? n.code : undefined,
       kind: 'account',
       depth,
       ...(n.children.length > 0 ? { isParent: true } : {}),
