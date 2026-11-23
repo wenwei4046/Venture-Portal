@@ -8,7 +8,8 @@
  * writes (PROPOSALS.md B1–B6) — each a database function that asks who may, as every CRM write does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { crmWrite, fetchAdDaily, fetchAdInsights, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchAdDaily, fetchAdInsightsMany, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { cachedFigs, keepFigs } from "./meta-cache";
 import { fetchCrmChannels, saveCrmBusinessProfile, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import { readsAds, type CrmData, type CrmEvent, type CrmForm, type CrmNote, type CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
@@ -345,13 +346,31 @@ export default function DeskScreens(p: DeskScreensProps) {
   useEffect(() => {
     // Meta's figures: CRM · Manage, or View at All read-only (readsAds) — the server asks the same.
     if (!adsOn || !live || !readsAds(data.can)) return;
+    // Faster (2026-11-23, the owner: "计算方式要加快"): what this computer kept shows at once, and every range still to read
+    // goes in ONE request (fetchAdInsightsMany — Server Actions run one at a time, so a request a range queued them).
+    const ask: typeof needs = [], shown: Record<string, Record<string, unknown>> = {};
     for (const n of needs) {
       const ids = n.ids.filter(id => !asked.current.has(`${n.key}|${id}`));
       if (!ids.length) continue;
       ids.forEach(id => asked.current.add(`${n.key}|${id}`));
-      void fetchAdInsights(ids, n.since, n.until).then(r => {
-        const figs = r.ok ? r.figs : Object.fromEntries(ids.map(id => [id, null]));
-        setUi(u => ({ ...u, apMeta: { ...u.apMeta, [n.key]: { ...(u.apMeta[n.key] ?? {}), ...figs } } }));
+      const kept = cachedFigs(n.key, n.until, ids);
+      if (Object.keys(kept.figs).length) shown[n.key] = kept.figs;
+      if (kept.stale.length) ask.push({ ...n, ids: kept.stale });
+    }
+    if (Object.keys(shown).length) setUi(u => { const m = { ...u.apMeta }; for (const [k, f] of Object.entries(shown)) m[k] = { ...(f as object), ...(m[k] ?? {}) }; return { ...u, apMeta: m }; });
+    for (let i = 0; i < ask.length; i += 8) {
+      const part = ask.slice(i, i + 8);
+      void fetchAdInsightsMany(part).then(r => {
+        setUi(u => {
+          const m = { ...u.apMeta };
+          for (const n of part) {
+            const figs = r.ok ? r.figs[n.key] ?? {} : Object.fromEntries(n.ids.map(id => [id, null]));
+            if (r.ok) keepFigs(n.key, figs);
+            // A failed read keeps what was shown from this computer rather than blanking it.
+            m[n.key] = r.ok ? { ...(m[n.key] ?? {}), ...figs } : { ...figs, ...(m[n.key] ?? {}) };
+          }
+          return { ...u, apMeta: m };
+        });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
