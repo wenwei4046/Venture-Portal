@@ -11,6 +11,7 @@ import { roomSlots, slotAt } from "../../sales/vm/chat";
 import { dayLabel, timeLabel } from "../../sales/vm/common";
 import type { DeskCtx, FormSection } from "./ctx";
 import { initials } from "./data";
+import { histInView } from "./audit";
 import { BASE_FORM } from "./settings";
 
 const DAY = 86_400_000;
@@ -154,7 +155,8 @@ export function customerFormVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
 /** History (the owner, 2026-10-13): who changed which CRM setting, when, before → after (audit_changes). */
 export function historyVM(ctx: DeskCtx) {
   const { ui, patch } = ctx;
-  const rows = ui.history ?? [];
+  // The Revenue app's view's changes alone (2026-11-23, audit.ts › histInView).
+  const rows = (ui.history ?? []).filter(h => histInView(ctx.data, h));
   const AREA: Record<string, string> = { crm_showrooms: "Showrooms", crm_ad_assign: "Ads to teams", crm_fulltime_rules: "Full time lead allocation", crm_staff: "Member work type", crm_templates: "Cold lead templates", crm_forms: "Forms" };
   const f = ui.histF;
   const shown = rows.filter(r => f === "all" || r.table === f);

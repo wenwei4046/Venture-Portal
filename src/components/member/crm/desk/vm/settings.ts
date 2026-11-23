@@ -19,6 +19,7 @@ import { initials } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, teamColours } from "./tokens";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 import { activeVM, lockedOf } from "../../shared/locked";
+import { personInView } from "@/lib/member/crm-view";
 
 /** The Customer info form as the phone draws it today (sales/vm/customer.ts): the base every edit starts from. */
 export const BASE_FORM: FormSection[] = [
@@ -263,7 +264,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const onUp = new Set(data.upNextStaff ?? []);
   const upNextAccess = {
     can: !!data.can.manage,
-    rows: data.people.filter(p => ["tl", "stl", "ta"].includes(p.role) && data.people.some(q => q.uplineId === p.id))
+    // …of the Revenue app's view (2026-11-23).
+    rows: data.people.filter(p => ["tl", "stl", "ta"].includes(p.role) && data.people.some(q => q.uplineId === p.id) && personInView(data, p.id))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(p => ({ id: p.id, name: ctx.nameOf(p.id), sub: `${jobTitle(p)} · ${data.people.filter(q => q.uplineId === p.id).length} under them`, on: onUp.has(p.id),
         toggle: () => act.setUpNext(p.id, !onUp.has(p.id)).then(okd => { if (okd) patch({ toast: `${ctx.nameOf(p.id)} ${onUp.has(p.id) ? "may no longer act" : "may act"} in Up next` }); return okd; }) })),

@@ -11,6 +11,7 @@
  */
 import type { MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import { HOUR_DAYS, LANG_WORDS, WA_VERTICALS, limitWords, parseHours, qualityWords } from "@/lib/meta/channels";
+import { brandOf } from "@/lib/member/crm-source";
 import type { DeskCtx } from "./ctx";
 import { MON } from "./insight";
 
@@ -40,9 +41,12 @@ export function channelsVM(ctx: DeskCtx) {
   const linkOf = (kind: string, id: string) => M?.links.find(l => l.kind === kind && l.externalId === id);
   const isLinked = (kind: string, id: string) => linkOf(kind, id)?.linked ?? true;
 
-  // The assets: our Pages, our WhatsApp numbers (Instagram and ads accounts are not connected to the CRM yet).
-  const pages = (M?.pages ?? []).map(p => ({ ...p, on: isLinked("page", p.id) }));
-  const nums = (M?.wa ?? []).map(n => ({ ...n, on: isLinked("wa", n.id) }));
+  // The assets: our Pages, our WhatsApp numbers (Instagram and ads accounts are not connected to the CRM yet) — the Revenue
+  // app's view's own (2026-11-23 — the owner: "Management 这边也不是统一的，IR 是 IR，DC 是 DC"): IR's The Conts, DC's Dream
+  // Crafter; a Page or number of no CRM brand, and Fair's (none yet), in no view.
+  const ours = (id: string) => !data.view || data.view.brands.some(b => b === brandOf(id));
+  const pages = (M?.pages ?? []).filter(p => ours(p.id)).map(p => ({ ...p, on: isLinked("page", p.id) }));
+  const nums = (M?.wa ?? []).filter(n => ours(n.id)).map(n => ({ ...n, on: isLinked("wa", n.id) }));
   const defOf = <T extends { id: string; on: boolean }>(kind: string, xs: T[]) => xs.find(x => x.on && linkOf(kind, x.id)?.isDefault)?.id ?? xs.find(x => x.on)?.id ?? null;
   const pageDef = defOf("page", pages), waDef = defOf("wa", nums);
   const page = pages.find(p => p.id === pageDef) ?? pages[0];

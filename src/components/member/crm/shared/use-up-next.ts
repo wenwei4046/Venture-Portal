@@ -159,7 +159,10 @@ export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[];
     flash(`${nameOf(e.id)} on leave ${fmtRange(e.from, e.to)}`);
   };
 
-  const d = read ? upNextFrame(read, book, ads, ui, acts, o.canAct && (read.manage || !!read.canAct)) : null;
+  // The view's people alone in the lists (2026-11-23): the dealer already deals an ad's leads only to its brand's people.
+  const inView = book.inView;
+  const shown = read && inView ? { ...read, people: read.people.filter(p => inView(p.staff)), upcoming: read.upcoming.filter(u => inView(u.staff)) } : read;
+  const d = shown ? upNextFrame(shown, book, ads, ui, acts, o.canAct && (shown.manage || !!shown.canAct)) : null;
   const lv = edit ? leaveFormVM(edit, nameOf(edit.id), p => setEdit(e => (e ? { ...e, ...p } : e)), () => void saveLeave(), () => setEdit(null)) : null;
   return { d, lv, toast, failed, close: () => set({ pick: false, adOpen: false }) };
 }

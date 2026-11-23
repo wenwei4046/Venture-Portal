@@ -31,6 +31,7 @@ import { MessageMenu } from "../shared/msg-menu";
 import { ActionSheetHost } from "../shared/action-sheet";
 import { inBrand } from "./vm/insight";
 import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
+import { pickedSource } from "@/lib/member/crm-view";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -275,7 +276,8 @@ export default function DeskScreens(p: DeskScreensProps) {
   // One brand at a time, as Lead View (the owner, 2026-10-29: "要分开 DC 和 The Conts 不同的专页，像 lead view 一样"): the
   // sidebar's All · The Conts · Dream Crafter keeps every page to that brand's customers, their visits and journey (ui.insSrc,
   // kept on this computer; Insight's own switch is the same choice). Writes still take ids.
-  const shown = useMemo(() => ({ data: inBrand(titleData(data), ui.insSrc as SourcePick | undefined), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors, ui.insSrc]);
+  // A view holding the CRM (2026-11-23) leaves no brand to pick: a pick kept from before is not read.
+  const shown = useMemo(() => ({ data: inBrand(titleData(data), pickedSource(data, ui.insSrc as SourcePick | undefined)), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors, ui.insSrc]);
   const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
   // The Inbox's brand tabs count what waits in each brand, whichever is picked (as Lead View's).
   const brandCounts = useMemo(() => {

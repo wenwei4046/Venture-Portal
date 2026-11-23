@@ -13,6 +13,7 @@ import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
 import { is100, pctOf, pctShow, pctText, r2 } from "../../shared/pct";
 import { applyOpening, applyToast, applyWindowVM, type ApplyWindowVM } from "../../shared/apply-ads";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
+import { personInView } from "@/lib/member/crm-view";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
@@ -71,7 +72,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
     onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act", onLv: sec === "Lv",
     act: activeVM([
-      { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) },
+      { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod" && personInView(data, p.id)).sort((a, b) => a.name.localeCompare(b.name)) },
       ...teams.map(t => ({ name: t.name, color: t.c, people: t.people })),
     ], lk, p => jobTitle(p as Team["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg })),
     cards: ([
@@ -155,7 +156,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     // A % saved for the team as it was (somebody since joined or left) no longer adds up: it opens as an even share, as
     // a team never set does — it was Save's silent block (the owner, 2026-10-18: "为什么我调整后，save处于灰色？").
     const stored = ps.reduce((x, p) => x + (B0.pv[p.id] ?? 0), 0), touched = (B0.touch[t.id] ?? []).length > 0;
-    const whole = t.id === DIRECTOR_SPLIT_KEY ? data.people.filter(p => p.role === "hod") : (teams.find(x => x.id === t.id)?.people ?? []);
+    const whole = t.id === DIRECTOR_SPLIT_KEY ? data.people.filter(p => p.role === "hod" && personInView(data, p.id)) : (teams.find(x => x.id === t.id)?.people ?? []);
     const lockedHere = whole.filter(p => lk.has(p.id)), scaled = mode === "pct" && !touched ? sharedOut(B0.pv, ps.map(p => p.id), lockedHere.length > 0) : null;
     const stale = !scaled && mode === "pct" && !touched && ps.some(p => B0.pv[p.id] != null) && stored !== 100;
     const val = (p: Team["people"][number], k: number) => (scaled ? scaled[p.id] ?? 0 : stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));

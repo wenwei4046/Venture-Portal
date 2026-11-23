@@ -58,7 +58,9 @@ export function activityPeriod(ui: { insPer: DeskCtx["ui"]["insPer"]; insRange: 
 
 /** Insight for one brand (the owner, 2026-10-29: "Insight 要可以筛选 DC / The Conts"): its customers, their visits and journey. */
 export function inBrand(d: CrmData, src: SourcePick | null | undefined): CrmData {
-  if (!src || src === "all") return d;
+  // The Revenue app's view already holds the CRM to its own brand (2026-11-23, lib/member/crm-view.ts): a pick kept from
+  // before is not read.
+  if (!src || src === "all" || d.view) return d;
   const customers = d.customers.filter(c => inSource(c, src)), ids = new Set(customers.map(c => c.id));
   // The ads too (2026-11-19, the owner: in the IR view "广告数据还是总体" — an ad is its leads' brand, else its Page's; one
   // whose brand is not known stays with The Conts (IR), as Assignment's IR | DC split).
@@ -263,7 +265,8 @@ export function insightVM(ctx0: DeskCtx) {
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,
-    src4: INSIGHT_SOURCES.map(([k, label]) => ({ label, on: (ctx.ui.insSrc ?? "all") === k, pick: () => ctx.patch({ insSrc: k }) })),
+    // No brand to pick while the Revenue app's view holds the CRM (2026-11-23).
+    src4: data.view ? undefined : INSIGHT_SOURCES.map(([k, label]) => ({ label, on: (ctx.ui.insSrc ?? "all") === k, pick: () => ctx.patch({ insSrc: k }) })),
     teams4: (() => {
       const apptN = (s: string) => parseFloat(s) || 0;
       const all = [...dirRows.map(t => ({ ...t, key: DIRECTOR_TEAM, people: ctx.directors })), ...teams.map((t, k) => ({ ...teamsOut[dirRows.length + k], key: t.id, people: t.people }))];

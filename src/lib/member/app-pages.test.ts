@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { closedBoxes } from '@/lib/page-tabs'
-import { APP_PAGE_TABS, NOTHING_CLOSED, SEND_REFUSED, appClosed, requestPageOf } from './app-pages'
+import { APP_PAGE_TABS, NOTHING_CLOSED, SEND_REFUSED, appClosed, crmOnlyClosed, requestPageOf } from './app-pages'
 import { TAB_BY_ID } from '@/lib/permission-tabs'
 
 // The Revenue app follows its holder's ticks (2026-10-11, the user: "勾掉 Arena，手机 app 就不显示").
@@ -48,5 +48,24 @@ describe('the Revenue app’s pages and their tabs', () => {
     expect(APP_PAGE_TABS[requestPageOf('replacement')]).toBe(APP_PAGE_TABS[requestPageOf('waiting')])
     expect(guard).toContain(`THEN '${SEND_REFUSED.requests}'`)
     expect(guard).toContain(`ELSE '${SEND_REFUSED.track}' END`)
+  })
+})
+
+// 2026-11-23 — the owner, of HECTOR and LIM YAU WEI, who answer Dream Crafter's customers from IR's roster: "give them" the DC
+// view. A view one holds in the CRM alone (no seat, not directed) is the CRM's alone.
+describe('a view one holds in the CRM alone', () => {
+  it('closes every page that reads its sales, pay or seats, and keeps what is one’s own', () => {
+    const c = crmOnlyClosed(NOTHING_CLOSED)
+    for (const page of ['today', 'insight', 'quote', 'arena', 'income', 'team', 'honours', 'brandWeeks', 'scheme', 'requests', 'track'] as const)
+      expect(c.pages).toContain(page)
+    for (const page of ['rooms', 'docs', 'tests', 'library'] as const) expect(c.pages).not.toContain(page)
+    expect(c.sends).toEqual([])
+  })
+
+  it('keeps what one’s ticks already close, once', () => {
+    const c = crmOnlyClosed({ pages: ['arena', 'rooms'], sends: ['track'] })
+    expect(c.pages.filter(p => p === 'arena')).toHaveLength(1)
+    expect(c.pages).toContain('rooms')
+    expect(c.sends).toEqual(['track'])
   })
 })

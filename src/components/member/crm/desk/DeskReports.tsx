@@ -303,7 +303,7 @@ export function DeskReports({ r, ads }: { r: R; ads?: AdsV; lba?: LbaV }) {
   const o = r.overview;
   const filters: ReactNode = (
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "18px 32px", minWidth: 0 }}>
-      <MenuChip aria="Brand" label={o.brandLabel} radius={10} pad="0 12px" gap={7} chev={12} menuW={220} opts={o.brands} />
+      {o.brands.length > 0 && <MenuChip aria="Brand" label={o.brandLabel} radius={10} pad="0 12px" gap={7} chev={12} menuW={220} opts={o.brands} />}
       <RpPeriods r={{ periods: r.periods, picker: r.picker, rangeText: o.rangeText }} />
       {r.cat === "overview" && <MenuChip aria="Ad" label={o.adLabel} radius={10} pad="0 12px" gap={7} chev={12} maxW={300} menuW={420} on={o.adOn}
         opts={o.adOpts.map(x => ({ label: x.label, n: x.n, on: x.value === o.adVal, pick: () => o.setAd(x.value) }))} />}

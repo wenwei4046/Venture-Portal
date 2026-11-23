@@ -13,6 +13,8 @@ import type { DeskCtx, HistRow } from "./ctx";
 import { arrayDrag } from "./columns";
 import { MON } from "./insight";
 import { officeStamp } from "@/lib/member/crm-data";
+import { brandOf } from "@/lib/member/crm-source";
+import { personInView } from "@/lib/member/crm-view";
 import { auditWhen, type AuditLine, type AuditTone } from "../../shared/audit-timeline";
 
 const DAY = 86_400_000;
@@ -44,7 +46,7 @@ export function auditEvents(ctx: DeskCtx): E[] {
   const firstOf = new Map<string, { at: string; ad: string; ch: string }>();
   for (const c of data.customers) if (c.adId) { const f = firstOf.get(c.adId); if (!f || c.createdAt < f.at) firstOf.set(c.adId, { at: c.createdAt, ad: c.ad, ch: c.channel === "whatsapp" ? "WhatsApp" : "Messenger" }); }
   for (const [id, f] of firstOf) out.push({ cat: "marketing", at: f.at, who: "System", action: "New ad found", target: f.ad, detail: `${f.ch} · ${data.adRules.some(r => r.adId === id) ? "split set" : "no split yet"}` });
-  for (const h of ctx.ui.history ?? []) out.push(...histEvent(h));
+  for (const h of ctx.ui.history ?? []) if (histInView(data, h)) out.push(...histEvent(h));
   // Insight › Up next (mig 20261108120000): who, when, before → after; shown under Assignment.
   for (const e of data.upNextEvents ?? []) {
     const adName = e.ad && e.ad !== "all" ? cust2(data, e.ad) : e.ad === "all" ? "All ads" : "";
@@ -70,6 +72,21 @@ const UP_ACTIONS: Record<string, (b: UpRow, a: UpRow, leave: (l: UpRow) => strin
   leave_changed: (b, a, l) => ["Leave changed", `${l(b)} → ${l(a)}`],
   leave_removed: (b, a, l) => ["Leave removed", `${l(b)} → ${l(a)}`],
 };
+
+/**
+ * Whether a change is the Revenue app's view's (2026-11-23 — the owner: the Audit log too, "IR 是 IR，DC 是 DC"): an ad's split
+ * of one of its ads, a person's work type or Full time days of one of its people, a Page or number of its brand. With no
+ * view, every change. (The journey's events and Up next's are the view's already — CrmData.view.)
+ */
+export function histInView(d: DeskCtx["data"], h: HistRow): boolean {
+  if (!d.view) return true;
+  const v = (k: string) => (typeof h.row[k] === "string" ? (h.row[k] as string) : "");
+  if (h.table === "crm_ad_assign") { const ad = v("ad_source_id"); return !!d.adNames?.[ad] || d.adRules.some(r => r.adId === ad); }
+  if (h.table === "crm_staff") return personInView(d, v("staff_id"));
+  if (h.table === "crm_fulltime_rules") return personInView(d, v("tl_id"));
+  if (h.table === "crm_channels") { const b = brandOf(v("external_id")); return !!b && d.view.brands.includes(b); }
+  return true;
+}
 
 function histEvent(h: HistRow): E[] {
   const change = h.changes.map(x => `${x.field}: ${x.from} → ${x.to}`).join(" · ");

@@ -181,7 +181,7 @@ export function panelAppVM(ctx: PanelCtx) {
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     deals6: show.pf && ctx.ui.pDeals ? deals6(ctx) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
-    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: readsAds(ctx.data.can),
+    adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: readsAds(ctx.data.can), view: ctx.data.view,
       // Insight's period and its sheet (the owner, 2026-10-24: "日曆顏色有點突兀，換成跟insight 一樣的 … 無法自定義要對比的時間段").
       range: periodRange(ui.period, ui.ovRange, now), cmp: ui.cmp,
       chips: (([["day", "Today"], ["week", "This week"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: ui.period === k, pick: () => set(u => ({ ...u, period: k, ovRange: null })) }))),

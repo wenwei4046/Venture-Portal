@@ -159,6 +159,12 @@ export interface MemberMembership {
    * holds on its ladder ("" where it has none), everybody as its people.
    */
   director?: boolean;
+  /**
+   * A sub-department the person holds in the CRM only — no seat there, not directed (2026-11-23 — the owner: HECTOR and LIM YAU
+   * WEI answer Dream Crafter's customers from the IR roster; "give them" the DC view): listed after the rest so the CRM can be
+   * opened on it; its sales pages are closed (app-pages.ts › crmOnlyClosed). `people` is empty, `rank` "".
+   */
+  crm?: boolean;
 }
 export interface MemberKpi {
   label: string;

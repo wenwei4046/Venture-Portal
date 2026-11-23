@@ -16,6 +16,7 @@ import { adRunning } from "@/lib/member/crm-ad-running";
 import { is100, pctOf, pctShow, pctText } from "../../shared/pct";
 import { lockedOf } from "../../shared/locked";
 import { adBrandOf, brandSplit } from "@/lib/member/crm-source";
+import { personInView } from "@/lib/member/crm-view";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
 const ROLE: Record<string, string> = { stl: "Senior TL", tl: "Team Lead", ta: "Team Assistant", rs: "Revenue Specialist", hod: "Revenue Director" };
@@ -122,7 +123,8 @@ export function assignVM(ctx: PanelCtx) {
   // "新增了 revenue director 也加入可以获得广告名单"; mig 20261016010000, crm_director_key() = DIRECTOR_SPLIT_KEY).
   // A member locked for now is on none of Assignment's lists (2026-10-22, shared/locked.ts).
   const lk = lockedOf(data);
-  const directors = data.people.filter(p => p.role === "hod" && !lk.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+  // …of the Revenue app's view (2026-11-23): a Director without its brand is no row of its ads.
+  const directors = data.people.filter(p => p.role === "hod" && !lk.has(p.id) && personInView(data, p.id)).sort((a, b) => a.name.localeCompare(b.name));
   // The Revenue Director first, above the teams (the owner, 2026-10-16: "revenue director 放在 team 的最上面").
   const adTeams: Team[] = [...(directors.length ? [{ id: DIRECTOR_SPLIT_KEY, tl: directors[0], name: DIRECTOR_TEAM, who: directors.map(d => d.name).join(", "), c: DIRECTOR_C[0], tint: DIRECTOR_C[1], own: DIRECTOR_C[1], people: directors }] : []), ...teams.map(t => ({ ...t, people: t.people.filter(p => !lk.has(p.id)) }))];
 

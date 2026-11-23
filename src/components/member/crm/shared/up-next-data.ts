@@ -29,6 +29,8 @@ export function upNextBookOf(teams: { id: string; name: string }[], nameOf: (id:
       return k < 0 ? { name: nameOf(key), dot: "var(--crm-faint)" } : { name: teams[k].name, dot: teamColour(k)[0] };
     },
     adName: id => d.adNames?.[id]?.name ?? d.customers.find(c => c.adId === id)?.ad ?? `Ad ${id}`,
+    // The Revenue app's view's people (2026-11-23, CrmData.view): Not in turn and On leave list them alone.
+    ...(d.view ? { inView: (id: string) => d.view!.people.includes(id) } : {}),
   };
 }
 

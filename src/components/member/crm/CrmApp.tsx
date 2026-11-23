@@ -25,8 +25,8 @@ import { shellVM } from "./sales/vm/header";
 import { byTeam, downlineOf, jobTitle } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import DeskScreens from "./desk/DeskScreens";
-import { inBrand } from "./desk/vm/insight";
-import type { SourceBrand } from "@/lib/member/crm-source";
+import { inView, personInView, teamsInView } from "@/lib/member/crm-view";
+import { brandOf, type SourceBrand } from "@/lib/member/crm-source";
 import type { DeskApp as DeskAppFrame } from "./desk/vm/ctx";
 import D from "./desk/desk.module.css";
 import { makePanelActions } from "./panel/actions";
@@ -69,7 +69,9 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, brand = null }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brand (Dream Crafter's view → "dc"); null = every brand. */ brand?: SourceBrand | null }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, view = null, onViewOf }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brands (lib/member/crm-view.ts › crmBrandsOfView: IR → The Conts, DC → Dream Crafter, Fair → none); null — no view, every brand one holds. */ view?: SourceBrand[] | null;
+  /** A tapped notice of a customer another view holds: the Revenue app moves to that brand's view (false — it has none of it). */
+  onViewOf?: (brand: SourceBrand) => boolean }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
   setUrgencyThresholds(data?.settings);
@@ -92,6 +94,11 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const refs = useRef<SalesRefs>({}).current;
   const dataRef = useRef<CrmData | null>(data);
   dataRef.current = data;
+  // The Revenue app's view holds the CRM to its own sub-department (2026-11-23 — the owner: "IR 的 view 就只可以看到 IR，DC 就只
+  // 可以看到 DC，同等的 fair 也只能看到 fair"; lib/member/crm-view.ts): every screen below reads the view's customers, their
+  // chats, visits and journey, its ads and its people alone. Kept by the view's brands, not the array the app hands in anew.
+  const viewKey = view ? view.join(",") : null;
+  const shownAll = useMemo(() => (data ? inView(data, viewKey === null ? null : viewKey ? (viewKey.split(",") as SourceBrand[]) : []) : null), [data, viewKey]);
   // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
   // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen). Keep it: without it every switch to
   // the CRM holds about 8s on the curtain (CrmApp.ready.test.tsx).
@@ -236,6 +243,14 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       if (readFresh.current) opened.current = true;
       return;
     }
+    // Another view's customer (2026-11-23 — each view holds its own): the Revenue app moves to the customer's view first, and
+    // this opens it there (viewKey below); a view one cannot switch to leaves it where it is.
+    const brand = brandOf(c.accountId);
+    if (viewKey !== null && !(brand && viewKey.split(",").includes(brand))) {
+      if (brand && onViewOf?.(brand)) return;
+      opened.current = true;
+      return;
+    }
     opened.current = true;
     if (c.assignedTo === me.id || data.shares.some(s => s.staffId === me.id && s.customerId === c.id)) {
       setViewing(null); setTeamAs(null); setHodMode("crm");
@@ -245,7 +260,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       setViewing(null); setTeamAs(null); setHodMode("panel");
       setPanelUi(u => ({ ...u, tab: "inbox", lead: c.id, nfOpen: false }));
     }
-  }, [data, open, act]);
+  }, [data, open, act, viewKey, onViewOf]);
 
   // The phone's Back steps back through the CRM (2026-10-20, shared/nav-history.ts): every screen — the side, its tab,
   // a chat, a sub-page, a sheet — is a step, and Back puts the one before it back. The desktop keeps desk/nav.ts.
@@ -286,10 +301,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const notice = (line: React.ReactNode) => (desk ? <div className={D.desk}><p className={H.loading}>{line}</p></div> : shell(<p className={H.loading}>{line}</p>));
   onScreenChat.current = null;
   panelShown.current = false;
-  if (!data) return notice(problem || "Loading your customers…");
-  // The Revenue app's view picks the brand (2026-11-17 — the owner: "Dream Crafter view 默认打开 dream crafter 的数据，聊天室等"):
-  // in Dream Crafter's view every screen holds Dream Crafter's customers, their chats, visits and journey alone.
-  const shownData = brand ? inBrand(data, brand) : data;
+  if (!data || !shownAll) return notice(problem || "Loading your customers…");
+  // The view's own (above): Dream Crafter's view, Dream Crafter's customers alone (2026-11-17); IR's, The Conts'; Fair's, none.
+  const shownData = shownAll;
   const me = personOf(shownData.viewerId, shownData.people);
   if (!me) return notice(shownData.setup === "no_role"
     ? "Your job title has no role in the CRM. The CRM is for the Revenue team; if you should be in it, ask your administrator to check your title in People."
@@ -326,7 +340,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   };
   // Who has a Team side: the Director, and anyone with somebody below them (rev 1011).
   // Whose CRM may be on screen: one's own, or someone below (View my team) — anyone, for the Principal and the Director.
-  const below = full ? shownData.people.filter(p => p.id !== me.id && ["hod", "stl", "tl", "ta", "rs"].includes(p.role)).map(p => p.id) : downlineOf(me.id, shownData.people);
+  // …of the view: somebody without its brand is in no list of it (2026-11-23).
+  const below = (full ? shownData.people.filter(p => p.id !== me.id && ["hod", "stl", "tl", "ta", "rs"].includes(p.role)).map(p => p.id) : downlineOf(me.id, shownData.people))
+    .filter(id => personInView(shownData, id));
   const switchList = byTeam(below.map(id => personOf(id, shownData.people)!).filter(Boolean), shownData.people);
   const hasTeamSide = (p: { id: string; role: string }) => p.role === "hod" || shownData.people.some(q => q.uplineId === p.id);
   const viewed = viewing ? personOf(viewing, shownData.people) ?? viewerPerson(viewing) : undefined;
@@ -347,10 +363,12 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       const ids = new Set(customers.map(c => c.id));
       return { ...shownData, viewerId: panelFor.id, can: canFromRole(panelFor.role), customers, visits: shownData.visits.filter(v => ids.has(v.customerId)) };
     })();
-    const teams = wide ? teamsOf(pdata) : teamsOf(pdata).filter(t => mine.has(t.id) || t.people.some(p => p.id === panelFor.id));
+    // The teams as the view has them (2026-11-23): each with its people of the view's brand — Dream Crafter's view, Team
+    // Stanley is LIM YAU WEI — and none drawn with nobody of it (the dealer gives none of its leads there).
+    const teams = teamsInView(pdata, wide ? teamsOf(pdata) : teamsOf(pdata).filter(t => mine.has(t.id) || t.people.some(p => p.id === panelFor.id)));
     const pctx: PanelCtx = {
       data: pdata, me: panelFor, now, live, ui: panelUi, set: setPanelUi, patch: p => setPanelUi(u => ({ ...u, ...p })), act: panelAct, nameOf, teams,
-      directors: wide ? shownData.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) : [],
+      directors: wide ? shownData.people.filter(p => p.role === "hod" && personInView(shownData, p.id)).sort((a, b) => a.name.localeCompare(b.name)) : [],
       teamOfStaff: id => { const tl = id ? teams.find(t => t.id === id || t.people.some(p => p.id === id)) : undefined; return tl; },
       openCrmOf, viewingAs: panelFor.id !== me.id, viewers: panelFor.id === me.id ? viewerList : [], wideView: panelFor.id !== me.id && wide,
       // Mine: one's own CRM — or, viewing somebody, back to theirs — on `tab` (the phone's button: Mine's Inbox), else the
