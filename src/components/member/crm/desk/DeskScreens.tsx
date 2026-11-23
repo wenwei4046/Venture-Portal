@@ -8,8 +8,9 @@
  * writes (PROPOSALS.md B1–B6) — each a database function that asks who may, as every CRM write does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { crmWrite, fetchAdDaily, fetchAdInsightsMany, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { crmWrite, fetchAdDaily, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
 import { cachedFigs, keepFigs } from "./meta-cache";
+import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchCrmChannels, saveCrmBusinessProfile, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import { readsAds, type CrmData, type CrmEvent, type CrmForm, type CrmNote, type CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
@@ -347,7 +348,8 @@ export default function DeskScreens(p: DeskScreensProps) {
     // Meta's figures: CRM · Manage, or View at All read-only (readsAds) — the server asks the same.
     if (!adsOn || !live || !readsAds(data.can)) return;
     // Faster (2026-11-23, the owner: "计算方式要加快"): what this computer kept shows at once, and every range still to read
-    // goes in ONE request (fetchAdInsightsMany — Server Actions run one at a time, so a request a range queued them).
+    // goes in ONE request — a GET (/member/crm-ad-figures), so it never waits behind the 5 s re-read the way a Server
+    // Action does (the owner, the same day: "overview 的数据还是很慢"); the server keeps Meta's answers for the next asker.
     const ask: typeof needs = [], shown: Record<string, Record<string, unknown>> = {};
     for (const n of needs) {
       const ids = n.ids.filter(id => !asked.current.has(`${n.key}|${id}`));
@@ -360,7 +362,10 @@ export default function DeskScreens(p: DeskScreensProps) {
     if (Object.keys(shown).length) setUi(u => { const m = { ...u.apMeta }; for (const [k, f] of Object.entries(shown)) m[k] = { ...(f as object), ...(m[k] ?? {}) }; return { ...u, apMeta: m }; });
     for (let i = 0; i < ask.length; i += 8) {
       const part = ask.slice(i, i + 8);
-      void fetchAdInsightsMany(part).then(r => {
+      const read = fetch(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(part))}`, { cache: "no-store" })
+        .then(async res => (res.ok ? { ok: true as const, figs: ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs } : { ok: false as const }))
+        .catch(() => ({ ok: false as const }));
+      void read.then(r => {
         setUi(u => {
           const m = { ...u.apMeta };
           for (const n of part) {
