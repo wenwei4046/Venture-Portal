@@ -295,6 +295,9 @@ alter table public.crm_partner_links alter column sub_department_id set default 
 -- update by name).
 drop index if exists public.crm_templates_meta_name;
 create unique index crm_templates_meta_name on public.crm_templates (sub_department_id, meta_name) nulls not distinct where meta_name is not null;
+-- A showroom's name is one sub-department's (DC may list a show unit IR lists too), as the save's own check below.
+drop index if exists public.crm_showrooms_name_key;
+create unique index crm_showrooms_name_key on public.crm_showrooms (sub_department_id, lower(trim(name))) nulls not distinct;
 
 -- Every other sub-department starts with IR's forms; Dream Crafter keeps the templates it can send today.
 insert into public.crm_forms (name, kind, sections, sort_order, created_by, updated_by, sub_department_id)

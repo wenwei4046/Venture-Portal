@@ -45,6 +45,7 @@ await db.exec(`
     slots text[] not null default '{11:00,13:00,15:00,17:00,19:00}', cap integer not null default 2, weekly integer[] not null default '{}',
     blocks jsonb not null default '[]', photo_path text, map_google text, map_waze text, remarks text not null default '', deleted_at timestamptz,
     key_handover boolean not null default false);
+  create unique index crm_showrooms_name_key on public.crm_showrooms using btree (lower(trim(both from name)));
   create table public.crm_forms (id uuid primary key default gen_random_uuid(), name text not null, sections jsonb not null default '[]', sort_order integer not null default 0,
     created_by uuid, updated_by uuid, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), kind text not null default 'customer');
   create table public.crm_templates (id uuid primary key default gen_random_uuid(), name text not null, channel text not null default 'whatsapp', body text not null,
