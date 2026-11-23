@@ -245,6 +245,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_can_reply', 'crm_my_can', 'crm_people', 'crm_record_out', 'crm_record_unsent', 'crm_set_reaction',
   // Cold lead templates (mig 20261011140000): both ask crm_manages().
   'crm_template_statuses', 'crm_template_submitted', 'crm_import_templates', 'crm_template_header',
+  // …onto a sub-department's list (mig 20261124210000): crm_set_sub asks crm_manages() and the sub-department's CRM reach.
+  'crm_import_templates_in',
+  // A number's or Page's sub-department (mig 20261124210000): whose templates its customers are sent — an id, nothing more.
+  'crm_sub_of',
   // CRM Desktop rev 1 (mig 20261013100000): asks crm_manages().
   'crm_save_showroom_extras',
   // CRM photos, videos and voice notes (mig 20261013240000): asks crm_can_reply().

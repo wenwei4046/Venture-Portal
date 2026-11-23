@@ -1728,7 +1728,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
-        view={crmBrandsOfView(membership?.code || membership?.name)} onViewOf={crmViewOf}
+        view={crmBrandsOfView(membership?.code || membership?.name)} viewSub={membership?.id ?? null} onViewOf={crmViewOf}
         onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqFromCrm : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,

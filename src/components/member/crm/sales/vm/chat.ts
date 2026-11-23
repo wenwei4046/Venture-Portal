@@ -562,7 +562,7 @@ export function chatVM(ctx: SalesCtx) {
     saveRecents: list => { ctx.recents?.keep(list); act.saveRecentEmoji(list); },
   };
   // Loading templates for a cold chat's button (also the ⋮ flow's).
-  async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }
+  async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(c!.id); patch({ templates: t ?? [] }); } }
 
   return {
     cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now, fbBlocked) },

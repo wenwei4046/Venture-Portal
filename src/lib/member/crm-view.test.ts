@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { crmBrandsOfView, inView, peopleInView, personInView, pickedSource, sourcePickInView, teamsInView } from "./crm-view";
+import { crmBrandsOfView, inView, newRoomDraftKey, peopleInView, personInView, pickedSource, sourcePickInView, teamsInView, templatesOfSub } from "./crm-view";
 import { inBrand } from "@/components/member/crm/desk/vm/insight";
-import type { CrmData, CrmPerson } from "./crm-data";
+import { DEFAULT_CRM_SETTINGS, subSettingsFrom, type CrmData, type CrmPerson, type CrmRoom } from "./crm-data";
 
 // The owner, 2026-11-23, over the Fair view's Insight and Assignment showing The Conts and Dream Crafter together: "IR 的 view
 // 就只可以看到 IR，DC 就只可以看到 DC，同等的 fair 也只能看到 fair。现在全部绑在一起，我不要这样"; "assign 广告的时候也是跟着 view 走的".
@@ -117,5 +117,117 @@ describe("a brand to pick in a view", () => {
     expect(sourcePickInView(ir, "conts")).toBe(false);
     expect(sourcePickInView(ir, "dc:messenger")).toBe(false);
     expect(sourcePickInView(data, "dc")).toBe(true);
+  });
+});
+
+// The owner, 2026-11-23: "Management 这边也不是统一的，IR 是 IR，DC 是 DC，包括 setting 等等都要分开"; "每个 segment 分开就对了".
+describe("a view's Management", () => {
+  const IR = "sub-ir", DCS = "sub-dc", FAIR = "sub-fair";
+  const room = (id: string, sub: string | null, extra: Partial<CrmRoom> = {}): CrmRoom =>
+    ({ id, name: id.toUpperCase(), active: true, address: "", slots: [], cap: 2, weekly: [], blocks: [], ...(sub ? { sub } : {}), ...extra });
+  const managed = {
+    ...data,
+    scope: IR,
+    visits: [{ id: "v1", customerId: "c1", showroomId: "kl" }, { id: "v2", customerId: "c2", showroomId: "kl" }, { id: "v3", customerId: "c3", showroomId: "visit:v3" }],
+    rooms: [room("kl", IR), room("astrum", null), room("dc-room", DCS), room("old-dc", DCS, { active: false, deleted: true }), room("visit:v3", null, { virtual: true, active: false })],
+    forms: [{ id: "f-ir", name: "Customer info", sections: [], sub: IR }, { id: "f-dc", name: "Customer info", sections: [], sub: DCS }, { id: "f-fair", name: "Customer info", sections: [], sub: FAIR }],
+    bookingForms: [{ id: "b-ir", name: "Booking", sections: [] }, { id: "b-dc", name: "Booking", sections: [], sub: DCS }],
+    templates: [{ id: "t-ir", name: "Hello", ch: "whatsapp", st: "approved", body: "", on: true, metaName: "hello", language: "en", reason: null, sub: IR },
+      { id: "t-dc", name: "Hello", ch: "whatsapp", st: "approved", body: "", on: false, metaName: "hello", language: "en", reason: null, sub: DCS }],
+    partnerLinks: [{ id: "the_conts", name: "The Conts", code: "pc-1", on: true, sub: IR }],
+    partnerBookings: [{ id: "pb1", partner: "the_conts", showroomId: "astrum" }],
+    roomDrafts: { new: { draft: { n: "IR's" }, by: null, at: "" }, [`new:${DCS}`]: { draft: { n: "DC's" }, by: null, at: "" }, kl: { draft: {}, by: null, at: "" }, "dc-room": { draft: {}, by: null, at: "" } },
+    settings: { ...DEFAULT_CRM_SETTINGS },
+    settingsBySub: { [IR]: { ...DEFAULT_CRM_SETTINGS }, [DCS]: { ...DEFAULT_CRM_SETTINGS, replySoonH: 2, autoAssign: false } },
+    apptTypes: [{ id: "online", label: "Online", on: true, base: "online", fields: [] }],
+    apptTypesBySub: { [DCS]: [{ id: "phone", label: "Phone", on: true, base: "place", fields: [] }] },
+  } as unknown as CrmData;
+
+  it("is DC's own showrooms — another's a visit of the view was at keeps its name, in no list", () => {
+    const dc = inView(managed, ["dc"], DCS);
+    expect(dc.view?.sub).toBe(DCS);
+    // c3's online visit (DC's) keeps its own room too.
+    expect(dc.rooms.map(r => r.id)).toEqual(["kl", "dc-room", "old-dc", "visit:v3"]);
+    const kl = dc.rooms.find(r => r.id === "kl")!;
+    expect(kl.name).toBe("KL");
+    expect(kl.active).toBe(false);
+    expect(kl.virtual).toBe(true);
+    expect(dc.rooms.filter(r => r.active).map(r => r.id)).toEqual(["dc-room"]);
+  });
+
+  it("is IR's own showrooms (one read with no sub-department is the CRM's own), and its visits' virtual rooms", () => {
+    const ir = inView(managed, ["conts"], IR);
+    expect(ir.rooms.map(r => r.id)).toEqual(["kl", "astrum"]);
+    expect(ir.rooms.every(r => r.active)).toBe(true);
+    expect(inView(managed, ["dc"], DCS).rooms.some(r => r.id === "visit:v3")).toBe(true);
+  });
+
+  it("is its own forms, templates, booking link and the bookings at its showrooms", () => {
+    const dc = inView(managed, ["dc"], DCS), ir = inView(managed, ["conts"], IR), fair = inView(managed, [], FAIR);
+    expect(dc.forms?.map(f => f.id)).toEqual(["f-dc"]);
+    expect(fair.forms?.map(f => f.id)).toEqual(["f-fair"]);
+    expect(ir.bookingForms?.map(f => f.id)).toEqual(["b-ir"]);
+    expect(dc.bookingForms?.map(f => f.id)).toEqual(["b-dc"]);
+    expect(dc.templates?.map(t => [t.id, t.on])).toEqual([["t-dc", false]]);
+    expect(ir.templates?.map(t => [t.id, t.on])).toEqual([["t-ir", true]]);
+    expect(ir.partnerLinks?.map(l => l.id)).toEqual(["the_conts"]);
+    expect(dc.partnerLinks).toEqual([]);
+    expect(ir.partnerBookings?.map(b => b.id)).toEqual(["pb1"]);
+    expect(dc.partnerBookings).toEqual([]);
+  });
+
+  it("is its own Settings › General and appointment types — a sub-department with none of its own reads the CRM's own", () => {
+    const dc = inView(managed, ["dc"], DCS), fair = inView(managed, [], FAIR);
+    expect(dc.settings?.replySoonH).toBe(2);
+    expect(dc.settings?.autoAssign).toBe(false);
+    expect(dc.apptTypes?.map(t => t.id)).toEqual(["phone"]);
+    expect(fair.settings).toBe(managed.settings);
+    expect(fair.apptTypes).toBe(managed.apptTypes);
+  });
+
+  it("keeps a new showroom's draft as its own: IR's 'new', DC's 'new:<DC>' — each read as 'new' in its view", () => {
+    expect(newRoomDraftKey(managed, IR)).toBe("new");
+    expect(newRoomDraftKey(managed, DCS)).toBe(`new:${DCS}`);
+    expect(newRoomDraftKey({}, DCS)).toBe("new");
+    const dc = inView(managed, ["dc"], DCS), ir = inView(managed, ["conts"], IR);
+    expect(Object.keys(dc.roomDrafts ?? {}).sort()).toEqual(["dc-room", "new"]);
+    expect(dc.roomDrafts?.new.draft).toEqual({ n: "DC's" });
+    expect(Object.keys(ir.roomDrafts ?? {}).sort()).toEqual(["kl", "new"]);
+    expect(ir.roomDrafts?.new.draft).toEqual({ n: "IR's" });
+  });
+
+  it("is everybody's Management while the database names no sub-department (no scope), or with no sub-department given", () => {
+    const before = { ...managed, scope: undefined } as CrmData;
+    expect(inView(before, ["dc"], DCS).rooms).toBe(before.rooms);
+    expect(inView(before, ["dc"], DCS).view?.sub).toBeUndefined();
+    expect(inView(managed, ["dc"]).forms).toBe(managed.forms);
+  });
+});
+
+describe("the templates a customer is sent", () => {
+  const rows = [{ meta_name: "hello", sub_department_id: "ir" }, { meta_name: "hello", sub_department_id: "dc" }, { meta_name: "promo", sub_department_id: "dc" }, { meta_name: null }];
+  it("are the customer's sub-department's, one a Meta name", () => {
+    expect(templatesOfSub(rows, "dc")).toEqual([rows[1], rows[2], rows[3]]);
+    expect(templatesOfSub(rows, "ir")).toEqual([rows[0], rows[3]]);
+  });
+  it("are the first of each name with no sub-department known", () => {
+    expect(templatesOfSub(rows, null)).toEqual([rows[0], rows[2], rows[3]]);
+  });
+});
+
+describe("every sub-department's settings, as crm_settings_read gives them", () => {
+  it("are each one's Settings › General and appointment types by its id, and the CRM's own id", () => {
+    const got = subSettingsFrom({ replySoonH: 3, scope: "ir", bySub: {
+      ir: { replySoonH: 3, replyUrgentH: 6, replyOverdueH: 9, autoAssign: true, apptTypes: [{ id: "online", label: "Online", on: true, base: "online", fields: [] }] },
+      dc: { replySoonH: 2, replyUrgentH: 4, replyOverdueH: 8, autoAssign: false, apptTypes: null },
+    } });
+    expect(got.scope).toBe("ir");
+    expect(got.settingsBySub?.dc).toMatchObject({ replySoonH: 2, replyUrgentH: 4, replyOverdueH: 8, autoAssign: false });
+    expect(got.apptTypesBySub?.ir?.map(t => t.id)).toEqual(["online"]);
+    expect(got.apptTypesBySub?.dc).toBeUndefined();
+  });
+  it("are nothing before the migration", () => {
+    expect(subSettingsFrom({ replySoonH: 3 })).toEqual({});
+    expect(subSettingsFrom(null)).toEqual({});
   });
 });

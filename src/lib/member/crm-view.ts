@@ -76,6 +76,21 @@ function adBrands(d: CrmData): Map<string, SourceBrand | null> {
   return out;
 }
 
+/**
+ * The templates a customer may be sent, one a Meta name: its sub-department's (`sub`, the customer's — a Meta template may
+ * be on more than one list, each with its own On / Off; mig 20261124210000). No sub-department known: the first of each name.
+ */
+export function templatesOfSub<T extends { meta_name: string | null; sub_department_id?: string | null }>(rows: T[], sub: string | null): T[] {
+  const seen = new Set<string>();
+  return rows.filter(t => {
+    if (sub && t.sub_department_id && t.sub_department_id !== sub) return false;
+    if (!t.meta_name) return true;
+    if (seen.has(t.meta_name)) return false;
+    seen.add(t.meta_name);
+    return true;
+  });
+}
+
 /** Whose a showroom, form, template or booking link is: its sub-department's, else the CRM's own (IR's, read with none). */
 export const subOfRow = (d: Pick<CrmData, "scope">, x: { sub?: string | null }): string | null => x.sub ?? d.scope ?? null;
 

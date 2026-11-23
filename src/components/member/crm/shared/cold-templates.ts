@@ -18,7 +18,7 @@ export async function openColdTemplates(c: CrmCustomer, act: Pick<SalesActions, 
   if (c.channel === "messenger") { openActions({ title: "Messenger has no templates", sub: "After 7 days Messenger allows no message from the Page. Call the customer instead.", actions: [{ label: "Close", run: NONE }] }); return; }
   const reading: ActionSheet = { title: "Send template message", sub: "Reading the templates you may send.", actions: [{ label: "Close", run: NONE }] };
   openActions(reading);
-  const tpls = await act.loadTemplates();
+  const tpls = await act.loadTemplates(id);
   if (actionsOnScreen() !== reading) return;
   // The read failed: its toast says why.
   if (!tpls) { closeActions(); return; }

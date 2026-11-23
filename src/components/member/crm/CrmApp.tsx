@@ -104,6 +104,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   subRef.current = shownAll?.view?.sub ?? null;
   // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency) — the view's own.
   setUrgencyThresholds(shownAll?.settings ?? data?.settings);
+  // A chat's templates read in another view are that one's sub-department's: read again in this one.
+  useEffect(() => { setUi(u => (u.templates == null ? u : { ...u, templates: null })); }, [viewKey, viewSub]);
   // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
   // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen). Keep it: without it every switch to
   // the CRM holds about 8s on the curtain (CrmApp.ready.test.tsx).

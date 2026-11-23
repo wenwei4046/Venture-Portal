@@ -288,13 +288,13 @@ export function makePanelActions(base: SalesActions, { live, data, setData, sub 
       }
       // Its language and category too (2026-11-04): the six-argument save; one opened before keeps both (four arguments).
       // The view's sub-department's (mig 20261124210000): a new one goes on its list, one of another's is refused.
-      const was = (data().templates ?? []).find(y => y.id === t.id), s = subNow();
+      const was = (data().templates ?? []).find(y => y.id === t.id), vsub = subNow();
       const args = { p_id: t.id, p_name: t.name, p_channel: t.ch, p_body: t.body,
         p_language: t.language ?? was?.language ?? "en", p_category: t.category ?? was?.category ?? "MARKETING" };
-      const r = await (s ? write("crm_save_template_in", { p_sub: s, ...args }) : write("crm_save_template", args));
+      const r = await (vsub ? write("crm_save_template_in", { p_sub: vsub, ...args }) : write("crm_save_template", args));
       if (!r) return false;
       const row = r.data as { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category: string; sub_department_id?: string | null };
-      const tsub = row.sub_department_id ?? was?.sub ?? s;
+      const tsub = row.sub_department_id ?? was?.sub ?? vsub;
       let x: CrmTemplate = { id: row.id, name: row.name, ch: row.channel, body: row.body, st: row.status, on: row.is_on, metaName: row.meta_name, language: row.language, category: row.category, reason: row.reject_reason, ...(tsub ? { sub: tsub } : {}) };
       putT(x);
       // Unchanged and already with Meta (In review / Approved): nothing to submit again.
