@@ -239,6 +239,8 @@ export interface CrmRoom {
   /** The unit's key is handed over here (the owner, 2026-10-29; mig 20261029100000): a visit takes the key photos on the phone
    * and is marked Show up only with the key returned (No show too once collected). Off, a visit is marked as before. */
   keys?: boolean;
+  /** The sub-department whose list it is on (mig 20261124210000 — "IR 是 IR，DC 是 DC"); none read: the CRM's own (`scope`). */
+  sub?: string | null;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
@@ -255,7 +257,7 @@ export interface CrmLeave { id: string; staffId: string; from: string; to: strin
 /** One Up next action on the record (crm_events, kind up_next): who, when, what, before and after. */
 export interface CrmUpNextEvent { id: number; at: string; actor: string | null; action: string; staff: string | null; ad: string | null; before: Record<string, unknown> | null; after: Record<string, unknown> | null }
 /** A partner's booking link (CRM · Manage only). */
-export interface CrmPartnerLink { id: string; name: string; code: string; on: boolean }
+export interface CrmPartnerLink { id: string; name: string; code: string; on: boolean; /** Its sub-department (mig 20261124210000): its showrooms and booking form are that one's. */ sub?: string | null }
 
 export interface CrmAutoReply { on: boolean; text: string; img?: string | null; imgName?: string }
 export interface CrmAutoReplySet {
@@ -349,7 +351,15 @@ export interface CrmData {
    * 也只能看到 fair"; lib/member/crm-view.ts › inView): its brands — IR's The Conts, DC's Dream Crafter, Fair none — and the
    * people who hold one of them. Absent: no view (every brand one holds). While it is set no screen offers a brand to pick.
    */
-  view?: { brands: SourceBrand[]; people: string[] };
+  view?: { brands: SourceBrand[]; people: string[]; /** The view's sub-department: its Management (settings, showrooms, forms, templates, booking link). */ sub?: string | null };
+  /**
+   * The CRM's own sub-department (crm_scope(), IR — mig 20261124210000): a showroom, form, template or link read with no
+   * sub-department is its. Absent before the migration: no list is held to a sub-department.
+   */
+  scope?: string | null;
+  /** Settings › General and the appointment types of every sub-department, by its id (crm_settings_read's `bySub`). */
+  settingsBySub?: Record<string, CrmSettings>;
+  apptTypesBySub?: Record<string, ApptType[]>;
   viewerId: string | null;
   /** Their CRM cells (crm_my_can). */
   can: CrmCan;
@@ -452,6 +462,22 @@ export function settingsFrom(raw: unknown): CrmSettings {
   return { ...lines, suggestTemplate: r.suggestTemplate !== false, autoAssign: r.autoAssign !== false, pushMessages: r.pushMessages !== false, reminders: r.reminders !== false, teamAlerts: r.teamAlerts === true, sendAutoReply: r.sendAutoReply !== false };
 }
 
+/**
+ * crm_settings_read()'s every sub-department (mig 20261124210000 — "IR 是 IR，DC 是 DC，包括 setting 等等都要分开"): each one's
+ * Settings › General and appointment types by its id, and the CRM's own id (IR's). Nothing before the migration.
+ */
+export function subSettingsFrom(raw: unknown): Pick<CrmData, "scope" | "settingsBySub" | "apptTypesBySub"> {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  if (typeof r.scope !== "string" || !r.bySub || typeof r.bySub !== "object") return {};
+  const settingsBySub: Record<string, CrmSettings> = {}, apptTypesBySub: Record<string, ApptType[]> = {};
+  for (const [id, v] of Object.entries(r.bySub as Record<string, unknown>)) {
+    settingsBySub[id] = settingsFrom(v);
+    const types = v && typeof v === "object" ? (v as Record<string, unknown>).apptTypes : null;
+    if (Array.isArray(types)) apptTypesBySub[id] = apptTypesFrom(types);
+  }
+  return { scope: r.scope, settingsBySub, apptTypesBySub };
+}
+
 /** A form's field (CRM Desktop rev 1, H3). `id` of a built-in field is the customer's own column (name, phone, type, size, loc, req, budget). */
 export interface CrmFormField {
   id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date" | "Range"; req: 0 | 1; locked?: 1; ph?: string; opts?: string[]; isNew?: 1;
@@ -462,6 +488,8 @@ export interface CrmForm {
   id: string; name: string; base?: boolean;
   /** `page` / `pageTitle`: the page a section is on (0 = the first) since the paged form (2026-10-16); none — one page. */
   sections: { id: string; title: string; fields: CrmFormField[]; page?: number; pageTitle?: string }[];
+  /** Its sub-department (mig 20261124210000); none read: the CRM's own (`scope`). */
+  sub?: string | null;
 }
 /** A lead form ad's answers on a customer (2026-10-30). */
 export interface CrmLeadForm { kind: "messenger" | "instant"; complete: boolean; at: string | null; answers: { q: string; a: string }[] }
@@ -478,6 +506,8 @@ export interface CrmTemplate {
    * buttons; `headerName` = the picture / video / PDF attached for a header that is a file (null = none yet).
    */
   source?: "crm" | "meta"; parts?: TemplateParts; headerName?: string | null;
+  /** Its sub-department (mig 20261124210000): a Meta template may be on more than one's list, each its own On / Off. */
+  sub?: string | null;
 }
 
 /* ── Defaults the design starts with ───────────────────────────────────── */
@@ -562,6 +592,8 @@ export interface CrmRoomRow {
   photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
   /** v2 frame 07 (mig 20261024150000): staff-only remarks; a deleted showroom stays for its past visits' names. */
   remarks?: string; deleted?: boolean;
+  /** Its sub-department (mig 20261124210000). */
+  sub_department_id?: string | null;
   /** Hands a unit's key over (mig 20261029100000). */
   keys?: boolean;
 }
@@ -583,7 +615,7 @@ export interface CrmDataRows {
   /** One's own starred messages (mig 20261014060000); absent before it. */
   stars?: { message_id: string }[];
   partnerBookings?: { id: string; ref: string; partner: string; showroom: string; start_at: string; minutes: number | null; state: "booked" | "cancelled"; booker_name: string; booker_phone: string | null; customer_name: string; customer_phone: string | null; info: Record<string, string> | null; remarks: string | null; booker_note: string | null; created_at: string }[];
-  partnerLinks?: { id: string; name: string; code: string; on: boolean }[];
+  partnerLinks?: { id: string; name: string; code: string; on: boolean; sub?: string | null }[];
   leaves?: { id: string; staff_id: string; starts_on: string; ends_on: string; note: string | null; from_at?: string | null; to_at?: string | null; reason?: string | null }[];
   upNextEvents?: { id: number; at: string; actor: string | null; data: Record<string, unknown> }[];
   upNextStaff?: string[];
@@ -597,7 +629,7 @@ export interface CrmDataRows {
   events: CrmEventRow[];
   staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null; recent_emoji?: string[] | null; ui_prefs?: Record<string, unknown> | null }[];
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
-  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number; kind?: string | null }[];
+  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number; kind?: string | null; sub_department_id?: string | null }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
   adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null; added_at?: string | null; starts_at?: string | null; ends_at?: string | null; page_id?: string | null; page_name?: string | null; hidden_at?: string | null }[];
   locked?: string[];
@@ -608,7 +640,7 @@ export interface CrmDataRows {
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null; together?: boolean | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
   templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category?: string;
-    source?: "crm" | "meta"; parts?: TemplateParts | null; header_path?: string | null; header_name?: string | null }[];
+    source?: "crm" | "meta"; parts?: TemplateParts | null; header_path?: string | null; header_name?: string | null; sub_department_id?: string | null }[];
   /** crm_my_can()'s answer; null when the database did not give one. */
   can?: unknown;
 }
@@ -707,6 +739,7 @@ export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
   ...(r.photo_url ? { photo: r.photo_url } : {}), ...(r.map_google ? { mapGoogle: r.map_google } : {}), ...(r.map_waze ? { mapWaze: r.map_waze } : {}),
   ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}), ...(r.keys ? { keys: true } : {}),
+  ...(r.sub_department_id ? { sub: r.sub_department_id } : {}),
 });
 
 export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
@@ -775,7 +808,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     starredMessages: (rows.stars ?? []).map(s => s.message_id),
     partnerBookings: (rows.partnerBookings ?? []).map(b => ({ id: b.id, ref: b.ref, partner: b.partner, showroomId: b.showroom, start: b.start_at, minutes: b.minutes ?? 60, state: b.state,
       booker: b.booker_name, bookerPhone: b.booker_phone ?? "", customer: b.customer_name, customerPhone: b.customer_phone ?? "", info: b.info ?? {}, remarks: b.remarks ?? "", note: b.booker_note ?? "", createdAt: b.created_at })),
-    partnerLinks: rows.partnerLinks ?? [],
+    partnerLinks: (rows.partnerLinks ?? []).map(l => ({ id: l.id, name: l.name, code: l.code, on: l.on, ...(l.sub ? { sub: l.sub } : {}) })),
     leaves: (rows.leaves ?? []).map(l => ({ id: l.id, staffId: l.staff_id, from: l.starts_on, to: l.ends_on, note: l.note ?? "",
       fromAt: officeStamp(l.from_at) ?? `${l.starts_on}T00:00`, toAt: officeStamp(l.to_at) ?? `${l.ends_on}T23:30`,
       reason: (["Annual", "Sick", "Training", "Other"].includes(l.reason ?? "") ? l.reason : "Other") as CrmLeave["reason"] })),
@@ -799,12 +832,14 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     uiPrefs: rows.staffPrefs[0]?.ui_prefs ?? {},
     settings: settingsFrom(rows.settings),
     apptTypes: apptTypesFrom(rows.apptTypes),
+    ...subSettingsFrom(rows.settings),
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason, category: t.category ?? "MARKETING",
-      ...(t.source === "meta" ? { source: "meta" as const, parts: t.parts ?? {}, headerName: t.header_path ? (t.header_name ?? "file") : null } : {}) })),
-    forms: [...(rows.forms ?? [])].filter(x => x.kind !== "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
-    bookingForms: [...(rows.forms ?? [])].filter(x => x.kind === "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
+      ...(t.source === "meta" ? { source: "meta" as const, parts: t.parts ?? {}, headerName: t.header_path ? (t.header_name ?? "file") : null } : {}),
+      ...(t.sub_department_id ? { sub: t.sub_department_id } : {}) })),
+    forms: [...(rows.forms ?? [])].filter(x => x.kind !== "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [], ...(x.sub_department_id ? { sub: x.sub_department_id } : {}) })),
+    bookingForms: [...(rows.forms ?? [])].filter(x => x.kind === "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [], ...(x.sub_department_id ? { sub: x.sub_department_id } : {}) })),
     notes: (rows.notes ?? []).map(n => ({ id: n.id, customerId: n.contact_id, by: n.author, text: n.body, at: n.created_at })).sort((a, b) => b.at.localeCompare(a.at)),
   };
 }

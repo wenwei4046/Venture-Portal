@@ -85,6 +85,11 @@ export function histInView(d: DeskCtx["data"], h: HistRow): boolean {
   if (h.table === "crm_staff") return personInView(d, v("staff_id"));
   if (h.table === "crm_fulltime_rules") return personInView(d, v("tl_id"));
   if (h.table === "crm_channels") { const b = brandOf(v("external_id")); return !!b && d.view.brands.includes(b); }
+  // A sub-department's Management (mig 20261124210000): its showrooms, forms, templates and settings — a row from before
+  // them, or the CRM's own settings row, is IR's (the CRM's own).
+  const sub = d.view.sub;
+  if (sub && ["crm_showrooms", "crm_forms", "crm_templates", "crm_sub_settings"].includes(h.table)) return (v("sub_department_id") || d.scope || "") === sub;
+  if (sub && h.table === "crm_settings") return sub === d.scope;
   return true;
 }
 

@@ -68,7 +68,8 @@ export interface SalesActions {
   saveRecentEmoji(list: string[]): void;
   invite(kind: "share" | "move", customerId: string, to: string): Promise<boolean>;
   answerInvite(inviteId: string, accept: boolean): Promise<void>;
-  loadTemplates(): Promise<WaTemplate[] | null>;
+  /** The templates switched on — `customerId`'s sub-department's (IR's, DC's …; mig 20261124210000). */
+  loadTemplates(customerId?: string): Promise<WaTemplate[] | null>;
   sendTemplate(customerId: string, t: WaTemplate, params: string[]): Promise<boolean>;
   sendMedia(customerId: string, file: File, caption: string): Promise<boolean>;
   /** Forward a message to another customer (the message menu, 2026-10-14). */
@@ -435,13 +436,13 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       if (!(await write("crm_answer_invite", { p_invite: inviteId, p_accept: accept })).ok) return;
       setData(d => ({ ...d, invites: d.invites.map(i => (i.id === inviteId ? { ...i, state: accept ? "accepted" : "declined", decidedAt: new Date().toISOString() } : i)) }));
     },
-    async loadTemplates() {
+    async loadTemplates(customerId) {
       // Demo: the switched-on WhatsApp templates of the demo data, as the live read gives them (rev 1011).
       if (!live) return (data().templates ?? []).filter(t => t.ch === "whatsapp" && t.st === "approved" && t.on && t.metaName).map(t => {
         const text = t.body.replace(/\{name\}/g, "{{1}}");
         return { name: t.metaName!, label: t.name, language: t.language, category: "MARKETING", text, params: text.includes("{{1}}") ? 1 : 0 };
       });
-      const r = await fetchCrmTemplates();
+      const r = await fetchCrmTemplates(customerId);
       if (!r.ok) { toast(r.error); return null; }
       return r.templates;
     },

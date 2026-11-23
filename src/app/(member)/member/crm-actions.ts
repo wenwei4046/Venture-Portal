@@ -10,6 +10,7 @@ import { cleanText, fetchWhatsAppTemplateStatuses, fetchWhatsAppTemplatesFull, f
 import { HUMAN_AGENT_APPROVED, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
+import { templatesOfSub } from "@/lib/member/crm-view";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
 import { headerKind, importPlan, templateTail, type TemplateParts } from "@/lib/whatsapp/template-import";
@@ -78,6 +79,9 @@ const CRM_WRITES = [
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
   "crm_add_contact",
+  // Each sub-department's Management (mig 20261124210000): the same saves, as the Revenue app's view's — CRM · Manage, and
+  // the sub-department in the caller's CRM reach (crm_set_sub).
+  "crm_save_settings_in", "crm_save_appt_types_in", "crm_save_showroom_full_in", "crm_save_form_in", "crm_save_template_in",
 ] as const;
 export type CrmWrite = (typeof CRM_WRITES)[number];
 
@@ -192,6 +196,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_template", "crm_template_on", "crm_delete_template", "crm_template_header",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
   "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order", "crm_save_showroom_draft", "crm_save_reply_library", "crm_partner_link_set", "crm_partner_booking_cancel", "crm_save_leave", "crm_delete_leave",
+  "crm_save_settings_in", "crm_save_appt_types_in", "crm_save_showroom_full_in", "crm_save_form_in", "crm_save_template_in",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -253,13 +258,16 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
     const extra = new Map(more.extras.map(x => [x.id, x.extra]));
     const leadForm = new Map(more.leadForms.map(x => [x.id, x.lead_form]));
     const roomX = new Map(more.rooms.map(r => [r.id, r]));
+    // Each template's sub-department (mig 20261124210000), read on its own so the CRM opens before the column.
+    const tplSub = new Map(more.templateSubs.map(t => [t.id, t.sub_department_id]));
     const data = withRoomDrafts(more.roomDrafts, crmDataFromRows({
-      people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules, templates,
+      people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules,
+      templates: tplSub.size ? templates.map(t => ({ ...t, sub_department_id: tplSub.get(t.id) ?? null })) : templates,
       contacts: extra.size || leadForm.size ? contacts.map(c => ({ ...c, ...(extra.has(c.id) ? { extra: extra.get(c.id) } : {}), ...(leadForm.has(c.id) ? { lead_form: leadForm.get(c.id) } : {}) })) : contacts,
       rooms: rooms.map(r => {
         const x = roomX.get(r.id);
         const y = more.roomMore.find(m => m.id === r.id);
-        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at, keys: !!y.key_handover } : r;
+        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at, keys: !!y.key_handover, sub_department_id: y.sub_department_id ?? null } : r;
         return x ? { ...r2, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r2;
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
@@ -290,8 +298,9 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked, uiPrefs] = await Promise.all([
-    soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked, uiPrefs, templateSubs] = await Promise.all([
+    // …each with its sub-department (mig 20261124210000).
+    soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind, sub_department_id")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
     soft<{ id: string; photo_path: string | null; map_google: string | null; map_waze: string | null }[]>(db.from("crm_showrooms").select("id, photo_path, map_google, map_waze")),
@@ -308,8 +317,8 @@ async function desktopRows(db: Db, journey: boolean) {
     // Members locked out of the dealing for now (mig 20261022130000).
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("locked", true)),
     // Showrooms' staff-only remarks and the deleted ones (mig 20261024150000).
-    // …and whether it hands a unit's key over (mig 20261029100000).
-    soft<{ id: string; remarks: string | null; deleted_at: string | null; key_handover?: boolean }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at, key_handover")),
+    // …and whether it hands a unit's key over (mig 20261029100000), and whose list it is on (mig 20261124210000).
+    soft<{ id: string; remarks: string | null; deleted_at: string | null; key_handover?: boolean; sub_department_id?: string | null }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at, key_handover, sub_department_id")),
     // Appointment types (mig 20261025040000): null before it, so the two built in stay.
     (async () => { try { const { data, error } = await db.rpc("crm_appt_types_read"); return error ? null : (data as unknown); } catch { return null; } })(),
     // A partner's bookings through its link (mig 20261029190000), the last two months and ahead: on the calendar.
@@ -318,7 +327,7 @@ async function desktopRows(db: Db, journey: boolean) {
     // The partners' links with their codes, CRM · Manage only ([] for anybody else, and before the migration).
     // Members' leave (mig 20261029220000): what has not ended yet (yesterday on, for the office's day).
     soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note, from_at, to_at, reason").gte("ends_on", new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
-    (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean }[]); } catch { return []; } })(),
+    (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean; sub?: string | null }[]); } catch { return []; } })(),
     // A lead form ad's answers (mig 20261030060000), read softly so the CRM opens before the column.
     soft<{ id: string; lead_form: CrmDataRows["contacts"][number]["lead_form"] }[]>(db.from("crm_contacts").select("id, lead_form").not("lead_form", "is", null).limit(5000)),
     // Showrooms' drafts (mig 20261103100000): CRM · Manage only, [] for anybody else and before the table.
@@ -331,8 +340,10 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<{ id: string }[]>(db.from("crm_contacts").select("id").eq("fb_blocked", true)),
     // One's own screen choices (mig 20261110120000): empty before it.
     soft<{ ui_prefs: Record<string, unknown> | null }[]>(db.from("crm_staff_prefs").select("ui_prefs")),
+    // Each template's sub-department (mig 20261124210000): empty before it.
+    soft<{ id: string; sub_department_id: string | null }[]>(db.from("crm_templates").select("id, sub_department_id")),
   ]);
-  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], uiPrefs: uiPrefs[0]?.ui_prefs ?? {}, adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, partnerBookings, partnerLinks, leaves };
+  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], uiPrefs: uiPrefs[0]?.ui_prefs ?? {}, adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, partnerBookings, partnerLinks, leaves, templateSubs };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */
@@ -458,16 +469,32 @@ export async function reactToMessage(messageId: string, emoji: string): Promise<
   }
 }
 
-/** The WhatsApp Business Account's approved templates (for a cold lead). */
-export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemplate[] } | { ok: false; error: string }> {
+/**
+ * A number's or Page's sub-department (mig 20261124210000, crm_sub_of: The Conts' IR, Dream Crafter's DC) — whose
+ * templates its customers are sent. Null before the migration: every template is the CRM's own then.
+ */
+async function subOfAccount(db: Db, account: string | null | undefined): Promise<string | null> {
+  if (!account) return null;
+  try {
+    const { data, error } = await db.rpc("crm_sub_of", { p_account: account });
+    return error || typeof data !== "string" ? null : data;
+  } catch { return null; }
+}
+
+/** The WhatsApp Business Account's approved templates (for a cold lead) — the customer's sub-department's (IR's, DC's …). */
+export async function fetchCrmTemplates(contactId?: string): Promise<{ ok: true; templates: WaTemplate[] } | { ok: false; error: string }> {
   try {
     const db = await session();
     await requireCrm("edit");
+    const sub = contactId ? await subOfAccount(db, ((await db.from("crm_contacts").select("account_id").eq("id", contactId).maybeSingle()).data as { account_id?: string } | null)?.account_id) : null;
     // rev 1011: only the CRM's own templates the Control panel switched on (Approved + On) — the row policy holds the rest back.
-    const { data, error } = await db.from("crm_templates").select("name, body, meta_name, language, category, parts")
-      .eq("channel", "whatsapp").eq("status", "approved").eq("is_on", true).not("meta_name", "is", null).order("created_at");
+    let q = db.from("crm_templates").select(sub ? "name, body, meta_name, language, category, parts, sub_department_id" : "name, body, meta_name, language, category, parts")
+      .eq("channel", "whatsapp").eq("status", "approved").eq("is_on", true).not("meta_name", "is", null);
+    if (sub) q = q.eq("sub_department_id", sub);
+    const { data, error } = await q.order("created_at");
     if (error) throw new Error(error.message);
-    return { ok: true, templates: (data ?? []).map(t => {
+    const rows = templatesOfSub((data ?? []) as unknown as { name: string; body: string; meta_name: string | null; language: string; category: string; parts: unknown; sub_department_id?: string | null }[], sub);
+    return { ok: true, templates: rows.map(t => {
       const text = metaTemplateBody(t.body as string);
       const parts = (t.parts ?? {}) as TemplateParts;
       return { name: t.meta_name as string, label: t.name as string, language: t.language as string, category: t.category as string, text, params: text.includes("{{1}}") ? 1 : 0,
@@ -527,7 +554,7 @@ export async function refreshCrmTemplates(): Promise<{ ok: true; changed: number
  * Import from Meta (2026-11-19): the account's approved templates the CRM can send, made in WhatsApp Manager, kept as
  * the CRM's own (Approved, Off) — again to bring Meta's new words for ones imported before. CRM · Manage.
  */
-export async function importCrmTemplates(): Promise<{ ok: true; added: number; skipped: { name: string; reason: string }[] } | { ok: false; error: string }> {
+export async function importCrmTemplates(sub?: string | null): Promise<{ ok: true; added: number; skipped: { name: string; reason: string }[] } | { ok: false; error: string }> {
   try {
     const db = await session();
     await requireCrm("manage");
@@ -535,7 +562,10 @@ export async function importCrmTemplates(): Promise<{ ok: true; added: number; s
     const meta = await fetchWhatsAppTemplatesFull({ wabaId, token });
     if (!meta.ok) throw new Error(meta.error);
     const plan = importPlan(meta.rows);
-    const { data, error } = await db.rpc("crm_import_templates", { p_rows: plan.rows });
+    // Onto the Revenue app's view's list (mig 20261124210000): the database asks CRM · Manage and that sub-department's reach.
+    const { data, error } = typeof sub === "string" && sub
+      ? await db.rpc("crm_import_templates_in", { p_sub: sub, p_rows: plan.rows })
+      : await db.rpc("crm_import_templates", { p_rows: plan.rows });
     if (error) throw new Error(error.message);
     return { ok: true, added: Number(data ?? 0), skipped: plan.skipped };
   } catch (error) {
@@ -647,8 +677,14 @@ export async function sendCrmTemplate(contactId: string, template: { name: strin
     await requireCrm("edit");
     const { contact, token } = await reachable(db, contactId, false);
     if (contact.channel !== "whatsapp") throw new Error("Messenger has no templates. Call the customer instead.");
-    // Only a template the Control panel switched on (rev 1011), in its own words — never what the browser says it is.
-    const { data: own } = await db.from("crm_templates").select("body, language, parts, header_path, header_mime, header_name").eq("meta_name", template.name).eq("status", "approved").eq("is_on", true).maybeSingle();
+    // Only a template the Control panel switched on (rev 1011), in its own words — never what the browser says it is; the
+    // customer's sub-department's (mig 20261124210000: a Meta template may be on IR's list and DC's, each its own On / Off).
+    const sub = await subOfAccount(db, contact.account_id);
+    let tq = db.from("crm_templates").select(sub ? "body, language, parts, header_path, header_mime, header_name, meta_name, sub_department_id" : "body, language, parts, header_path, header_mime, header_name, meta_name")
+      .eq("meta_name", template.name).eq("status", "approved").eq("is_on", true);
+    if (sub) tq = tq.eq("sub_department_id", sub);
+    const { data: owns } = await tq.order("created_at").limit(2);
+    const own = templatesOfSub((owns ?? []) as unknown as { body: string; language: string; parts: unknown; header_path: string | null; header_mime: string | null; header_name: string | null; meta_name: string | null; sub_department_id?: string | null }[], sub)[0];
     if (!own) throw new Error("That template is not switched on any more. Close and open the templates again.");
     const text = metaTemplateBody(own.body as string), language = own.language as string;
     // An imported template (2026-11-19): its named variable, and its picture / video / PDF uploaded to WhatsApp for this send.
@@ -808,7 +844,8 @@ export async function saveCrmShowroomExtras(form: FormData): Promise<{ ok: true 
 }
 
 /** The CRM's settings tables History reads (B8), and what each is called there. */
-const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings", "crm_channels"];
+// crm_sub_settings: Settings › General by sub-department since mig 20261124210000 (crm_settings keeps what came before).
+const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings", "crm_sub_settings", "crm_channels"];
 export interface CrmHistoryRow { id: number; at: string; who: string; table: string; op: string; key: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null; changed: string[] }
 
 /**

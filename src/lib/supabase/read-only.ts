@@ -37,6 +37,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'fa_read',
   // The CRM's brands per person (mig 20261117160000): STABLE — a person's window.
   'person_crm_brands',
+  // A number's or Page's sub-department (mig 20261124210000): STABLE — whose templates a chat's template sheet lists.
+  'crm_sub_of',
   // Lead View's outlets per person (mig 20261119200000): STABLE — a person's window.
   'person_lead_outlets',
   'ar_account_code_for', 'ar_account_for_invoice', 'audit_changes', 'audit_overview', 'bank_gl_codes', 'bridge_mirror_slices',

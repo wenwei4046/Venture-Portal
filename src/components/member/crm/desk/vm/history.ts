@@ -42,7 +42,8 @@ export function words(field: string, v: unknown, nameOf: (id: string) => string)
 export function historyRows(rows: CrmHistoryRow[], nameOf: (id: string) => string): HistRow[] {
   return rows.map(r => {
     const row = r.after ?? r.before ?? {};
-    const label = (row.name ?? row.ad_label ?? (row.staff_id ? nameOf(String(row.staff_id)) : row.tl_id ? `${nameOf(String(row.tl_id))}'s team` : null) ?? r.key) as string;
+    const label = (r.table === "crm_settings" || r.table === "crm_sub_settings" ? "Settings"
+      : row.name ?? row.ad_label ?? (row.staff_id ? nameOf(String(row.staff_id)) : row.tl_id ? `${nameOf(String(row.tl_id))}'s team` : null) ?? r.key) as string;
     const fields = r.op === "UPDATE" ? r.changed : Object.keys(row);
     return {
       at: r.at, who: r.who, table: r.table, op: r.op, what: String(label || "—"), row, before: r.before, after: r.after,

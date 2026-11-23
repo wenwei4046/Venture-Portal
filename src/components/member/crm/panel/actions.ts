@@ -12,6 +12,7 @@ import { adToSync } from "@/lib/member/crm-ad-running";
 import type { CrmData, CrmLeave, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
+import { newRoomDraftKey } from "@/lib/member/crm-view";
 import { officeTime } from "@/lib/office-time";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -85,13 +86,19 @@ export interface PanelActions extends SalesActions {
 const sameValues = (a: Record<string, unknown> = {}, b: Record<string, unknown> = {}) =>
   [...new Set([...Object.keys(a), ...Object.keys(b)])].every(k => a[k] === b[k]);
 
-export function makePanelActions(base: SalesActions, { live, data, setData }: { live: boolean; data: () => CrmData; setData: Dispatch<SetStateAction<CrmData>> }): PanelActions {
+/**
+ * `sub`: the Revenue app's view's sub-department (2026-11-23 — "IR 是 IR，DC 是 DC，包括 setting 等等都要分开"; mig
+ * 20261124210000). Settings › General, the appointment types, a showroom, a template and Import from Meta are then saved
+ * as that one's (the "…_in" writes); none — or a database that names no sub-department yet (no `scope`) — the CRM's own.
+ */
+export function makePanelActions(base: SalesActions, { live, data, setData, sub }: { live: boolean; data: () => CrmData; setData: Dispatch<SetStateAction<CrmData>>; sub?: () => string | null }): PanelActions {
   const write = async (name: Parameters<typeof crmWrite>[0], args: Record<string, unknown>) => {
     if (!live) return { ok: true as const, data: null as unknown };
     const r = await crmWrite(name, args);
     if (!r.ok) { base.toast(r.error); return null; }
     return r;
   };
+  const subNow = () => { const s = sub?.() ?? null; return s && data().scope ? s : null; };
   const api: PanelActions = {
     ...base,
     async sendTo(customerId, staffId) {
@@ -101,8 +108,9 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveSettings(st) {
-      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
-      setData(d => ({ ...d, settings: st }));
+      const s = subNow(), args = { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply };
+      if (!(await (s ? write("crm_save_settings_in", { p_sub: s, ...args }) : write("crm_save_settings", args)))) return false;
+      setData(d => (s ? { ...d, settingsBySub: { ...(d.settingsBySub ?? {}), [s]: st }, ...(s === d.scope ? { settings: st } : {}) } : { ...d, settings: st }));
       return true;
     },
     async setPartnerLink(id, on, newCode) {
@@ -152,8 +160,9 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveApptTypes(types) {
-      if (!(await write("crm_save_appt_types", { p_types: types }))) return false;
-      setData(d => ({ ...d, apptTypes: types }));
+      const s = subNow();
+      if (!(await (s ? write("crm_save_appt_types_in", { p_sub: s, p_types: types }) : write("crm_save_appt_types", { p_types: types })))) return false;
+      setData(d => (s ? { ...d, apptTypesBySub: { ...(d.apptTypesBySub ?? {}), [s]: types }, ...(s === d.scope ? { apptTypes: types } : {}) } : { ...d, apptTypes: types }));
       return true;
     },
     async hideAd(ad, on) {
@@ -278,12 +287,15 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
         return x;
       }
       // Its language and category too (2026-11-04): the six-argument save; one opened before keeps both (four arguments).
-      const was = (data().templates ?? []).find(y => y.id === t.id);
-      const r = await write("crm_save_template", { p_id: t.id, p_name: t.name, p_channel: t.ch, p_body: t.body,
-        p_language: t.language ?? was?.language ?? "en", p_category: t.category ?? was?.category ?? "MARKETING" });
+      // The view's sub-department's (mig 20261124210000): a new one goes on its list, one of another's is refused.
+      const was = (data().templates ?? []).find(y => y.id === t.id), vsub = subNow();
+      const args = { p_id: t.id, p_name: t.name, p_channel: t.ch, p_body: t.body,
+        p_language: t.language ?? was?.language ?? "en", p_category: t.category ?? was?.category ?? "MARKETING" };
+      const r = await (vsub ? write("crm_save_template_in", { p_sub: vsub, ...args }) : write("crm_save_template", args));
       if (!r) return false;
-      const row = r.data as { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category: string };
-      let x: CrmTemplate = { id: row.id, name: row.name, ch: row.channel, body: row.body, st: row.status, on: row.is_on, metaName: row.meta_name, language: row.language, category: row.category, reason: row.reject_reason };
+      const row = r.data as { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category: string; sub_department_id?: string | null };
+      const tsub = row.sub_department_id ?? was?.sub ?? vsub;
+      let x: CrmTemplate = { id: row.id, name: row.name, ch: row.channel, body: row.body, st: row.status, on: row.is_on, metaName: row.meta_name, language: row.language, category: row.category, reason: row.reject_reason, ...(tsub ? { sub: tsub } : {}) };
       putT(x);
       // Unchanged and already with Meta (In review / Approved): nothing to submit again.
       if (!submit || (x.st !== "draft" && x.st !== "rejected")) return x;
@@ -305,7 +317,7 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     },
     async importTemplates() {
       if (!live) { base.toast("Import from Meta works on the live CRM only."); return null; }
-      const r = await importCrmTemplates();
+      const r = await importCrmTemplates(subNow());
       if (!r.ok) { base.toast(r.error); return null; }
       return { added: r.added, skipped: r.skipped };
     },
@@ -335,10 +347,13 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (live) void crmWrite("crm_read_notifs", { p_keys: keys, p_all: all });
     },
     async saveRoom(room) {
-      const r = await write("crm_save_showroom_full", { p_id: room.id, p_name: room.name, p_address: room.address, p_slots: room.slots, p_cap: room.cap, p_weekly: room.weekly, p_blocks: room.blocks, p_active: room.active });
+      // The view's sub-department's (mig 20261124210000): a new showroom goes on its list, one of another's is refused.
+      const s = subNow(), args = { p_id: room.id, p_name: room.name, p_address: room.address, p_slots: room.slots, p_cap: room.cap, p_weekly: room.weekly, p_blocks: room.blocks, p_active: room.active };
+      const r = await (s ? write("crm_save_showroom_full_in", { p_sub: s, ...args }) : write("crm_save_showroom_full", args));
       if (!r) return false;
-      const saved = r.data as { id: string } | null;
-      const next: CrmRoom = { ...room, id: saved?.id ?? room.id ?? `r${Date.now()}` };
+      const saved = r.data as { id: string; sub_department_id?: string | null } | null;
+      const was = room.id ? data().rooms.find(x => x.id === room.id) : undefined, rsub = saved?.sub_department_id ?? was?.sub ?? s;
+      const next: CrmRoom = { ...room, id: saved?.id ?? room.id ?? `r${Date.now()}`, ...(rsub ? { sub: rsub } : {}) };
       setData(d => ({ ...d, rooms: d.rooms.some(x => x.id === next.id) ? d.rooms.map(x => (x.id === next.id ? next : x)) : [...d.rooms, next] }));
       return next.id;
     },
@@ -347,7 +362,9 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, remarks } : r)) }));
       return true;
     },
-    async saveRoomDraft(room, draft) {
+    async saveRoomDraft(room0, draft) {
+      // A new showroom's draft is the view's sub-department's own (crm-view.ts › newRoomDraftKey).
+      const room = room0 === "new" ? newRoomDraftKey(data(), subNow()) : room0;
       if (!(await write("crm_save_showroom_draft", { p_room: room, p_draft: draft }))) return false;
       const by = data().viewerId;
       setData(d => {

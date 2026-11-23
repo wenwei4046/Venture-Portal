@@ -6,8 +6,12 @@
  * IR's, Dream Crafter's DC's; Fair has no number or Page yet, so its CRM is empty). Every screen reads what `inView` hands
  * it — the view's customers and all that hangs on them, its ads, its people — and none offers a brand to pick while a view
  * holds the CRM. Who may READ a brand at all is still the database's (crm_my_brands); this only narrows the screens.
+ *
+ * Its Management too (the owner: "Management 这边也不是统一的，IR 是 IR，DC 是 DC，包括 setting 等等都要分开"; mig
+ * 20261124210000): given the view's sub-department, `inView` hands every screen that one's Settings › General and
+ * appointment types, showrooms, forms, cold lead templates and booking link — Fair's own too, before it has a customer.
  */
-import type { CrmData, CrmPerson } from "./crm-data";
+import { virtualRoomId, type CrmData, type CrmPerson } from "./crm-data";
 import { brandOf, type SourceBrand, type SourcePick } from "./crm-source";
 
 /** The brands of the sub-department a view is: IR's The Conts, DC's Dream Crafter, any other (Fair) none. Null — no view. */
@@ -72,8 +76,61 @@ function adBrands(d: CrmData): Map<string, SourceBrand | null> {
   return out;
 }
 
-/** The CRM's data as a view sees it (see the file's head). No view (`brands` null): the data as it is. */
-export function inView(d: CrmData, brands: SourceBrand[] | null): CrmData {
+/**
+ * The templates a customer may be sent, one a Meta name: its sub-department's (`sub`, the customer's — a Meta template may
+ * be on more than one list, each with its own On / Off; mig 20261124210000). No sub-department known: the first of each name.
+ */
+export function templatesOfSub<T extends { meta_name: string | null; sub_department_id?: string | null }>(rows: T[], sub: string | null): T[] {
+  const seen = new Set<string>();
+  return rows.filter(t => {
+    if (sub && t.sub_department_id && t.sub_department_id !== sub) return false;
+    if (!t.meta_name) return true;
+    if (seen.has(t.meta_name)) return false;
+    seen.add(t.meta_name);
+    return true;
+  });
+}
+
+/** Whose a showroom, form, template or booking link is: its sub-department's, else the CRM's own (IR's, read with none). */
+export const subOfRow = (d: Pick<CrmData, "scope">, x: { sub?: string | null }): string | null => x.sub ?? d.scope ?? null;
+
+/** The key a view's new showroom's unsaved draft is kept under: IR's 'new' as before, another sub-department's 'new:<its id>'. */
+export function newRoomDraftKey(d: Pick<CrmData, "scope">, sub: string | null | undefined): string {
+  return !sub || !d.scope || sub === d.scope ? "new" : `new:${sub}`;
+}
+
+/**
+ * A sub-department's Management (see the file's head): its own showrooms, forms, templates and booking link, its settings
+ * and appointment types. Another's showroom a visit of the view was at keeps its name there — in no list, picker or count.
+ */
+function managementOf(d: CrmData, sub: string, visits: CrmData["visits"]): Partial<CrmData> {
+  const mine = (x: { sub?: string | null }) => subOfRow(d, x) === sub;
+  const ownRooms = new Set(d.rooms.filter(r => !r.virtual && mine(r)).map(r => r.id));
+  const links = (d.partnerLinks ?? []).filter(mine), linkIds = new Set(links.map(l => l.id));
+  const bookings = (d.partnerBookings ?? []).filter(b => ownRooms.has(b.showroomId) || linkIds.has(b.partner));
+  const named = new Set([...visits.map(v => v.showroomId), ...bookings.map(b => b.showroomId)]);
+  const visitRooms = new Set(visits.map(v => virtualRoomId(v.id)));
+  const rooms = d.rooms.flatMap(r => (r.virtual ? (visitRooms.has(r.id) ? [r] : [])
+    : ownRooms.has(r.id) ? [r] : named.has(r.id) ? [{ ...r, active: false, virtual: true }] : []));
+  const newKey = newRoomDraftKey(d, sub);
+  return {
+    rooms,
+    partnerLinks: links,
+    partnerBookings: bookings,
+    ...(d.forms ? { forms: d.forms.filter(mine) } : {}),
+    ...(d.bookingForms ? { bookingForms: d.bookingForms.filter(mine) } : {}),
+    ...(d.templates ? { templates: d.templates.filter(mine) } : {}),
+    ...(d.roomDrafts ? { roomDrafts: Object.fromEntries(Object.entries(d.roomDrafts).flatMap(([k, v]) => (k === newKey ? [["new", v]] : ownRooms.has(k) ? [[k, v]] : []))) } : {}),
+    settings: d.settingsBySub?.[sub] ?? d.settings,
+    apptTypes: d.apptTypesBySub?.[sub] ?? d.apptTypes,
+  };
+}
+
+/**
+ * The CRM's data as a view sees it (see the file's head). No view (`brands` null): the data as it is. `sub`: the view's
+ * sub-department, whose Management it reads — none, or before the database names them (no `scope`): every one's.
+ */
+export function inView(d: CrmData, brands: SourceBrand[] | null, sub?: string | null): CrmData {
   if (!brands) return d;
   const has = (b: SourceBrand | null | undefined) => !!b && brands.includes(b);
   const customers = d.customers.filter(c => has(brandOf(c.accountId)));
@@ -81,11 +138,14 @@ export function inView(d: CrmData, brands: SourceBrand[] | null): CrmData {
   const ads = adBrands(d), keepAd = (id: string | null | undefined) => !!id && has(ads.get(id));
   const people = d.people.filter(p => p.id === d.viewerId || brandsOfPerson(p).some(b => brands.includes(b))).map(p => p.id);
   const inPeople = new Set(people);
+  const visits = d.visits.filter(v => ids.has(v.customerId));
+  const own = sub && d.scope ? sub : null;
   return {
     ...d,
-    view: { brands, people },
+    view: { brands, people, ...(own ? { sub: own } : {}) },
     customers,
-    visits: d.visits.filter(v => ids.has(v.customerId)),
+    visits,
+    ...(own ? managementOf(d, own, visits) : {}),
     events: d.events.filter(e => ids.has(e.customerId)),
     shares: d.shares.filter(s => ids.has(s.customerId)),
     invites: d.invites.filter(i => ids.has(i.customerId)),
