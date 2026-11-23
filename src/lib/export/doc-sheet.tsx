@@ -45,15 +45,15 @@ function T(props: React.ComponentProps<typeof Text>) {
 const FOOTER_TOP = 841.89 - px(34) - 7.5 * 1.45 - px(10) - px(1)
 
 /**
- * The issuer's block: the company, then its line of work — the invoice says
- * both lines, the receipt, the voucher and the credit note the first (the
- * design's) — and its email last on every document. The name is the
+ * The issuer's block: the company, then its line of work, and its email last —
+ * the same on every document (2026-11-23 — the user: "把第二行 Director salary
+ * distribution 拿掉"; the invoice had said it too). The name is the
  * company's (`lib/company.ts` — *Holding*, no s, as the user wrote it), the
  * email the one the user named (2026-10-16 — finance-view.md).
  */
 export const ISSUER = {
   name: COMPANY_NAME,
-  lines: ['Internal banking · Shared services', 'Director salary distribution'],
+  lines: ['Internal banking · Shared services'],
   email: 'hello@houzsventure.com',
 }
 
@@ -256,13 +256,13 @@ export function DocMeta({ lines }: { lines: DocLine[] }) {
   return <DocList lines={lines} style={s.meta} />
 }
 
-/** The issuer beside the counter-party: a bold first line, the rest soft, the email last. `full` — the invoice's two lines of work. */
-export function DocParties({ counter, full = false }: { counter: { heading: string; lines: string[] }; full?: boolean }) {
+/** The issuer beside the counter-party: a bold first line, the rest soft, the email last. */
+export function DocParties({ counter }: { counter: { heading: string; lines: string[] } }) {
   return (
     <View style={s.parties}>
       <View style={s.party}>
         <T style={s.strong}>{ISSUER.name}</T>
-        {[...(full ? ISSUER.lines : ISSUER.lines.slice(0, 1)), ISSUER.email].map((l) => (
+        {[...ISSUER.lines, ISSUER.email].map((l) => (
           <T key={l} style={s.soft}>
             {l}
           </T>
