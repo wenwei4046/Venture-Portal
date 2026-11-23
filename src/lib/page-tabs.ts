@@ -189,6 +189,8 @@ export const PAGE_TABS = {
   '/reconciliation/journal-entries/[id]': JOURNAL,
   '/reconciliation/journal-entries/[id]/edit': JOURNAL,
   '/reconciliation/journal-entries/new': JOURNAL,
+  // Fixed assets and their depreciation (2026-11-24): the classes, the register, the schedule — it posts journals.
+  '/reconciliation/fixed-assets': JOURNAL,
   '/claims': ['pri.claims', 'dept.my_claims', 'mkt.my_claims', 'hr.my_claims', 'fin.my_claims',
     'dept.claims_approve', 'mkt.claims_approve', 'hr.claims_approve', 'fin.claims_approve'],
   '/dept-pool': DEPT_POOL,

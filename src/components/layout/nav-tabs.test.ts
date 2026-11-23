@@ -39,7 +39,7 @@ describe('the menus on the day tabs arrive', () => {
       const route = routeOf(h)!
       expect(can(v.before, ...(PAGE_TABS[route].flatMap(t => TAB_BY_ID.get(t)!.keys) as Permission[])), `${h} opened for ${v.name}`).toBe(false)
     }
-    expect(gone).toEqual(v.name === 'carrieong1218@gmail.com' ? ['/reconciliation', '/reconciliation/journal-entries'] : [])
+    expect(gone).toEqual(v.name === 'carrieong1218@gmail.com' ? ['/reconciliation', '/reconciliation/journal-entries', '/reconciliation/fixed-assets'] : [])
     const hr = (viewer: NavViewer) => visibleHrNav(hrNavSections('fair'), viewer).flatMap(s => s.items.map(i => i.href))
     expect(hr(v.after)).toEqual(hr(v.before))
     const bar = (viewer: NavViewer) => tabsForRole(viewer.role).filter(t => opensPath(viewer.tabs, t.href)).map(t => t.href)

@@ -24,6 +24,7 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   get_staff_dept_moves_allocation: 'a read: the payroll moved between departments, for the internal invoices about to be made',
   get_director_ctc_by_company: 'a read: the directors’ CTC a company, for the director invoices about to be made',
   payroll_month_closed: 'a read: is the payroll month closed',
+  fa_read: 'a read: the fixed asset classes, register, purchase lines and postings, for the posting about to be worked out',
   revenue_seller_checks: 'a read: the move an answer is about — whom the bill goes to, so the closes are asked first',
   hiring_orphan_files: 'a read: the files no record names, for the sweep after a write',
   payroll_reopen_month: 'the Principal’s alone — its own check asks the account’s kind, not a cell a box stands for',

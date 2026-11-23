@@ -645,6 +645,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Interest in suspense, one account per deal (mig 20261113140000): a deal's own accounts made as it starts (Treasury /
   // the approval), the month-end run's entries (Treasury · Approve), what it posted and the go-live (Treasury · View).
   'ensure_deal_accounts', 'iis_post', 'iis_posted', 'iis_live_from',
+  // Fixed assets (mig 20261124100000): the page's read (Reconciliation · View), the classes and the register
+  // (Reconciliation · Edit), posting and undoing depreciation (Reconciliation · Create).
+  'fa_read', 'fa_save_class', 'fa_save_asset', 'fa_post', 'fa_undo_from',
 ])
 
 /**

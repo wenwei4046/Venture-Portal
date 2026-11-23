@@ -477,8 +477,10 @@ function navEntries(data: NavData): NavEntry[] {
         { href: '/reports/company-statement', label: 'Company Statement', visible: canAccessReports },
       ],
     },
-    { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries'], visible: canAccessTreasury },
+    { href: '/reconciliation', label: 'Reconciliation', section: 'Reports & Admin', notPaths: ['/reconciliation/journal-entries', '/reconciliation/fixed-assets'], visible: canAccessTreasury },
     { href: '/reconciliation/journal-entries', label: 'Journal Entries', section: 'Reports & Admin', visible: canAccessTreasury },
+    // Fixed assets and their depreciation (2026-11-24).
+    { href: '/reconciliation/fixed-assets', label: 'Fixed Assets', section: 'Reports & Admin', visible: canAccessTreasury },
     // Meeting Rooms (2026-10-11, the HR revamp's second package): every view
     // books a room — the user: "can add on at every view, hr principal, finance".
     { href: '/admin/rooms', label: 'Meeting Rooms', section: 'Reports & Admin', visible: canAccessMeetingRooms },
