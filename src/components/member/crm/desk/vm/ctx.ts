@@ -21,7 +21,10 @@ export interface DeskUi {
   /** Team activity opened on one person (Inbox's name, 2026-11-08). */
   actWho?: string | null;
   /** Closed deals (2026-11-20): its period and the seller picked. */
-  dlPer?: "month" | "3m" | "year" | "all";
+  dlPer?: import("../../sales/vm/deals").DealPeriod;
+  /** Closed deals' Custom: its days, and its calendar open. */
+  dlRange?: { a: number; b: number } | null;
+  dlDates?: boolean;
   dlWho?: string | null;
   pane: PaneMode;
   kind: PaneKind;
@@ -48,6 +51,8 @@ export interface DeskUi {
   partner?: string | null;
   visit: string | null;
   clist: string;
+  /** A list of given customers (Ads performance's Appointments, 2026-11-23): `clist` is its title. */
+  clistIds?: string[] | null;
   clSort: string;
   clSortOpen: boolean;
   /** Leads › the one salesperson shown (the owner, 2026-11-09: "要能选 sales person"); null = everybody. */

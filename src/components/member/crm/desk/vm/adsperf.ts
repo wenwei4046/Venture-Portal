@@ -84,6 +84,12 @@ export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number
   const appt = new Set(vs.map(v => v.customerId)).size, showup = new Set(vs.filter(v => v.state === "attended").map(v => v.customerId)).size, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
 }
+/** The leads of a range who booked a visit — the Appointments figure's customers (crmFigures' `appt`). */
+export function apptIds(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number): string[] {
+  const inR = (iso: string) => { const t = new Date(iso).getTime(); return t >= a && t < b + DAY; };
+  const ids = new Set(cs.filter(c => inR(c.createdAt)).map(c => c.id));
+  return [...new Set(ctx.data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled").map(v => v.customerId))];
+}
 /**
  * Meta's figures for a set of ads over a range, summed (null when none of them could be read), and every metric built
  * from them with the CRM's own (2026-10-22, the owner: "做花费和每个名单成本"): cost per lead / appointment / won.
@@ -417,7 +423,9 @@ export function adsPerfVM(ctx: DeskCtx) {
   };
   const hintOf = (k: string) => (k === "cpl" ? cplHint() : k === "spend" ? spendHint() : k === "leads" ? leadsHint() : {});
   const picked = slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
-    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...hintOf(k) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
+    remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null, ...hintOf(k),
+    // Appointments opens its customers (the owner, 2026-11-23: "点 appt 6 的时候可以显示该客户资料"), Insight's list pane.
+    ...(k === "appt" ? { open: () => ctx.patch({ pane: "overlay", kind: "clist", clist: "Appointments", clistIds: apptIds(allCs, ctx, ra, rb), infoId: null, visit: null }) } : {}) } : null)).filter((x): x is NonNullable<typeof x> => !!x);
   // The Revenue Team's marketing fee and the whole cost (the owner, 2026-11-12: the spend alone is not the whole cost; "mkt
   // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
   // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after

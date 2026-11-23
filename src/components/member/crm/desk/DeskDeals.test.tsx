@@ -6,7 +6,8 @@ import { NAV_GROUPS, PANEL_TABS } from "./vm/tokens";
 import type { CrmData } from "@/lib/member/crm-data";
 
 // The owner, 2026-11-20: "电脑版也做 closed deals".
-const C = (id: string, assignedTo: string, wonAmount: number) => ({ id, name: id.toUpperCase() + " Tan", status: "won", assignedTo, wonAmount });
+const C = (id: string, assignedTo: string, wonAmount: number) => ({ id, name: id.toUpperCase() + " Tan", status: "won", assignedTo, wonAmount,
+  createdAt: id === "a" ? "2026-11-01T02:00:00Z" : "2026-10-03T01:00:00Z", ad: id === "a" ? "Video Ads-15/10" : "WhatsApp · no ad", details: { size: id === "a" ? "800 sqft" : "" } });
 const data = {
   customers: [C("a", "me", 12000), C("b", "other", 30000)],
   visits: [{ id: "v1", customerId: "a", start: "2026-11-18T06:00:00Z", outcome: "won", showroomId: "kl", wonFiles: { quote: { path: "a/q.pdf", name: "Q" }, slip: { path: "a/s.jpg", name: "S" } } }],
@@ -23,7 +24,7 @@ describe("Closed deals on the desktop", () => {
     const open = vi.fn(), setWho = vi.fn();
     const v = dealsView({ deals: allClosedDeals(data), per: "all", setPer: () => {}, now: new Date("2026-11-20T04:00:00Z"), roomName: () => "Kuala Lumpur",
       fileUrl: async () => null, openChat: id => (id === "a" ? open : null), back: () => {}, nameOf: id => (id === "me" ? "JIA HUI" : "KELVIN"), who: null, setWho });
-    render(<DeskDeals v={{ ...v, alertsN: "", openAlerts: () => {} }} />);
+    render(<DeskDeals v={{ ...v, alertsN: "", openAlerts: () => {}, rangeText: "", picker: null }} />);
     expect(screen.getByText("Closed deals")).toBeTruthy();
     expect(document.querySelector('[data-deals-tile="Total closed"]')!.textContent).toBe("RM 42,000");
     expect(document.querySelectorAll("[data-deals-month]").length).toBe(2);
@@ -31,6 +32,14 @@ describe("Closed deals on the desktop", () => {
     expect(within(rows[0] as HTMLElement).getByText("JIA HUI")).toBeTruthy();
     expect(within(rows[0] as HTMLElement).getByText("Kuala Lumpur")).toBeTruthy();
     expect(within(rows[1] as HTMLElement).getByText("KELVIN")).toBeTruthy();
+    // First contact, how long it took, unit size and the ad (the owner, 2026-11-23).
+    expect(within(rows[0] as HTMLElement).getByText("1 Nov")).toBeTruthy();
+    expect(rows[0].querySelector("[data-deal-took]")!.textContent).toBe("17 days");
+    expect(within(rows[0] as HTMLElement).getByText("800 sqft")).toBeTruthy();
+    expect(within(rows[0] as HTMLElement).getByText("Video Ads-15/10")).toBeTruthy();
+    expect(rows[1].querySelector("[data-deal-took]")!.textContent).toBe("Same day");
+    // One table: every month's rows under the same heads.
+    expect(document.querySelectorAll("[data-deals-table]").length).toBe(1);
     fireEvent.click(rows[0]);
     expect(open).toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /Sold by: Everyone/ }));

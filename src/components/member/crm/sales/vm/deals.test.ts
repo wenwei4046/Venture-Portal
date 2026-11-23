@@ -52,3 +52,20 @@ describe("Profile › Closed deals on the Team side (the owner, 2026-11-20: \"pr
     expect(dealsView({ ...base, who: "other" }).count).toBe("1");
   });
 });
+
+describe("Closed deals' periods and how long a deal took (the owner, 2026-11-23)", () => {
+  it("reads Today, This week and a Custom range of days", async () => {
+    const { dealsIn } = await import("./deals");
+    const ds = [{ at: "2026-11-23T03:00:00Z" }, { at: "2026-11-18T03:00:00Z" }, { at: "2026-11-10T03:00:00Z" }, { at: "2026-10-30T03:00:00Z" }];
+    const now = new Date(2026, 10, 23, 15); // Mon 23 Nov
+    expect(dealsIn(ds, "today", now).length).toBe(1);
+    expect(dealsIn(ds, "week", now).length).toBe(1);
+    expect(dealsIn(ds, "custom", now, { a: new Date(2026, 10, 10).getTime(), b: new Date(2026, 10, 18).getTime() }).map(d => d.at)).toEqual(["2026-11-18T03:00:00Z", "2026-11-10T03:00:00Z"]);
+  });
+  it("counts the days from first contact to won", async () => {
+    const { tookOf } = await import("./deals");
+    expect(tookOf("2026-11-01T02:00:00Z", "2026-11-18T06:00:00Z")).toBe("17 days");
+    expect(tookOf("2026-11-18T01:00:00Z", "2026-11-18T09:00:00Z")).toBe("Same day");
+    expect(tookOf(undefined, "2026-11-18T09:00:00Z")).toBe("");
+  });
+});

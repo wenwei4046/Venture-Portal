@@ -126,7 +126,7 @@ export interface SalesUi {
    */
   qrDraft?: { id: string; shortcut: string; message: string }[] | null;
   /** Profile › Closed deals' period (2026-11-20). */
-  dealsPer?: "month" | "3m" | "year" | "all";
+  dealsPer?: import("./vm/deals").DealPeriod;
   teamOpen: boolean;
   swOpen: boolean;
   tp: { k: "from" | "to"; h: number; m: number; ap: "AM" | "PM" } | null;
