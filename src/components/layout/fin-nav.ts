@@ -113,8 +113,9 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
         link('invoices', 'Invoice', 'invoice', '/statements', canAccessTreasury, (p) => p === '/statements' || under(p, '/invoices') || under(p, '/billing')),
         link('billing', 'Billing Allocator', 'people', '/billing-allocator', canAccessTreasury),
         link('daily-bank', 'Daily Bank', 'calendar', '/daily-bank', canAccessTreasury),
-        link('recon', 'Reconciliation', 'approve', '/reconciliation', canAccessTreasury, (p) => under(p, '/reconciliation') && !under(p, '/reconciliation/journal-entries')),
+        link('recon', 'Reconciliation', 'approve', '/reconciliation', canAccessTreasury, (p) => under(p, '/reconciliation') && !under(p, '/reconciliation/journal-entries') && !under(p, '/reconciliation/fixed-assets')),
         link('journal', 'Journal Entries', 'doc', '/reconciliation/journal-entries', canAccessTreasury),
+        link('fixed-assets', 'Fixed Assets', 'tree', '/reconciliation/fixed-assets', canAccessTreasury),
       ],
     },
     {

@@ -26,7 +26,7 @@ describe("Finance's sidebar", () => {
   it('lists finance@’s rows in the design’s order', () => {
     expect(labels(finance)).toEqual([
       [null, null, ['Overview']],
-      ['I.', 'Daily', ['Payment voucher', 'Payment request', 'Receipt', 'Invoice', 'Billing Allocator', 'Daily Bank', 'Reconciliation', 'Journal Entries']],
+      ['I.', 'Daily', ['Payment voucher', 'Payment request', 'Receipt', 'Invoice', 'Billing Allocator', 'Daily Bank', 'Reconciliation', 'Journal Entries', 'Fixed Assets']],
       ['II.', 'Fund', ['Fund IN', 'Fund OUT', 'Invoice Financing', 'Repayment', 'Statements']],
       ['III.', 'Report', ['General Ledger', 'P&L', 'Cash Flow', 'Receipt & Payment', 'Balance Sheet', 'Trial Balance', 'Debtor Aging', 'Loan Aging', 'Company Statement', 'Chart of Account', 'Base Rate History']],
       ['IV.', 'Department', ['Dept Pool', 'Venture', 'Marketing', 'Finance', 'HR', 'Director Office', 'Venture Pool']],
