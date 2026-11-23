@@ -117,7 +117,7 @@ export function deskVM(ctx: DeskCtx) {
       roleOf: (id: string) => { const p = data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
       openChat: (id: string) => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null }) },
     workspace: { customers: data.customers, visits: data.visits, adNames: data.adNames ?? {}, nameOf: ctx.nameOf, now: ctx.now, live: ctx.live,
-      teams: ctx.teams.map(t => ({ id: t.id, name: t.name, people: t.people.map(p => p.id) })) },
+      teams: ctx.teams.map(t => ({ id: t.id, name: t.name, people: t.people.map(p => p.id) })), view: data.view },
     ...chatProgressVM(ctx, op),
     // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
     // waiting 6 h") or its status in the muted line's colour.

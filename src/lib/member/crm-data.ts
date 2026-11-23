@@ -10,6 +10,7 @@ import type { CrmRole } from "./crm-team";
 import { goneAtMeta } from "@/lib/whatsapp/media";
 import type { CrmContactRow, CrmMessageRow, CrmPeopleRow } from "./crm-live";
 import type { TemplateParts } from "@/lib/whatsapp/template-import";
+import type { SourceBrand } from "./crm-source";
 
 export type CrmChannel = "whatsapp" | "messenger";
 
@@ -37,6 +38,11 @@ export interface CrmPerson {
   login?: boolean;
   /** Up next's / People's Pause: no ad leads until Resume (crm_staff.paused). */
   paused?: boolean;
+  /**
+   * The CRM brands they hold (crm_brands_of_user, mig 20261124200000): a view lists only its own brand's people. Null —
+   * no login, or a database before it — reads as IR's (lib/member/crm-view.ts › brandsOfPerson).
+   */
+  brands?: SourceBrand[] | null;
 }
 
 /**
@@ -338,6 +344,12 @@ export function canFrom(value: unknown, role: CrmRole | null): CrmCan {
 }
 
 export interface CrmData {
+  /**
+   * The Revenue app's view this CRM is held to (2026-11-23 — the owner: "IR 的 view 就只可以看到 IR，DC 就只可以看到 DC，同等的 fair
+   * 也只能看到 fair"; lib/member/crm-view.ts › inView): its brands — IR's The Conts, DC's Dream Crafter, Fair none — and the
+   * people who hold one of them. Absent: no view (every brand one holds). While it is set no screen offers a brand to pick.
+   */
+  view?: { brands: SourceBrand[]; people: string[] };
   viewerId: string | null;
   /** Their CRM cells (crm_my_can). */
   can: CrmCan;
@@ -744,7 +756,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     viewerId: rows.people.role ? rows.people.me : null,
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
-    people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "", login: p.login ?? true, paused: !!p.paused })),
+    people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "", login: p.login ?? true, paused: !!p.paused,
+      ...(Array.isArray(p.brands) ? { brands: p.brands.filter((b): b is SourceBrand => b === "conts" || b === "dc") } : {}) })),
     viewers: (rows.people.viewers ?? []).map(v => ({ id: v.id, name: personName(v.name), title: v.title ?? "",
       can: { viewAll: v.reach === "all", editOwn: !!v.editOwn, editAll: !!v.editAll, manage: !!v.manage } })),
     // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read

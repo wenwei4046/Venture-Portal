@@ -7,9 +7,10 @@
  * The arithmetic is vm/workspace-report.ts; Meta's figures and pictures are read on the server (CRM · Manage).
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
+import type { CrmCustomer, CrmData, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adPageInSource, BRAND_LABEL, brandOf, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
+import { sourcePickInView } from "@/lib/member/crm-view";
 import { fetchAdInsights, fetchAdThumbs } from "@/app/(member)/member/crm-actions";
 import { afterDragStart, ALL, METRICS, metaFigures, moveHeld, pastMiddle } from "./vm/adsperf";
 import { chartFmt, chartFmtOf, isoOf } from "./vm/adschart";
@@ -27,6 +28,8 @@ export interface WorkspaceIn {
   live: boolean;
   /** The teams, for Who the leads went to's team picker (the owner, 2026-10-29: "可以选team"). */
   teams?: { id: string; name: string; people: string[] }[];
+  /** The Revenue app's view (2026-11-23, CrmData.view): only its own brand's sources are offered. */
+  view?: CrmData["view"];
 }
 
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, padding: 0, boxSizing: "border-box" };
@@ -67,7 +70,8 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
   const removeReport = () => setReports(list => { if (list.length < 2) return list; const next = list.filter(r => r.id !== rep.id); saveReports(next); setPick(next[0].id); return next; });
 
   const { cur, prev } = useMemo(() => periodRanges(rep.period, w.now, { from: rep.from, to: rep.to }), [rep.period, rep.from, rep.to, w.now]);
-  const src = rep.src;
+  // A report kept on a source another view holds reads All here (2026-11-23).
+  const src: SourcePick = sourcePickInView(w, rep.src) ? rep.src : "all";
   const on = (s: ReportSection) => rep.sections.includes(s);
   const leads = useMemo(() => reportLeads(w.customers, cur, src), [w.customers, cur, src]);
   const leadsPrev = useMemo(() => reportLeads(w.customers, prev, src), [w.customers, prev, src]);
@@ -170,7 +174,7 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
             )}
             <span style={{ width: "1px", height: "22px", background: "var(--crm-rule)", margin: "0 4px" }} />
             <select value={src} onChange={e => update({ src: e.target.value as SourcePick })} aria-label="Source" style={{ height: "30px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 8px", font: "500 12.5px Inter, sans-serif", background: "#fff", color: "var(--crm-ink)" }}>
-              {SOURCE_PICKS.map(p => <option key={p.v} value={p.v}>{p.sub ? `  ${p.label}` : p.label}</option>)}
+              {SOURCE_PICKS.filter(p => sourcePickInView(w, p.v)).map(p => <option key={p.v} value={p.v}>{p.sub ? `  ${p.label}` : p.label}</option>)}
             </select>
             <span style={{ marginLeft: "auto" }} />
             <button type="button" onClick={() => setEditing(e => !e)} style={chip(editing)}>{editing ? "Done" : "Customise"}</button>

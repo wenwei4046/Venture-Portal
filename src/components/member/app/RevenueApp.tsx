@@ -115,7 +115,8 @@ import { foodOpenTo, transportPartsFor, type ClaimRates } from "@/lib/member/cla
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
-import { crmBrandOfView } from "@/lib/member/crm-source";
+import { crmBrandsOfView } from "@/lib/member/crm-view";
+import type { SourceBrand } from "@/lib/member/crm-source";
 import { IrQuoteScreen, IrQuoteSettingsScreen, type IrQuoteNav } from "./irq/IrQuoteScreens";
 import { useBackStep } from "./useBackStep";
 import { openIrqPreview } from "./irq/open-preview";
@@ -849,6 +850,15 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     meta: m.director ? [m.title, m.rank].filter(Boolean).join(" · ")
       : i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));
+
+  // The CRM is the view's (2026-11-23, lib/member/crm-view.ts): a tapped notice of another view's customer moves the app to
+  // the view whose brand it is — the CRM stays open and opens the chat there. False: no view of that brand to move to.
+  const crmViewOf = useCallback((brand: SourceBrand) => {
+    const to = data.memberships.find(m => crmBrandsOfView(m.code || m.name)?.includes(brand));
+    if (!to || to.id === membership?.id) return false;
+    go({ department: to.id, staff: principal ? route.staff : "" });
+    return true;
+  }, [data.memberships, membership?.id, go, principal, route.staff]);
 
   // ── this month's Championship, for Today's board ──
   // The KPI rule is the scheme's (Rules), not a month's: this month's summary says it.
@@ -1711,7 +1721,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
-        brand={crmBrandOfView(membership?.code || membership?.name, data.memberships.map(m => m.code || m.name))}
+        view={crmBrandsOfView(membership?.code || membership?.name)} onViewOf={crmViewOf}
         onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqFromCrm : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,

@@ -4,6 +4,7 @@
  * info, Assign to, and CRM alerts. The rows are the phone's (data.ts › chatRows); writes are the phone's actions.
  */
 import { sourceOf } from "@/lib/member/crm-source";
+import { personInView } from "@/lib/member/crm-view";
 import { panelNotifs, type PanelNotif } from "../../panel/vm/notifs";
 import { infoRows } from "../../sales/vm/customer";
 import { CHANNEL, STATUS_LABEL, lastReal, urgencyOf } from "../../sales/vm/common";
@@ -363,7 +364,8 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const done = c ? new Set([...data.shares.filter(s => s.customerId === c.id).map(s => s.staffId),
     ...data.invites.filter(i => i.customerId === c.id && i.state === "pending" && i.kind === kind).map(i => i.to)]) : new Set<string>();
   type P = { id: string; name: string; sub: string };
-  const stls = data.people.filter(p => p.role === "stl").map(p => ({ id: p.id, name: p.name, sub: "Senior TL" }));
+  // The Revenue app's view's people only (2026-11-23): somebody without its brand cannot take its customer.
+  const stls = data.people.filter(p => p.role === "stl" && personInView(data, p.id)).map(p => ({ id: p.id, name: p.name, sub: "Senior TL" }));
   const teamGroups = teams.map((t, k) => [t.name.toUpperCase(), teamColours(k)[0], t.people.map(p => ({ id: p.id, name: p.name, sub: t.name }))] as [string, string, P[]]);
   const src: [string, string, P[]][] = kind === "move"
     ? (upTo ? [[holder === me.id ? "YOUR DIRECT UPLINE" : `${nameOf(holder).toUpperCase()}'S DIRECT UPLINE`, "var(--crm-ink)", [{ id: upTo.id, name: upTo.name, sub: jobTitle(upTo) }]]] : [])

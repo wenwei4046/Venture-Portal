@@ -135,18 +135,22 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   // 4a (frame 06): the ads as a table — channel, the name managers typed (oxblood "Not named yet" with Set up when it has
   // none), Meta's headline, leads, the split in team colours — and one docked editor with Split · Ad performance · Audit log.
   const named = (a: (typeof ads)[number]) => !!data.adNames?.[a.id];
-  const brandOf = (id: string) => data.adNames?.[id]?.pageName || (data.adNames?.[id]?.pageId ? `Page ${data.adNames[id]!.pageId}` : "Other");
+  // In a view of one brand (2026-11-23) an ad whose Page Meta did not name is that brand's too — one group, not "Other".
+  const viewPage = data.view?.brands.length === 1 ? ads.map(a => data.adNames?.[a.id]?.pageName).find(Boolean) : undefined;
+  const brandOf = (id: string) => data.adNames?.[id]?.pageName || (data.adNames?.[id]?.pageId ? `Page ${data.adNames[id]!.pageId}` : viewPage ?? "Other");
   const brandSort = <C extends { id: string }>(cs: C[]) => { const order = [...new Set(cs.map(c => brandOf(c.id)))].sort((x, y) => Number(x === "Other") - Number(y === "Other") || x.localeCompare(y));
     return [...cs].sort((x, y) => order.indexOf(brandOf(x.id)) - order.indexOf(brandOf(y.id))); };
   // The Conts or Dream Crafter (the owner, 2026-10-29: "多一个筛选条件，the conts & Dream Crafter"): an ad's brand by its Page,
   // else by its leads' number or Page.
   const brandKey = (id: string): SourceBrand | null => { const a = ads.find(x => x.id === id); return pageBrand(data.adNames?.[id]?.pageId) ?? (a?.cs[0] ? sourceOf(a.cs[0]).brand : null); };
-  const adBrand = (ui.adBrand ?? "all") as SourceBrand | "all";
+  // The Revenue app's view holds Assignment to its own brand's ads (2026-11-23 — the owner: "assign 广告的时候也是跟着 view 走的"):
+  // no tabs then, and a pick kept from before is not read.
+  const adBrand = (data.view ? "all" : ui.adBrand ?? "all") as SourceBrand | "all";
   const inBrandPick = (id: string) => adBrand === "all" || brandKey(id) === adBrand;
   const brandAds = ads.filter(a => inBrandPick(a.id));
   const adList4 = {
     summary: `${brandAds.length} ads`, unsetN: brandAds.filter(a => !data.adRules.some(r => r.adId === a.id) || !named(a)).length,
-    brands: (["all", "conts", "dc"] as const).map(k => ({ label: k === "all" ? "All" : BRAND_LABEL[k], on: adBrand === k, pick: () => patch({ adBrand: k }) })),
+    brands: data.view ? undefined : (["all", "conts", "dc"] as const).map(k => ({ label: k === "all" ? "All" : BRAND_LABEL[k], on: adBrand === k, pick: () => patch({ adBrand: k }) })),
     legend: T3.map(t => ({ name: t.name === DIRECTOR_TEAM ? "Director" : t.name.replace(/^Team /, ""), color: t.color })),
     // By the ad's id (two ads may share a name — Meta lets a name repeat across ad sets), grouped by Page (2026-10-22, the
     // owner: "分一下 DC & The conts"): one brand after another, Other (no Page known) last.

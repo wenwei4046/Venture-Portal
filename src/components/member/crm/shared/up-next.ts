@@ -32,6 +32,8 @@ export interface UpNextBook {
   nameOf(id: string): string; teamOf(key: string): UpNextTeam; adName(id: string): string;
   /** v4 9g: the person's leads today, as Team activity counts them (a customer given to them today). */
   todayOf?(id: string): number;
+  /** Whether somebody is the Revenue app's view's (2026-11-23): its people alone are listed; absent — everybody. */
+  inView?(id: string): boolean;
 }
 
 export const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

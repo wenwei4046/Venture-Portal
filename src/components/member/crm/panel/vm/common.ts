@@ -8,6 +8,7 @@ import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import { showUpOnce, type CrmCustomer, type CrmData, type CrmPerson, type CrmVisit } from "@/lib/member/crm-data";
 import { formatIntlDate } from "@/lib/utils";
 import { downlineOf, isTeamTop, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
+import { personInView } from "@/lib/member/crm-view";
 import type { PanelActions } from "../actions";
 import type { PanelUi, Period, Range } from "../ui";
 import type { SalesTab } from "../../sales/ui";
@@ -249,7 +250,8 @@ export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: strin
   }
   const groups: PickGroup[] = [];
   // The Principal can be given a customer too since 2026-10-13 (their Mine); listed first, only where CRM · Manage sends.
-  const boss = ctx.assign === "any" || ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "var(--crm-ink)")) : [];
+  // Only the Revenue app's view's people (2026-11-23, lib/member/crm-view.ts) — the database refuses anybody without its brand.
+  const boss = ctx.assign === "any" || ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip && personInView(ctx.data, p.id)).map(p => row(p, "var(--crm-ink)")) : [];
   if (boss.length) groups.push({ name: "Principal", c: "var(--crm-ink)", n: boss.length, people: boss });
   const dirs = ctx.directors.filter(d => d.id !== o.skip).map(d => row(d, DIRECTOR.c));
   if (dirs.length) groups.push({ name: o.hodLabel ?? "Revenue Director", c: DIRECTOR.c, n: dirs.length, people: dirs });
@@ -258,7 +260,7 @@ export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: strin
     if (ps.length) groups.push({ name: t.name, c: t.c, n: ps.length, people: ps });
   }
   const seated = new Set([...ctx.directors.map(d => d.id), ...ctx.teams.flatMap(t => t.people.map(p => p.id))]);
-  const rest = ctx.data.people.filter(p => !seated.has(p.id) && p.id !== o.skip && ["stl", "tl", "ta", "rs"].includes(p.role)).sort((a, b) => sortKey(a) - sortKey(b) || a.name.localeCompare(b.name)).map(p => row(p, "var(--crm-muted)"));
+  const rest = ctx.data.people.filter(p => !seated.has(p.id) && p.id !== o.skip && ["stl", "tl", "ta", "rs"].includes(p.role) && personInView(ctx.data, p.id)).sort((a, b) => sortKey(a) - sortKey(b) || a.name.localeCompare(b.name)).map(p => row(p, "var(--crm-muted)"));
   if (rest.length) groups.push({ name: "Others", c: "var(--crm-muted)", n: rest.length, people: rest });
   return groups;
 }

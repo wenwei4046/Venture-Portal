@@ -73,8 +73,9 @@ export function reportsVM(ctx: DeskCtx) {
   const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
   const statusOf = (c: CrmCustomer) => stOf.get(c.id) ?? "New";
   // The brand is the CRM's own (ui.insSrc, the Inbox's and Insight's — DeskScreens keeps every page to it).
-  const brand = ui.insSrc ?? "all";
-  const brands = INSIGHT_SOURCES.map(([k, label]) => ({ label: k === "all" ? "All brands" : label, on: brand === k, pick: () => patch({ insSrc: k, rpAd: "all", rpPick: null, rpLead: null }) }));
+  // None to pick while the Revenue app's view holds the CRM to its own (2026-11-23, lib/member/crm-view.ts).
+  const brand = data.view ? "all" : ui.insSrc ?? "all";
+  const brands = data.view ? [] : INSIGHT_SOURCES.map(([k, label]) => ({ label: k === "all" ? "All brands" : label, on: brand === k, pick: () => patch({ insSrc: k, rpAd: "all", rpPick: null, rpLead: null }) }));
   const adNm = (c: { adId?: string | null; ad: string }) => (c.adId && data.adNames?.[c.adId]?.name) || c.ad || `Ad ${c.adId}`;
   const allAds = overviewReport(data.customers, range, adNm, nameOf, statusOf, data.visits, "all", now).byAd;
   const rpAd = ui.rpAd && allAds.some(a => a.key === ui.rpAd) ? ui.rpAd : "all";

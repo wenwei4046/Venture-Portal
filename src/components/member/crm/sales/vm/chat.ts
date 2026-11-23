@@ -12,6 +12,7 @@
  */
 import { HUMAN_AGENT_APPROVED } from "@/lib/messenger/send";
 import { sourceOf } from "@/lib/member/crm-source";
+import { personInView } from "@/lib/member/crm-view";
 import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { customBookVM, customPrefill, type CustomBook } from "../../shared/custom-book";
@@ -253,7 +254,9 @@ export function chatVM(ctx: SalesCtx) {
   const superior = personOf(owner.uplineId, data.people);
   const myTeam = teamOf(owner.id, data.people);
   // Share: anyone in one's own team (peers, above, below) — never the HOD; the customer's own person and those already in are shown done.
-  const teamPeople = myTeam ? [myTeam, ...downlineOf(myTeam.id, data.people).map(id => personOf(id, data.people)!)].filter(p => p && p.id !== owner.id) : downlineOf(owner.id, data.people).map(id => personOf(id, data.people)!).filter(Boolean);
+  // …who hold the Revenue app's view's brand (2026-11-23): the database refuses a share onto anybody else.
+  const teamPeople = (myTeam ? [myTeam, ...downlineOf(myTeam.id, data.people).map(id => personOf(id, data.people)!)].filter(p => p && p.id !== owner.id) : downlineOf(owner.id, data.people).map(id => personOf(id, data.people)!).filter(Boolean))
+    .filter(p => personInView(data, p.id));
   const already = new Set([...data.shares.filter(s => s.customerId === c.id).map(s => s.staffId), ...(c.assignedTo ? [c.assignedTo] : [])]);
   const ss = hm.ssel ?? [];
   // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
@@ -266,7 +269,7 @@ export function chatVM(ctx: SalesCtx) {
   // Others; teams in the order the list first names them.
   // The Principal is on it too since 2026-10-13 (their Mine), first.
   const groupOf = (p: { id: string; role?: string }) => (p.role === "boss" ? "Principal" : p.role === "hod" ? "Director" : teamName(teamOf(p.id, data.people)) || "Others");
-  const assign0 = ctx.embedded?.assignTo ? [...data.people.filter(p => p.role === "boss"), ...(ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss")] : leaderList;
+  const assign0 = ctx.embedded?.assignTo ? [...data.people.filter(p => p.role === "boss" && personInView(data, p.id)), ...(ctx.embedded?.switchList ?? []).filter(p => p.role !== "boss")] : leaderList;
   const groupOrder = [...new Set(assign0.map(groupOf))];
   const assignList = [...assign0].sort((a, b) => groupOrder.indexOf(groupOf(a)) - groupOrder.indexOf(groupOf(b)));
   const assigning = !!(assigner && hm.assign);

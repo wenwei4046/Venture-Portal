@@ -14,6 +14,7 @@ import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
 import { adPageInSource, BRAND_LABEL, brandOf, inSource, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
+import { pickedSource, sourcePickInView } from "@/lib/member/crm-view";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
 export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
@@ -257,12 +258,13 @@ export function adsPerfVM(ctx: DeskCtx) {
   const hiddenN = new Set([...data.customers.map(c => c.adId ?? ""), ...added].filter(id => id && data.adNames?.[id]?.hidden)).size;
   // The source picked (the owner, 2026-10-27: DC and The Conts, each WhatsApp · Messenger): an ad's leads from that source, an ad
   // with none yet by its Page; the list, the chart and the total all follow it.
-  const src = (ui.apSrc ?? "all") as SourcePick;
+  // In the Revenue app's view (2026-11-23) only its own brand's channels are offered — a pick kept from before that is not, reads All.
+  const src = (sourcePickInView(data, (ui.apSrc ?? "all") as SourcePick) ? ui.apSrc ?? "all" : "all") as SourcePick;
   const adsAll = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src) && !repeats.has(c.id));
     const s0 = all[0] ? sourceOf(all[0]) : null, brand = s0?.brandLabel || (brandOf(data.adNames?.[id]?.pageId) ? BRAND_LABEL[brandOf(data.adNames?.[id]?.pageId)!] : "");
     return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, // An ad with no lead in the brand picked at the top (Insight's DC / The Conts) is listed only when its Page is that brand's — else
     // the other brand's ads stood there with 0 leads (the owner, 2026-10-30: "我在msg 跑广告怎么都没显示出来？" — the page was on Dream Crafter).
-    keep: (all.length > 0 || adPageInSource(data.adNames?.[id]?.pageId, ui.insSrc as SourcePick | undefined)) && (src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src))) }; }).filter(a => a.keep);
+    keep: (all.length > 0 || adPageInSource(data.adNames?.[id]?.pageId, pickedSource(data, ui.insSrc as SourcePick | undefined))) && (src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src))) }; }).filter(a => a.keep);
   const ads = adsAll.filter(a => ui.apShowHidden || !data.adNames?.[a.id]?.hidden);
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
@@ -493,7 +495,7 @@ export function adsPerfVM(ctx: DeskCtx) {
       cmp,
     },
     apSrcOpen: !!ui.apSrcOpen, apSrcToggle: () => set(u => ({ ...u, apSrcOpen: !u.apSrcOpen, apStOpen: false })), apSrcCur: { label: sourceLabel(src), n: AD.length },
-    apSrcOpts: SOURCE_PICKS.map(p => { const on = src === p.v; return { label: p.label, sub: p.sub, bg: on ? "var(--crm-tint-attention)" : "transparent", w: on ? 700 : 550, pad: p.sub ? "22px" : "10px", pick: () => patch({ apSrc: p.v, apSrcOpen: false, apPg: 0 } as Partial<typeof ui>) }; }),
+    apSrcOpts: SOURCE_PICKS.filter(p => sourcePickInView(data, p.v)).map(p => { const on = src === p.v; return { label: p.label, sub: p.sub, bg: on ? "var(--crm-tint-attention)" : "transparent", w: on ? 700 : 550, pad: p.sub ? "22px" : "10px", pick: () => patch({ apSrc: p.v, apSrcOpen: false, apPg: 0 } as Partial<typeof ui>) }; }),
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: stDot(apStF), n: AD.length },
     apStOpts: (["all", "Running", "Paused"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
       return { label: ST_META[k][0], dot: stDot(k), n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),

@@ -7,6 +7,7 @@
  * read from Ads Manager on the server, as the desktop's (fetchAdInsights / fetchAdDaily, CRM · Manage).
  */
 import { inSource, SOURCE_PICKS, type SourcePick } from "@/lib/member/crm-source";
+import { sourcePickInView } from "@/lib/member/crm-view";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
@@ -64,6 +65,8 @@ export const AD_STATUSES = ["all", "Running", "Paused"] as const; // no Pending 
 export type AdStatusPick = (typeof AD_STATUSES)[number];
 
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: NonNullable<CrmData["adNames"]>; now: Date; live: boolean; manage: boolean;
+  /** The Revenue app's view (2026-11-23): only its own brand's sources are offered. */
+  view?: CrmData["view"];
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
   const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null), [src, setSrc] = useState<SourcePick>("all");
   // The source picked (the owner, 2026-10-27): The Conts / DC, each by WhatsApp · Messenger — the ads, tiles and chart follow it.
@@ -175,7 +178,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
         {menu && (
           <div role="listbox" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 7, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "50vh", overflowY: "auto" }}>
             {menu === "per" && [...p.chips.map(c => ({ k: c.label, label: c.label, on: c.on && !p.custom, go: c.pick })), { k: "Custom", label: "Custom…", on: p.custom, go: p.openDates }].map(o => <button key={o.k} type="button" role="option" aria-selected={o.on} onClick={() => { setMenu(null); o.go(); }} style={opt(o.on)}>{o.label}</button>)}
-            {menu === "src" && SOURCE_PICKS.map(o => <button key={o.v} type="button" role="option" aria-selected={src === o.v} onClick={() => { setMenu(null); setSrc(o.v); }} style={opt(src === o.v)}>{o.label}</button>)}
+            {menu === "src" && SOURCE_PICKS.filter(o => sourcePickInView(p, o.v)).map(o => <button key={o.v} type="button" role="option" aria-selected={src === o.v} onClick={() => { setMenu(null); setSrc(o.v); }} style={opt(src === o.v)}>{o.label}</button>)}
             {menu === "st" && AD_STATUSES.map(k => <button key={k} type="button" role="option" aria-selected={stF === k} onClick={() => { setMenu(null); setStF(k); }} style={opt(stF === k)}>{k !== "all" && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: k === "Running" ? "var(--crm-v4-green)" : ST_META[k][1] }} />}{ST_META[k][0]}<span style={{ marginLeft: "auto", color: "var(--crm-faint)" }}>{stCount(k)}</span></button>)}
           </div>
         )}
