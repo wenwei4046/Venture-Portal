@@ -75,7 +75,9 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
   const tmCols = "minmax(0,2fr) minmax(0,1.4fr) repeat(4,minmax(0,0.8fr))" + more(o.teamCol.cols.length);
   const extra = (v: string[]) => <>{v.map((x, k) => <span key={k} style={R}>{x}</span>)}<span /></>;
   return (
-    <div data-insight-overview="" style={{ display: "flex", flexDirection: "column", gap: "28px", paddingTop: "4px" }}>
+    // Right under the tab bar, as Team performance's figures (the owner, 2026-11-24: "这个空间是有一点 gap，不是直接连上去上面那个
+    // bar") — the 4px stays only over the Brand row, shown with no Revenue app view.
+    <div data-insight-overview="" style={{ display: "flex", flexDirection: "column", gap: "28px", paddingTop: src ? "4px" : 0 }}>
       {src && (
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", marginBottom: "-12px" }}>
           <span style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Brand</span>
