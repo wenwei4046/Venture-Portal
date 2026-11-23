@@ -119,7 +119,7 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
   return (
     <DocPage title="Invoice" footer={`${no} · ${headline}`} running={`${no} · ${inv.bill_to.name}`}>
       <DocMeta lines={meta} />
-      <DocParties full counter={{ heading: 'Bill to', lines: [inv.bill_to.name, inv.bill_to.kind, inv.billing_mode_label, ...inv.bill_to.contact] }} />
+      <DocParties counter={{ heading: 'Bill to', lines: [inv.bill_to.name, inv.bill_to.kind, inv.billing_mode_label, ...inv.bill_to.contact] }} />
       <DocHeadline headline={headline} summary={inv.description?.trim() || null} />
       <DocItems
         columns={[{ label: 'Description' }, { label: 'Qty', width: 40, align: 'right' }, { label: 'Unit price', width: 100, align: 'right' }, { label: 'Amount', width: 100, align: 'right' }]}
