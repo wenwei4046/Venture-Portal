@@ -10,7 +10,8 @@ import { inSource, SOURCE_PICKS, type SourcePick } from "@/lib/member/crm-source
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
-import { fetchAdDaily, fetchAdInsights } from "@/app/(member)/member/crm-actions";
+import { fetchAdDaily } from "@/app/(member)/member/crm-actions";
+import { readAdFigures } from "./ad-figures-read";
 import { ALL, METRICS, feeMonths, marketingFee, metaFigures } from "../desk/vm/adsperf";
 import { ST_META } from "../desk/vm/tokens";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
@@ -101,9 +102,13 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     let on = true;
     const a0 = keptGet<Record<string, MetaFig | null>>(kA), d0 = keptGet<Record<string, Record<string, MetaFig> | null>>(kD), b0 = keptGet<Record<string, MetaFig | null>>(kB);
     if (a0) setFigA(a0); if (d0) setDaily(d0); if (b0) setFigB(b0);
-    void fetchAdInsights(ids, si, ui).then(x => { if (on && x.ok) { setFigA(x.figs); keptSet(kA, x.figs); } });
+    // The period and the one compared, in one GET (ad-figures-read.ts: never queued behind the 5 s re-read; kept on the server).
+    void readAdFigures([{ key: "a", since: si, until: ui, ids }, ...(cmp ? [{ key: "b", since: sb, until: ub, ids }] : [])], got => {
+      if (!on) return;
+      if (got.a) { setFigA(got.a); keptSet(kA, got.a); }
+      if (got.b) { setFigB(got.b); keptSet(kB, got.b); }
+    });
     void fetchAdDaily(ids, si, ui).then(x => { if (on && x.ok) { setDaily(x.days); keptSet(kD, x.days); } });
-    if (cmp) void fetchAdInsights(ids, sb, ub).then(x => { if (on && x.ok) { setFigB(x.figs); keptSet(kB, x.figs); } });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantMeta, idKey, si, ui, sb, ub, cmp]);
@@ -116,7 +121,10 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   useEffect(() => {
     if (!p.live || !p.manage || !feeIds.length || !keys.includes("cpl")) return;
     let on = true;
-    for (const k of feeWant) { const [x, y] = k.split("|"); void fetchAdInsights(feeIds, x, y).then(res => { if (on && res.ok) setFeeFig(f => { const n = { ...f, [k]: res.figs }; keptSet("fee", n); return n; }); }); }
+    // Every month the fee is read on, in one GET (it was a Server Action a month, one after another — Per lead waited on all).
+    void readAdFigures(feeWant.map(k => { const [x, y] = k.split("|"); return { key: k, since: x, until: y, ids: feeIds }; }), got => {
+      if (on) setFeeFig(f => { const n = { ...f, ...got }; keptSet("fee", n); return n; });
+    });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.live, p.manage, feeKey, feeWantKey, keys.includes("cpl")]);
