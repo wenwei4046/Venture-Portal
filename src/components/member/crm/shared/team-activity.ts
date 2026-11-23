@@ -19,6 +19,7 @@ import { addDays, dowOf } from "./people-book";
 import { officeStamp } from "./leave-cal-data";
 import type { AuditLine } from "./audit-timeline";
 import { customerLog } from "./customer-audit";
+import { noAdRepeats } from "../desk/vm/adsperf";
 
 export interface AssignedRow { contact_id: string; actor: string | null; data: { to?: string | null; from?: string | null } | null; at: string }
 export type Period = "Today" | "Week" | "Month" | "Custom";
@@ -167,7 +168,12 @@ export function activityVM(x: ActivityIn) {
   // the earlier stints stay in their people's lists as "Handed away", with their reply times, but are no lead, appt or
   // show-up of theirs.
   const lastKey = new Map<string, string>(); stints0.forEach(s => lastKey.set(s.customer.id, s.key));
-  const counted = (s: Stint) => lastKey.get(s.customer.id) === s.key;
+  // Leads are Overview's and Ads Performance's (the owner, 2026-11-23: 185 / 180 / 186 → one figure): a customer who FIRST
+  // CAME IN in the period, each person once (a "no ad" repeat of an ad's lead is not one again — noAdRepeats); one handed
+  // over in the period but first in earlier stays in the list with its reply times, and is no lead, appt or show-up here.
+  const repeats = noAdRepeats(d.customers);
+  const cameIn = (c: Stint["customer"]) => { const day = officeStamp(new Date(c.createdAt)).slice(0, 10); return day >= range.a && day <= range.b && !repeats.has(c.id); };
+  const counted = (s: Stint) => lastKey.get(s.customer.id) === s.key && cameIn(s.customer);
   const adN = new Map<string, number>(); stints0.filter(counted).forEach(s => adN.set(adOf(s), (adN.get(adOf(s)) ?? 0) + 1));
   if (adSel !== "all" && !adN.has(adSel)) adN.set(adSel, 0);
   const adName = (id: string) => id === "none" ? "No ad" : d.adNames?.[id]?.name ?? stints0.find(s => s.customer.adId === id)?.customer.ad ?? `Ad ${id}`;

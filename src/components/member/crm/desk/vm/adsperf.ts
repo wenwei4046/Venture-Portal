@@ -281,7 +281,8 @@ export function adsPerfVM(ctx: DeskCtx) {
   // hidden ad's unless they are shown, whatever the Running / Paused filter (the owner, 2026-11-17: "ads performance 的 per
   // lead 也一起改" — Per lead ÷ total leads, as Overview's).
   const day0 = (iso: string) => { const d = new Date(iso); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
-  const totalLeads = (a: number, b: number) => data.customers.filter(c => inSource(c, src) && (ui.apShowHidden || !(c.adId && data.adNames?.[c.adId]?.hidden)) && day0(c.createdAt) >= a && day0(c.createdAt) <= b).length;
+  // Each person once (2026-11-23, "一人只算一次"): a "no ad" repeat is not a lead again, as the strip's Leads.
+  const totalLeads = (a: number, b: number) => data.customers.filter(c => !repeats.has(c.id) && inSource(c, src) && (ui.apShowHidden || !(c.adId && data.adNames?.[c.adId]?.hidden)) && day0(c.createdAt) >= a && day0(c.createdAt) <= b).length;
   const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number, whole = false): number | null => {
     const crm = crmFigures(cs, ctx, a, b);
     // The whole (the strip and the Total row): (ads spend + the fee's share) ÷ every lead of the period, not the ads' alone.

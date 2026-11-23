@@ -133,3 +133,17 @@ describe("Insight › Overview's words", () => {
     expect(overviewTiles(f, false).map(t => t.label)).toEqual(["Leads", "Avg. reply", "Appt rate", "Show-up", "Won", "Total sales", "Conversion", "AOV"]);
   });
 });
+
+// One Leads figure everywhere (the owner, 2026-11-23: 185 / 180 / 186 → "能不能统一", picked "一人只算一次"): a "no ad" chat
+// that is the same person as an ad's lead (the same phone) is not a lead again — in the total, the team's row and Per lead.
+describe("Insight › Overview's Leads count each person once", () => {
+  it("leaves out a no-ad chat that repeats an ad's lead", () => {
+    const dd = data();
+    (dd.customers.find(c => c.id === "c1") as unknown as C).phone = "60123456789";
+    (dd.customers as unknown as C[]).push(cust("r1", { phone: "+60 0123456789", assignedTo: "p1", createdAt: iso(5, 10, 3) }));
+    const f = overviewFigures(base({ data: dd }));
+    const g = overviewFigures(base());
+    expect(f.work.leads).toBe(g.work.leads);
+    expect(f.teams.find(t => t.key === "t1")!.leads).toBe(g.teams.find(t => t.key === "t1")!.leads);
+  });
+});

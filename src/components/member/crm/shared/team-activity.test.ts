@@ -7,7 +7,7 @@ import { activityVM, periodDays, stintsOf, type ActivityUi, type AssignedRow } f
 const P = (id: string, name: string, uplineId: string | null, role: CrmPerson["role"] = "rs"): CrmPerson => ({ id, name, role, uplineId, fullTime: true, login: true });
 const people = [P("tl", "Stanley", null, "tl"), P("a", "Chea Huan", "tl"), P("b", "Alvin", "tl"), P("c", "Jason", "tl")];
 const cust = (id: string, msgs: { from: "lead" | "me"; at: string; auto?: boolean }[], status: CrmCustomer["status"] = "new") =>
-  ({ id, name: `Cust ${id}`, ad: "Raya Promo", status, messages: msgs.map((m, i) => ({ id: `${id}${i}`, kind: "text", text: "", ...m })) } as unknown as CrmCustomer);
+  ({ id, name: `Cust ${id}`, ad: "Raya Promo", status, createdAt: msgs[0]?.at ?? "2026-11-06T01:00:00Z", messages: msgs.map((m, i) => ({ id: `${id}${i}`, kind: "text", text: "", ...m })) } as unknown as CrmCustomer);
 // 6 Nov 2026, office time = UTC+8.
 const at = (hhmm: string, day = "2026-11-06") => new Date(`${day}T${hhmm}:00+08:00`).toISOString();
 const data = (customers: CrmCustomer[], extra: Partial<CrmData> = {}) => ({

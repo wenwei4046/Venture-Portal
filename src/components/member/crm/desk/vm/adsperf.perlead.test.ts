@@ -14,7 +14,7 @@ const cust = (id: string, o: Record<string, unknown>) => ({ id, name: "Amy", pho
   createdAt: new Date(2026, 10, 3, 10).toISOString(), lastCustomerAt: null, unread: 0, details: { type: "", size: "", loc: "", req: "", budget: "" }, messages: [], ...o });
 // One ad lead, then the same person writing again with no ad (a repeat: no lead of an ad's, but a lead of the period).
 const data = {
-  customers: [cust("a", {}), cust("b", { adId: null, ad: "", createdAt: new Date(2026, 10, 5, 10).toISOString() })],
+  customers: [cust("a", {}), cust("b", { adId: null, ad: "", name: "Ben", phone: "60199999999", createdAt: new Date(2026, 10, 5, 10).toISOString() })],
   adNames: { [AD]: { name: "Skyline", added: true, pageId: "p" } },
   visits: [], events: [], adRules: [], can: { viewAll: true, manage: true, editAll: true },
 } as unknown as CrmData;
