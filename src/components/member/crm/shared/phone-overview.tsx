@@ -9,7 +9,7 @@
  * phone's Ads performance reads it, and kept on the phone for the next open.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { fetchAdInsights } from "@/app/(member)/member/crm-actions";
+import { readAdFigures } from "./ad-figures-read";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { withoutHiddenAds, type CrmData } from "@/lib/member/crm-data";
 import { inSource, type SourcePick } from "@/lib/member/crm-source";
@@ -47,10 +47,12 @@ export function PhoneOverview(p: PhoneOverviewProps) {
   useEffect(() => {
     if (!p.live || !p.money || !f.need.length) return;
     let on = true;
-    for (const n of f.need) void fetchAdInsights(n.ids, n.since, n.until).then(x => {
-      if (!on) return;
-      const figs = x.ok ? x.figs : Object.fromEntries(n.ids.map(id => [id, null]));
-      setMeta(m => { const v = { ...m, [n.key]: { ...(m[n.key] ?? {}), ...figs } }; keep(v); return v; });
+    // Every range in one GET (ad-figures-read.ts) — not a Server Action a range, queued behind the 5 s re-read.
+    const put = (got: Record<string, Record<string, MetaFig | null>>) => { if (on) setMeta(m => { const v = { ...m }; for (const [k, figs] of Object.entries(got)) v[k] = { ...(m[k] ?? {}), ...figs }; keep(v); return v; }); };
+    void readAdFigures(f.need, put).then(got => {
+      // A range that could not be read reads "—" rather than waiting for ever (as before).
+      const miss = Object.fromEntries(f.need.filter(n => !got[n.key]).map(n => [n.key, Object.fromEntries(n.ids.map(id => [id, (meta[n.key]?.[id] ?? null) as MetaFig | null]))]));
+      if (Object.keys(miss).length) put(miss);
     });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
