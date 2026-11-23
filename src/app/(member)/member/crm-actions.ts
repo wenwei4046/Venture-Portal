@@ -844,7 +844,8 @@ export async function saveCrmShowroomExtras(form: FormData): Promise<{ ok: true 
 }
 
 /** The CRM's settings tables History reads (B8), and what each is called there. */
-const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings", "crm_channels"];
+// crm_sub_settings: Settings › General by sub-department since mig 20261124210000 (crm_settings keeps what came before).
+const HISTORY_TABLES = ["crm_showrooms", "crm_ad_assign", "crm_fulltime_rules", "crm_staff", "crm_templates", "crm_forms", "crm_settings", "crm_sub_settings", "crm_channels"];
 export interface CrmHistoryRow { id: number; at: string; who: string; table: string; op: string; key: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null; changed: string[] }
 
 /**

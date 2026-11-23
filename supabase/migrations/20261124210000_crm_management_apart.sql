@@ -114,7 +114,7 @@ select sd.id, coalesce(s.reply_soon_h, 3), coalesce(s.reply_urgent_h, 6), coales
  where sd.is_active
 on conflict (sub_department_id) do nothing;
 
-SELECT public.audit_register('crm_sub_settings', 'CRM settings by sub-department', 'Member services', '{revenue}', 'people',
+SELECT public.audit_register('crm_sub_settings', 'CRM settings by sub-department', 'Member services', '{crm_manage,revenue}', 'people',
   p_keys => '{sub_department_id}', p_reason => 'Settings › General and the appointment types, one set a sub-department (2026-11-23).');
 
 create or replace function public.crm_settings_of_sub(p_sub uuid)
