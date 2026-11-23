@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MemberCatalogue, MemberCatalogueModel, MemberData, MemberMembership, MemberOrgMap, MemberProduct, MemberReadContext, QuoteInput } from "@/lib/member/types";
 import type { ProductListAccess } from "@/lib/member/product-access";
 import type { ChangeViewRow } from "@/lib/marketing/change-view";
-import { NOTHING_CLOSED, requestPageOf, type AppClosed } from "@/lib/member/app-pages";
+import { crmOnlyClosed, NOTHING_CLOSED, requestPageOf, type AppClosed } from "@/lib/member/app-pages";
 import { allowedRoute, landing, requestPage, sends, shows } from "./app-access";
 import { setViewAs } from "@/components/layout/view-as-actions";
 import PushAsk from "@/components/pwa/PushAsk";
@@ -247,7 +247,7 @@ const CRM_HOUSE = '[aria-label="Back to Revenue app"], [title="Back to Revenue a
 
 const NO_CROSS_VIEWS: readonly ChangeViewRow[] = [];
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, training = null, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed: closedBase = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, training = null, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -269,6 +269,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const searchNow = useSearchParams()?.toString() ?? "";
   const startSearch = initialSearch ?? (searchNow ? `?${searchNow}` : "");
   const [baseRoute, go] = useRoute(startSearch);
+  // A sub-department one holds in the CRM alone — no seat there, not directed (2026-11-23 — the owner, of HECTOR, LIM YAU WEI and
+  // KRIS, who answer Dream Crafter's customers: "give them" its view): its view is the CRM's alone. Every page that reads the
+  // sub-department's sales and pay is closed in it (the database refuses them — no seat) and the app opens on Profile.
+  const crmOnly = !!(data.memberships.find(m => m.id === baseRoute.department) ?? data.memberships[0])?.crm;
+  const closed = useMemo(() => (crmOnly ? crmOnlyClosed(closedBase) : closedBase), [crmOnly, closedBase]);
   // The Product List is a page of its own (`/member/products`), drawn inside the app.
   const pathname = usePathname();
   const router = useRouter();
@@ -419,7 +424,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [viewed, principal, data.profile.name, membership]);
 
   // ── the month being worked: last month while it is still being closed ──
-  const readable = (!principal || !!context) && memoryReady;
+  // A CRM-only view (above) reads none of the sub-department's sales: the database would refuse them.
+  const readable = (!principal || !!context) && memoryReady && !crmOnly;
   const markViewed = useCallback((snap: MemberArenaSnapshot) => viewedAs(snap, context?.staffId), [context?.staffId]);
   const schemeId = membership?.schemeId ?? "";
   const prevMonth = addMonths(period, -1);
@@ -468,7 +474,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // time, and this month's figures used to wait for the book to say which month is being worked (a
   // second round trip, ~1 s on prod). Last month's figures are read only by the pages that show them.
   const viewStaff = context?.staffId ?? "";
-  const todayKey = fixture || data.demo || !membershipId ? "" : `${membershipId}|${deptView ? "*" : viewStaff}|${period}`;
+  const todayKey = fixture || data.demo || !membershipId || crmOnly ? "" : `${membershipId}|${deptView ? "*" : viewStaff}|${period}`;
   // Ids, not the `context` object: a refresh rebuilds it, and this runs the engine. A pull reads it again and
   // keeps the figure on screen until the new one lands. Not on the Product List: Server Actions run one at a
   // time, and the engine read would hold its saves behind it (2026-10-08) — Today reads it when it opens.
@@ -845,9 +851,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   };
 
   // A sub-department somebody directs (2026-10-14) reads as their title and rung; a seat as Home (the first) or Member.
+  // One held in the CRM alone (2026-11-23) reads CRM.
   const subOptions: SubDeptOption[] = data.memberships.map((m, i) => ({
     id: m.id, name: m.name, abbr: subDeptAbbr(m.name),
-    meta: m.director ? [m.title, m.rank].filter(Boolean).join(" · ")
+    meta: m.crm ? "CRM" : m.director ? [m.title, m.rank].filter(Boolean).join(" · ")
       : i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));
 

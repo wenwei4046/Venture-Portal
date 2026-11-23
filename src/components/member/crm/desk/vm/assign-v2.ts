@@ -19,6 +19,7 @@ import { adRunLine, adRunning, adStatusOf } from "@/lib/member/crm-ad-running";
 import { lbaRange, lbaStatus, leadsByAd, type LbaStatus } from "./leads-by-ad";
 import { panelLeads } from "./lead-panel";
 import { initials } from "./data";
+import { histInView } from "./audit";
 import { BRAND_LABEL, brandOf as pageBrand, sourceOf, type SourceBrand } from "@/lib/member/crm-source";
 
 const DAY = 86_400_000;
@@ -44,7 +45,8 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const { ui, patch, set, data, now, teams, W } = ctx;
   const T = day0(now), monthA = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const inSheet = frame.sheetMode && ui.stage !== "menu";
-  const hist = ui.history ?? [];
+  // The Revenue app's view's changes alone (2026-11-23, audit.ts › histInView).
+  const hist = (ui.history ?? []).filter(h => histInView(data, h));
 
   // ── The ads (the live list: one per ad id the CRM saw), their leads, their rule.
   const added = Object.entries(data.adNames ?? {}).filter(([, n]) => n.added).map(([id]) => id);

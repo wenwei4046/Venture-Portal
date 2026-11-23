@@ -51,6 +51,17 @@ export interface AppClosed {
 
 export const NOTHING_CLOSED: AppClosed = { pages: [], sends: [] }
 
+/**
+ * A view one holds in the CRM alone (2026-11-23 — no seat in that sub-department, not directed; the snapshot's `crm`
+ * membership): its every page that reads the sub-department's sales, pay or seats is closed there — the database refuses
+ * them to somebody with no seat — and requests, which name the sub-department, are sent from one's own views. What is
+ * one's own (rooms, documentation, tests, library, memos) stays.
+ */
+export const CRM_ONLY_CLOSED: readonly AppPage[] = ['today', 'insight', 'quote', 'arena', 'income', 'team', 'honours', 'brandWeeks', 'scheme', 'requests', 'track']
+export function crmOnlyClosed(c: AppClosed): AppClosed {
+  return { pages: [...new Set([...c.pages, ...CRM_ONLY_CLOSED])], sends: c.sends }
+}
+
 const PAGES = Object.entries(APP_PAGE_TABS) as Array<[AppPage, string]>
 
 export function appClosed(closed: readonly string[] | undefined): AppClosed {
