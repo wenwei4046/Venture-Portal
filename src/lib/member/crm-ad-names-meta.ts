@@ -242,6 +242,64 @@ function figOf(row: Record<string, unknown>): MetaFig {
 }
 
 /**
+ * Many ads over many ranges in a few calls (the owner, 2026-11-23, Insight waiting on "Reading spend from Ads Manager…":
+ * "计算方式要加快"): Graph's Batch API — up to 50 requests a call, the calls side by side — each ad's insights for each range
+ * and its budget once. Measured on November's 21 ads: three ranges and the budgets in 3.4 s, where an ad at a time took
+ * ~6 s a range. Answers as metaAdInsights / metaAdBudget would, ad by ad (null = one the token cannot see); a call that
+ * fails as a whole is asked again the old way, ad by ad.
+ */
+export async function metaAdsFigures(ids: string[], ranges: { key: string; since: string; until: string }[], token: string, fetchImpl: typeof fetch = fetch): Promise<Record<string, Record<string, MetaFig | null>>> {
+  const ads = [...new Set(ids)].filter(id => AD_ID.test(id));
+  const rs = ranges.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.since) && /^\d{4}-\d{2}-\d{2}$/.test(r.until));
+  const out: Record<string, Record<string, MetaFig | null>> = Object.fromEntries(rs.map(r => [r.key, {}]));
+  if (!ads.length || !rs.length) return out;
+  type Req = { url: string; kind: 'fig'; key: string; since: string; until: string; id: string } | { url: string; kind: 'budget'; id: string };
+  const reqs: Req[] = [
+    ...rs.flatMap(r => ads.map(id => ({ kind: 'fig' as const, key: r.key, since: r.since, until: r.until, id,
+      url: `${GRAPH_VERSION}/${id}/insights?fields=spend,impressions,reach,inline_link_clicks,clicks,actions&time_range=${encodeURIComponent(JSON.stringify({ since: r.since, until: r.until }))}` }))),
+    ...ads.map(id => ({ kind: 'budget' as const, id, url: `${GRAPH_VERSION}/${id}?fields=${encodeURIComponent('adset{id,daily_budget,lifetime_budget},campaign{id,daily_budget,lifetime_budget}')}` })),
+  ];
+  const figs = new Map<string, MetaFig | null>(), budgets = new Map<string, MetaBudget | null>();
+  const chunks: Req[][] = [];
+  for (let i = 0; i < reqs.length; i += 50) chunks.push(reqs.slice(i, i + 50));
+  const rm = (v: unknown) => { const n = typeof v === 'string' || typeof v === 'number' ? Number(v) : NaN; return Number.isFinite(n) && n > 0 ? n / 100 : null };
+  const budgetOf = (body: { adset?: Record<string, unknown>; campaign?: Record<string, unknown> }): MetaBudget | null => {
+    for (const [level, h] of [['adset', body.adset], ['campaign', body.campaign]] as const) {
+      const daily = rm(h?.daily_budget), lifetime = rm(h?.lifetime_budget)
+      if ((daily || lifetime) && typeof h?.id === 'string') return { daily, lifetime, key: `${level}:${h.id}`, level }
+    }
+    return null
+  };
+  await Promise.all(chunks.map(async chunk => {
+    let answers: ({ code?: number; body?: string } | null)[] | null = null;
+    try {
+      const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000),
+        body: new URLSearchParams({ batch: JSON.stringify(chunk.map(r => ({ method: 'GET', relative_url: r.url }))), include_headers: 'false' }),
+      });
+      if (res.ok) { const j = await res.json(); if (Array.isArray(j) && j.length === chunk.length) answers = j; }
+    } catch { answers = null; }
+    if (!answers) {
+      // The whole call failed: ask the old way, ad by ad.
+      await Promise.all(chunk.map(async r => {
+        if (r.kind === 'fig') figs.set(`${r.key}|${r.id}`, await metaAdInsights(r.id, token, r.since, r.until, fetchImpl));
+        else budgets.set(r.id, await metaAdBudget(r.id, token, fetchImpl));
+      }));
+      return;
+    }
+    chunk.forEach((r, i) => {
+      const a = answers![i];
+      let body: Record<string, unknown> | null = null;
+      try { body = a && a.code === 200 && typeof a.body === 'string' ? JSON.parse(a.body) : null; } catch { body = null; }
+      if (r.kind === 'fig') figs.set(`${r.key}|${r.id}`, body ? figOf(((body.data as Record<string, unknown>[] | undefined) ?? [])[0] ?? {}) : null);
+      else budgets.set(r.id, body ? budgetOf(body as { adset?: Record<string, unknown>; campaign?: Record<string, unknown> }) : null);
+    });
+  }));
+  for (const r of rs) for (const id of ads) { const fig = figs.get(`${r.key}|${id}`) ?? null; out[r.key][id] = fig ? { ...fig, budget: budgets.get(id) ?? null } : null; }
+  return out;
+}
+
+/**
  * An ad's figures DAY BY DAY over a range (2026-10-23, Ads Performance's chart — the owner: "加一个数据图（参考谷歌广告的成效
  * 显示）"): Graph's insights with time_increment=1, keyed by the day ("2026-10-21"); a day with no delivery has no row.
  * Null when the ad cannot be read (the token cannot see it, a timeout).

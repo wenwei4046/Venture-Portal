@@ -13,7 +13,7 @@ import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type C
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
 import { headerKind, importPlan, templateTail, type TemplateParts } from "@/lib/whatsapp/template-import";
-import { crmAdNumbers, crmPages, listMetaAds, metaAdBudget, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, crmPages, listMetaAds, metaAdDaily, metaAdThumbs, metaAdsFigures, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -571,13 +571,33 @@ export async function fetchAdInsights(ids: string[], since: string, until: strin
     await requireCrm("ads");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
-    const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40), figs: Record<string, MetaFig | null> = {};
-    for (let i = 0; i < ads.length; i += 4) {
-      const part = ads.slice(i, i + 4);
-      // Each ad's figures for the range and its budget as it stands today (2026-10-27: the daily budget).
-      const got = await Promise.all(part.map(id => Promise.all([metaAdInsights(id, token, since, until), metaAdBudget(id, token)])));
-      part.forEach((id, k) => { const [fig, budget] = got[k]; figs[id] = fig ? { ...fig, budget } : null; });
-    }
+    const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40);
+    // Each ad's figures for the range and its budget as it stands today (2026-10-27: the daily budget) — through Graph's
+    // Batch API since 2026-11-23 (metaAdsFigures: ~6 s an ad at a time → a few hundred ms for November's 21 ads).
+    const figs = (await metaAdsFigures(ads, [{ key: "r", since, until }], token)).r ?? {};
+    return { ok: true, figs };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "Meta's figures could not be read.") };
+  }
+}
+
+/**
+ * Several ranges' figures in ONE request (2026-11-23, the owner: "计算方式要加快"): the screen's Server Actions go one at a
+ * time, so Insight's period, the period before and the fee's months were asked one after another, each ad by ad. Now
+ * every range is read side by side through Graph's Batch API (metaAdsFigures). Same gate and token as fetchAdInsights;
+ * at most 8 ranges and 40 ads.
+ */
+export async function fetchAdInsightsMany(needs: { key: string; since: string; until: string; ids: string[] }[]): Promise<{ ok: true; figs: Record<string, Record<string, MetaFig | null>> } | { ok: false; error: string }> {
+  try {
+    await session();
+    await requireCrm("ads");
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+    if (!token) throw new Error("Meta is not connected on this server.");
+    const list = (Array.isArray(needs) ? needs : []).slice(0, 8);
+    const ids = [...new Set(list.flatMap(n => (Array.isArray(n.ids) ? n.ids : [])))].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40);
+    const got = await metaAdsFigures(ids, list.map(n => ({ key: String(n.key), since: String(n.since), until: String(n.until) })), token);
+    // Each range answers only for the ads it asked about.
+    const figs = Object.fromEntries(list.map(n => [n.key, Object.fromEntries((n.ids ?? []).filter(id => id in (got[n.key] ?? {})).map(id => [id, got[n.key][id]]))]));
     return { ok: true, figs };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's figures could not be read.") };

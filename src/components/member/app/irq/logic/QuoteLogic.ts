@@ -596,7 +596,12 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       const q = st.q.trim().toLowerCase();
       const colView = st.sheetView === "col", col = colView ? st.col || "" : "", clr = st.clr || "", colorsOf = it => String(it.color || "").split(/\s*,\s*/).filter(Boolean);
       const live = it => !it.paused && !(kinds[it.kind] || {}).paused;
-      const match = it => live(it) && (!q || (it.name + " " + it.code + " " + (it.collection || "")).toLowerCase().includes(q)) && (!col || it.collection === col) && (!clr || colorsOf(it).includes(clr));
+      // Every word typed, against the name, code, collection AND the item's category (the owner, 2026-11-23: "搜寻 airbnb
+      // service 只会出现 airbnb items, 不会出现 decoration & linens" — the category "Airbnb Service" was not searched, and the
+      // words had to stand together).
+      const qWords = q.split(/\s+/).filter(Boolean);
+      const hay = it => (it.name + " " + it.code + " " + (it.collection || "") + " " + ((kinds[it.kind] || {}).label || "")).toLowerCase();
+      const match = it => live(it) && (!qWords.length || qWords.every(w => hay(it).includes(w))) && (!col || it.collection === col) && (!clr || colorsOf(it).includes(clr));
       if (st.sheet.mode === "swap") {
         const l = st.lines.find(x => x.id === st.sheet.id);
         const base = l.orig || l, k = kinds[l.kind] || {};
