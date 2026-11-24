@@ -8,8 +8,9 @@ import { exportXlsxResponse } from '@/lib/export/response'
 import { fixedAssetsSheet } from '@/lib/fixed-assets-sheet'
 import { buildXlsxBuffer } from '@/lib/export/excel'
 
-// The fixed asset schedule for a financial year, for the auditor (2026-11-24): each asset's cost, what was depreciated
-// before the year, each month of it, the year's total, accumulated and net book value at its end. Read-only, as the page.
+// The PPE listing for a financial year, for the auditor (2026-11-24 — the user's Carres listing as the sample): by class,
+// cost and accumulated depreciation brought forward, the year's, carried forward, and the net book value at the year's
+// end (this month while it runs). Read-only, as the page.
 export async function GET(req: Request) {
   await requirePage('/reconciliation/fixed-assets')
   await requirePermission('reconciliation')
@@ -20,10 +21,18 @@ export async function GET(req: Request) {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('fa_read' as never)
   if (error) return Response.json({ error: error.message }, { status: 500 })
-  const sheet = fixedAssetsSheet(faDataOf(data), from, to)
-  const filename = `fixed-assets-${from}-${to}`
+  const now = officeMonth()
+  const asAt = to < now ? to : now
+  const sheet = fixedAssetsSheet(faDataOf(data), from, asAt, dayjs(`${asAt}-01`).endOf('month').format('DD.MM.YYYY'))
+  const filename = `ppe-listing-${asAt}`
   return exportXlsxResponse({
     filename,
-    buffer: buildXlsxBuffer({ sheetName: `FY ${dayjs(`${to}-01`).format('MMM YYYY')}`, headerRow: sheet.header, rows: sheet.rows, columnWidths: sheet.widths }),
+    buffer: buildXlsxBuffer({
+      sheetName: `PPE ${dayjs(`${asAt}-01`).format('MMM YYYY')}`,
+      headerRow: sheet.header,
+      rows: sheet.rows,
+      sectionBreaks: sheet.sectionBreaks,
+      columnWidths: sheet.widths,
+    }),
   })
 }

@@ -5,17 +5,18 @@ import dayjs from 'dayjs'
 // was posted) and everything below works the schedule out of it. A line no asset holds yet stands in an asset of its
 // own making — the lines of one voucher for one thing grouped — until somebody keeps it.
 //
-// Straight line, month by month: from the first month (the purchase's, or the next) over the life, what is left to
-// depreciate over the months left — so a class changed after some months were posted spreads the rest over what is
-// left of the life, and nothing is posted twice. The last month takes what remains; a disposed asset stops with the
-// month it went.
+// Straight line at an annual rate (2026-11-24 — the user's Carres PPE listing: "输入每年折旧率 %"): from the first month
+// (the purchase's, or the next) each month charges the depreciable amount × rate ÷ 12, until nothing is left — the last
+// month the remainder. A posted month stays as posted (a rate changed later charges the new rate from the next month
+// on), nothing is posted twice, and a disposed asset stops with the month it went.
 
 export type StartRule = 'purchase_month' | 'next_month'
 
 export interface FaClass {
   id: string
   name: string
-  lifeMonths: number
+  /** Annual rate, % of the depreciable amount. */
+  ratePct: number
   residualPct: number
   startRule: StartRule
   assetAccount: string
@@ -40,7 +41,8 @@ export interface FaAssetRow {
   name: string
   classId: string
   inServiceDate: string
-  lifeMonths: number | null
+  /** Its own annual rate; null = its class's. */
+  ratePct: number | null
   disposedOn: string | null
   notes: string | null
 }
@@ -71,7 +73,6 @@ export interface FaData {
 const r2 = (n: number) => Math.round(n * 100) / 100
 const ym = (d: string) => d.slice(0, 7)
 const addMonths = (m: string, n: number) => dayjs(`${m}-01`).add(n, 'month').format('YYYY-MM')
-const monthsBetween = (a: string, b: string) => dayjs(`${b}-01`).diff(dayjs(`${a}-01`), 'month')
 
 /** The voucher a line came on: the entry's number, else its description before " — ". */
 export function voucherOf(l: Pick<FaLine, 'entryNo' | 'entryDescription'>): string {
@@ -112,7 +113,7 @@ export function assetsOf(rows: FaAssetRow[], lines: FaLine[], classes: FaClass[]
       name: wordsOf(first),
       classId: cls.id,
       inServiceDate: first.date,
-      lifeMonths: null,
+      ratePct: null,
       disposedOn: null,
       notes: null,
       draft: true,
@@ -134,37 +135,30 @@ export interface ScheduleMonth {
   nbv: number
 }
 
-/** The asset's first month of depreciation, its life in months and the amount to depreciate. */
-export function termsOf(asset: Pick<FaAsset, 'inServiceDate' | 'lifeMonths' | 'cost'>, cls: FaClass): { first: string; life: number; depreciable: number } {
+/** The asset's first month of depreciation, its annual rate, the amount to depreciate and the month's charge. */
+export function termsOf(asset: Pick<FaAsset, 'inServiceDate' | 'ratePct' | 'cost'>, cls: FaClass): { first: string; rate: number; depreciable: number; monthly: number } {
   const start = ym(asset.inServiceDate)
-  return {
-    first: cls.startRule === 'next_month' ? addMonths(start, 1) : start,
-    life: asset.lifeMonths ?? cls.lifeMonths,
-    depreciable: r2(asset.cost * (1 - cls.residualPct / 100)),
-  }
+  const rate = asset.ratePct ?? cls.ratePct
+  const depreciable = r2(asset.cost * (1 - cls.residualPct / 100))
+  return { first: cls.startRule === 'next_month' ? addMonths(start, 1) : start, rate, depreciable, monthly: r2((depreciable * rate) / 1200) }
 }
 
 /**
- * The asset's months up to `through` (YYYY-MM): what each posted, or what it would — what is left over the months
- * left, the last taking the rest, nothing after the month it was disposed of.
+ * The asset's months up to `through` (YYYY-MM): what each posted, or what it would — the month's charge at the rate,
+ * the last taking what is left, nothing once it is all depreciated or after the month it was disposed of.
  */
 export function scheduleOf(asset: FaAsset, cls: FaClass, posted: ReadonlyMap<string, number>, through: string): ScheduleMonth[] {
-  const { first, life, depreciable } = termsOf(asset, cls)
-  const last = addMonths(first, life - 1)
-  const stop = [through, last, asset.disposedOn ? ym(asset.disposedOn) : last].sort()[0]
+  const { first, depreciable, monthly } = termsOf(asset, cls)
+  const stop = asset.disposedOn && ym(asset.disposedOn) < through ? ym(asset.disposedOn) : through
   const out: ScheduleMonth[] = []
   let acc = 0
-  // A month posted before the life began (a class changed since) still counts.
+  // A month posted before the first (a class changed since) still counts.
   for (const [m, amt] of [...posted].sort()) if (m < first && m <= through) acc = r2(acc + amt)
   for (let m = first; m <= stop; m = addMonths(m, 1)) {
     const done = posted.get(m)
-    let amount: number
-    if (done !== undefined) amount = done
-    else {
-      const left = r2(depreciable - acc)
-      const monthsLeft = life - monthsBetween(first, m)
-      amount = left <= 0 ? 0 : monthsLeft <= 1 ? left : r2(left / monthsLeft)
-    }
+    const left = r2(depreciable - acc)
+    if (done === undefined && left <= 0) break
+    const amount = done ?? (monthly <= 0 ? 0 : Math.min(monthly, left))
     acc = r2(acc + amount)
     out.push({ month: m, amount, posted: done !== undefined, accumulated: acc, nbv: r2(asset.cost - acc) })
   }
@@ -175,7 +169,7 @@ export interface AssetFigures {
   asset: FaAsset
   cls: FaClass | undefined
   months: ScheduleMonth[]
-  /** The monthly charge over the whole life. */
+  /** The month's charge at the rate. */
   monthly: number
   accumulated: number
   nbv: number
@@ -189,8 +183,7 @@ export function figuresOf(data: FaData, through: string): AssetFigures[] {
     const posted = new Map(data.postings.filter((p) => p.assetId === asset.id).map((p) => [p.month, p.amount]))
     const months = cls ? scheduleOf(asset, cls, posted, through) : []
     const lastRow = months[months.length - 1]
-    const terms = cls ? termsOf(asset, cls) : null
-    const monthly = terms ? r2(terms.depreciable / terms.life) : 0
+    const monthly = cls ? termsOf(asset, cls).monthly : 0
     return { asset, cls, months, monthly, accumulated: lastRow?.accumulated ?? 0, nbv: lastRow?.nbv ?? asset.cost }
   })
 }
@@ -258,7 +251,7 @@ export function faDataOf(raw: unknown): FaData {
   const classes: FaClass[] = (o.classes ?? []).map((c) => {
     const x = c as Record<string, unknown>
     return {
-      id: String(x.id), name: String(x.name), lifeMonths: n(x.life_months), residualPct: n(x.residual_pct),
+      id: String(x.id), name: String(x.name), ratePct: n(x.rate_pct), residualPct: n(x.residual_pct),
       startRule: (x.start_rule === 'next_month' ? 'next_month' : 'purchase_month') as StartRule,
       assetAccount: String(x.asset_account), accumAccount: String(x.accum_account), expenseAccount: String(x.expense_account),
       isActive: x.is_active !== false,
@@ -275,7 +268,7 @@ export function faDataOf(raw: unknown): FaData {
     const x = a as Record<string, unknown>
     return {
       id: String(x.id), name: String(x.name), classId: String(x.class_id), inServiceDate: String(x.in_service_date).slice(0, 10),
-      lifeMonths: x.life_months == null ? null : n(x.life_months), disposedOn: x.disposed_on == null ? null : String(x.disposed_on).slice(0, 10),
+      ratePct: x.rate_pct == null ? null : n(x.rate_pct), disposedOn: x.disposed_on == null ? null : String(x.disposed_on).slice(0, 10),
       notes: s(x.notes),
     }
   })
@@ -284,4 +277,67 @@ export function faDataOf(raw: unknown): FaData {
     return { assetId: String(x.asset_id), month: String(x.month), amount: n(x.amount) }
   })
   return { classes, lines, postings, assets: assetsOf(rows, lines, classes) }
+}
+
+export interface ListingRow {
+  asset: FaAsset
+  rate: number
+  costBf: number
+  addition: number
+  disposal: number
+  costCf: number
+  accBf: number
+  charge: number
+  accDisposal: number
+  accCf: number
+  nbv: number
+}
+
+export interface ListingGroup {
+  cls: FaClass
+  rows: ListingRow[]
+  total: Omit<ListingRow, 'asset' | 'rate'>
+}
+
+const NUMBERS = ['costBf', 'addition', 'disposal', 'costCf', 'accBf', 'charge', 'accDisposal', 'accCf', 'nbv'] as const
+
+/** A set of rows added up, figure by figure. */
+export function sumRows(rows: ReadonlyArray<Omit<ListingRow, 'asset' | 'rate'>>): Omit<ListingRow, 'asset' | 'rate'> {
+  const t = Object.fromEntries(NUMBERS.map((k) => [k, 0])) as Omit<ListingRow, 'asset' | 'rate'>
+  for (const r of rows) for (const k of NUMBERS) t[k] = r2(t[k] + r[k])
+  return t
+}
+
+/**
+ * The PPE listing for a financial year (2026-11-24 — the user's Carres sample): by class, each asset's cost brought
+ * forward, added in the year, disposed of in it, carried forward; its depreciation the same — brought forward, the
+ * year's charge, what left with a disposal, carried forward — and the net book value, as at `asAt` (the year's end,
+ * or this month while it runs). An asset disposed of before the year is not on it.
+ */
+export function listingOf(data: FaData, from: string, asAt: string): ListingGroup[] {
+  const groups: ListingGroup[] = []
+  const figures = figuresOf(data, asAt)
+  for (const cls of data.classes) {
+    const rows: ListingRow[] = []
+    for (const f of figures) {
+      if (f.asset.classId !== cls.id) continue
+      const start = ym(f.asset.inServiceDate)
+      if (start > asAt) continue
+      const gone = f.asset.disposedOn ? ym(f.asset.disposedOn) : null
+      if (gone && gone < from) continue
+      const before = start < from
+      const costBf = before ? f.asset.cost : 0
+      const addition = before ? 0 : f.asset.cost
+      const accBf = r2(f.months.filter((m) => m.month < from).reduce((s, m) => s + m.amount, 0))
+      const charge = r2(f.months.filter((m) => m.month >= from && m.month <= asAt).reduce((s, m) => s + m.amount, 0))
+      const out = gone !== null && gone <= asAt
+      const disposal = out ? -f.asset.cost : 0
+      const accDisposal = out ? -r2(accBf + charge) : 0
+      const costCf = r2(costBf + addition + disposal)
+      const accCf = r2(accBf + charge + accDisposal)
+      rows.push({ asset: f.asset, rate: f.asset.ratePct ?? cls.ratePct, costBf, addition, disposal, costCf, accBf, charge, accDisposal, accCf, nbv: r2(costCf - accCf) })
+    }
+    if (rows.length > 0) groups.push({ cls, rows, total: sumRows(rows) })
+  }
+  return groups
 }
