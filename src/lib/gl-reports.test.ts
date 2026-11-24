@@ -255,6 +255,7 @@ describe('buildCashFlow', () => {
 
 describe('gl-report-blocks flatten (export path)', async () => {
   const { pnlBlocks, balanceSheetBlocks, flattenGlReport } = await import('./gl-report-blocks')
+  type ReportBlock = import('./gl-report-blocks').ReportBlock
 
   it('flattens P&L blocks with section breaks + summary rows', () => {
     const pnl = buildPnl(LINES, ACCOUNTS, FILTER)
@@ -278,6 +279,25 @@ describe('gl-report-blocks flatten (export path)', async () => {
     const child = flat.rows.find((r) => String(r[0]).includes('3051'))
     expect(String(child?.[0]).startsWith('    ')).toBe(true)
     expect(flat.rows[0]).toHaveLength(4) // no % Rev column
+  })
+
+  it('lays the Balance Sheet out as NCA + CA = CL + NCL + Equity, each with its total', () => {
+    const bs = buildBalanceSheet(LINES, ACCOUNTS, FILTER)
+    const blocks = balanceSheetBlocks(bs)
+    const flat = flattenGlReport(blocks, {})
+    expect(flat.sectionBreaks.map((b) => b.title)).toEqual([
+      'Non-current Assets', 'Current Assets', 'Current Liabilities', 'Non-current Liabilities', 'Equity',
+    ])
+    const totals = blocks.flatMap((b) => (b.kind === 'summary' ? [b.row.label] : []))
+    expect(totals).toEqual([
+      'Total Non-current Assets', 'Total Current Assets', 'Total Assets',
+      'Total Current Liabilities', 'Total Non-current Liabilities', 'Total Liabilities',
+      'Total Equity', 'Total Liabilities & Equity',
+    ])
+    const row = (label: string) => blocks.find((b) => b.kind === 'summary' && b.row.label === label) as Extract<ReportBlock, { kind: 'summary' }>
+    expect(row('Total Non-current Assets').row.current + row('Total Current Assets').row.current).toBeCloseTo(row('Total Assets').row.current, 2)
+    expect(row('Total Liabilities').row.current + row('Total Equity').row.current).toBeCloseTo(row('Total Liabilities & Equity').row.current, 2)
+    expect(row('Total Non-current Liabilities').row.current).toBe(0)
   })
 })
 

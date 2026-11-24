@@ -101,35 +101,32 @@ export function balanceSheetBlocks(bs: BalanceSheetReport, segment?: string): Re
   // lib/fiscal-year): brought forward, and the year's own.
   const equityWithEarnings: ReportSection = {
     ...bs.equity,
+    label: 'Equity',
     nodes: [...bs.equity.nodes, ...earningsNodes(bs)],
     current: r2(bs.equity.current + bs.earnings.current),
     previous: r2(bs.equity.previous + bs.earnings.previous),
   }
+  // NCA + CA = CL + NCL + Equity, each with its own total (user 2026-11-24, for the auditor). Every loan and
+  // amount due counts as current — no written repayment terms — so Non-current Liabilities stands empty at 0.
+  const nonCurrentLiabilities: ReportSection = { key: 'non_current_liability', label: 'Non-current Liabilities', nodes: [], current: 0, previous: 0 }
+  const total = (label: string, v: { current: number; previous: number }, strong = false): ReportBlock => ({
+    kind: 'summary',
+    row: { label, current: v.current, previous: v.previous, ...(strong ? { emphasis: 'strong' as const, tone: 'ledger' as const } : {}) },
+  })
   return [
-    ...(bs.fixedAssets.nodes.length > 0
-      ? ([{ kind: 'section', section: bs.fixedAssets }] as ReportBlock[])
-      : []),
-    { kind: 'section', section: bs.assets },
-    {
-      kind: 'summary',
-      row: { label: 'Total Assets', current: bs.totalAssets.current, previous: bs.totalAssets.previous, emphasis: 'strong', tone: 'ledger' },
-    },
-    { kind: 'section', section: bs.liabilities },
-    {
-      kind: 'summary',
-      row: { label: 'Total Liabilities', current: bs.liabilities.current, previous: bs.liabilities.previous },
-    },
+    { kind: 'section', section: { ...bs.fixedAssets, label: 'Non-current Assets' } },
+    total('Total Non-current Assets', bs.fixedAssets),
+    { kind: 'section', section: { ...bs.assets, label: 'Current Assets' } },
+    total('Total Current Assets', bs.assets),
+    total('Total Assets', bs.totalAssets, true),
+    { kind: 'section', section: { ...bs.liabilities, label: 'Current Liabilities' } },
+    total('Total Current Liabilities', bs.liabilities),
+    { kind: 'section', section: nonCurrentLiabilities },
+    total('Total Non-current Liabilities', nonCurrentLiabilities),
+    total('Total Liabilities', bs.liabilities),
     { kind: 'section', section: equityWithEarnings },
-    {
-      kind: 'summary',
-      row: {
-        label: 'Total Liabilities & Equity',
-        current: bs.totalLiabEquity.current,
-        previous: bs.totalLiabEquity.previous,
-        emphasis: 'strong',
-        tone: 'ledger',
-      },
-    },
+    total('Total Equity', equityWithEarnings),
+    total('Total Liabilities & Equity', bs.totalLiabEquity, true),
     ...(Math.abs(bs.check.current) > 0.005 || Math.abs(bs.check.previous) > 0.005
       ? ([
           {
