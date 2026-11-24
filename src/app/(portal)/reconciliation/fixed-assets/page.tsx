@@ -51,6 +51,7 @@ export default async function FixedAssetsPage({ searchParams }: Props) {
         </ReturnLink>
       </div>
       <FixedAssetsView
+        key={fy}
         data={data}
         accounts={accounts}
         fy={{ from: fy, to: fyEndOf(fy) }}
