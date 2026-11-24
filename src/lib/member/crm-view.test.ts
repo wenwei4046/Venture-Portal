@@ -231,3 +231,16 @@ describe("every sub-department's settings, as crm_settings_read gives them", () 
     expect(subSettingsFrom(null)).toEqual({});
   });
 });
+
+// KRIS is DC's Revenue Director until DC's hierarchy names one (the owner, 2026-11-24: "目前现在DC CRM 上让Kris as a revenue
+// director 进来"; "手机& 电脑 都要调整"; mig 20261124230000 makes him 'hod'). The desktop (CrmApp's directors) and the phone
+// (panel/vm/assign.ts, assign-1011.ts) both pick the Director row as role 'hod' in the view: DC's shows KRIS beside PETER,
+// IR's PETER alone.
+describe("the Revenue Director row in a view", () => {
+  const withKris = { ...data, people: [...data.people.map(p => (p.id === "peter" ? { ...p, brands: ["conts", "dc"] } : p)),
+    person("kris", ["dc"], { role: "hod" })] } as CrmData;
+  const directors = (d: CrmData) => d.people.filter(p => p.role === "hod" && personInView(d, p.id)).map(p => p.id).sort();
+  it("DC's view lists KRIS and PETER", () => expect(directors(inView(withKris, ["dc"]))).toEqual(["kris", "peter"]));
+  it("IR's view lists PETER alone", () => expect(directors(inView(withKris, ["conts"]))).toEqual(["peter"]));
+  it("no view lists both", () => expect(directors(withKris)).toEqual(["kris", "peter"]));
+});
