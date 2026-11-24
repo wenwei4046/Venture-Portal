@@ -9,11 +9,12 @@ import { DsSelect, Field, TextField } from '@/components/ds/Field'
 import { Button } from '@/components/ds/Button'
 import { CenterWindow, PanelHead } from '@/components/ds/Overlay'
 import { formatMoney } from '@/lib/utils'
-import { figuresOf, monthsOf, postRows, type FaAsset, type FaClass, type FaData, type StartRule } from '@/lib/fixed-assets'
+import { figuresOf, listingOf, monthsOf, postRows, sumRows, type FaAsset, type FaClass, type FaData, type ListingRow, type StartRule } from '@/lib/fixed-assets'
 import { postDepreciation, saveFaAsset, saveFaClass, undoDepreciation } from '../actions'
 
-// The page's three views (2026-11-24): the register (each asset, what it cost, what is depreciated as at, what is
-// left), the schedule (the financial year's months, asset by asset) and the classes Finance keeps.
+// The page's three views (2026-11-24): the register — the PPE listing, as the user's Carres sample: by class, cost and
+// accumulated depreciation brought forward, the year's, carried forward, the net book value — the schedule (the
+// financial year's months, asset by asset) and the classes Finance keeps, each at an annual rate.
 
 export interface AccountChoice {
   code: string
@@ -25,6 +26,19 @@ type View = 'register' | 'schedule' | 'classes'
 const mon = (ym: string) => dayjs(`${ym}-01`).format('MMM YYYY')
 const money = (n: number) => (Math.abs(n) < 0.005 ? '—' : formatMoney(n))
 const r2 = (n: number) => Math.round(n * 100) / 100
+const pct = (n: number) => `${r2(n)}%`
+
+/** A listing row's nine figures: cost B/F · addition · disposal · C/F, depreciation the same, the book value. */
+function Figures({ row }: { row: Omit<ListingRow, 'asset' | 'rate'> }) {
+  return (
+    <>
+      {[row.costBf, row.addition, row.disposal, row.costCf, row.accBf, row.charge, row.accDisposal, row.accCf].map((v, i) => (
+        <td key={i} className="num">{money(v)}</td>
+      ))}
+      <td className="num">{formatMoney(row.nbv)}</td>
+    </>
+  )
+}
 
 export default function FixedAssetsView({ data, accounts, fy, years, now, view: initialView, canEdit, canPost }: {
   data: FaData
@@ -50,12 +64,10 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
   const classById = new Map(data.classes.map((c) => [c.id, c]))
 
   const inYear = (f: (typeof figures)[number]) => r2(f.months.filter((m) => m.month >= fy.from && m.month <= fy.to).reduce((s, m) => s + m.amount, 0))
-  const totals = {
-    cost: r2(figures.reduce((s, f) => s + f.asset.cost, 0)),
-    accumulated: r2(figures.reduce((s, f) => s + f.accumulated, 0)),
-    nbv: r2(figures.reduce((s, f) => s + f.nbv, 0)),
-    year: r2(figures.reduce((s, f) => s + inYear(f), 0)),
-  }
+  const groups = useMemo(() => listingOf(data, fy.from, asAt), [data, fy.from, asAt])
+  const all = sumRows(groups.map((g) => g.total))
+  const count = groups.reduce((s, g) => s + g.rows.length, 0)
+  const totals = { cost: all.costCf, accumulated: all.accCf, nbv: all.nbv, year: all.charge }
   const postedThrough = data.postings.reduce((m, p) => (p.month > m ? p.month : m), '')
   const postable = monthsOf(fy.from, asAt).reverse()
   // The month picked counts only while it is one of this year's (2026-11-24: picked on another year, it stayed — the
@@ -95,7 +107,7 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
       </div>
 
       <StatCards label="Fixed assets">
-        <StatCard label="Cost" value={formatMoney(totals.cost)} icon="wallet" note={`${figures.length} assets`} />
+        <StatCard label={`Cost · ${mon(asAt)}`} value={formatMoney(totals.cost)} icon="wallet" note={`${count} assets`} />
         <StatCard label={`Accumulated · ${mon(asAt)}`} value={formatMoney(totals.accumulated)} icon="chart" tone="out" note="Depreciation to date" />
         <StatCard label={`Net book value · ${mon(asAt)}`} value={formatMoney(totals.nbv)} icon="receipt" tone="primary" note="Cost − accumulated" />
         <StatCard label="Depreciation · this year" value={formatMoney(totals.year)} icon="chart" tone="danger" note={`${mon(fy.from)} – ${mon(asAt)}`} />
@@ -157,55 +169,66 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
           <table className="ledger-table">
             <thead>
               <tr>
-                <th>Asset</th>
-                <th>Class</th>
-                <th>In service</th>
-                <th className="num">Cost</th>
-                <th className="num">Life</th>
-                <th className="num">Monthly</th>
-                <th className="num">Accumulated</th>
-                <th className="num">Net book value</th>
-                {canEdit ? <th aria-label="Edit" /> : null}
+                <th rowSpan={2}>Description</th>
+                <th rowSpan={2}>Purchase date</th>
+                <th rowSpan={2} className="num">Rate</th>
+                <th colSpan={4} className="text-center">Cost</th>
+                <th colSpan={4} className="text-center">Accum. depreciation</th>
+                <th rowSpan={2} className="num whitespace-nowrap">NBV {dayjs(`${asAt}-01`).endOf('month').format('DD.MM.YYYY')}</th>
+                {canEdit ? <th rowSpan={2} aria-label="Edit" /> : null}
+              </tr>
+              <tr>
+                <th className="num">B/F</th>
+                <th className="num">Addition</th>
+                <th className="num">Disposal</th>
+                <th className="num">C/F</th>
+                <th className="num">B/F</th>
+                <th className="num">Charge</th>
+                <th className="num">Disposal</th>
+                <th className="num">C/F</th>
               </tr>
             </thead>
-            <tbody>
-              {figures.map((f) => (
-                <tr key={f.asset.id}>
-                  <td>
-                    <span className="font-medium text-ink">{f.asset.name}</span>
-                    <span className="font-mono text-[11px] text-graphite ml-2">{f.asset.voucher}</span>
-                    {f.asset.draft ? <span className="text-[11px] text-muted ml-2">· new</span> : null}
-                    {f.asset.disposedOn ? <span className="text-[11px] text-muted ml-2">· disposed {dayjs(f.asset.disposedOn).format('D MMM YYYY')}</span> : null}
-                  </td>
-                  <td>{f.cls?.name ?? '—'}</td>
-                  <td className="whitespace-nowrap">{dayjs(f.asset.inServiceDate).format('D MMM YYYY')}</td>
-                  <td className="num">{formatMoney(f.asset.cost)}</td>
-                  <td className="num">{f.asset.lifeMonths ?? f.cls?.lifeMonths ?? '—'} mo</td>
-                  <td className="num">{money(f.monthly)}</td>
-                  <td className="num">{money(f.accumulated)}</td>
-                  <td className="num">{formatMoney(f.nbv)}</td>
-                  {canEdit ? (
-                    <td>
-                      <Button variant="link" size="sm" onClick={() => setEditing(f.asset)}>
-                        Edit
-                      </Button>
-                    </td>
-                  ) : null}
+            {groups.map((g) => (
+              <tbody key={g.cls.id}>
+                <tr>
+                  <td colSpan={canEdit ? 13 : 12} className="font-medium text-ink uppercase tracking-wide text-[12px] pt-4">{g.cls.name}</td>
                 </tr>
-              ))}
-            </tbody>
+                {g.rows.map((r) => (
+                  <tr key={r.asset.id}>
+                    <td>
+                      <span className="text-ink">{r.asset.name}</span>
+                      <span className="font-mono text-[11px] text-graphite ml-2">{r.asset.voucher}</span>
+                      {r.asset.draft ? <span className="text-[11px] text-muted ml-2">· new</span> : null}
+                      {r.asset.disposedOn ? <span className="text-[11px] text-muted ml-2">· disposed {dayjs(r.asset.disposedOn).format('D MMM YYYY')}</span> : null}
+                    </td>
+                    <td className="whitespace-nowrap">{dayjs(r.asset.inServiceDate).format('D MMM YYYY')}</td>
+                    <td className="num">{pct(r.rate)}</td>
+                    <Figures row={r} />
+                    {canEdit ? (
+                      <td>
+                        <Button variant="link" size="sm" onClick={() => setEditing(r.asset)}>
+                          Edit
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+                <tr className="font-medium">
+                  <td colSpan={3}>Total {g.cls.name}</td>
+                  <Figures row={g.total} />
+                  {canEdit ? <td /> : null}
+                </tr>
+              </tbody>
+            ))}
             <tfoot>
               <tr>
                 <td colSpan={3}>Total</td>
-                <td className="num">{formatMoney(totals.cost)}</td>
-                <td />
-                <td />
-                <td className="num">{formatMoney(totals.accumulated)}</td>
-                <td className="num">{formatMoney(totals.nbv)}</td>
+                <Figures row={all} />
                 {canEdit ? <td /> : null}
               </tr>
             </tfoot>
           </table>
+          {groups.length === 0 ? <p className="text-sm text-muted mt-3">No assets in service by {mon(asAt)}.</p> : null}
         </div>
       ) : null}
 
@@ -260,7 +283,7 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
             <thead>
               <tr>
                 <th>Class</th>
-                <th className="num">Life</th>
+                <th className="num">Rate / year</th>
                 <th className="num">Residual</th>
                 <th>Starts</th>
                 <th>Asset account</th>
@@ -273,7 +296,7 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
               {data.classes.map((c) => (
                 <tr key={c.id} className={c.isActive ? '' : 'text-muted'}>
                   <td className="font-medium">{c.name}{c.isActive ? '' : ' · off'}</td>
-                  <td className="num">{c.lifeMonths} mo ({r2(c.lifeMonths / 12)} yr)</td>
+                  <td className="num">{pct(c.ratePct)} <span className="text-muted">({r2(100 / c.ratePct)} yr)</span></td>
                   <td className="num">{c.residualPct}%</td>
                   <td>{c.startRule === 'next_month' ? 'Month after purchase' : 'Purchase month'}</td>
                   <td className="font-mono text-[12px]">{c.assetAccount}</td>
@@ -296,7 +319,7 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
             </div>
           ) : null}
           <p className="text-xs text-muted mt-2">
-            A changed life or residual spreads what is left over the months left; months already posted stay. To post them
+            A changed rate or residual charges from the next month not posted; months already posted stay. To post them
             again, undo from the first month to change.
           </p>
         </div>
@@ -343,7 +366,7 @@ function AssetWindow({ asset, data, classes, classById, onClose, onSaved }: {
   const [name, setName] = useState(asset.name)
   const [classId, setClassId] = useState(asset.classId)
   const [date, setDate] = useState(asset.inServiceDate)
-  const [life, setLife] = useState(asset.lifeMonths == null ? '' : String(asset.lifeMonths))
+  const [rate, setRate] = useState(asset.ratePct == null ? '' : String(asset.ratePct))
   const [disposed, setDisposed] = useState(asset.disposedOn ?? '')
   const [notes, setNotes] = useState(asset.notes ?? '')
   const [lineIds, setLineIds] = useState(asset.lineIds)
@@ -364,7 +387,7 @@ function AssetWindow({ asset, data, classes, classById, onClose, onSaved }: {
           name,
           classId,
           inServiceDate: date,
-          lifeMonths: life.trim() ? Number(life) : null,
+          ratePct: rate.trim() ? Number(rate) : null,
           disposedOn: disposed || null,
           notes: notes.trim() || null,
           lineIds,
@@ -387,8 +410,8 @@ function AssetWindow({ asset, data, classes, classById, onClose, onSaved }: {
           <Field label="In service">
             <input aria-label="In service" type="date" className="jv-input font-mono" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
-          <Field label="Life (months)" optional hint={cls ? `The class: ${cls.lifeMonths} months` : undefined}>
-            <TextField ariaLabel="Life (months)" type="number" value={life} onChange={setLife} placeholder={cls ? String(cls.lifeMonths) : ''} />
+          <Field label="Rate % per year" optional hint={cls ? `The class: ${pct(cls.ratePct)}` : undefined}>
+            <TextField ariaLabel="Rate % per year" type="number" value={rate} onChange={setRate} placeholder={cls ? String(r2(cls.ratePct)) : ''} suffix="%" />
           </Field>
           <Field label="Disposed of" optional hint="Depreciation stops with that month">
             <input aria-label="Disposed of" type="date" className="jv-input font-mono" value={disposed} onChange={(e) => setDisposed(e.target.value)} />
@@ -431,7 +454,7 @@ function ClassWindow({ cls, accounts, onClose, onSaved }: {
   const fixed = accounts.filter((a) => a.kind === 'fixed_asset').map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }))
   const expense = accounts.filter((a) => a.kind === 'expense').map((a) => ({ value: a.code, label: `${a.code} ${a.name}` }))
   const [name, setName] = useState(cls?.name ?? '')
-  const [years, setYears] = useState(cls ? String(r2(cls.lifeMonths / 12)) : '3')
+  const [rate, setRate] = useState(cls ? String(r2(cls.ratePct)) : '10')
   const [residual, setResidual] = useState(String(cls?.residualPct ?? 0))
   const [startRule, setStartRule] = useState<StartRule>(cls?.startRule ?? 'purchase_month')
   const [assetAccount, setAssetAccount] = useState(cls?.assetAccount ?? fixed[0]?.value ?? '')
@@ -445,8 +468,7 @@ function ClassWindow({ cls, accounts, onClose, onSaved }: {
     start(async () => {
       setError(null)
       try {
-        const months = Math.round(Number(years) * 12)
-        await saveFaClass({ id: cls?.id, name, lifeMonths: months, residualPct: Number(residual), startRule, assetAccount, accumAccount, expenseAccount, isActive: active })
+        await saveFaClass({ id: cls?.id, name, ratePct: Number(rate), residualPct: Number(residual), startRule, assetAccount, accumAccount, expenseAccount, isActive: active })
         onSaved(`Saved ${name}.`)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -459,8 +481,8 @@ function ClassWindow({ cls, accounts, onClose, onSaved }: {
       <div style={{ padding: '16px 20px', display: 'grid', gap: 12 }}>
         <Field label="Name"><TextField ariaLabel="Class name" value={name} onChange={setName} /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <Field label="Life (years)" hint={`${Math.round(Number(years) * 12) || 0} months`}>
-            <TextField ariaLabel="Life (years)" type="number" step="0.5" value={years} onChange={setYears} />
+          <Field label="Rate % per year" hint={Number(rate) > 0 ? `${r2(100 / Number(rate))} years` : undefined}>
+            <TextField ariaLabel="Rate % per year" type="number" step="0.01" value={rate} onChange={setRate} suffix="%" />
           </Field>
           <Field label="Residual">
             <TextField ariaLabel="Residual" type="number" value={residual} onChange={setResidual} suffix="%" />

@@ -15,7 +15,8 @@ const YM = /^\d{4}-\d{2}$/
 export interface ClassInput {
   id?: string
   name: string
-  lifeMonths: number
+  /** Annual rate, %. */
+  ratePct: number
   residualPct: number
   startRule: StartRule
   assetAccount: string
@@ -27,12 +28,12 @@ export interface ClassInput {
 export async function saveFaClass(input: ClassInput): Promise<void> {
   await requireActionOn('/reconciliation/fixed-assets', 'reconciliation', 'edit')
   if (!input.name.trim()) throw new Error('The class needs a name')
-  if (!Number.isInteger(input.lifeMonths) || input.lifeMonths < 1) throw new Error('The life is a whole number of months')
+  if (!(input.ratePct > 0 && input.ratePct <= 100)) throw new Error('The rate is more than 0 and at most 100%')
   if (!(input.residualPct >= 0 && input.residualPct < 100)) throw new Error('The residual is 0 to under 100%')
   const supabase = await createClient()
   const { error } = await supabase.rpc('fa_save_class' as never, {
     p: {
-      id: input.id ?? null, name: input.name.trim(), life_months: input.lifeMonths, residual_pct: input.residualPct,
+      id: input.id ?? null, name: input.name.trim(), rate_pct: input.ratePct, residual_pct: input.residualPct,
       start_rule: input.startRule, asset_account: input.assetAccount, accum_account: input.accumAccount,
       expense_account: input.expenseAccount, is_active: input.isActive,
     },
@@ -47,7 +48,8 @@ export interface AssetInput {
   name: string
   classId: string
   inServiceDate: string
-  lifeMonths: number | null
+  /** Its own annual rate, %; null = its class's. */
+  ratePct: number | null
   disposedOn: string | null
   notes: string | null
   lineIds: string[]
@@ -55,7 +57,7 @@ export interface AssetInput {
 
 const assetPayload = (a: AssetInput) => ({
   id: a.id ?? null, name: a.name.trim(), class_id: a.classId, in_service_date: a.inServiceDate,
-  life_months: a.lifeMonths, disposed_on: a.disposedOn || null, notes: a.notes, line_ids: a.lineIds,
+  rate_pct: a.ratePct, disposed_on: a.disposedOn || null, notes: a.notes, line_ids: a.lineIds,
 })
 
 export async function saveFaAsset(input: AssetInput): Promise<void> {
@@ -87,7 +89,7 @@ export async function postDepreciation(through: string): Promise<{ months: numbe
     await requireActionOn('/reconciliation/fixed-assets', 'reconciliation', 'edit')
     for (const a of drafts) {
       const { error } = await supabase.rpc('fa_save_asset' as never, {
-        p: assetPayload({ name: a.name, classId: a.classId, inServiceDate: a.inServiceDate, lifeMonths: null, disposedOn: null, notes: null, lineIds: a.lineIds }),
+        p: assetPayload({ name: a.name, classId: a.classId, inServiceDate: a.inServiceDate, ratePct: null, disposedOn: null, notes: null, lineIds: a.lineIds }),
       } as never)
       if (error) throw new Error(error.message)
     }
