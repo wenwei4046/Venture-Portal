@@ -151,7 +151,9 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const inBrandPick = (id: string) => adBrand === "all" || brandKey(id) === adBrand;
   const brandAds = ads.filter(a => inBrandPick(a.id));
   const adList4 = {
-    summary: `${brandAds.length} ads`, unsetN: brandAds.filter(a => !data.adRules.some(r => r.adId === a.id) || !named(a)).length,
+    // "Not set up" is the split alone (2026-11-24 — the owner, DC's four ads split 75 / 25 but unnamed, read Not set up:
+    // "Yes, change it"); a missing name already says "Not named yet" on its row, as the phone's list does.
+    summary: `${brandAds.length} ads`, unsetN: brandAds.filter(a => !data.adRules.some(r => r.adId === a.id)).length,
     brands: data.view ? undefined : (["all", "conts", "dc"] as const).map(k => ({ label: k === "all" ? "All" : BRAND_LABEL[k], on: adBrand === k, pick: () => patch({ adBrand: k }) })),
     legend: T3.map(t => ({ name: t.name === DIRECTOR_TEAM ? "Director" : t.name.replace(/^Team /, ""), color: t.color })),
     // By the ad's id (two ads may share a name — Meta lets a name repeat across ad sets), grouped by Page (2026-10-22, the
@@ -166,7 +168,7 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
       return { name: nameless ? "Not named yet" : c.name, nameless, paused, run: dup ? [run, `ID …${c.id.slice(-6)}`].filter(Boolean).join(" · ") : run,
         brand, brandHead: i === 0 || brandOf(all[i - 1].id) !== brand, brandN: all.filter(x => brandOf(x.id) === brand).length,
         headline: nameless ? hl || c.name : hl, ch: (a?.wa ? "whatsapp" : "messenger") as "whatsapp" | "messenger", leads: c.leads,
-        segs: c.segs2.length ? c.segs2 : T3.map(t => ({ color: t.color, pct: 1, op: 1, label: t.name, pctS: "" })), set: c.set && !nameless, sel: ui.ad === a?.id, open: c.open }; }),
+        segs: c.segs2.length ? c.segs2 : T3.map(t => ({ color: t.color, pct: 1, op: 1, label: t.name, pctS: "" })), set: c.set, sel: ui.ad === a?.id, open: c.open }; }),
   };
   // Ads to teams' "+" (2026-10-22, the owner: "director 能提前先把广告加进来先做分配"): Meta's ads to pick from, or a typed id.
   const addList = ui.addAdList, q = ui.addAdQ.trim().toLowerCase();
