@@ -352,6 +352,10 @@ export default function DeskScreens(p: DeskScreensProps) {
   // …on Ads Performance, on Insight › Overview, and on Reports › Ads performance, which draws the same table (2026-10-23).
   const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && (ui.insTab === "ads" || !!v.overview)) || (ui.tab === "reports" && (ui.rpCat === "ads" || ((v.rpNeed as unknown[] | undefined)?.length ?? 0) > 0)) || (ui.tab === "assignment" && ui.adPane === "perf");
   const asked = useRef(new Set<string>());
+  // An ad Meta did not answer for (left out of the GET's answer, or the GET failed) is asked again 3 s later, three times
+  // at most, then reads "—" (2026-11-24, the owner: "计算还是很慢" — such an ad was marked asked and read "—" for good).
+  const metaTries = useRef(new Map<string, number>());
+  const [metaRetry, setMetaRetry] = useState(0);
   useEffect(() => {
     // Meta's figures: CRM · Manage, or View at All read-only (readsAds) — the server asks the same.
     if (!adsOn || !live || !readsAds(data.can)) return;
@@ -374,20 +378,31 @@ export default function DeskScreens(p: DeskScreensProps) {
         .then(async res => (res.ok ? { ok: true as const, figs: ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs } : { ok: false as const }))
         .catch(() => ({ ok: false as const }));
       void read.then(r => {
+        // What did not come: asked again shortly, until its third try, which then reads "—".
+        const gaveUp: Record<string, string[]> = {};
+        let again = false;
+        for (const n of part) for (const id of n.ids) {
+          if (r.ok && id in (r.figs[n.key] ?? {})) continue;
+          const k = `${n.key}|${id}`, t = (metaTries.current.get(k) ?? 0) + 1;
+          metaTries.current.set(k, t);
+          if (t < 3) { asked.current.delete(k); again = true; } else (gaveUp[n.key] ??= []).push(id);
+        }
+        if (again) setTimeout(() => setMetaRetry(x => x + 1), 3000);
         setUi(u => {
           const m = { ...u.apMeta };
           for (const n of part) {
-            const figs = r.ok ? r.figs[n.key] ?? {} : Object.fromEntries(n.ids.map(id => [id, null]));
-            if (r.ok) keepFigs(n.key, figs);
-            // A failed read keeps what was shown from this computer rather than blanking it.
-            m[n.key] = r.ok ? { ...(m[n.key] ?? {}), ...figs } : { ...figs, ...(m[n.key] ?? {}) };
+            const figs = r.ok ? r.figs[n.key] ?? {} : {};
+            if (Object.keys(figs).length) keepFigs(n.key, figs);
+            // What could not be read keeps what was shown from this computer rather than blanking it.
+            const none = Object.fromEntries((gaveUp[n.key] ?? []).map(id => [id, null]));
+            m[n.key] = { ...none, ...(m[n.key] ?? {}), ...figs };
           }
           return { ...u, apMeta: m };
         });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adsOn, live, data.can.manage, data.can.viewAll, apNeedKey]);
+  }, [adsOn, live, data.can.manage, data.can.viewAll, apNeedKey, metaRetry]);
 
   // …and its chart, the same figures day by day for the range on screen (2026-10-23; ui.apDaily), each range and ad once.
   const dayNeed = v.apDayNeed as { key: string; since: string; until: string; ids: string[] } | null | undefined;

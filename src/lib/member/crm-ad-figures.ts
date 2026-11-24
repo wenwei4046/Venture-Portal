@@ -12,5 +12,8 @@ export function needsFromParam(raw: string | null): AdFigNeed[] | null {
   } catch { return null; }
 }
 
+/** The day Meta is read up to: the range's end, or today when it ends later (no spend yet) — never before its start. */
+export const readUntil = (since: string, until: string, today: string) => (until > today ? (today < since ? since : today) : until);
+
 /** How long the server keeps a range's answer: one ended before today an hour, one still running 10 minutes. */
 export const keepSeconds = (until: string, today: string) => (until < today ? 3600 : 600);

@@ -6,7 +6,8 @@
  */
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 
-const STORE = "crm-meta-figs-v1";
+// v2 (2026-11-24): v1 kept a figure Meta failed to give as null, which then showed "—" for up to 6 hours.
+const STORE = "crm-meta-figs-v2";
 const PAST_MS = 6 * 3_600_000, LIVE_MS = 10 * 60_000, KEEP_MS = 7 * 86_400_000;
 type Entry = { f: MetaFig | null; at: number };
 
