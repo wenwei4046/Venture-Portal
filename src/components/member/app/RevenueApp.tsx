@@ -857,6 +857,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     meta: m.crm ? "CRM" : m.director ? [m.title, m.rank].filter(Boolean).join(" · ")
       : i === 0 ? ["Home", m.title, m.rank].filter(Boolean).join(" · ") : ["Member", m.title].filter(Boolean).join(" · "),
   }));
+  // One sub-department to be in → no switch at all (2026-11-24, the owner: "他只有 IR，那他的 apps 就只有 IR，不需要切换"):
+  // the headers name it and press nothing. The Principal keeps the switch whatever the list holds.
+  const openSubDept = principal || subOptions.length > 1 ? () => openSheet("sd") : undefined;
 
   // The CRM is the view's (2026-11-23, lib/member/crm-view.ts): a tapped notice of another view's customer moves the app to
   // the view whose brand it is — the CRM stays open and opens the chat there. False: no view of that brand to move to.
@@ -1732,7 +1735,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqFromCrm : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
-        go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
+        go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept, signOut,
         // The CRM's 4a frame draws this sidebar's rows itself (2026-10-18): the same screens, counts and switcher.
         hidden: hiddenScreens, crmUnread: crmUnread ?? 0,
         products: productList ? { group: productList.group, onOpen: openProducts } : null,
@@ -1794,7 +1797,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         modules={principal ? { current: "revenue_member", onPick: pickModule } : null}
         crm={crm ? { unread: crmUnread ?? 0, onOpen: openCrm } : null} />
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
-        unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
+        unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={openSubDept} onNotif={toggleNotif}
         onSignOut={() => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); }} />
       {viewed && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
       {/* The first open asks once whether this phone gets notifications (2026-10-11, the user) — not the Principal's, as Profile's row. */}
@@ -1802,7 +1805,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       {showHeader && (
         <MobileHeader ruled={scrolled} back={route.screen === "calc"} subName={membership?.name ?? ""} count={nfCount} me={me}
           crm={crm && route.screen !== "calc" ? { unread: crmUnread ?? 0, onOpen: openCrm } : null}
-          onLogo={() => goScreen(home)} onBack={() => goScreen("quote")} onSubDept={() => openSheet("sd")} onBell={openNotif}
+          onLogo={() => goScreen(home)} onBack={() => goScreen("quote")} onSubDept={openSubDept} onBell={openNotif}
           onProfile={() => goScreen("account")} />
       )}
       <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing || bootOverKept} failed={refreshFailed} onRefresh={pullRefresh} />

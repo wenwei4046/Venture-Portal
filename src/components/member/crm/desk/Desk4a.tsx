@@ -182,7 +182,11 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
     <header style={{ position: "absolute", left: `${left}px`, right: 0, top: 0, height: "56px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "18px", padding: "0 36px",
       borderBottom: "1px solid var(--crm-rule)", background: "var(--crm-page)" }}>
       <div style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{f4.greet}, <span style={{ fontWeight: 500, color: "var(--crm-ink)" }}>{f4.first}</span></div>
-      {f4.subName && (
+      {f4.subName && !f4.openSubDept && (
+        // One sub-department (2026-11-24): its name, no switch.
+        <div data-sub-only style={{ marginLeft: "auto", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{f4.subName} view</div>
+      )}
+      {f4.subName && f4.openSubDept && (
         <button type="button" onClick={f4.openSubDept} aria-label="Switch sub-department" style={{ ...BTN, marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px",
           font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
           {f4.subName} view

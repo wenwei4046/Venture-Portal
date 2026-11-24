@@ -237,7 +237,7 @@ export function frameVM(ctx: DeskCtx) {
     opItem: opItem[0],
     showToast: !!ui.toast, toastText: ui.toast, canUndo: !!undo && undo.until > ctx.now.getTime(),
     // The Revenue app's own top bar (desk-patches.cjs).
-    frameRadius: "0", frameShadow: "none", greetWord: ctx.app.greeting, subLabel: ctx.app.subName ? `${ctx.app.subName} view` : "", subCur: "pointer", dateLine: ctx.app.dateLine,
+    frameRadius: "0", frameShadow: "none", greetWord: ctx.app.greeting, subLabel: ctx.app.subName ? `${ctx.app.subName} view` : "", subCur: ctx.app.openSubDept ? "pointer" : "default", dateLine: ctx.app.dateLine,
     appBellDot: ctx.app.bellUnread, openSubDept: ctx.app.openSubDept, openAppBell: ctx.app.openBell, signOut: ctx.app.signOut,
     role,
   };

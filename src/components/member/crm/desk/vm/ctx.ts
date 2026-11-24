@@ -335,7 +335,8 @@ export interface DeskApp {
   notifCount: number;
   go(screen: "today" | "insight" | "quote" | "arena" | "account"): void;
   openNotifications(): void;
-  openSubDept(): void;
+  /** Absent when the person has only one sub-department (2026-11-24): the top bar names it, nothing to switch. */
+  openSubDept?(): void;
   openBell(): void;
   signOut(): void;
   /** 4a's Revenue sidebar (2026-10-18), as the Revenue app's own desktop sidebar has them: the screens their ticks close, */

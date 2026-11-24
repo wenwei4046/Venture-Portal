@@ -35,7 +35,8 @@ export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onB
   crm?: { unread: number; onOpen: () => void } | null;
   onLogo: () => void;
   onBack: () => void;
-  onSubDept: () => void;
+  /** Opens the sub-department switch — absent when the person has only one to be in (2026-11-24): the name, nothing to press. */
+  onSubDept?: () => void;
   onBell: () => void;
   onProfile: () => void;
 }) {
@@ -51,9 +52,13 @@ export function MobileHeader({ ruled, back, subName, count, me, crm, onLogo, onB
         </button>
       )}
       <div className={`${s.capsule} ${crm ? s.capsuleWithCrm : ""}`}>
-        <button className={s.capsuleSd} onClick={onSubDept} aria-label="Switch sub-department">
-          {subName}<Svg d={ICON.chevronDown} size={15} sw={2.2} stroke="var(--rv-accent)" />
-        </button>
+        {onSubDept ? (
+          <button className={s.capsuleSd} onClick={onSubDept} aria-label="Switch sub-department">
+            {subName}<Svg d={ICON.chevronDown} size={15} sw={2.2} stroke="var(--rv-accent)" />
+          </button>
+        ) : (
+          <span className={s.capsuleSd} data-sub-only>{subName}</span>
+        )}
         <span className={s.capsuleRule} />
         {crm && (
           <button className={s.capsuleCrm} onClick={e => { pressFeedback(e.currentTarget, ripple.current); crm.onOpen(); }} aria-label="Open CRM">
@@ -297,16 +302,21 @@ export function DeskHeader({ greet, me, subName, dateLine, unread, onSubDept, on
   subName: string;
   dateLine: string;
   unread: boolean;
-  onSubDept: () => void;
+  /** Absent when the person has only one sub-department (2026-11-24): "IR view" is a label, not a switch. */
+  onSubDept?: () => void;
   onNotif: () => void;
   onSignOut: () => void;
 }) {
   return (
     <header className={s.deskHeader}>
       <span className={s.deskGreet}>{greet}, <span className={s.deskGreetName}>{me.first}</span>.</span>
-      <button className={s.deskSd} onClick={onSubDept} aria-label="Switch sub-department">
-        <span className={s.deskSdDot} />{subName} view<Svg d={ICON.chevronDown} size={15} sw={2.2} stroke="var(--rv-sub)" />
-      </button>
+      {onSubDept ? (
+        <button className={s.deskSd} onClick={onSubDept} aria-label="Switch sub-department">
+          <span className={s.deskSdDot} />{subName} view<Svg d={ICON.chevronDown} size={15} sw={2.2} stroke="var(--rv-sub)" />
+        </button>
+      ) : (
+        <span className={s.deskSd} data-sub-only><span className={s.deskSdDot} />{subName} view</span>
+      )}
       <span className={s.deskDate}>{dateLine}</span>
       <button className={s.deskBell} onClick={onNotif} aria-label="Notifications">
         <Svg d={ICON.bell} size={20} sw={1.7} />
