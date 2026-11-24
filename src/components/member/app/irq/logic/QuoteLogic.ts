@@ -4,6 +4,7 @@ import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
 import { productSlug } from "../lib/catalog-import";
+import { srcOf, sourceOn } from "../lib/price-list";
 import { makeQuotePdf } from "../lib/quote-pdf";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
@@ -174,10 +175,10 @@ export class QuoteLogic extends DcLogic {
     let col = "";
     if (sheet && sheet.mode === "swap") { const l = this.state.lines.find(x => x.id === sheet.id), it = l && (this.state.catalog?.items || []).find(c => (c.code && c.code === l.code) || c.name === l.name); if (it && it.collection) col = it.collection; }
     col = "";
-    this.setState({ sheet, sheetView: "cat", q: "", col, clr: "", vsel: {}, custom: { code: "", name: "", cost: "" } });
+    this.setState({ sheet, sheetSrc: null, sheetView: "cat", q: "", col, clr: "", vsel: {}, custom: { code: "", name: "", cost: "" } });
   }
   collectionPlan(col) {
-    const st = this.state, kinds = st.catalog?.kinds || {}, live = it => !it.paused && !(kinds[it.kind] || {}).paused && it.cost != null && !it.noPrice;
+    const st = this.state, kinds = st.catalog?.kinds || {}, live = it => !it.paused && !(kinds[it.kind] || {}).paused && sourceOn(st.catalog, it) && it.cost != null && !it.noPrice;
     const pool = (st.catalog?.items || []).filter(it => it.collection === col && live(it));
     return st.lines.filter(l => l.kind && l.qty > 0).map(l => { const c = pool.filter(it => it.kind === l.kind); if (!c.length) return null; const best = c.reduce((a, b) => Math.abs(b.cost - l.cost) < Math.abs(a.cost - l.cost) ? b : a); return best.name === l.name && best.code === l.code ? null : { id: l.id, item: best }; }).filter(Boolean);
   }
@@ -194,6 +195,18 @@ export class QuoteLogic extends DcLogic {
   itemFor(l) { const its = (this.state.catalog && this.state.catalog.items) || []; return l.code ? its.find(c => c.code === l.code) : undefined; }
   imgFor(l) { if (l.img) return l.img; const it = this.itemFor(l); return (it && it.img) || ""; }
   colorFor(l) { if (l.color != null) return l.color; const it = this.itemFor(l); return (it && it.color) || ""; }
+  // Change item / Add item read one source at a time — b2b or the Excel price list (the user, 2026-11-24: "先选来源，再选品项"):
+  // the sources switched on that have priced items; the sheet opens on the line's (its category's) own source.
+  sheetSources(st, pkg) {
+    const cat = st.catalog, K = (cat && cat.kinds) || {}, srcK = k => ((K[k] || {}).src === "excel" ? "excel" : "b2b");
+    if (!cat || !st.sheet) return { list: [], cur: "b2b", home: "b2b" };
+    const list = ["b2b", "excel"].filter(k => sourceOn(cat, { src: k }) && cat.items.some(it => srcOf(it) === k && it.cost != null && !it.noPrice && !it.paused));
+    let home = "b2b";
+    if (st.sheet.mode === "swap") { const l = st.lines.find(x => x.id === st.sheet.id); if (l && l.kind) home = srcK(l.kind); }
+    else { const c = pkg && pkg.cats[st.sheet.ci], ks = c ? c.items.map(i => i.kind).filter(Boolean) : []; if (ks.length && ks.every(k => srcK(k) === "excel")) home = "excel"; }
+    const cur = list.includes(st.sheetSrc) ? st.sheetSrc : list.includes(home) ? home : list[0] || "b2b";
+    return { list, cur, home };
+  }
   apply(item) {
     const sh = this.state.sheet;
     if (!sh) return;
@@ -591,11 +604,12 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
 
     // sheet
     let sheet = { eyebrow: "", title: "", sub: "", url: "" }, options = [];
-    const hideOpts = !!st.sheet && st.sheetView === "col" && !st.col && !(st.q || "").trim();
+    const SS = this.sheetSources(st, pkg);
+    const hideOpts = !!st.sheet && SS.cur === "b2b" && st.sheetView === "col" && !st.col && !(st.q || "").trim();
     if (st.sheet && pkg && st.catalog) {
       const q = st.q.trim().toLowerCase();
       const colView = st.sheetView === "col", col = colView ? st.col || "" : "", clr = st.clr || "", colorsOf = it => String(it.color || "").split(/\s*,\s*/).filter(Boolean);
-      const live = it => !it.paused && !(kinds[it.kind] || {}).paused;
+      const live = it => !it.paused && !(kinds[it.kind] || {}).paused && srcOf(it) === SS.cur && sourceOn(st.catalog, it);
       // Every word typed, against the name, code, collection AND the item's category (the owner, 2026-11-23: "搜寻 airbnb
       // service 只会出现 airbnb items, 不会出现 decoration & linens" — the category "Airbnb Service" was not searched, and the
       // words had to stand together).
@@ -607,7 +621,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         const base = l.orig || l, k = kinds[l.kind] || {};
         const baseImg = this.imgFor(base) || imgFor(base.code);
         sheet = { eyebrow: "CHANGE ITEM", title: title(l.orig ? l.orig.name : l.name), sub: `${k.label || "Item"} · ${rm0(base.cost * m)}`, url: k.url || "", img: baseImg, zoom: e => { e.stopPropagation(); this.openZoom([{ img: baseImg, name: title(base.name), code: base.code || "", delta: rm0(base.cost * m), item: null }], 0); } };
-        options = st.catalog.items.filter(it => it.kind === l.kind && it.cost != null && !it.noPrice && match(it)).map(it => {
+        // Its own kind on its own source; the other source lists everything it has (a search narrows it).
+        options = st.catalog.items.filter(it => (SS.cur !== SS.home || it.kind === l.kind) && it.cost != null && !it.noPrice && match(it)).map(it => {
           const dd = (quoteDocLib.unitPrice(it.cost) - quoteDocLib.unitPrice(base.cost)) * (l.qty || 1);
           const cur = it.code === l.code && it.name === l.name;
           return { ...it, item: it, cur, delta: cur ? "Selected" : dd === 0 ? "Same price" : signed(dd), ink: cur ? "#2F6B47" : dd > 0 ? "#1F1F1C" : "#2F6B47" };
@@ -615,9 +630,10 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       } else {
         const c = pkg.cats[st.sheet.ci];
         const ks = [...new Set(c.items.map(i => i.kind).filter(Boolean))];
-        sheet = { eyebrow: "ADD ITEM", title: c.label, sub: "Priced at cost × " + m, url: (kinds[ks[0]] || {}).url || "https://www.b2bfurnituresupply.com" };
+        sheet = SS.cur === "excel" ? { eyebrow: "ADD ITEM", title: c.label, sub: "From the Excel price list", url: "" } : { eyebrow: "ADD ITEM", title: c.label, sub: "Priced at cost × " + m, url: (kinds[ks[0]] || {}).url || "https://www.b2bfurnituresupply.com" };
+        const ownKs = ks.filter(k => ((kinds[k] || {}).src === "excel" ? "excel" : "b2b") === SS.cur);
         // A search reads the whole catalogue, whatever its category; with nothing typed, the category's own kinds as before.
-        options = st.catalog.items.filter(it => (q ? true : ks.includes(it.kind)) && it.cost != null && !it.noPrice && match(it)).map(it => ({ ...it, item: it, delta: signed(Math.round(it.cost * m)), ink: "#1F1F1C" }));
+        options = st.catalog.items.filter(it => (q || !ownKs.length ? true : ownKs.includes(it.kind)) && it.cost != null && !it.noPrice && match(it)).map(it => ({ ...it, item: it, delta: signed(Math.round(it.cost * m)), ink: "#1F1F1C" }));
       }
       const VAR = /\s*\(#\)|\s+\d{2,4}\/\d{2,5}(?:\/\d{1,5})*$|\b(?:LEFT|RIGHT|LHF|RHF|LHS|RHS|LH|RH|REVERSIBLE)(?:\s+(?:FACING|HAND|ARM|CHAISE|SIDE))?\b/gi;
       const lead = /^[\d\/\s-]{6,}(?=[A-Z])/i;
@@ -626,18 +642,18 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       const groups = []; const gi = {};
       // b2b's own grouping (its product page's OPTION list, `group`) where the import read it, else by the name. One product is one option: b2b lists it under a category and every collection, and two products may share a code.
       const pid = o => productSlug(o.url) || o.code;
-      options.forEach(o => { const k = o.group ? "g:" + o.group : gk(o.name); if (gi[k] == null) { gi[k] = groups.length; groups.push({ k, list: [] }); } const list = groups[gi[k]].list, same = list.findIndex(x => pid(x) && pid(x) === pid(o)); if (same < 0) list.push(o); else if (o.cur) list[same] = o; });
+      options.forEach(o => { const k = srcOf(o) === "excel" ? "x:" + o.id : o.group ? "g:" + o.group : gk(o.name); /* an Excel row is its own item */ if (gi[k] == null) { gi[k] = groups.length; groups.push({ k, list: [] }); } const list = groups[gi[k]].list, same = list.findIndex(x => pid(x) && pid(x) === pid(o)); if (same < 0) list.push(o); else if (o.cur) list[same] = o; });
       const words = n => String(n || "").toUpperCase().replace(lead, "").trim().split(/\s+/);
       const shared = vs => { const a = words(vs[0].name); let i = 0; while (i < a.length && vs.every(v => words(v.name)[i] === a[i])) i++; return i; };
       options = groups.map(g => { const vs = g.list; const selId = (st.vsel || {})[g.k]; const o = vs.find(v => v.id === selId) || vs.find(v => v.cur) || vs[0]; const same = shared(vs);
         const vars = vs.length > 1 ? vs.map(v => { const on = v === o; return { label: (v.group ? title(words(v.name).slice(same).join(" ")) : vl(v.name)) || v.code || "—", bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: e => { e.stopPropagation(); this.setState(s => ({ vsel: { ...(s.vsel || {}), [g.k]: v.id } })); } }; }) : [];
         return { ...o, vars, hasVars: vars.length > 1, varCount: vars.length > 1 ? vars.length + " options" : "", gname: vs.length > 1 ? (o.group ? words(o.name).slice(0, same).join(" ") || o.name : g.k) : o.name }; });
       // A search over the whole catalogue draws its first 150 (a phone stays quick); typing more narrows it.
-      if (st.sheet.mode !== "swap" && q && options.length > 150) options = options.slice(0, 150);
+      if (((st.sheet.mode !== "swap" && q) || SS.cur !== SS.home) && options.length > 150) options = options.slice(0, 150);
       const zl = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return im ? { img: im, name: title(o.name), code: [o.code, o.color].filter(Boolean).join(" · "), delta: o.delta, item: o.item } : null; }).filter(Boolean);
       options = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return {
         name: title(o.gname), code: [o.code || "—", o.color].filter(Boolean).join(" · "), img: im, initials: im ? "" : (o.name.match(/\b[A-Z]/g) || []).slice(0, 2).join(""),
-        collection: o.collection || "", vars: o.vars, hasVars: o.hasVars, varCount: o.varCount,
+        collection: srcOf(o) === "excel" ? [o.nameCn, o.unit].filter(Boolean).join(" · ") : o.collection || "", vars: o.vars, hasVars: o.hasVars, varCount: o.varCount,
         sample: !!o.sample, delta: o.delta, ink: o.ink, pick: () => this.apply(o.item),
         // A Use (Add) button under the price, the option on show applied (2026-11-11); the one in use reads "Selected" alone.
         canUse: !o.cur, useLabel: st.sheet?.mode === "swap" ? "Use" : "Add", use: e => { e.stopPropagation(); this.apply(o.item); },
@@ -794,10 +810,11 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       sheetAlign: desk ? "flex-end" : "stretch", sheetTop: desk ? "60px" : "0", sheetDim: desk ? "transparent" : "rgba(20,20,18,0.18)", sheetPass: desk ? "none" : "auto",
       sheetW: desk ? "400px" : "auto", sheetH: desk ? "100%" : "auto", sheetMax: desk ? "none" : "86%", sheetRadius: desk ? "0" : "28px 28px 0 0",
       sheetAnim: desk ? (this._sheetWasOpen ? "none" : "rvPanelIn .34s cubic-bezier(.2,.8,.2,1)") : "rvSheetUp .32s cubic-bezier(.2,.8,.2,1)",
-      staleText: (() => { const t = st.catalog?.syncedAt; if (!st.catalog) return ""; const d = t ? Math.floor((Date.now() - t) / 86400000) : null; return d == null ? "⚠ Prices may be outdated" : d >= 7 ? `⚠ Checked ${d}d ago` : ""; })(),
+      staleText: (() => { const t = st.catalog?.syncedAt; if (!st.catalog || SS.cur !== "b2b") return ""; /* b2b's age, not the Excel's */ const d = t ? Math.floor((Date.now() - t) / 86400000) : null; return d == null ? "⚠ Prices may be outdated" : d >= 7 ? `⚠ Checked ${d}d ago` : ""; })(),
       isPreview: !!this.preview, closePreview: () => { try { window.close(); } catch (e) {} this.props.onClosePreview && this.props.onClosePreview(); },
       q: st.q, onQuery: e => this.setState({ q: e.target.value }),
-      ...(() => { if (!st.sheet || !st.catalog || !pkg) return { sheetTabs: [], colListOn: false, colList: [], colBack: false, hasCols: false, colSel: false, colChips: [], hasClrs: false, clrChips: [], colAll: false };
+      srcPick: SS.list.length > 1 ? { value: SS.cur, opts: SS.list.map(k => ({ v: k, l: k === "excel" ? "Excel price list" : "b2b" })), onChange: e => this.setState({ sheetSrc: e.target.value, sheetView: "cat", col: "", clr: "", vsel: {} }) } : false,
+      ...(() => { if (!st.sheet || !st.catalog || !pkg || SS.cur !== "b2b" || !sourceOn(st.catalog, { src: "b2b" })) return { sheetTabs: [], colListOn: false, colList: [], colBack: false, hasCols: false, colSel: false, colChips: [], hasClrs: false, clrChips: [], colAll: false };
         let ks; if (st.sheet.mode === "swap") { const l = st.lines.find(x => x.id === st.sheet.id); ks = l ? [l.kind] : []; } else { const c = pkg.cats[st.sheet.ci]; ks = c ? c.items.map(i => i.kind) : []; }
         const cs = [...new Set(st.catalog.items.filter(it => ks.includes(it.kind) && it.collection && it.cost != null && !it.noPrice && !it.paused && !(kinds[it.kind] || {}).paused).map(it => it.collection))].sort();
         const chip = (v, label) => { const on = (st.col || "") === v; return { label, bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: () => this.setState({ col: v }) }; };
