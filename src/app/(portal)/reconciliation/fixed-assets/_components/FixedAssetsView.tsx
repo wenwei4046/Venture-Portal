@@ -57,10 +57,13 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
     year: r2(figures.reduce((s, f) => s + inYear(f), 0)),
   }
   const postedThrough = data.postings.reduce((m, p) => (p.month > m ? p.month : m), '')
-  const [through, setThrough] = useState(asAt)
+  const postable = monthsOf(fy.from, asAt).reverse()
+  // The month picked counts only while it is one of this year's (2026-11-24: picked on another year, it stayed — the
+  // select showed June, Post would have taken November).
+  const [picked, setThrough] = useState(asAt)
+  const through = postable.includes(picked) ? picked : asAt
   const due = postRows({ ...data, assets: data.assets.map((a) => ({ ...a, draft: false })) }, through)
   const dueAmount = r2(due.reduce((s, r) => s + r.postings.reduce((t, p) => t + p.amount, 0), 0))
-  const postable = monthsOf(fy.from, asAt).reverse()
 
   const run = (work: () => Promise<string>) =>
     start(async () => {
