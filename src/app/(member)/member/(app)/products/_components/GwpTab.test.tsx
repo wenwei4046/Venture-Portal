@@ -139,6 +139,9 @@ describe('Product List › GWP', () => {
     click('Save changes')
     await waitFor(() => expect(saveGwp).toHaveBeenCalledWith('gwp-1', { gifts: [{ id: 'mp-k', qty: 1 }, { id: 'mf', qty: 3 }] }))
     expect(await screen.findByRole('alert')).toHaveTextContent('MF PILLOW is both bought and given')
+    // The save is over before the next edit (2026-11-24: on CI's slower runner the alert came while the button still
+    // said Saving…, its chips disabled, and the click after it found no Save changes).
+    await screen.findByRole('button', { name: 'Save changes' })
     // A chip taken off is a change of that side alone.
     click('Take AERO-MP (K) off', side('Gifts'))
     click('Save changes')
