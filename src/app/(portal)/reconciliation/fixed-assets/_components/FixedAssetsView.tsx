@@ -33,9 +33,9 @@ function Figures({ row }: { row: Omit<ListingRow, 'asset' | 'rate'> }) {
   return (
     <>
       {[row.costBf, row.addition, row.disposal, row.costCf, row.accBf, row.charge, row.accDisposal, row.accCf].map((v, i) => (
-        <td key={i} className="num">{money(v)}</td>
+        <td key={i} className={`num${i === 0 || i === 4 ? ' ppe-split' : ''}`}>{money(v)}</td>
       ))}
-      <td className="num">{formatMoney(row.nbv)}</td>
+      <td className="num ppe-split">{formatMoney(row.nbv)}</td>
     </>
   )
 }
@@ -166,23 +166,23 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
 
       {view === 'register' ? (
         <div className="overflow-x-auto">
-          <table className="ledger-table">
+          <table className="ledger-table ppe-grid">
             <thead>
               <tr>
-                <th rowSpan={2}>Description</th>
+                <th rowSpan={2} className="ppe-desc">Description</th>
                 <th rowSpan={2}>Purchase date</th>
                 <th rowSpan={2} className="num">Rate</th>
-                <th colSpan={4} className="text-center">Cost</th>
-                <th colSpan={4} className="text-center">Accum. depreciation</th>
-                <th rowSpan={2} className="num whitespace-nowrap">NBV {dayjs(`${asAt}-01`).endOf('month').format('DD.MM.YYYY')}</th>
+                <th colSpan={4} className="text-center ppe-split">Cost</th>
+                <th colSpan={4} className="text-center ppe-split">Accum. depreciation</th>
+                <th rowSpan={2} className="num ppe-split">NBV {dayjs(`${asAt}-01`).endOf('month').format('DD.MM.YYYY')}</th>
                 {canEdit ? <th rowSpan={2} aria-label="Edit" /> : null}
               </tr>
               <tr>
-                <th className="num">B/F</th>
+                <th className="num ppe-split">B/F</th>
                 <th className="num">Addition</th>
                 <th className="num">Disposal</th>
                 <th className="num">C/F</th>
-                <th className="num">B/F</th>
+                <th className="num ppe-split">B/F</th>
                 <th className="num">Charge</th>
                 <th className="num">Disposal</th>
                 <th className="num">C/F</th>
@@ -190,12 +190,12 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
             </thead>
             {groups.map((g) => (
               <tbody key={g.cls.id}>
-                <tr>
-                  <td colSpan={canEdit ? 13 : 12} className="font-medium text-ink uppercase tracking-wide text-[12px] pt-4">{g.cls.name}</td>
+                <tr className="tb-block">
+                  <td colSpan={canEdit ? 13 : 12} className="uppercase tracking-wide text-[12px]">{g.cls.name}</td>
                 </tr>
                 {g.rows.map((r) => (
                   <tr key={r.asset.id}>
-                    <td>
+                    <td className="ppe-desc">
                       <span className="text-ink">{r.asset.name}</span>
                       <span className="font-mono text-[11px] text-graphite ml-2">{r.asset.voucher}</span>
                       {r.asset.draft ? <span className="text-[11px] text-muted ml-2">· new</span> : null}
@@ -213,7 +213,7 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
                     ) : null}
                   </tr>
                 ))}
-                <tr className="font-medium">
+                <tr className="tb-sub">
                   <td colSpan={3}>Total {g.cls.name}</td>
                   <Figures row={g.total} />
                   {canEdit ? <td /> : null}
@@ -221,7 +221,7 @@ export default function FixedAssetsView({ data, accounts, fy, years, now, view: 
               </tbody>
             ))}
             <tfoot>
-              <tr>
+              <tr className="tb-total">
                 <td colSpan={3}>Total</td>
                 <Figures row={all} />
                 {canEdit ? <td /> : null}
