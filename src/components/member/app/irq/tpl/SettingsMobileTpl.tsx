@@ -45,6 +45,44 @@ export function renderSettingsMobile(v: DcVals, C: DcComponents) {
         {"\n\n    "}
         {(v["tabCat"]) ? (<>
           {"\n      "}
+          <div style={{"borderRadius":"16px","background":"var(--irq-c-ffffff)","overflow":"hidden","boxShadow":"0 1px 2px rgba(20,20,18,.05)"}}>
+            <div style={{"display":"flex","alignItems":"center","gap":"12px","padding":"12px 12px 12px 14px","borderBottom":"1px solid var(--irq-c-f2f2ef)"}}>
+              <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px"}}>
+                <span style={{"fontSize":"14px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                  {"b2b"}
+                </span>
+                <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
+                  {dcText(v["srcs"]?.["b2b"]?.["count"])}
+                </span>
+              </span>
+              <button onClick={v["srcs"]?.["b2b"]?.["toggle"]} aria-label={"Show in IR Quote"} style={dcCss(`flex:0 0 38px;position:relative;width:38px;height:22px;border-radius:11px;border:0;padding:0;background:${dcS(v["srcs"]?.["b2b"]?.["track"])}`)}>
+                <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["b2b"]?.["knob"])};width:18px;height:18px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+              </button>
+            </div>
+            <div style={{"display":"flex","alignItems":"center","gap":"10px","padding":"12px 12px 12px 14px"}}>
+              <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px"}}>
+                <span style={{"fontSize":"14px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                  {"Excel price list · "}{dcText(v["srcs"]?.["xl"]?.["count"])}
+                </span>
+                <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap"}}>
+                  {dcText(v["srcs"]?.["xl"]?.["sub"])}
+                </span>
+              </span>
+              <label style={{"flex":"0 0 auto","display":"flex","alignItems":"center","height":"34px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13px","fontWeight":"650"}}>
+                {dcText(v["srcs"]?.["xl"]?.["upLabel"])}
+                <input type={"file"} accept={".xlsx,.xls"} onChange={v["srcs"]?.["xl"]?.["onFile"]} style={{"display":"none"}} />
+              </label>
+              <button onClick={v["srcs"]?.["xl"]?.["toggle"]} aria-label={"Show in IR Quote"} style={dcCss(`flex:0 0 38px;position:relative;width:38px;height:22px;border-radius:11px;border:0;padding:0;background:${dcS(v["srcs"]?.["xl"]?.["track"])}`)}>
+                <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["xl"]?.["knob"])};width:18px;height:18px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+              </button>
+            </div>
+          </div>
+          {(v["catMsg"]) ? (<>
+            <p style={dcCss(`margin:0;padding:0 2px;font-size:12.5px;line-height:1.4;color:${dcS(v["catMsgInk"])}`)}>
+              {dcText(v["catMsg"])}
+            </p>
+          </>) : null}
+          {"\n      "}
           <label style={{"display":"flex","alignItems":"center","gap":"10px","height":"44px","padding":"0 14px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)"}}>
             {"\n        "}
             <svg width={"17"} height={"17"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2"} strokeLinecap={"round"} style={{"stroke":"var(--irq-c-6b6b66)"}}>

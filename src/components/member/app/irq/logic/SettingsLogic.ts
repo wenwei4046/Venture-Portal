@@ -8,7 +8,7 @@ import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 import * as catalogImport from "../lib/catalog-import";
 import { sortCatalog, nextCatalogSort } from "../lib/catalog-import";
-import { pickSheet, mergeExcel, srcOf } from "../lib/price-list";
+import { mergeExcel, srcOf, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
 const ICON = {
   home: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
   chart: "M4 20V10m5 10V4m5 16v-7m5 7V8M3 20h18",
@@ -176,14 +176,11 @@ export class SettingsLogic extends DcLogic {
   // The second source: the company's Excel price list (2026-11-24). Replaces the Excel items, never the b2b ones.
   async readPriceList(file) {
     this.setState({ catMsg: "Reading " + file.name + "…", catErr: false });
-    let found = null;
-    try { const X = await this.loadXlsx(); const wb = X.read(await file.arrayBuffer()); found = pickSheet(wb.SheetNames.map(n => ({ name: n, rows: X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "" }) }))); }
-    catch (e) { this.setState({ catMsg: "Could not read this file.", catErr: true }); return; }
-    if (!found) { this.setState({ catMsg: "No price list found in " + file.name + ". It needs a header row with Code, Item Description and Selling Price.", catErr: true }); return; }
-    const usedIn = c => { const used = new Set(); (c.packages || []).forEach(p => (p.cats || []).forEach(ct => (ct.items || []).forEach(i => { if (i.kind) used.add(i.kind); }))); return used; };
-    const at = Date.now(), res = mergeExcel(JSON.parse(JSON.stringify(this.state.cfg.catalog)), found.list, file.name, at, p => quoteDocLib.newId(p), usedIn(this.state.cfg)); // the counts, worked out on a copy
-    this.upd(c => { mergeExcel(c.catalog, found.list, file.name, at, p => quoteDocLib.newId(p), usedIn(c)); });
-    this.setState({ kindFilter: "all", catMsg: `Excel price list: ${res.total} items from ${found.name} (${res.added} new, ${res.changed} price changed, ${res.removed} gone). Press Publish to save.`, catErr: false });
+    const got = await readPriceListFile(file);
+    if ("error" in got) { this.setState({ catMsg: got.error, catErr: true }); return; }
+    const at = Date.now(), res = mergeExcel(JSON.parse(JSON.stringify(this.state.cfg.catalog)), got.list, file.name, at, p => quoteDocLib.newId(p), kindsInPackages(this.state.cfg)); // the counts, worked out on a copy
+    this.upd(c => { mergeExcel(c.catalog, got.list, file.name, at, p => quoteDocLib.newId(p), kindsInPackages(c)); });
+    this.setState({ kindFilter: "all", catMsg: uploadMessage(res, got.name), catErr: false });
   }
   async readXl(file, pid) {
     let rows = [];

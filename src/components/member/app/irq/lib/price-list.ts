@@ -97,3 +97,25 @@ export function mergeExcel(catalog: any, list: PriceList, file: string, now: num
   S.excel = { ...(S.excel || {}), file, at: now, n: fresh.length };
   return { added: fresh.filter(x => !was.has(keyOf(x))).length, changed: fresh.filter(x => x.prevCost != null && x.updatedAt === now && was.has(keyOf(x))).length, removed: old.filter((o: any) => !fresh.some(f => f.id === o.id)).length, total: fresh.length };
 }
+
+/** SheetJS, loaded once from its CDN as Quote settings' other Excel readers load it. */
+export function loadXlsx(): Promise<any> {
+  const w = window as any;
+  if (w.XLSX) return Promise.resolve(w.XLSX);
+  return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"; sc.onload = () => res(w.XLSX); sc.onerror = rej; document.head.appendChild(sc); });
+}
+
+/** Reads an uploaded workbook into its price list, or says why not (in the words Quote settings shows). */
+export async function readPriceListFile(file: File): Promise<{ name: string; list: PriceList } | { error: string }> {
+  try {
+    const X = await loadXlsx(), wb = X.read(await file.arrayBuffer());
+    const found = pickSheet(wb.SheetNames.map((n: string) => ({ name: n, rows: X.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "" }) })));
+    return found || { error: "No price list found in " + file.name + ". It needs a header row with Code, Item Description and Selling Price." };
+  } catch (e) { return { error: "Could not read this file." }; }
+}
+
+/** The kinds the room types still use: an Excel category one of them names is not dropped by an upload. */
+export const kindsInPackages = (cfg: any) => { const used = new Set<string>(); (cfg.packages || []).forEach((p: any) => (p.cats || []).forEach((ct: any) => (ct.items || []).forEach((i: any) => { if (i.kind) used.add(i.kind); }))); return used; };
+
+export const uploadMessage = (r: { total: number; added: number; changed: number; removed: number }, sheet: string) =>
+  `Excel price list: ${r.total} items from ${sheet} (${r.added} new, ${r.changed} price changed, ${r.removed} gone). Press Publish to save.`;
