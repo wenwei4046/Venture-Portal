@@ -17,6 +17,8 @@ ALTER TABLE public.fa_assets ADD CONSTRAINT fa_assets_rate_pct_check CHECK (rate
 COMMENT ON COLUMN public.fa_classes.rate_pct IS 'Annual depreciation rate, % of the depreciable amount (2026-11-24).';
 COMMENT ON COLUMN public.fa_assets.rate_pct IS 'The asset''s own annual rate; null = its class''s.';
 
+-- fa_read still says life_months beside the rate, so the page deployed before this one reads what it knows while both
+-- run (the hour between the migration and the deploy).
 CREATE OR REPLACE FUNCTION public.fa_read()
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -27,12 +29,12 @@ BEGIN
     RAISE EXCEPTION 'fa_read: needs Reconciliation · View' USING ERRCODE = '42501';
   END IF;
   RETURN jsonb_build_object(
-    'classes', coalesce((SELECT jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'rate_pct', c.rate_pct,
+    'classes', coalesce((SELECT jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'rate_pct', c.rate_pct, 'life_months', c.life_months,
         'residual_pct', c.residual_pct, 'start_rule', c.start_rule, 'asset_account', c.asset_account,
         'accum_account', c.accum_account, 'expense_account', c.expense_account, 'is_active', c.is_active)
         ORDER BY c.sort_order, c.name) FROM fa_classes c), '[]'::jsonb),
     'assets', coalesce((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'name', a.name, 'class_id', a.class_id,
-        'in_service_date', a.in_service_date, 'rate_pct', a.rate_pct, 'disposed_on', a.disposed_on, 'notes', a.notes)
+        'in_service_date', a.in_service_date, 'rate_pct', a.rate_pct, 'life_months', a.life_months, 'disposed_on', a.disposed_on, 'notes', a.notes)
         ORDER BY a.in_service_date, a.name) FROM fa_assets a), '[]'::jsonb),
     -- Every live line on an account a class depreciates.
     'lines', coalesce((SELECT jsonb_agg(jsonb_build_object('id', jl.id, 'date', je.transaction_date, 'entry_no', je.entry_no,
