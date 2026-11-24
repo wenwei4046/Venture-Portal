@@ -248,6 +248,12 @@ function figOf(row: Record<string, unknown>): MetaFig {
  * ~6 s a range. Answers as metaAdInsights / metaAdBudget would, ad by ad (null = one the token cannot see); a call that
  * fails as a whole is asked again the old way, ad by ad.
  */
+/** A batch answer that says the ad will never be read (deleted, or not this token's): Graph's error 100 on a 400. */
+export function metaSaysGone(a: { code?: number; body?: string } | null | undefined): boolean {
+  if (!a || a.code !== 400 || typeof a.body !== 'string') return false;
+  try { return (JSON.parse(a.body) as { error?: { code?: number } }).error?.code === 100; } catch { return false; }
+}
+
 export async function metaAdsFigures(ids: string[], ranges: { key: string; since: string; until: string }[], token: string, fetchImpl: typeof fetch = fetch): Promise<Record<string, Record<string, MetaFig | null>>> {
   const ads = [...new Set(ids)].filter(id => AD_ID.test(id));
   const rs = ranges.filter(r => /^\d{4}-\d{2}-\d{2}$/.test(r.since) && /^\d{4}-\d{2}-\d{2}$/.test(r.until));
@@ -270,7 +276,12 @@ export async function metaAdsFigures(ids: string[], ranges: { key: string; since
     }
     return null
   };
-  await Promise.all(chunks.map(async chunk => {
+  // A figure Meta did not give THIS time (a timeout, its rate limit, a 5xx) is not a figure (2026-11-24, the owner: "计算还是
+  // 很慢" — such a miss was kept as null on the server and the computer and never asked again, so an ad read "—" and the
+  // spend added up short). It is asked once more here; still missing, it is left OUT of the answer — never null — so
+  // nobody keeps it and the screen asks again. Null stays for what Meta says will not come: an ad deleted or not ours.
+  const missed = new Set<string>();
+  const runChunk = async (chunk: Req[]) => {
     let answers: ({ code?: number; body?: string } | null)[] | null = null;
     try {
       const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/`, {
@@ -282,8 +293,10 @@ export async function metaAdsFigures(ids: string[], ranges: { key: string; since
     if (!answers) {
       // The whole call failed: ask the old way, ad by ad.
       await Promise.all(chunk.map(async r => {
-        if (r.kind === 'fig') figs.set(`${r.key}|${r.id}`, await metaAdInsights(r.id, token, r.since, r.until, fetchImpl));
-        else budgets.set(r.id, await metaAdBudget(r.id, token, fetchImpl));
+        if (r.kind === 'fig') {
+          const f = await metaAdInsights(r.id, token, r.since, r.until, fetchImpl);
+          if (f) { figs.set(`${r.key}|${r.id}`, f); missed.delete(`${r.key}|${r.id}`); } else missed.add(`${r.key}|${r.id}`);
+        } else budgets.set(r.id, await metaAdBudget(r.id, token, fetchImpl));
       }));
       return;
     }
@@ -291,11 +304,24 @@ export async function metaAdsFigures(ids: string[], ranges: { key: string; since
       const a = answers![i];
       let body: Record<string, unknown> | null = null;
       try { body = a && a.code === 200 && typeof a.body === 'string' ? JSON.parse(a.body) : null; } catch { body = null; }
-      if (r.kind === 'fig') figs.set(`${r.key}|${r.id}`, body ? figOf(((body.data as Record<string, unknown>[] | undefined) ?? [])[0] ?? {}) : null);
-      else budgets.set(r.id, body ? budgetOf(body as { adset?: Record<string, unknown>; campaign?: Record<string, unknown> }) : null);
+      if (r.kind === 'fig') {
+        const k = `${r.key}|${r.id}`;
+        if (body) { figs.set(k, figOf(((body.data as Record<string, unknown>[] | undefined) ?? [])[0] ?? {})); missed.delete(k); }
+        else if (metaSaysGone(a)) { figs.set(k, null); missed.delete(k); }
+        else missed.add(k);
+      } else budgets.set(r.id, body ? budgetOf(body as { adset?: Record<string, unknown>; campaign?: Record<string, unknown> }) : null);
     });
-  }));
-  for (const r of rs) for (const id of ads) { const fig = figs.get(`${r.key}|${id}`) ?? null; out[r.key][id] = fig ? { ...fig, budget: budgets.get(id) ?? null } : null; }
+  };
+  await Promise.all(chunks.map(runChunk));
+  if (missed.size) {
+    const again = reqs.filter(r => r.kind === 'fig' && missed.has(`${r.key}|${r.id}`));
+    await new Promise(res => setTimeout(res, 400));
+    for (let i = 0; i < again.length; i += 50) await runChunk(again.slice(i, i + 50));
+  }
+  for (const r of rs) for (const id of ads) {
+    if (missed.has(`${r.key}|${id}`)) continue;
+    const fig = figs.get(`${r.key}|${id}`) ?? null; out[r.key][id] = fig ? { ...fig, budget: budgets.get(id) ?? null } : null;
+  }
   return out;
 }
 
