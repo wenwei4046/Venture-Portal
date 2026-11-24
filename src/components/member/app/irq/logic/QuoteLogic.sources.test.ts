@@ -3,7 +3,8 @@ import { QuoteLogic } from "./QuoteLogic";
 
 // The user, 2026-11-24: items come from b2b or the company's Excel price list; Change item / Add item pick the source
 // first ("先选来源，再选品项"), and a source switched off in Quote settings offers nothing.
-const P = QuoteLogic.prototype as any;
+type Sources = { list: string[]; cur: string; home: string };
+const P = QuoteLogic.prototype as unknown as { sheetSources: (this: object, st: object, pkg: object) => Sources };
 const catalog = (sources = {}) => ({
   sources,
   kinds: { sofa: { label: "Sofa", url: "https://b2b" }, "xl-paint": { label: "WALL & PAINTING", src: "excel" } },
@@ -14,7 +15,7 @@ const catalog = (sources = {}) => ({
   ],
 });
 const pkg = { cats: [{ label: "Living", items: [{ kind: "sofa" }] }, { label: "Painting", items: [{ kind: "xl-paint" }] }] };
-const at = (st: any) => P.sheetSources.call({}, { lines: [], sheetSrc: null, ...st }, pkg);
+const at = (st: Record<string, unknown>) => P.sheetSources.call({}, { lines: [], sheetSrc: null, ...st }, pkg);
 
 describe("the item sheet's source", () => {
   it("offers both sources and opens on the category's own", () => {

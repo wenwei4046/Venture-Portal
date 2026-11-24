@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeExcel, parsePriceList, pickSheet, sourceOn, srcOf } from "./price-list";
+import { mergeExcel, parsePriceList, pickSheet, sourceOn, srcOf, type Catalog, type CatItem } from "./price-list";
 
 // The top of The_Conts_Price_List_Master's PRICELIST sheet, as SheetJS reads it (header: 1), 2026-11-24.
 const SHEET: unknown[][] = [
@@ -41,31 +41,31 @@ describe("the Excel price list", () => {
   it("replaces only the Excel items, keeping b2b's, a paused item and a photo of its own", () => {
     let n = 0;
     const id = (p: string) => p + ++n;
-    const cat: any = { kinds: { sofa: { label: "Sofa", url: "https://b2b" } }, items: [{ id: "c1", kind: "sofa", code: "232114", name: "HIACE SOFA", cost: 1290, url: "https://b2b/p" }] };
+    const cat: Catalog & { items: CatItem[]; kinds: NonNullable<Catalog["kinds"]> } = { kinds: { sofa: { label: "Sofa", url: "https://b2b" } }, items: [{ id: "c1", kind: "sofa", code: "232114", name: "HIACE SOFA", cost: 1290, url: "https://b2b/p" }] };
     const list = parsePriceList(SHEET)!;
     const r1 = mergeExcel(cat, list, "a.xlsx", 1000, id);
     expect(r1).toMatchObject({ added: 6, removed: 0, total: 6 });
     expect(cat.items).toHaveLength(7);
     expect(cat.items[0].id).toBe("c1");
-    const paint = cat.items.find((x: any) => x.code === "PW-01");
+    const paint = cat.items.find(x => x.code === "PW-01")!;
     expect(paint).toMatchObject({ src: "excel", kind: "xl-wall-painting", kindLocked: true, cost: 4.94 });
     expect(cat.kinds["xl-wall-painting"]).toMatchObject({ label: "WALL & PAINTING 墙身 & 油漆", src: "excel" });
-    expect(cat.sources.excel).toMatchObject({ file: "a.xlsx", at: 1000, n: 6 });
+    expect(cat.sources?.excel).toMatchObject({ file: "a.xlsx", at: 1000, n: 6 });
 
     paint.paused = true; paint.img = "data:x"; paint.imgOwn = true;
     // the second upload: the paint costs more, the sofa is gone and with it its category
     const next = parsePriceList(SHEET.filter(r => r[0] !== "LV-01" && r[0] !== "E. LIVING AREA 客厅家具").map(r => (r[0] === "PW-01" ? [...r.slice(0, 10), 5.5, ...r.slice(11)] : r)))!;
     const r2 = mergeExcel(cat, next, "b.xlsx", 2000, id);
     expect(r2).toMatchObject({ added: 0, removed: 1, total: 5, changed: 1 });
-    const paint2 = cat.items.find((x: any) => x.code === "PW-01");
+    const paint2 = cat.items.find(x => x.code === "PW-01");
     expect(paint2).toMatchObject({ id: paint.id, paused: true, img: "data:x", cost: 5.5, prevCost: 4.94 });
-    expect(cat.items.find((x: any) => x.id === "c1")).toBeTruthy();
+    expect(cat.items.find(x => x.id === "c1")).toBeTruthy();
     expect(cat.kinds["xl-living-area"]).toBeUndefined();
     expect(cat.kinds.sofa).toBeTruthy();
   });
 
   it("keeps an Excel category a room type still uses", () => {
-    const cat: any = { kinds: {}, items: [] };
+    const cat: Catalog & { items: CatItem[]; kinds: NonNullable<Catalog["kinds"]> } = { kinds: {}, items: [] };
     mergeExcel(cat, parsePriceList(SHEET)!, "a.xlsx", 1, p => p + Math.random());
     mergeExcel(cat, { cats: [], items: [] }, "b.xlsx", 2, p => p, new Set(["xl-living-area"]));
     expect(Object.keys(cat.kinds)).toEqual(["xl-living-area"]);
