@@ -186,3 +186,5 @@
 .part { font-size: 12px; color: rgb(var(--hvs-muted)); }
 .table th[data-part] { font-size: 10.5px; color: rgb(var(--hvs-muted)); cursor: default; }
 .colSplit { margin-top: 4px; padding-top: 8px !important; border-top: 1px solid rgb(var(--fv-box)); }
+/* The company / deal column never wraps (2026-11-25 — the user, the table split wide: "这个会wrap text"). */
+.table tbody td:first-child, .table thead th[data-col='name'] { white-space: nowrap; }
