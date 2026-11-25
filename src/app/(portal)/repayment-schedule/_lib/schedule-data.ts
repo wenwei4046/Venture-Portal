@@ -14,7 +14,7 @@ import { listPayableFundSources } from '../../fund-in/actions'
 import { minPayPlanFrom, minPayStartYM } from '@/lib/min-pay'
 import { owedNowOf } from '@/lib/deal-print'
 import { rateBasisOf, rateWords } from '@/lib/rate-basis'
-import { actualsOf, dueOfEntries, monthsTo, type DealFacts, type DealMonth } from '@/lib/schedule-by-company'
+import { actualsOf, dueOfEntries, monthsTo, owedInterest, type DealFacts, type DealMonth } from '@/lib/schedule-by-company'
 import type { SchedRow, NoTermRow, CompoundRow, MinInterestRow } from '../_components/ScheduleView'
 
 // The Repayment Schedule's month (2026-10-10, lifted out of its page so the
@@ -527,13 +527,13 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     status: string,
     payments: Array<{ date: string; type: string; amount: number }>,
     compounding: boolean,
-    head: Pick<DealFacts, 'side' | 'company' | 'companyKey' | 'tag' | 'words' | 'bf' | 'ahead'>,
+    head: Pick<DealFacts, 'side' | 'company' | 'companyKey' | 'tag' | 'words' | 'bf' | 'bfInterest' | 'ahead'>,
   ): DealFacts => {
     const { byMonth, last } = actualsOf(payments)
     const months: Record<string, DealMonth> = {}
     for (const ym of window) {
       const due = dueOfEntries(shownForStatus(monthEvents(plan, deal, ym, today), status), compounding)
-      const act = byMonth[ym] ?? { got: 0, gotInterest: 0, settled: 0 }
+      const act = byMonth[ym] ?? { got: 0, gotInterest: 0, settled: 0, penalty: 0 }
       months[ym] = { ...due, ...act }
     }
     const repaid = status === 'fully_repaid' || status === 'repaid'
@@ -554,15 +554,20 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // since is read as running (its plan then); once repaid, an instalment still owing now — interest never recorded, not
   // shown as owed (shownForStatus) — is no overdue either.
   const monthStart = `${currentYM}-01`
-  const atStart = (input: PlanInput, plan: RepaymentPlan, deal: Parameters<typeof monthEvents>[1], compounding: boolean): { bf: number; ahead: number } => {
-    if (!isCurrentMonth || compounding) return { bf: 0, ahead: 0 }
+  const atStart = (input: PlanInput, plan: RepaymentPlan, deal: Parameters<typeof monthEvents>[1], compounding: boolean): { bf: number; bfInterest: number; ahead: number } => {
+    if (!isCurrentMonth || compounding) return { bf: 0, bfInterest: 0, ahead: 0 }
     const repaid = input.status === 'fully_repaid' || input.status === 'repaid'
     const before = input.payments.filter((p) => p.date < monthStart)
     const then = buildRepaymentPlan({ ...input, payments: before, status: repaid && before.length < input.payments.length ? 'active' : input.status })
     const owedNow = new Map(plan.rows.map((r) => [r.no, r.outstanding]))
     const late = arrearsBefore(then, deal, currentYM, today).filter((e) => !repaid || (owedNow.get(e.no) ?? 0) <= 0.005)
     const own = monthEvents(then, deal, currentYM, today).filter((e) => e.rolled <= 0.005)
-    return { bf: r2(late.reduce((t, e) => t + e.outstanding, 0)), ahead: r2(own.reduce((t, e) => t + e.paid, 0)) }
+    return {
+      bf: r2(late.reduce((t, e) => t + e.outstanding, 0)),
+      // Its interest, interest first (2026-11-25): what came in on an instalment paid its interest before its principal.
+      bfInterest: r2(late.reduce((t, e) => t + owedInterest({ interest: e.instInterest, paid: e.paid, owed: e.outstanding }), 0)),
+      ahead: r2(own.reduce((t, e) => t + e.paid, 0)),
+    }
   }
   const dealTag = (text: unknown) => /\[((?:LO|BI)[^\]]{0,20})\]/.exec(String(text ?? ''))?.[1]?.trim() ?? null
   // A deal agreed a year's rate is said per year, as on its own page (v4.256).

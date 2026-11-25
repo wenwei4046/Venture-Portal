@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actualsOf, byCompany, dueOfEntries, figuresOf, historyOf, monthsTo, type DealFacts } from './schedule-by-company'
+import { actualsOf, byCompany, dueOfEntries, figuresOf, historyOf, monthsTo, owedInterest, PART_KEYS, type DealFacts } from './schedule-by-company'
 import type { CalendarEntry } from './repayment-calendar'
 import type { ListRow } from './schedule-list'
 
@@ -31,8 +31,8 @@ describe('actualsOf', () => {
       { date: '2026-11-02', type: 'netting', amount: 5000 },
       { date: '2026-11-03', type: 'penalty', amount: 30 },
     ])
-    expect(a.byMonth['2026-10']).toEqual({ got: 1120, gotInterest: 120, settled: 1120 })
-    expect(a.byMonth['2026-11']).toEqual({ got: 30, gotInterest: 30, settled: 5000 })
+    expect(a.byMonth['2026-10']).toEqual({ got: 1120, gotInterest: 120, settled: 1120, penalty: 0 })
+    expect(a.byMonth['2026-11']).toEqual({ got: 30, gotInterest: 30, settled: 5000, penalty: 30 })
     expect(a.last).toBe('2026-11-03')
   })
 })
@@ -181,3 +181,65 @@ describe('byCompany — a month that adds up', () => {
       expect(now + early + bf).toBeCloseTo(settled + open, 2)
   })
 })
+
+// 2026-11-25 — the user: "每一笔的collect 和pay都想要分principal和interest"; a part payment pays the interest first, the
+// penalty on its own.
+describe('byCompany — principal and interest', () => {
+  it('owes the principal before the interest: what came in paid the interest first', () => {
+    expect(owedInterest({ interest: 200, paid: 600, owed: 400 })).toBe(0)
+    expect(owedInterest({ interest: 200, paid: 150, owed: 850 })).toBe(50)
+    expect(owedInterest({ interest: 200, paid: 0, owed: 1000 })).toBe(200)
+    // No more interest owed than is owed.
+    expect(owedInterest({ interest: 200, paid: 0, owed: 120 })).toBe(120)
+  })
+
+  // November: its own instalment 800 + 200, 600 in on 10 Nov. October's 800 + 200 owed as the month began, 150 in
+  // before then (so 50 of its interest owed), nothing since. A 40 penalty came in with November's.
+  const facts = [
+    fact('l1', 'collect', 'CAR', {
+      bf: 850,
+      bfInterest: 50,
+      months: { '2026-11': { due: 1000, dueInterest: 200, got: 640, gotInterest: 40, settled: 600, penalty: 40 } },
+    }),
+  ]
+  const list = [
+    row('l1', '2026-10-05', { principal: 800, interest: 200, due: 1000, received: 150, owed: 850, status: 'partial' }),
+    row('l1', '2026-11-05', { principal: 800, interest: 200, due: 1000, received: 600, owed: 400, status: 'partial' }),
+  ]
+  const [car] = byCompany({ facts, collectList: list, payList: [], month: '2026-11' })
+  const d = car.deals[0]
+
+  it('splits each figure', () => {
+    expect(d.parts.now).toEqual({ p: 800, i: 200, pen: 0 })
+    expect(d.parts.bf).toEqual({ p: 800, i: 50, pen: 0 })
+    // Still: October's 850 (50 interest), November's 400 (none — the 600 paid its 200 first).
+    expect(d.parts.open).toEqual({ p: 1200, i: 50, pen: 0 })
+    // Settled: the interest that went — 200 + 50 − 50 — the rest principal; the penalty beside it.
+    expect(d.parts.settled).toEqual({ p: 400, i: 200, pen: 40 })
+    expect(d.parts.early).toEqual({ p: 0, i: 0, pen: 0 })
+  })
+
+  it('adds up part by part, as the figures do', () => {
+    for (const k of PART_KEYS) expect(r(d.parts[k].p + d.parts[k].i)).toBe(d[k])
+    for (const x of ['p', 'i'] as const) expect(r(d.parts.now[x] + d.parts.early[x] + d.parts.bf[x])).toBe(r(d.parts.settled[x] + d.parts.open[x]))
+  })
+
+  it('sums the parts each side', () => {
+    const f = figuresOf(car.deals)
+    expect(f.parts.openCollect).toEqual({ p: 1200, i: 50, pen: 0 })
+    expect(f.parts.settledCollect.pen).toBe(40)
+    expect(f.parts.openPay).toEqual({ p: 0, i: 0, pen: 0 })
+  })
+
+  it('puts principal repaid early under principal', () => {
+    const [x] = byCompany({
+      facts: [fact('l9', 'collect', 'HK', { months: { '2026-11': { due: 0, dueInterest: 0, got: 5300, gotInterest: 300, settled: 5300 } } })],
+      collectList: [row('l9', '2026-11-30', { no: null, months: null, principal: 0, interest: 300, due: 300, received: 300, owed: 0, status: 'paid' })],
+      payList: [],
+      month: '2026-11',
+    })
+    expect(x.deals[0].parts.early).toEqual({ p: 5000, i: 0, pen: 0 })
+    expect(x.deals[0].parts.settled).toEqual({ p: 5000, i: 300, pen: 0 })
+  })
+})
+const r = (n: number) => Math.round(n * 100) / 100
