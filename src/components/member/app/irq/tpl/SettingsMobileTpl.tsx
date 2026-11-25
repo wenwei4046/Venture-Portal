@@ -76,6 +76,19 @@ export function renderSettingsMobile(v: DcVals, C: DcComponents) {
                 <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["xl"]?.["knob"])};width:18px;height:18px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
               </button>
             </div>
+            <div style={{"display":"flex","alignItems":"center","gap":"12px","padding":"12px 12px 12px 14px","borderTop":"1px solid var(--irq-c-f2f2ef)"}}>
+              <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px"}}>
+                <span style={{"fontSize":"14px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                  {"Manual"}
+                </span>
+                <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
+                  {dcText(v["srcs"]?.["man"]?.["count"])}{" · added by hand"}
+                </span>
+              </span>
+              <button onClick={v["srcs"]?.["man"]?.["toggle"]} aria-label={"Show in IR Quote"} style={dcCss(`flex:0 0 38px;position:relative;width:38px;height:22px;border-radius:11px;border:0;padding:0;background:${dcS(v["srcs"]?.["man"]?.["track"])}`)}>
+                <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["man"]?.["knob"])};width:18px;height:18px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+              </button>
+            </div>
           </div>
           {(v["catMsg"]) ? (<>
             <p style={dcCss(`margin:0;padding:0 2px;font-size:12.5px;line-height:1.4;color:${dcS(v["catMsgInk"])}`)}>

@@ -6,7 +6,7 @@ import * as quoteDocLib from "../lib/quote-doc";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
-import { mergeExcel, srcOf, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
+import { mergeExcel, srcOf, SOURCES, SRC_LABEL, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
 export class SettingsMobileLogic extends DcLogic {
   state = { cfg: null, saved: "", tab: "rooms", q: "", kind: "all", src: "all", limit: 40, sheet: null, toast: "", arm: null };
   componentDidUpdate(pp, ps) { if (!this.props.readOnly && this.lib && this.state.cfg && ps.cfg && ps.cfg !== this.state.cfg) this.lib.savePreview(this.state.cfg); }
@@ -92,16 +92,16 @@ export class SettingsMobileLogic extends DcLogic {
       publish: () => { if (!dirty) return; if (this.props.readOnly) { this.flash("Read-only while viewing as"); return; } this.lib.save(cfg); this.setState({ saved: JSON.stringify(cfg) }); this.flash("Published"); },
       tabCat: st.tab === "cat", tabRooms: st.tab === "rooms", tabStyles: st.tab === "styles", tabQuote: st.tab === "quote", hdrD: st.tab === "quote" ? "none" : "flex",
       q: st.q, onQ: e => this.setState({ q: e.target.value, limit: 40 }),
-      srcChips: [["all", "All sources"], ["b2b", "b2b"], ["excel", "Excel price list"]].map(([k, label]) => { const on = srcF === k, n = k === "all" ? all.length : all.filter(i => srcOf(i) === k).length; return { label: label + " · " + n, bg: on ? "#F5871F" : "#FFFFFF", ink: on ? "#111111" : "#1F1F1C", border: on ? "#F5871F" : "#DEDED8", pick: () => this.setState({ src: k, kind: "all", limit: 40 }) }; }),
+      srcChips: [["all", "All sources"], ...SOURCES.map(k => [k, SRC_LABEL[k]])].map(([k, label]) => { const on = srcF === k, n = k === "all" ? all.length : all.filter(i => srcOf(i) === k).length; return { label: label + " · " + n, bg: on ? "#F5871F" : "#FFFFFF", ink: on ? "#111111" : "#1F1F1C", border: on ? "#F5871F" : "#DEDED8", pick: () => this.setState({ src: k, kind: "all", limit: 40 }) }; }),
       kindChips: [["all", "All"], ...Object.entries(kinds).filter(([k, v]) => srcF === "all" || (v.src === "excel" ? "excel" : "b2b") === srcF || srcItems.some(i => i.kind === k)).map(([k, v]) => [k, v.label + (v.src === "excel" && srcF !== "excel" ? " · Excel" : "")])].map(([k, label]) => { const on = st.kind === k; return { label, bg: on ? "#111111" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#111111" : "#DEDED8", pick: () => this.setState({ kind: k, limit: 40 }) }; }),
       catCount: list.length + " items",
       srcs: (() => { const S = cfg.catalog.sources || {}, one = k => { const on = !(S[k] || {}).off, s2 = sw(on); return { on, track: s2.track, knob: s2.knob, toggle: () => this.upd(c => { const T = (c.catalog.sources = c.catalog.sources || {}); T[k] = { ...(T[k] || {}), off: on }; }) }; };
-        const xl = S.excel || {}, nx = all.filter(i => srcOf(i) === "excel").length;
-        return { b2b: { ...one("b2b"), count: (all.length - nx).toLocaleString("en-MY") + " items" }, xl: { ...one("excel"), count: nx ? nx + " items" : "Not uploaded yet",
+        const xl = S.excel || {}, nx = all.filter(i => srcOf(i) === "excel").length, nm = all.filter(i => srcOf(i) === "manual").length;
+        return { b2b: { ...one("b2b"), count: (all.length - nx - nm).toLocaleString("en-MY") + " items" }, man: { ...one("manual"), count: nm + " item" + (nm === 1 ? "" : "s") }, xl: { ...one("excel"), count: nx ? nx + " items" : "Not uploaded yet",
           sub: xl.file ? xl.file + " · " + new Date(xl.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "Code, Item Description, Selling Price",
           upLabel: nx ? "Replace" : "Upload", onFile: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) this.readPriceList(f); } } }; })(),
       catMsg: st.catMsg || "", catMsgInk: st.catErr ? "#8A2E1C" : "#387557",
-      items: list.slice(0, st.limit).map(it => { const on = !it.paused, s2 = sw(on); return { name: it.name, code: [it.code, srcOf(it) === "excel" ? "Excel" : ""].filter(Boolean).join(" · "), img: this.u(it.img), price: it.cost == null || it.noPrice ? "No price" : rm(it.cost), priceInk: it.cost == null || it.noPrice ? "#8A2E1C" : "#1F1F1C", op: on ? 1 : .5, track: s2.track, knob: s2.knob,
+      items: list.slice(0, st.limit).map(it => { const on = !it.paused, s2 = sw(on); return { name: it.name, code: [it.code, srcOf(it) === "excel" ? "Excel" : srcOf(it) === "manual" ? "Manual" : ""].filter(Boolean).join(" · "), img: this.u(it.img), price: it.cost == null || it.noPrice ? "No price" : rm(it.cost), priceInk: it.cost == null || it.noPrice ? "#8A2E1C" : "#1F1F1C", op: on ? 1 : .5, track: s2.track, knob: s2.knob,
         edit: () => this.setState({ sheet: { type: "item", id: it.id } }), toggle: () => setItem(it.id, x => { x.paused = !x.paused; }) }; }),
       noItems: !list.length, more: list.length > st.limit ? { label: `Show more (${list.length - st.limit})`, run: () => this.setState({ limit: st.limit + 40 }) } : false,
       rooms: gList.map(ps => { const ph = (ps[0].spec || {}).photos || []; return { label: ps[0].groupLabel || ps[0].name, prices: priceText(ps), photos: ph.length ? ph.length + " photo" + (ph.length === 1 ? "" : "s") : "No photos yet", cover: this.u(ph[0]), noCover: !ph.length, open: () => this.setState({ sheet: { type: "room", id: ps[0].group }, rtab: "specs", rver: null, warn: "" }) }; }),

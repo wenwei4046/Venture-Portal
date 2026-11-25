@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeExcel, parsePriceList, pickSheet, sourceOn, srcOf, type Catalog, type CatItem } from "./price-list";
+import { kindSrc, mergeExcel, parsePriceList, pickSheet, sourceOn, srcOf, type Catalog, type CatItem } from "./price-list";
 
 // The top of The_Conts_Price_List_Master's PRICELIST sheet, as SheetJS reads it (header: 1), 2026-11-24.
 const SHEET: unknown[][] = [
@@ -72,10 +72,22 @@ describe("the Excel price list", () => {
   });
 
   it("each source has its own switch, on until switched off", () => {
-    expect(srcOf({})).toBe("b2b");
+    expect(srcOf({ url: "https://b2b/p" })).toBe("b2b");
+    expect(srcOf({})).toBe("manual"); // added by hand: no b2b address (2026-11-25)
+    expect(srcOf({ src: undefined, url: "" })).toBe("manual");
     expect(srcOf({ src: "excel" })).toBe("excel");
     expect(sourceOn({}, { src: "excel" })).toBe(true);
     expect(sourceOn({ sources: { excel: { off: true } } }, { src: "excel" })).toBe(false);
-    expect(sourceOn({ sources: { excel: { off: true } } }, {})).toBe(true);
+    expect(sourceOn({ sources: { excel: { off: true } } }, { url: "https://b2b/p" })).toBe(true);
+    expect(sourceOn({ sources: { manual: { off: true } } }, {})).toBe(false);
+    expect(sourceOn({ sources: { manual: { off: true } } }, { url: "https://b2b/p" })).toBe(true);
+  });
+
+  it("a category is Manual when every item in it was added by hand", () => {
+    const cat = { kinds: { air: { label: "Airbnb Service" }, sofa: { label: "Sofa" }, "xl-p": { label: "P", src: "excel" } },
+      items: [{ id: "m1", kind: "air", name: "Linens Set", cost: 600 }, { id: "b1", kind: "sofa", name: "HIACE", cost: 1, url: "https://b2b/p" }, { id: "m2", kind: "sofa", name: "SOFA 2.5", cost: 2 }] };
+    expect(kindSrc(cat, "air")).toBe("manual");
+    expect(kindSrc(cat, "sofa")).toBe("b2b");
+    expect(kindSrc(cat, "xl-p")).toBe("excel");
   });
 });
