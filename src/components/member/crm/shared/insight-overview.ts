@@ -36,6 +36,11 @@ export interface OverviewIn {
   meta: OvMeta;
   /** Ads Performance's figures are CRM · Manage's (readsAds): without it the money is never asked for. */
   money: boolean;
+  /**
+   * Whether a range is read again for every ad, not only the ones not read yet (2026-11-25, the owner: "所有的数据都要 up to
+   * date" — the phone kept the first spend it read for "This month" all month). Absent: only what is missing.
+   */
+  askAll?: (key: string, until: string) => boolean;
 }
 
 export interface OvMoney { spend: number | null; fee: number | null; cost: number | null; cpl: number | null }
@@ -211,7 +216,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   const ranges = [[r.a, r.b], [prev.a, prev.b], ...feeMonths(r.a, r.b, T), ...feeMonths(prev.a, prev.b, T)] as [number, number][];
   const need = !p.money || !paidIds.length ? [] : ranges
     .filter(([a, b], i, l) => l.findIndex(([x, y]) => x === a && y === b) === i)
-    .map(([a, b]) => ({ key: metaKey(a, b), since: isoOf(a), until: isoOf(b), ids: paidIds.filter(id => !(id in (meta?.[metaKey(a, b)] ?? {}))) }))
+    .map(([a, b]) => ({ key: metaKey(a, b), since: isoOf(a), until: isoOf(b), ids: p.askAll?.(metaKey(a, b), isoOf(b)) ? paidIds : paidIds.filter(id => !(id in (meta?.[metaKey(a, b)] ?? {}))) }))
     .filter(n => n.ids.length);
 
   return { ads, adsPrev, work: workAll(data.customers, r), workPrev: workAll(data.customers, prev), brands, adRows, teams, adTeams, need };
