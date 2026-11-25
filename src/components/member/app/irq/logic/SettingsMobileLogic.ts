@@ -8,7 +8,7 @@ import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 import { mergeExcel, srcOf, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
 export class SettingsMobileLogic extends DcLogic {
-  state = { cfg: null, saved: "", tab: "rooms", q: "", kind: "all", limit: 40, sheet: null, toast: "", arm: null };
+  state = { cfg: null, saved: "", tab: "rooms", q: "", kind: "all", src: "all", limit: 40, sheet: null, toast: "", arm: null };
   componentDidUpdate(pp, ps) { if (!this.props.readOnly && this.lib && this.state.cfg && ps.cfg && ps.cfg !== this.state.cfg) this.lib.savePreview(this.state.cfg); }
   componentDidMount() {
     Promise.all([Promise.resolve({ ...quoteDocLib, CRM_FIELDS: this.props.crmFields || quoteDocLib.CRM_FIELDS }), Promise.resolve(seedPackages), Promise.resolve(seedCatalog)])
@@ -39,7 +39,9 @@ export class SettingsMobileLogic extends DcLogic {
     if (!cfg) return { ...base, loading: true, tabQuote: false, hdrD: "flex", tabCat: false, tabRooms: false, tabStyles: false, sheet: false, dirtyText: "", dirtyInk: "#6B6B66", pubBg: "#D2D2CB", publish: () => {} };
     const dirty = JSON.stringify(cfg) !== st.saved, kinds = cfg.catalog.kinds || {};
     const all = cfg.catalog.items, q = st.q.trim().toLowerCase();
-    const list = all.filter(it => (st.kind === "all" || it.kind === st.kind) && (!q || (it.name + " " + (it.code || "")).toLowerCase().includes(q)));
+    // By source too, as on a computer (the user, 2026-11-25: "分开整理 excel & b2b 的资讯").
+    const srcF = st.src || "all", srcItems = all.filter(it => srcF === "all" || srcOf(it) === srcF);
+    const list = srcItems.filter(it => (st.kind === "all" || it.kind === st.kind) && (!q || (it.name + " " + (it.code || "")).toLowerCase().includes(q)));
     const setItem = (id, fn) => this.upd(c => { const x = c.catalog.items.find(y => y.id === id); if (x) fn(x); });
     const sw = on => ({ track: on ? "#111111" : "#D2D2CB", knob: on ? "18px" : "2px" });
     // sheet
@@ -90,7 +92,8 @@ export class SettingsMobileLogic extends DcLogic {
       publish: () => { if (!dirty) return; if (this.props.readOnly) { this.flash("Read-only while viewing as"); return; } this.lib.save(cfg); this.setState({ saved: JSON.stringify(cfg) }); this.flash("Published"); },
       tabCat: st.tab === "cat", tabRooms: st.tab === "rooms", tabStyles: st.tab === "styles", tabQuote: st.tab === "quote", hdrD: st.tab === "quote" ? "none" : "flex",
       q: st.q, onQ: e => this.setState({ q: e.target.value, limit: 40 }),
-      kindChips: [["all", "All"], ...Object.entries(kinds).map(([k, v]) => [k, v.label + (v.src === "excel" ? " · Excel" : "")])].map(([k, label]) => { const on = st.kind === k; return { label, bg: on ? "#111111" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#111111" : "#DEDED8", pick: () => this.setState({ kind: k, limit: 40 }) }; }),
+      srcChips: [["all", "All sources"], ["b2b", "b2b"], ["excel", "Excel price list"]].map(([k, label]) => { const on = srcF === k, n = k === "all" ? all.length : all.filter(i => srcOf(i) === k).length; return { label: label + " · " + n, bg: on ? "#F5871F" : "#FFFFFF", ink: on ? "#111111" : "#1F1F1C", border: on ? "#F5871F" : "#DEDED8", pick: () => this.setState({ src: k, kind: "all", limit: 40 }) }; }),
+      kindChips: [["all", "All"], ...Object.entries(kinds).filter(([k, v]) => srcF === "all" || (v.src === "excel" ? "excel" : "b2b") === srcF || srcItems.some(i => i.kind === k)).map(([k, v]) => [k, v.label + (v.src === "excel" && srcF !== "excel" ? " · Excel" : "")])].map(([k, label]) => { const on = st.kind === k; return { label, bg: on ? "#111111" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#111111" : "#DEDED8", pick: () => this.setState({ kind: k, limit: 40 }) }; }),
       catCount: list.length + " items",
       srcs: (() => { const S = cfg.catalog.sources || {}, one = k => { const on = !(S[k] || {}).off, s2 = sw(on); return { on, track: s2.track, knob: s2.knob, toggle: () => this.upd(c => { const T = (c.catalog.sources = c.catalog.sources || {}); T[k] = { ...(T[k] || {}), off: on }; }) }; };
         const xl = S.excel || {}, nx = all.filter(i => srcOf(i) === "excel").length;

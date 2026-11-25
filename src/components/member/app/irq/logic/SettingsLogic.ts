@@ -36,7 +36,7 @@ const num = v => { const n = parseFloat(String(v).replace(/[^\d.]/g, "")); retur
 const cost = p => p.cats.reduce((a, c) => a + c.items.reduce((x, i) => x + quoteDocLib.lineSum(i.cost, i.qty), 0), 0); // whole ringgit a line, as the quote prints (2026-11-11)
 
 export class SettingsLogic extends DcLogic {
-  state = { lib: null, base: null, cfg: null, savedJson: "", tab: "doc", sel: null, drag: null, over: null, arm: "", notice: "", pid: "p0", newUnit: null, kindFilter: "all", catQ: "", newKind: "" };
+  state = { lib: null, base: null, cfg: null, savedJson: "", tab: "doc", sel: null, drag: null, over: null, arm: "", notice: "", pid: "p0", newUnit: null, kindFilter: "all", srcFilter: "all", catQ: "", newKind: "" };
 
   bmRef = el => { this._bm = el; if (el && this.ci) el.setAttribute("href", this.ci.BOOKMARKLET); };
   impMsg(msg, err) { this.setState({ impMsg: msg, impErr: !!err }); }
@@ -632,7 +632,10 @@ export class SettingsLogic extends DcLogic {
     const items = cfg.catalog.items;
     const q = st.catQ.trim().toLowerCase();
     const kinds = cfg.catalog.kinds;
-    const catRows = sortCatalog(items.filter(it => (st.kindFilter === "all" || it.kind === st.kindFilter) && (!q || (it.code + " " + it.name).toLowerCase().includes(q))), st.catSort, kinds).map(it => {
+    // The list by source (the user, 2026-11-25: "选择条件可以分开？这样我可以分开整理 excel & b2b 的资讯"): All · b2b · Excel price list;
+    // the category dropdown then lists that source's categories and counts.
+    const srcF = st.srcFilter || "all", inSrc = it => srcF === "all" || srcOf(it) === srcF, srcItems = items.filter(inSrc);
+    const catRows = sortCatalog(items.filter(it => inSrc(it) && (st.kindFilter === "all" || it.kind === st.kindFilter) && (!q || (it.code + " " + it.name).toLowerCase().includes(q))), st.catSort, kinds).map(it => {
       const setC = fn => this.upd(c => { const x = c.catalog.items.find(y => y.id === it.id); if (x) fn(x); });
       return {
         onImg: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) lib.fileToDataUrl(f, 1000).then(d => this.upd(c => { c.catalog.items.filter(y => y.id === it.id || (it.code && y.code === it.code)).forEach(y => { y.img = d; y.imgOwn = true; }); })); },
@@ -653,7 +656,7 @@ export class SettingsLogic extends DcLogic {
         ...(() => { const kp = !!(kinds[it.kind] || {}).paused, on = !it.paused && !kp; return { rowBg: on ? "#FFFFFF" : "#F8F7F3", pauseLabel: on ? "On" : "Paused", pauseInk: on ? "#387557" : "#97978F", trackBg: on ? "#111111" : "#D5D2C8", knobX: on ? "14px" : "2px", pauseTitle: kp ? "Whole category is paused" : on ? "Hide from IR Quote (keeps the item)" : "Show in IR Quote again", togglePause: () => setC(x => { x.paused = !x.paused; }) }; })()
       };
     });
-    const sampleN = items.filter(i => i.sample).length, noPriceN = items.filter(i => i.noPrice).length;
+    const sampleN = srcItems.filter(i => i.sample).length, noPriceN = srcItems.filter(i => i.noPrice).length;
     const ci = this.ci;
     const fromClip = this._fromClip = text => {
       const s = String(text || "").trim();
@@ -913,7 +916,9 @@ export class SettingsLogic extends DcLogic {
         return { useWebLabel: mv.length ? `Use website categories (${mv.length})` : "Use website categories", useWeb: () => { if (!mv.length) { this.setState({ catMsg: items.some(i => i.webCat) ? "Every item already follows the website categories." : "Items don't know their website category yet. On b2b: bookmark › Everything › Copy, then Paste from website › Update (this also fills Stock).", catErr: !items.some(i => i.webCat) }); return; } this.upd(c => { c.catalog.items.forEach(x => { if (x.webCat) x.kind = this.kindForCat(c, x.webCat, x.room); }); }); this.setState({ kindFilter: "all", catMsg: `Moved ${mv.length} items to their website categories. Check, then Save and publish.`, catErr: false }); } }; })(),
       catSortH: Object.fromEntries(["code", "name", "kind", "cost", "show"].map(k => { const on = st.catSort && st.catSort.key === k; return [k, { mark: on ? (st.catSort.dir > 0 ? " ▲" : " ▼") : "", go: () => this.setState(s => ({ page: 0, catSort: nextCatalogSort(s.catSort, k) })) }]; })),
       kindFilter: st.kindFilter, onKindFilter: e => this.setState({ kindFilter: e.target.value, sel: {}, page: 0 }),
-      kindSelOpts: [{ v: "all", l: "All categories (" + items.length + ")" }, ...Object.entries(kinds).map(([k, v]) => ({ v: k, l: v.label + (v.src === "excel" ? " · Excel" : "") + " (" + items.filter(i => i.kind === k).length + ")" }))],
+      srcFilter: srcF, onSrcFilter: e => this.setState({ srcFilter: e.target.value, kindFilter: "all", sel: {}, page: 0 }),
+      srcSelOpts: [{ v: "all", l: "All sources (" + items.length + ")" }, { v: "b2b", l: "b2b (" + items.filter(i => srcOf(i) === "b2b").length + ")" }, { v: "excel", l: "Excel price list (" + items.filter(i => srcOf(i) === "excel").length + ")" }],
+      kindSelOpts: [{ v: "all", l: "All categories (" + srcItems.length + ")" }, ...Object.entries(kinds).filter(([k, v]) => srcF === "all" || (v.src === "excel" ? "excel" : "b2b") === srcF || srcItems.some(i => i.kind === k)).map(([k, v]) => ({ v: k, l: v.label + (v.src === "excel" && srcF !== "excel" ? " · Excel" : "") + " (" + srcItems.filter(i => i.kind === k).length + ")" }))],
       // Each source's switch (2026-11-24): off, the quote offers none of its items; each item keeps its own On / Paused.
       srcs: (() => { const S = cfg.catalog.sources || {}, sw = k => { const on = !(S[k] || {}).off; return { on, label: on ? "On" : "Off", ink: on ? "#387557" : "#97978F", track: on ? "#111111" : "#D5D2C8", knob: on ? "14px" : "2px", title: on ? "Hide every item of this source from IR Quote" : "Show this source's items in IR Quote again", toggle: () => this.upd(c => { const T = (c.catalog.sources = c.catalog.sources || {}); T[k] = { ...(T[k] || {}), off: on }; }) }; };
         const xl = S.excel || {}, nx = items.filter(i => srcOf(i) === "excel").length, nb = items.length - nx;
@@ -930,7 +935,7 @@ export class SettingsLogic extends DcLogic {
       catRows, ...(() => { const per = st.perPage || 50, n = catRows.length, pages = Math.max(1, Math.ceil(n / per)), pg = Math.min(st.page || 0, pages - 1), rows = catRows.slice(pg * per, pg * per + per);
         return { catPageRows: rows, ...this.bulkVals(rows, st), pager: { show: n > 25, range: n ? `${pg * per + 1}–${Math.min(n, pg * per + per)} of ${n}` : "", label: `${pg + 1} / ${pages}`, first: pg === 0, last: pg >= pages - 1, prevOp: pg === 0 ? .4 : 1, nextOp: pg >= pages - 1 ? .4 : 1,
           prev: () => this.setState({ page: Math.max(0, pg - 1) }), next: () => this.setState({ page: Math.min(pages - 1, pg + 1) }),
-          sizes: [25, 50, 100].map(k => ({ label: String(k), bg: per === k ? "#FFFFFF" : "transparent", ink: per === k ? "#111111" : "#6B6B66", shadow: per === k ? "0 1px 2px rgba(20,20,18,.14)" : "none", pick: () => this.setState({ perPage: k, page: 0 }) })) } }; })(), catCount: `${catRows.length} item${catRows.length === 1 ? "" : "s"}`, catSampleText: [items.filter(i => i.paused || (kinds[i.kind] || {}).paused).length ? `· ${items.filter(i => i.paused || (kinds[i.kind] || {}).paused).length} paused` : "", noPriceN ? `· ${noPriceN} without a price (hidden from IR)` : "", sampleN ? `· ${sampleN} with a sample price` : ""].filter(Boolean).join(" ") || "· every price confirmed",
+          sizes: [25, 50, 100].map(k => ({ label: String(k), bg: per === k ? "#FFFFFF" : "transparent", ink: per === k ? "#111111" : "#6B6B66", shadow: per === k ? "0 1px 2px rgba(20,20,18,.14)" : "none", pick: () => this.setState({ perPage: k, page: 0 }) })) } }; })(), catCount: `${catRows.length} item${catRows.length === 1 ? "" : "s"}`, catSampleText: [srcItems.filter(i => i.paused || (kinds[i.kind] || {}).paused).length ? `· ${srcItems.filter(i => i.paused || (kinds[i.kind] || {}).paused).length} paused` : "", noPriceN ? `· ${noPriceN} without a price (hidden from IR)` : "", sampleN ? `· ${sampleN} with a sample price` : ""].filter(Boolean).join(" ") || "· every price confirmed",
       ...(() => { const moves = items.filter(it => { if (srcOf(it) === "excel") return false; const g = this.guessKind(it.name, kinds); return g && g !== it.kind; });
         return { autoSortLabel: moves.length ? `Sort by name (${moves.length} to move)` : "Sort by name", autoSort: () => { if (!moves.length) { this.setState({ catMsg: "Every item is already in the category its name says.", catErr: false }); return; } const ids = {}; moves.forEach(m => { ids[m.id] = this.guessKind(m.name, kinds); }); this.upd(c => { c.catalog.items.forEach(x => { if (ids[x.id]) x.kind = ids[x.id]; }); }); this.setState({ catMsg: `Moved ${moves.length} items to the category their name says. Check, then Save and publish.`, catErr: false }); } }; })(),
       addCatItem: () => { const k = st.kindFilter === "all" ? Object.keys(kinds)[0] : st.kindFilter; this.upd(c => { c.catalog.items.unshift({ id: lib.newId("c"), kind: k, code: "", name: "NEW ITEM", cost: 0 }); }); },
