@@ -46,13 +46,13 @@ describe("Insight › Overview's ads", () => {
   it("adds Ads Performance's money: spend, the month's fee, total cost and per lead", () => {
     const meta = { [metaKey(NOV.a, NOV.b)]: { [AD_C]: fig(1000), [AD_D]: fig(500) } };
     const f = overviewFigures(base({ meta }));
-    // RM 1,500 spent → the RM 2,500 minimum fee; per lead = (spend + fee) ÷ leads, as Ads Performance's.
-    expect(f.ads).toMatchObject({ spend: 1500, fee: 2500, cost: 4000, leads: 4, appt: 2, won: 1, ready: true });
-    expect(f.ads.cpl).toBe(1000);
+    // RM 1,000 on The Conts + RM 500 on Dream Crafter → RM 2,500 for each brand (2026-11-25); per lead = (spend + fee) ÷ leads.
+    expect(f.ads).toMatchObject({ spend: 1500, fee: 5000, cost: 6500, leads: 4, appt: 2, won: 1, ready: true });
+    expect(f.ads.cpl).toBe(1625);
     // Each ad carries its share of the fee (the fee's rate on its own spend).
     const c = f.adRows.find(a => a.id === AD_C)!;
     expect(c).toMatchObject({ name: "Conts Video", brand: "The Conts", leads: 2, appt: 2, won: 1, spend: 1000 });
-    expect(c.cost).toBeCloseTo(1000 * (4000 / 1500), 6);
+    expect(c.cost).toBeCloseTo(1000 * (6500 / 1500), 6);
     expect(c.cpl).toBeCloseTo(c.cost! / 2, 6);
   });
   it("ranks the ads by leads, an organic lead as 'No ad', and splits them by brand", () => {
@@ -127,7 +127,7 @@ describe("Insight › Overview's words", () => {
   it("puts the ads' money first when it may be read, then the team's work", () => {
     const f = overviewFigures(base({ meta: { [metaKey(NOV.a, NOV.b)]: { [AD_C]: fig(1000), [AD_D]: fig(500) } } }));
     expect(overviewTiles(f, true).map(t => [t.label, t.value])).toEqual([
-      ["Ads spend", "RM 1,500"], ["Total cost", "RM 4,000"], ["Per lead", "RM 1,000.00"],
+      ["Ads spend", "RM 1,500"], ["Total cost", "RM 6,500"], ["Per lead", "RM 1,625.00"],
       ["Leads", "4"], ["Avg. reply", "20 min"], ["Appt rate", "50%"], ["Show-up", "100%"], ["Won", "1"],
       ["Total sales", "RM 0"], ["Conversion", "100%"], ["AOV", "—"], ["ROAS", "—"]]);
     expect(overviewTiles(f, false).map(t => t.label)).toEqual(["Leads", "Avg. reply", "Appt rate", "Show-up", "Won", "Total sales", "Conversion", "AOV"]);
