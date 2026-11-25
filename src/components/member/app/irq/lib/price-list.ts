@@ -13,15 +13,30 @@ export type XlItem = { code: string; name: string; nameCn: string; spec: string;
 export type PriceList = { cats: { key: string; label: string }[]; items: XlItem[] };
 /** The parts of Quote settings' catalogue this file reads and writes (the rest of an item is kept as it is). */
 export type CatItem = { id: string; src?: string; kind?: string; code?: string; name?: string; unit?: string; cost?: number | null; img?: string; imgOwn?: boolean; paused?: boolean; prevCost?: number; updatedAt?: number; [k: string]: unknown };
-export type Catalog = { items?: CatItem[]; kinds?: Record<string, { label?: string; url?: string; src?: string; [k: string]: unknown }>; sources?: Partial<Record<"b2b" | "excel", { off?: boolean; file?: string; at?: number; n?: number }>> };
+export type Catalog = { items?: CatItem[]; kinds?: Record<string, { label?: string; url?: string; src?: string; [k: string]: unknown }>; sources?: Partial<Record<Src, { off?: boolean; file?: string; at?: number; n?: number }>> };
 
 const txt = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
 const num = (v: unknown): number | null => { if (typeof v === "number") return isFinite(v) ? v : null; const s = txt(v).replace(/[^\d.\-]/g, ""); if (!s) return null; const n = parseFloat(s); return isFinite(n) ? n : null; };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 
-export const srcOf = (it: { src?: string } | null | undefined): "b2b" | "excel" => (it && it.src === "excel" ? "excel" : "b2b");
+export type Src = "b2b" | "excel" | "manual";
+export const SOURCES: Src[] = ["b2b", "excel", "manual"];
+export const SRC_LABEL: Record<Src, string> = { b2b: "b2b", excel: "Excel price list", manual: "Manual" };
+/**
+ * An item's source: the Excel price list's carry `src: "excel"`; one the b2b grabber brought has its b2b address (`url`);
+ * anything else was added by hand in Quote settings — Manual, a source with its own switch (the user, 2026-11-25: "手动也加开关").
+ */
+export const srcOf = (it: { src?: string; url?: unknown } | null | undefined): Src =>
+  !it ? "b2b" : it.src === "excel" ? "excel" : it.src === "manual" || !it.url ? "manual" : "b2b";
+/** A category's source: the Excel's own, else Manual when every item in it is, else b2b. */
+export const kindSrc = (catalog: Catalog | null | undefined, k: string): Src => {
+  const K = (catalog && catalog.kinds) || {};
+  if ((K[k] || {}).src === "excel") return "excel";
+  const its = ((catalog && catalog.items) || []).filter(i => i.kind === k);
+  return its.length && its.every(i => srcOf(i) === "manual") ? "manual" : "b2b";
+};
 /** Is this item's source switched on? (a source with no setting is on) */
-export const sourceOn = (catalog: Pick<Catalog, "sources"> | null | undefined, it: { src?: string }) => !((catalog && catalog.sources && catalog.sources[srcOf(it)]) || {}).off;
+export const sourceOn = (catalog: Pick<Catalog, "sources"> | null | undefined, it: { src?: string; url?: unknown }) => !((catalog && catalog.sources && catalog.sources[srcOf(it)]) || {}).off;
 
 const HEAD: [keyof XlItem | "markup", RegExp][] = [
   ["code", /^code\b|编号/i],

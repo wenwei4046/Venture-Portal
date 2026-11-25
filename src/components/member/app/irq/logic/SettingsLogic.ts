@@ -8,7 +8,7 @@ import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 import * as catalogImport from "../lib/catalog-import";
 import { sortCatalog, nextCatalogSort } from "../lib/catalog-import";
-import { mergeExcel, srcOf, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
+import { mergeExcel, srcOf, SOURCES, SRC_LABEL, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
 const ICON = {
   home: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
   chart: "M4 20V10m5 10V4m5 16v-7m5 7V8M3 20h18",
@@ -24,7 +24,7 @@ const NAMES = { field: "Field", letterhead: "Letterhead", heading: "Heading", te
 const REMOVABLE = ["heading", "text", "spacer", "signature", "field"];
 const FACT_NAMES = { att: "Customer name", by: "Prepared by", bill: "Billing address", building: "Building", address: "Address", unit: "Unit", layout: "Layout", date: "Date" };
 const BADGE = { letterhead: "Company", heading: "Heading", text: "Paragraph", facts: "Details", table: "Items", totals: "Totals", terms: "Terms", signature: "Signature", spacer: "Free space" };
-const TABS = [["doc", "Quotation document"], ["cust", "Customer info"], ["units", "Room types"], ["styles", "Styles"], ["cat", "Catalogue"], ["kinds", "Categories"]];
+const TABS = [["doc", "Quotation document"], ["cust", "Customer info"], ["units", "Room types"], ["styles", "Styles"], ["cat", "Master list"] /* the user, 2026-11-25: "catalogue 改成类似 master 的词语" */, ["kinds", "Categories"]];
 const SIZES = ["1-1", "2-1", "2-2", "3-2", "3-3", "4-2", "4-3", "4-4"];
 const sizeKey = sp => { const b = parseInt((sp || {}).beds), t = parseInt((sp || {}).baths); return b && t ? b + "-" + t : ""; };
 const sizeLabel = k => k ? k.split("-").map(n => n + "R").join(" ") : "No room count";
@@ -43,7 +43,7 @@ export class SettingsLogic extends DcLogic {
   stage(items, source, page) {
     const ci = this.ci, cfg = this.state.cfg;
     if (!items.length) { this.impMsg("No products found there.", true); return; }
-    const rows = ci.diff(cfg.catalog.items.filter(x => srcOf(x) === "b2b"), items); // the Excel price list's items are never a b2b row's match (2026-11-24)
+    const rows = ci.diff(cfg.catalog.items.filter(x => srcOf(x) !== "excel"), items); // the Excel price list's items are never a b2b row's match (2026-11-24)
     const kindGuess = Object.entries(cfg.catalog.kinds).find(([k, v]) => v.url && page && page.startsWith(v.url.replace(/\/$/, "")))?.[0] || (this.state.kindFilter !== "all" ? this.state.kindFilter : Object.keys(cfg.catalog.kinds)[0] || "");
     const sel = {}; rows.forEach(r => { sel[r.key] = r.status !== "same"; });
     const sing = s => String(s || "").toUpperCase().replace(/[^A-Z]/g, "").replace(/S$/, "");
@@ -642,7 +642,7 @@ export class SettingsLogic extends DcLogic {
         id: it.id, selected: !!(st.sel || {})[it.id], onSel: () => this.setState(s => { const m = { ...(s.sel || {}) }; if (m[it.id]) delete m[it.id]; else m[it.id] = true; return { sel: m }; }),
         img: it.img || imgFor(it.code), specs: it.specs || "", initials: "",
         code: it.code || "", name: it.name, kind: it.kind, cost: it.noPrice || it.cost == null ? "" : String(it.cost),
-        chip: it.noPrice ? "NO PRICE" : it.sample ? "SAMPLE" : srcOf(it) === "excel" ? "EXCEL" : "", chipBg: it.noPrice ? "#EEEEEA" : it.sample ? "#F5E1AE" : "#E8F3ED", chipInk: it.noPrice ? "#8A2E1C" : it.sample ? "#D96E0B" : "#387557",
+        /* every row names its source — B2B, EXCEL or MANUAL (the user, 2026-11-25: "一个有 excel 来源，一个没有？") */ chip: it.noPrice ? "NO PRICE" : it.sample ? "SAMPLE" : ({ b2b: "B2B", excel: "EXCEL", manual: "MANUAL" })[srcOf(it)], chipBg: it.noPrice ? "#EEEEEA" : it.sample ? "#F5E1AE" : ({ b2b: "#F2F2EF", excel: "#E8F3ED", manual: "#EEF1F7" })[srcOf(it)], chipInk: it.noPrice ? "#8A2E1C" : it.sample ? "#D96E0B" : ({ b2b: "#6B6B66", excel: "#387557", manual: "#2D5788" })[srcOf(it)],
         onCode: e => { const v = e.target.value; setC(x => { x.code = v; }); }, onName: e => { const v = e.target.value; setC(x => { x.name = v; }); },
         onKind: e => { const v = e.target.value; setC(x => { x.kind = v; }); }, onCost: e => { const raw = e.target.value, v = num(raw); setC(x => { if (raw.trim() === "") { x.cost = null; x.noPrice = true; } else { x.cost = v; x.sample = false; x.noPrice = false; } }); },
         toggleSample: () => setC(x => { if (!x.noPrice) x.sample = !x.sample; }),
@@ -915,14 +915,16 @@ export class SettingsLogic extends DcLogic {
       ...(() => { const mv = items.filter(it => it.webCat && (kinds[it.kind] || {}).webCat !== it.webCat);
         return { useWebLabel: mv.length ? `Use website categories (${mv.length})` : "Use website categories", useWeb: () => { if (!mv.length) { this.setState({ catMsg: items.some(i => i.webCat) ? "Every item already follows the website categories." : "Items don't know their website category yet. On b2b: bookmark › Everything › Copy, then Paste from website › Update (this also fills Stock).", catErr: !items.some(i => i.webCat) }); return; } this.upd(c => { c.catalog.items.forEach(x => { if (x.webCat) x.kind = this.kindForCat(c, x.webCat, x.room); }); }); this.setState({ kindFilter: "all", catMsg: `Moved ${mv.length} items to their website categories. Check, then Save and publish.`, catErr: false }); } }; })(),
       catSortH: Object.fromEntries(["code", "name", "kind", "cost", "show"].map(k => { const on = st.catSort && st.catSort.key === k; return [k, { mark: on ? (st.catSort.dir > 0 ? " ▲" : " ▼") : "", go: () => this.setState(s => ({ page: 0, catSort: nextCatalogSort(s.catSort, k) })) }]; })),
+      // Tidy up opens and closes by state, and a press anywhere else — or on one of its choices — closes it (the user, 2026-11-25: "点空白处就能收起").
+      tidyOpen: !!st.tidyOpen, tidyToggle: e => { e && e.preventDefault && e.preventDefault(); this.setState(s => ({ tidyOpen: !s.tidyOpen })); }, tidyClose: () => this.setState({ tidyOpen: false }),
       kindFilter: st.kindFilter, onKindFilter: e => this.setState({ kindFilter: e.target.value, sel: {}, page: 0 }),
       srcFilter: srcF, onSrcFilter: e => this.setState({ srcFilter: e.target.value, kindFilter: "all", sel: {}, page: 0 }),
-      srcSelOpts: [{ v: "all", l: "All sources (" + items.length + ")" }, { v: "b2b", l: "b2b (" + items.filter(i => srcOf(i) === "b2b").length + ")" }, { v: "excel", l: "Excel price list (" + items.filter(i => srcOf(i) === "excel").length + ")" }],
+      srcSelOpts: [{ v: "all", l: "All sources (" + items.length + ")" }, ...SOURCES.map(k => ({ v: k, l: SRC_LABEL[k] + " (" + items.filter(i => srcOf(i) === k).length + ")" }))],
       kindSelOpts: [{ v: "all", l: "All categories (" + srcItems.length + ")" }, ...Object.entries(kinds).filter(([k, v]) => srcF === "all" || (v.src === "excel" ? "excel" : "b2b") === srcF || srcItems.some(i => i.kind === k)).map(([k, v]) => ({ v: k, l: v.label + (v.src === "excel" && srcF !== "excel" ? " · Excel" : "") + " (" + srcItems.filter(i => i.kind === k).length + ")" }))],
       // Each source's switch (2026-11-24): off, the quote offers none of its items; each item keeps its own On / Paused.
       srcs: (() => { const S = cfg.catalog.sources || {}, sw = k => { const on = !(S[k] || {}).off; return { on, label: on ? "On" : "Off", ink: on ? "#387557" : "#97978F", track: on ? "#111111" : "#D5D2C8", knob: on ? "14px" : "2px", title: on ? "Hide every item of this source from IR Quote" : "Show this source's items in IR Quote again", toggle: () => this.upd(c => { const T = (c.catalog.sources = c.catalog.sources || {}); T[k] = { ...(T[k] || {}), off: on }; }) }; };
-        const xl = S.excel || {}, nx = items.filter(i => srcOf(i) === "excel").length, nb = items.length - nx;
-        return { b2b: { ...sw("b2b"), count: nb.toLocaleString("en-MY") + " items" }, xl: { ...sw("excel"), has: nx > 0, count: nx ? nx + " items" : "Not uploaded yet",
+        const xl = S.excel || {}, nx = items.filter(i => srcOf(i) === "excel").length, nm = items.filter(i => srcOf(i) === "manual").length, nb = items.length - nx - nm;
+        return { b2b: { ...sw("b2b"), count: nb.toLocaleString("en-MY") + " items" }, man: { ...sw("manual"), count: nm + " item" + (nm === 1 ? "" : "s") }, xl: { ...sw("excel"), has: nx > 0, count: nx ? nx + " items" : "Not uploaded yet",
           sub: xl.file ? xl.file + " · " + new Date(xl.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Upload the price list (Code, Item Description, Selling Price)",
           upLabel: nx ? "Replace Excel" : "Upload Excel", onFile: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) this.readPriceList(f); } } }; })(),
       sync: (() => { const t = cfg.catalog.syncedAt, d = t ? Math.floor((Date.now() - t) / 86400000) : null, old = d == null || d >= 7;

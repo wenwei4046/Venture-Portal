@@ -2381,6 +2381,23 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     </button>
                   </div>
                 </div>
+                <div style={{"display":"flex","alignItems":"center","gap":"12px","flexWrap":"wrap","padding":"10px 10px 10px 16px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)"}}>
+                  <span style={{"flex":"0 0 8px","width":"8px","height":"8px","borderRadius":"50%","background":"var(--irq-c-97978f)"}} />
+                  <div style={{"flex":"1 1 240px","display":"flex","flexDirection":"column","gap":"2px","minWidth":"0"}}>
+                    <strong style={{"fontSize":"13.5px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                      {"Manual · "}{dcText(v["srcs"]?.["man"]?.["count"])}
+                    </strong>
+                    <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
+                      {"Items added by hand here (+ Add item), not from b2b or the Excel"}
+                    </span>
+                  </div>
+                  <button onClick={v["srcs"]?.["man"]?.["toggle"]} title={v["srcs"]?.["man"]?.["title"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:36px;padding:0 4px;border:0;background:transparent;font-size:12.5px;font-weight:600;color:${dcS(v["srcs"]?.["man"]?.["ink"])};white-space:nowrap`)}>
+                    <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(v["srcs"]?.["man"]?.["track"])}`)}>
+                      <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["man"]?.["knob"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+                    </span>
+                    {dcText(v["srcs"]?.["man"]?.["label"])}
+                  </button>
+                </div>
                 {"\n            "}
                 {(v["imp"]?.["showBox"]) ? (<>
                   {"\n                    "}
@@ -2774,13 +2791,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                   {"\n            "}
                 </select>
                 {"\n            "}
-                <details style={{"position":"relative"}}>
+                <details open={v["tidyOpen"]} style={{"position":"relative"}}>
                   {"\n              "}
-                  <summary style={{"listStyle":"none","display":"flex","alignItems":"center","height":"40px","padding":"0 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13.5px","fontWeight":"600","whiteSpace":"nowrap","cursor":"pointer"}}>
+                  <summary onClick={v["tidyToggle"]} style={{"listStyle":"none","display":"flex","alignItems":"center","height":"40px","padding":"0 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13.5px","fontWeight":"600","whiteSpace":"nowrap","cursor":"pointer"}}>
                     {"Tidy up ▾"}
                   </summary>
                   {"\n              "}
-                  <div style={{"position":"absolute","right":"0","top":"46px","zIndex":"20","display":"flex","flexDirection":"column","gap":"2px","width":"260px","padding":"6px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)","boxShadow":"0 10px 28px rgba(20,20,18,.16)"}}>
+                  <div onClick={v["tidyClose"]} style={{"position":"fixed","inset":"0","zIndex":"19"}} />
+                  <div onClick={v["tidyClose"]} style={{"position":"absolute","right":"0","top":"46px","zIndex":"20","display":"flex","flexDirection":"column","gap":"2px","width":"260px","padding":"6px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)","boxShadow":"0 10px 28px rgba(20,20,18,.16)"}}>
                     {"\n                "}
                     <button onClick={v["useWeb"]} style={{"display":"flex","flexDirection":"column","gap":"2px","padding":"9px 10px","border":"0","borderRadius":"8px","background":"transparent","textAlign":"left","cursor":"pointer"}} className={"irq-p1"}>
                       <span style={{"fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)"}}>

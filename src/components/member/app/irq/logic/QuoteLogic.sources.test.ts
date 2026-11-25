@@ -9,7 +9,7 @@ const catalog = (sources = {}) => ({
   sources,
   kinds: { sofa: { label: "Sofa", url: "https://b2b" }, "xl-paint": { label: "WALL & PAINTING", src: "excel" } },
   items: [
-    { id: "c1", kind: "sofa", code: "232114", name: "HIACE SOFA", cost: 1290 },
+    { id: "c1", kind: "sofa", code: "232114", name: "HIACE SOFA", cost: 1290, url: "https://b2b/p" },
     { id: "x1", src: "excel", kind: "xl-paint", code: "PW-01", name: "Paint", cost: 4.94 },
     { id: "x2", src: "excel", kind: "xl-paint", code: "PW-02", name: "Fluted Panel", cost: 499.85, paused: true },
   ],
@@ -18,6 +18,15 @@ const pkg = { cats: [{ label: "Living", items: [{ kind: "sofa" }] }, { label: "P
 const at = (st: Record<string, unknown>) => P.sheetSources.call({}, { lines: [], sheetSrc: null, ...st }, pkg);
 
 describe("the item sheet's source", () => {
+  it("offers Manual — items added by hand — as a source of its own, with its own switch (2026-11-25)", () => {
+    const c = catalog() as unknown as { kinds: Record<string, object>; items: object[]; sources: object }; c.kinds["air"] = { label: "Airbnb Service" }; c.items.push({ id: "m1", kind: "air", code: "", name: "Linens Set", cost: 600 });
+    const p2 = { cats: [...pkg.cats, { label: "Airbnb", items: [{ kind: "air" }] }] };
+    const at2 = (st: Record<string, unknown>) => P.sheetSources.call({}, { lines: [], sheetSrc: null, ...st }, p2);
+    expect(at2({ catalog: c, sheet: { mode: "add", ci: 2 } })).toEqual({ list: ["b2b", "excel", "manual"], cur: "manual", home: "manual" });
+    c.sources = { manual: { off: true } };
+    expect(at2({ catalog: c, sheet: { mode: "add", ci: 2 } })).toMatchObject({ list: ["b2b", "excel"], cur: "b2b" });
+  });
+
   it("offers both sources and opens on the category's own", () => {
     expect(at({ catalog: catalog(), sheet: { mode: "add", ci: 0 } })).toEqual({ list: ["b2b", "excel"], cur: "b2b", home: "b2b" });
     expect(at({ catalog: catalog(), sheet: { mode: "add", ci: 1 } })).toMatchObject({ cur: "excel", home: "excel" });

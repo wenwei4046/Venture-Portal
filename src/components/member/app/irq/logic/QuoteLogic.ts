@@ -4,7 +4,7 @@ import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
 import { productSlug } from "../lib/catalog-import";
-import { srcOf, sourceOn } from "../lib/price-list";
+import { srcOf, sourceOn, kindSrc, SOURCES, SRC_LABEL } from "../lib/price-list";
 import { makeQuotePdf } from "../lib/quote-pdf";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
@@ -198,12 +198,12 @@ export class QuoteLogic extends DcLogic {
   // Change item / Add item read one source at a time — b2b or the Excel price list (the user, 2026-11-24: "先选来源，再选品项"):
   // the sources switched on that have priced items; the sheet opens on the line's (its category's) own source.
   sheetSources(st, pkg) {
-    const cat = st.catalog, K = (cat && cat.kinds) || {}, srcK = k => ((K[k] || {}).src === "excel" ? "excel" : "b2b");
+    const cat = st.catalog, srcK = k => kindSrc(cat, k);
     if (!cat || !st.sheet) return { list: [], cur: "b2b", home: "b2b" };
-    const list = ["b2b", "excel"].filter(k => sourceOn(cat, { src: k }) && cat.items.some(it => srcOf(it) === k && it.cost != null && !it.noPrice && !it.paused));
+    const list = SOURCES.filter(k => sourceOn(cat, { src: k, url: k === "b2b" ? 1 : "" }) && cat.items.some(it => srcOf(it) === k && it.cost != null && !it.noPrice && !it.paused));
     let home = "b2b";
     if (st.sheet.mode === "swap") { const l = st.lines.find(x => x.id === st.sheet.id); if (l && l.kind) home = srcK(l.kind); }
-    else { const c = pkg && pkg.cats[st.sheet.ci], ks = c ? c.items.map(i => i.kind).filter(Boolean) : []; if (ks.length && ks.every(k => srcK(k) === "excel")) home = "excel"; }
+    else { const c = pkg && pkg.cats[st.sheet.ci], ks = c ? c.items.map(i => i.kind).filter(Boolean) : []; if (ks.length && ks.every(k => srcK(k) === srcK(ks[0]))) home = srcK(ks[0]); }
     const cur = list.includes(st.sheetSrc) ? st.sheetSrc : list.includes(home) ? home : list[0] || "b2b";
     return { list, cur, home };
   }
@@ -630,8 +630,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       } else {
         const c = pkg.cats[st.sheet.ci];
         const ks = [...new Set(c.items.map(i => i.kind).filter(Boolean))];
-        sheet = SS.cur === "excel" ? { eyebrow: "ADD ITEM", title: c.label, sub: "From the Excel price list", url: "" } : { eyebrow: "ADD ITEM", title: c.label, sub: "Priced at cost × " + m, url: (kinds[ks[0]] || {}).url || "https://www.b2bfurnituresupply.com" };
-        const ownKs = ks.filter(k => ((kinds[k] || {}).src === "excel" ? "excel" : "b2b") === SS.cur);
+        sheet = SS.cur !== "b2b" ? { eyebrow: "ADD ITEM", title: c.label, sub: SS.cur === "excel" ? "From the Excel price list" : "Added by hand in Quote settings", url: "" } : { eyebrow: "ADD ITEM", title: c.label, sub: "Priced at cost × " + m, url: (kinds[ks[0]] || {}).url || "https://www.b2bfurnituresupply.com" };
+        const ownKs = ks.filter(k => st.catalog.items.some(i => i.kind === k && srcOf(i) === SS.cur));
         // A search reads the whole catalogue, whatever its category; with nothing typed, the category's own kinds as before.
         options = st.catalog.items.filter(it => (q || !ownKs.length ? true : ownKs.includes(it.kind)) && it.cost != null && !it.noPrice && match(it)).map(it => ({ ...it, item: it, delta: signed(Math.round(it.cost * m)), ink: "#1F1F1C" }));
       }
@@ -813,7 +813,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       staleText: (() => { const t = st.catalog?.syncedAt; if (!st.catalog || SS.cur !== "b2b") return ""; /* b2b's age, not the Excel's */ const d = t ? Math.floor((Date.now() - t) / 86400000) : null; return d == null ? "⚠ Prices may be outdated" : d >= 7 ? `⚠ Checked ${d}d ago` : ""; })(),
       isPreview: !!this.preview, closePreview: () => { try { window.close(); } catch (e) {} this.props.onClosePreview && this.props.onClosePreview(); },
       q: st.q, onQuery: e => this.setState({ q: e.target.value }),
-      srcPick: SS.list.length > 1 ? { value: SS.cur, opts: SS.list.map(k => ({ v: k, l: k === "excel" ? "Excel price list" : "b2b" })), onChange: e => this.setState({ sheetSrc: e.target.value, sheetView: "cat", col: "", clr: "", vsel: {} }) } : false,
+      srcPick: SS.list.length > 1 ? { value: SS.cur, opts: SS.list.map(k => ({ v: k, l: SRC_LABEL[k] })), onChange: e => this.setState({ sheetSrc: e.target.value, sheetView: "cat", col: "", clr: "", vsel: {} }) } : false,
       ...(() => { if (!st.sheet || !st.catalog || !pkg || SS.cur !== "b2b" || !sourceOn(st.catalog, { src: "b2b" })) return { sheetTabs: [], colListOn: false, colList: [], colBack: false, hasCols: false, colSel: false, colChips: [], hasClrs: false, clrChips: [], colAll: false };
         let ks; if (st.sheet.mode === "swap") { const l = st.lines.find(x => x.id === st.sheet.id); ks = l ? [l.kind] : []; } else { const c = pkg.cats[st.sheet.ci]; ks = c ? c.items.map(i => i.kind) : []; }
         const cs = [...new Set(st.catalog.items.filter(it => ks.includes(it.kind) && it.collection && it.cost != null && !it.noPrice && !it.paused && !(kinds[it.kind] || {}).paused).map(it => it.collection))].sort();
