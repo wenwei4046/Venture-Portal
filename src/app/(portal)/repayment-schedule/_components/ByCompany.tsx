@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
-import { figuresOf, type CoDeal, type Company, type Figures } from '@/lib/schedule-by-company'
+import { figuresOf, type CoDeal, type Company, type Figures, type Part, type PartKey, type SideKey } from '@/lib/schedule-by-company'
 import s from './by-company.module.css'
 
 // We collect and We pay as one table, a row a company (2026-11-13, the mockup approved: "照这个做"); ▸ opens its deals,
@@ -28,6 +28,12 @@ const EXTRAS: Array<{ key: Extra; label: string }> = [
   { key: 'pos', label: 'Total owed both ways' },
 ]
 const COLS_KEY = 'repayment.by-company.columns'
+// Split P / I (2026-11-25 — the user: "每一笔的collect 和pay都想要分principal和interest", a Columns switch, "往右加，不是往下"):
+// each side figure's principal and interest to its right, Settled's penalty with them (lib/schedule-by-company). Kept by
+// the browser.
+const SPLIT_KEY = 'repayment.by-company.split'
+const PART_LABEL: Record<keyof Part, string> = { p: 'P', i: 'I', pen: 'Pen' }
+const PART_WORDS: Record<keyof Part, string> = { p: 'principal', i: 'interest', pen: 'penalty (outside the figure)' }
 // The order the figures stand in (2026-11-13 — the user: "我不能自己拖着排？"): drag a heading onto another, as the hub
 // tables do; kept by the browser. Company stays first, the row's button last. v4 (2026-11-20): the columns are new, so
 // an order kept before starts again from this one.
@@ -85,6 +91,7 @@ export default function ByCompany({
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'name', dir: 1 })
   const [extra, setExtra] = useState<Extra[]>([])
+  const [split, setSplit] = useState(false)
   const [menu, setMenu] = useState(false)
   const [order, setOrder] = useState<ColKey[]>([...DEFAULT_ORDER])
   const [drag, setDrag] = useState<{ from: ColKey | null; over: ColKey | null }>({ from: null, over: null })
@@ -104,7 +111,21 @@ export default function ByCompany({
     } catch {
       // Private mode — the columns simply are not kept.
     }
+    try {
+      setSplit(window.localStorage.getItem(SPLIT_KEY) === '1')
+    } catch {
+      // Private mode.
+    }
   }, [])
+  const toggleSplit = () => {
+    setSplit(!split)
+    try {
+      if (split) window.localStorage.removeItem(SPLIT_KEY)
+      else window.localStorage.setItem(SPLIT_KEY, '1')
+    } catch {
+      // Private mode.
+    }
+  }
   const toggleExtra = (key: Extra) => {
     const next = extra.includes(key) ? extra.filter((x) => x !== key) : [...extra, key]
     setExtra(next)
@@ -150,7 +171,8 @@ export default function ByCompany({
       const k = sort.key
       return (fig(a)[k] - fig(b)[k]) * sort.dir || a.name.localeCompare(b.name)
     })
-  const total = (k: keyof Figures) => shown.reduce((t, c) => t + fig(c)[k], 0)
+  const total = (k: Exclude<keyof Figures, 'parts'>) => shown.reduce((t, c) => t + fig(c)[k], 0)
+  const partTotal = (k: SideKey, p: keyof Part) => shown.reduce((t, c) => t + fig(c).parts[k][p], 0)
   const position = shown.reduce((t, c) => t + c.position, 0)
 
   const tone = (n: number) => (n >= EPS ? s.good : n <= -EPS ? s.bad : s.quiet)
@@ -171,17 +193,31 @@ export default function ByCompany({
     num?: boolean
     sort?: SortKey
     extra?: Extra
+    /** A side figure's parts, to its right while split: principal, interest (Settled: penalty too). */
+    parts?: {
+      keys: Array<keyof Part>
+      co: (f: Figures, p: keyof Part) => number
+      deal: (d: CoDeal, p: keyof Part) => number | null
+      foot: (p: keyof Part) => number
+    }
     co: (c: Company, f: Figures) => ReactNode
     deal: (d: CoDeal) => ReactNode
     foot: () => ReactNode
   }
   const cell = (cls: string, v: ReactNode) => <td className={cls}>{v}</td>
   // A side's figure: the company's, a deal's (on its own side only), the foot's — collect green, pay red, overdue red.
-  const side = (key: FigKey & ColKey, group: Group, dir: 'in' | 'out', label: string, of: (d: CoDeal) => number, late = false): Col => {
+  const side = (key: SideKey, group: Group, dir: 'in' | 'out', label: string, of: (d: CoDeal) => number, late = false): Col => {
     const mine = (d: CoDeal) => d.side === (dir === 'in' ? 'collect' : 'pay')
     const ink = (v: number) => (Math.abs(v) < EPS ? s.quiet : late || dir === 'out' ? s.bad : s.good)
+    const pk = key.replace(/(Collect|Pay)$/, '') as PartKey
     return {
       key, group, dir, label, num: true, sort: key,
+      parts: {
+        keys: pk === 'settled' ? ['p', 'i', 'pen'] : ['p', 'i'],
+        co: (f, p) => f.parts[key][p],
+        deal: (d, p) => (mine(d) ? d.parts[pk][p] : null),
+        foot: (p) => partTotal(key, p),
+      },
       co: (_, f) => cell(`${s.num} ${ink(f[key])}`, bare(f[key])),
       deal: (d) => cell(`${s.num} ${late && of(d) >= EPS ? s.bad : ''}`, mine(d) ? bare(of(d)) : ''),
       foot: () => cell(s.num, bare(total(key))),
@@ -244,6 +280,9 @@ export default function ByCompany({
     },
   }
   const cols = order.map((k) => COLS[k]).filter((c) => !c.extra || has(c.extra))
+  const partsOf = (c: Col) => (split && c.parts ? c.parts.keys : [])
+  const width = (c: Col) => 1 + partsOf(c).length
+  const span = cols.reduce((t, c) => t + width(c), 0)
   const GROUP: Record<Group, string> = {
     month: 'This month',
     early: 'Principal repaid early',
@@ -257,8 +296,8 @@ export default function ByCompany({
   const runs: Array<{ group: Group; span: number; first: ColKey }> = []
   for (const c of cols) {
     const last = runs[runs.length - 1]
-    if (last && last.group === c.group && c.group !== 'more') last.span += 1
-    else runs.push({ group: c.group, span: 1, first: c.key })
+    if (last && last.group === c.group && c.group !== 'more') last.span += width(c)
+    else runs.push({ group: c.group, span: width(c), first: c.key })
   }
   const starts = new Set(runs.map((r) => r.first))
   const mark = (c: Col, node: ReactNode) =>
@@ -266,6 +305,20 @@ export default function ByCompany({
       'data-dir': c.dir,
       'data-start': starts.has(c.key) ? 'true' : undefined,
     })
+  // A figure's cell and, while split, its parts to its right.
+  const cells = (c: Col, node: ReactNode, part: (p: keyof Part) => number | null) => (
+    <Fragment key={c.key}>
+      {mark(c, node)}
+      {partsOf(c).map((p) => {
+        const v = part(p)
+        return (
+          <td key={p} className={`${s.num} ${s.part}`} data-part={p} data-dir={c.dir}>
+            {v == null ? '' : bare(v)}
+          </td>
+        )
+      })}
+    </Fragment>
+  )
 
   const head = (c: Col) => (
     <th
@@ -304,6 +357,16 @@ export default function ByCompany({
       {c.sort ? sortGlyph(c.sort) : null}
     </th>
   )
+  const heads = (c: Col) => (
+    <Fragment key={c.key}>
+      {head(c)}
+      {partsOf(c).map((p) => (
+        <th key={p} data-part={p} data-num="true" data-dir={c.dir} title={`${GROUP[c.group]} · ${c.label} — ${PART_WORDS[p]}`}>
+          {PART_LABEL[p]}
+        </th>
+      ))}
+    </Fragment>
+  )
 
   const dealRow = (d: CoDeal) => {
     const c1 = d.side === 'collect'
@@ -321,7 +384,7 @@ export default function ByCompany({
           {d.pending ? <span className="chip wait ml-2">pending PV</span> : null}
           <div className={s.sub}>{d.words}</div>
         </td>
-        {cols.map((c) => <Fragment key={c.key}>{mark(c, c.deal(d))}</Fragment>)}
+        {cols.map((c) => cells(c, c.deal(d), (p) => c.parts?.deal(d, p) ?? null))}
         <td className="text-right whitespace-nowrap">
           {canRecord && !d.pending && d.open >= EPS && d.href ? (
             <Link href={`${d.href}${c1 ? '#repayment-form' : '#repay_principal'}`} className="sch-row-btn border-0">
@@ -359,6 +422,7 @@ export default function ByCompany({
           <div className={s.colWrap}>
             <button type="button" className={s.colBtn} aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
               ▥ Columns{extra.length ? ` · ${extra.length} more` : ''}
+              {split ? ' · P / I' : ''}
             </button>
             {menu ? (
               <>
@@ -377,6 +441,9 @@ export default function ByCompany({
                       <input type="checkbox" checked={has(e.key)} onChange={() => toggleExtra(e.key)} /> {e.label}
                     </label>
                   ))}
+                  <label className={s.colSplit}>
+                    <input type="checkbox" checked={split} onChange={toggleSplit} /> Split P / I — principal and interest beside each figure
+                  </label>
                 </div>
               </>
             ) : null}
@@ -397,12 +464,12 @@ export default function ByCompany({
                 ))}
                 <th rowSpan={2} aria-label="Actions" />
               </tr>
-              <tr>{cols.map(head)}</tr>
+              <tr>{cols.map(heads)}</tr>
             </thead>
             <tbody>
               {shown.length === 0 ? (
                 <tr>
-                  <td colSpan={20} className={s.empty}>
+                  <td colSpan={span + 2} className={s.empty}>
                     {companies.length === 0 ? `Nothing to collect or pay in ${monthLong}.` : 'No company matches.'}
                   </td>
                 </tr>
@@ -428,7 +495,7 @@ export default function ByCompany({
                           {c.both ? ' · both sides' : ''}
                         </div>
                       </td>
-                      {cols.map((col) => <Fragment key={col.key}>{mark(col, col.co(c, f))}</Fragment>)}
+                      {cols.map((col) => cells(col, col.co(c, f), (p) => col.parts?.co(f, p) ?? null))}
                       <td />
                     </tr>
                     {isOpen ? c.deals.map(dealRow) : null}
@@ -440,7 +507,7 @@ export default function ByCompany({
                   <td>
                     Total · {shown.length} {shown.length === 1 ? 'company' : 'companies'}
                   </td>
-                  {cols.map((col) => <Fragment key={col.key}>{mark(col, col.foot())}</Fragment>)}
+                  {cols.map((col) => cells(col, col.foot(), (p) => col.parts?.foot(p) ?? null))}
                   <td />
                 </tr>
               ) : null}
@@ -455,6 +522,9 @@ export default function ByCompany({
         as the month began; what came in since does not take it down. Settled so far = all repaid this month, a contra with it. Still to settle = this
         month&rsquo;s and overdue not yet settled. Each side: This month + Principal repaid early + Overdue = Settled + Still to settle. Net = cash
         received − cash paid this month (a contra is no cash). Interest + penalty = interest and penalty received − paid this month.
+        {split
+          ? ' P / I: each figure’s principal and interest. What is owed is its principal before its interest — a part payment pays the interest first. Settled’s Pen is the penalty received or paid this month, outside Settled.'
+          : ''}
       </p>
     </section>
   )

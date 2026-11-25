@@ -5,8 +5,10 @@ import type { CoDeal, Company } from '@/lib/schedule-by-company'
 
 // 2026-11-13 — the user: "我不能自己拖着排？" — a heading dragged onto another moves there, and the order is kept.
 
+const zero = { p: 0, i: 0, pen: 0 }
 const deal = (over: Partial<CoDeal> & Pick<CoDeal, 'id' | 'side'>): CoDeal => ({
   tag: 'LO#1', words: 'RM 1', href: `/x/${over.id}`, now: 0, early: 0, bf: 0, earlier: 0, settled: 0, got: 0, gotInterest: 0, open: 0, next: null, last: null, owe: 0, pending: false,
+  parts: { now: zero, early: zero, bf: zero, settled: zero, open: zero },
   ...over,
 })
 const companies: Company[] = [
@@ -111,5 +113,36 @@ describe('By company adds up', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Still overdue · 1$/ }))
     expect(screen.getByText('HK')).toBeInTheDocument()
     expect(screen.queryByText('CAR')).toBeNull()
+  })
+})
+
+// 2026-11-25 — the user: a Columns switch, principal and interest "往右加，不是往下".
+describe('By company split P / I', () => {
+  const split: Company[] = [
+    {
+      ...companies[0],
+      deals: [
+        deal({ id: 'l1', side: 'collect', now: 1000, settled: 640, open: 400, parts: { now: { p: 800, i: 200, pen: 0 }, early: zero, bf: zero, settled: { p: 400, i: 200, pen: 40 }, open: { p: 400, i: 0, pen: 0 } } }),
+        deal({ id: 'f1', side: 'pay', tag: 'BI#1', now: 80, open: 80, parts: { now: { p: 50, i: 30, pen: 0 }, early: zero, bf: zero, settled: zero, open: { p: 50, i: 30, pen: 0 } } }),
+      ],
+    },
+  ]
+  it('adds each figure’s parts to its right from Columns, and keeps the choice', () => {
+    const { unmount } = render(<ByCompany companies={split} month="2026-11" monthLong="November 2026" />)
+    expect(document.querySelectorAll('thead th[data-part]').length).toBe(0)
+    fireEvent.click(screen.getByRole('button', { name: /Columns/ }))
+    fireEvent.click(screen.getByLabelText(/Split P \/ I/))
+    const parts = Array.from(document.querySelectorAll('thead th[data-part]')).map((th) => th.textContent)
+    // Ten side figures, each P and I; Settled's two a Pen too.
+    expect(parts.length).toBe(22)
+    expect(parts.slice(0, 4)).toEqual(['P', 'I', 'P', 'I'])
+    // The bands widen with them: This month is Collect P I Pay P I.
+    expect(groups()[0]).toEqual(['This month', 6])
+    const row = screen.getByText('CAR').closest('tr') as HTMLElement
+    const cells = Array.from(row.querySelectorAll('td')).map((td) => td.textContent)
+    expect(cells.slice(1, 7)).toEqual(['1,000.00', '800.00', '200.00', '80.00', '50.00', '30.00'])
+    unmount()
+    render(<ByCompany companies={split} month="2026-11" monthLong="November 2026" />)
+    expect(document.querySelectorAll('thead th[data-part]').length).toBe(22)
   })
 })

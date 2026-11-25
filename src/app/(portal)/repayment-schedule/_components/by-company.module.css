@@ -181,3 +181,8 @@
 .table td[data-dir='in'] { box-shadow: inset 0 0 0 999px rgb(var(--fv-chip-ledger) / 0.45); }
 .table td[data-dir='out'] { box-shadow: inset 0 0 0 999px rgb(var(--fv-chip-danger) / 0.45); }
 .table th[data-drop='true'] { box-shadow: inset 2px 0 0 var(--ds-ink); }
+
+/* Split P / I (2026-11-25): a figure's parts to its right, smaller and quieter than the figure. */
+.part { font-size: 12px; color: rgb(var(--hvs-muted)); }
+.table th[data-part] { font-size: 10.5px; color: rgb(var(--hvs-muted)); cursor: default; }
+.colSplit { margin-top: 4px; padding-top: 8px !important; border-top: 1px solid rgb(var(--fv-box)); }

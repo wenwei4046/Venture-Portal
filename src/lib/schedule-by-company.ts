@@ -17,6 +17,13 @@
 // Net and Interest + penalty read the cash: what came in − what went out, a contra left out, being no cash.
 // A company is who the deal is with BY ID (2026-11-15): two deals that only share a name — a lender typed as text, a
 // loan with no company — stand apart; a lender typed as text joins its company once the deal names it.
+// Split into principal / interest / penalty (2026-11-25 — the user: "每一笔的collect 和pay都想要分principal和interest",
+// then: a Columns switch, the parts to the right, a part payment on the interest first, the penalty on its own). An
+// instalment's cash still owed is its interest first: what came in on it paid its interest before its principal, so
+// what is owed is its principal before its interest (part paid 600 of 800 + 200 → 400 principal owed). This month,
+// Overdue and Still to settle split so; Settled so far is what took them down — its interest This month's + Overdue's −
+// Still's, the rest principal — and Principal repaid early principal (each part adds up as the figures do). A plan
+// asks no penalty: the penalty that came in or went out in the month stands beside Settled, outside it, as before.
 // The month's rows are the We collect / We pay lists' (lib/schedule-list), so the two never disagree. The six months
 // of the chart read each deal's own plan month by month (what fell due in it) and its repayments (what came in).
 
@@ -37,7 +44,18 @@ export interface DealMonth {
   got: number
   gotInterest: number
   settled: number
+  /** The penalty that came in (went out) in the month. */
+  penalty?: number
 }
+
+/** A figure's parts: principal, interest, penalty. */
+export interface Part {
+  p: number
+  i: number
+  pen: number
+}
+export type PartKey = 'now' | 'early' | 'bf' | 'settled' | 'open'
+export const PART_KEYS: readonly PartKey[] = ['now', 'early', 'bf', 'settled', 'open']
 
 /** What the page knows of a deal beside the month's rows (lib/repayment-schedule's loader). */
 export interface DealFacts {
@@ -65,6 +83,8 @@ export interface DealFacts {
   months: Record<string, DealMonth>
   /** What earlier months still owed in cash as the page's month began (the office's month only; 0 otherwise). */
   bf?: number
+  /** The interest among it (interest first — what came in on an instalment paid its interest before its principal). */
+  bfInterest?: number
   /** What had come in on the month's own instalments before it began (the office's month only; 0 otherwise). */
   ahead?: number
 }
@@ -95,6 +115,8 @@ export interface CoDeal {
   owe: number
   /** A repayment PV for it awaits approval (We pay). */
   pending: boolean
+  /** Each figure's principal / interest / penalty. */
+  parts: Record<PartKey, Part>
 }
 
 export interface Company {
@@ -133,7 +155,11 @@ export interface Figures {
   profit: number
   /** Still owed from months before, both sides together, now (the Still overdue filter). */
   earlier: number
+  /** Each side figure's principal / interest / penalty, by its key (nowCollect … openPay). */
+  parts: Record<SideKey, Part>
 }
+
+export type SideKey = 'nowCollect' | 'nowPay' | 'earlyCollect' | 'earlyPay' | 'bfCollect' | 'bfPay' | 'settledCollect' | 'settledPay' | 'openCollect' | 'openPay'
 
 export interface HistMonth {
   /** YYYY-MM */
@@ -142,7 +168,13 @@ export interface HistMonth {
   act: { interestIn: number; interestOut: number; cashIn: number; cashOut: number }
 }
 
-const emptyMonth = (): DealMonth => ({ due: 0, dueInterest: 0, got: 0, gotInterest: 0, settled: 0 })
+const emptyMonth = (): DealMonth => ({ due: 0, dueInterest: 0, got: 0, gotInterest: 0, settled: 0, penalty: 0 })
+const part = (p: number, i: number, pen = 0): Part => ({ p: r2(p), i: r2(i), pen: r2(pen) })
+
+/** The interest still owed on an instalment, interest first: its interest less what came in on it, no more than is owed. */
+export function owedInterest(e: { interest: number; paid: number; owed: number }): number {
+  return r2(Math.min(Math.max(0, e.owed), Math.max(0, e.interest - Math.max(0, e.paid))))
+}
 
 /** The `count` months up to and with `ym`, oldest first. */
 export function monthsTo(ym: string, count: number): string[] {
@@ -170,15 +202,16 @@ export function dueOfEntries(entries: CalendarEntry[], compounding: boolean): { 
 /** A deal's repayments by month — the cash (a contra, netting, is none), the interest and penalty among it, and what
  *  was settled (cash and contra; a penalty is no instalment) — and the day of its last cash. */
 export function actualsOf(payments: Array<{ date: string; type: string; amount: number }>): {
-  byMonth: Record<string, { got: number; gotInterest: number; settled: number }>
+  byMonth: Record<string, { got: number; gotInterest: number; settled: number; penalty: number }>
   last: string | null
 } {
-  const byMonth: Record<string, { got: number; gotInterest: number; settled: number }> = {}
+  const byMonth: Record<string, { got: number; gotInterest: number; settled: number; penalty: number }> = {}
   let last: string | null = null
   for (const p of payments) {
     const ym = p.date.slice(0, 7)
-    const m = (byMonth[ym] ??= { got: 0, gotInterest: 0, settled: 0 })
+    const m = (byMonth[ym] ??= { got: 0, gotInterest: 0, settled: 0, penalty: 0 })
     if (p.type !== 'penalty') m.settled = r2(m.settled + p.amount)
+    else m.penalty = r2(m.penalty + p.amount)
     if (p.type === 'netting') continue
     m.got = r2(m.got + p.amount)
     if (p.type !== 'principal') m.gotInterest = r2(m.gotInterest + p.amount)
@@ -209,6 +242,7 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
     const now = rows.filter((r) => r.date >= start)
     const before = rows.filter((r) => r.date < start)
     const act = f.months[month] ?? emptyMonth()
+    const cashNow = now.filter((r) => r.status !== 'rolled')
     const d: CoDeal = {
       id: f.id,
       side: f.side,
@@ -217,7 +251,7 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
       href: f.href,
       // A row's cash: what came in on it and what is still owed (a 利滚利 instalment's rolled interest is none), no
       // more than it asks; less what came in before the month began.
-      now: r2(Math.max(0, now.filter((r) => r.status !== 'rolled').reduce((s, r) => s + Math.min(r.due, r.received + (r.owed ?? 0)), 0) - (f.ahead ?? 0))),
+      now: r2(Math.max(0, cashNow.reduce((s, r) => s + Math.min(r.due, r.received + (r.owed ?? 0)), 0) - (f.ahead ?? 0))),
       early: 0,
       bf: r2(f.bf ?? 0),
       earlier: r2(before.reduce((s, r) => s + (r.owed ?? 0), 0)),
@@ -229,8 +263,24 @@ export function byCompany(input: { facts: DealFacts[]; collectList: ListRow[]; p
       last: f.last,
       owe: f.owe,
       pending: rows.some((r) => r.pending),
+      parts: { now: part(0, 0), early: part(0, 0), bf: part(0, 0), settled: part(0, 0), open: part(0, 0) },
     }
     d.early = r2(d.settled - (d.now + d.bf - d.open))
+    // The parts, interest first. This month: the instalments' interest (no more than each asked in cash), less what came
+    // in before the 1st — on the interest first.
+    const nowAskedI = cashNow.reduce((s, r) => s + Math.min(r.interest, Math.min(r.due, r.received + (r.owed ?? 0))), 0)
+    const nowI = Math.min(d.now, Math.max(0, nowAskedI - (f.ahead ?? 0)))
+    const bfI = Math.min(d.bf, Math.max(0, f.bfInterest ?? 0))
+    const openI = rows.reduce((s, r) => s + (r.owed == null ? 0 : owedInterest({ interest: r.interest, paid: r.received, owed: r.owed })), 0)
+    const settledI = Math.min(Math.max(0, d.settled), Math.max(0, nowI + bfI - openI))
+    const earlyI = settledI - (nowI + bfI - openI)
+    d.parts = {
+      now: part(d.now - nowI, nowI),
+      early: part(d.early - earlyI, earlyI),
+      bf: part(d.bf - bfI, bfI),
+      settled: part(d.settled - settledI, settledI, act.penalty ?? 0),
+      open: part(d.open - openI, openI),
+    }
     if (rows.length === 0 && d.now < EPS && d.bf < EPS && d.settled < EPS && d.got < EPS) continue
     deals.set(f.companyKey, [...(deals.get(f.companyKey) ?? []), d])
     if (!nameOf.has(f.companyKey)) nameOf.set(f.companyKey, f.company)
@@ -257,7 +307,18 @@ export function figuresOf(deals: CoDeal[]): Figures {
     r2(deals.filter((d) => d.side === side).reduce((s, d) => s + d[k], 0))
   const interestIn = sum('collect', 'gotInterest')
   const interestOut = sum('pay', 'gotInterest')
+  const parts = {} as Record<SideKey, Part>
+  for (const k of PART_KEYS)
+    for (const side of ['collect', 'pay'] as const) {
+      const of = deals.filter((d) => d.side === side).map((d) => d.parts[k])
+      parts[`${k}${side === 'collect' ? 'Collect' : 'Pay'}` as SideKey] = part(
+        of.reduce((t, x) => t + x.p, 0),
+        of.reduce((t, x) => t + x.i, 0),
+        of.reduce((t, x) => t + x.pen, 0),
+      )
+    }
   return {
+    parts,
     nowCollect: sum('collect', 'now'),
     nowPay: sum('pay', 'now'),
     earlyCollect: sum('collect', 'early'),
