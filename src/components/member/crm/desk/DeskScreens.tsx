@@ -404,6 +404,32 @@ export default function DeskScreens(p: DeskScreensProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adsOn, live, data.can.manage, data.can.viewAll, apNeedKey, metaRetry]);
 
+  // Up to date (2026-11-25, the owner: "所有的数据都要 up to date"): each range above is asked once a page load, so a computer
+  // left open kept the spend it first read. Every 10 minutes, a range still running (its last day today or later) is read
+  // again for every ad on screen and the answer laid over what shows; a range that ended keeps its answer.
+  const apMetaRef = useRef(ui.apMeta);
+  apMetaRef.current = ui.apMeta;
+  useEffect(() => {
+    if (!adsOn || !live || !readsAds(data.can)) return;
+    const t = setInterval(() => {
+      const d = new Date(), today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const again = Object.entries(apMetaRef.current ?? {}).map(([key, figs]) => { const [since, until] = key.split("|"); return { key, since, until, ids: Object.keys(figs ?? {}) }; })
+        .filter(n => n.since && n.until && n.until >= today && n.ids.length);
+      for (let i = 0; i < again.length; i += 8) {
+        const part = again.slice(i, i + 8);
+        void fetch(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(part))}`, { cache: "no-store" })
+          .then(async res => (res.ok ? ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs : null))
+          .catch(() => null)
+          .then(figs => {
+            if (!figs) return;
+            setUi(u => { const m = { ...u.apMeta }; for (const n of part) { const f = figs[n.key]; if (f && Object.keys(f).length) { keepFigs(n.key, f); m[n.key] = { ...(m[n.key] ?? {}), ...f }; } } return { ...u, apMeta: m }; });
+          });
+      }
+    }, 10 * 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adsOn, live, data.can.manage, data.can.viewAll]);
+
   // …and its chart, the same figures day by day for the range on screen (2026-10-23; ui.apDaily), each range and ad once.
   const dayNeed = v.apDayNeed as { key: string; since: string; until: string; ids: string[] } | null | undefined;
   const dayNeedKey = JSON.stringify(dayNeed ?? null);

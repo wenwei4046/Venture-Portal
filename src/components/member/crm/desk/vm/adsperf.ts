@@ -113,40 +113,23 @@ export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<st
     cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won), dbudget: dailyBudget(got) };
 }
 /**
- * The Revenue Team's marketing fee on an amount of ads spend (the owner, 2026-11-12): ladder stacking — 25% of the first
- * RM 30,000, 20% of the rest — and never under RM 2,500; billed at the end of the month. RM 10k → 2,500 (the minimum),
- * RM 20k → 5,000, RM 50k → 7,500 + 4,000 = 11,500. Nothing spent, no fee.
+ * The Revenue Team's marketing fee for a calendar month of ads spend: a FIXED RM 2,500 (the owner, 2026-11-25: "手续费固定2500"
+ * — until then 25% of the first RM 30,000 + 20% above, never under RM 2,500). Nothing spent, no fee; unknown spend, unknown fee.
  */
-export const FEE_MIN = 2500, FEE_STEP = 30000, FEE_LOW = 0.25, FEE_HIGH = 0.2;
+export const FEE_FIXED = 2500;
 export function marketingFee(spend: number | null | undefined): number | null {
   if (spend == null) return null;
-  if (spend <= 0) return 0;
-  const ladder = Math.min(spend, FEE_STEP) * FEE_LOW + Math.max(0, spend - FEE_STEP) * FEE_HIGH;
-  return Math.max(FEE_MIN, ladder);
+  return spend > 0 ? FEE_FIXED : 0;
 }
-/** Where the minimum stops: the spend at which 25% is RM 2,500 (RM 10,000). */
-export const FEE_MIN_UNTIL = FEE_MIN / FEE_LOW;
-/** The fee's three tiers, as the strip names them under the fee (the owner, 2026-11-12: "加上 tier 的价钱（已经目前到哪个阶段）"). */
-export const FEE_TIERS = [
-  { n: 1, price: "Min RM 2,500", rule: `Minimum RM 2,500 · spend up to RM ${FEE_MIN_UNTIL.toLocaleString("en-MY")}` },
-  { n: 2, price: "25%", rule: `25% · spend RM ${FEE_MIN_UNTIL.toLocaleString("en-MY")} – ${FEE_STEP.toLocaleString("en-MY")}` },
-  { n: 3, price: "25% + 20%", rule: `25% of the first RM ${FEE_STEP.toLocaleString("en-MY")} + 20% above` },
-] as const;
-/** The tier a month's spend has reached, and how much more spend reaches the next (null on the last). */
-export function feeTier(spend: number): { tier: (typeof FEE_TIERS)[number]; toNext: number | null } {
-  if (spend < FEE_MIN_UNTIL) return { tier: FEE_TIERS[0], toNext: FEE_MIN_UNTIL - spend };
-  if (spend <= FEE_STEP) return { tier: FEE_TIERS[1], toNext: FEE_STEP - spend };
-  return { tier: FEE_TIERS[2], toNext: null };
+/** The fee's one rule, as the strip and its hover name it. */
+export const FEE_TIERS = [{ n: 1, price: "Fixed RM 2,500", rule: "Fixed RM 2,500 a month" }] as const;
+/** The fee's rule for a month (one rule since 2026-11-25; no next tier). */
+export function feeTier(_spend: number): { tier: (typeof FEE_TIERS)[number]; toNext: number | null } {
+  return { tier: FEE_TIERS[0], toNext: null };
 }
-/** The fee's working in words, for the hover (the owner, 2026-11-12: "记得写出他的算法"). */
+/** The fee's working in words, for the hover: a fixed fee needs none. */
 export function feeWorking(spend: number): string {
-  const rm = (v: number) => `RM ${Math.round(v).toLocaleString("en-MY")}`;
-  if (spend <= 0) return "No spend, no fee";
-  // Under RM 10,000 the month pays the minimum, which its Tier 1 line already says (the owner, 2026-11-16, crossing out
-  // "25% × RM 4,642 = RM 1,161, under the minimum → RM 2,500"): no working line.
-  if (spend < FEE_MIN_UNTIL) return "";
-  if (spend <= FEE_STEP) return `25% × ${rm(spend)} = ${rm(spend * FEE_LOW)}`;
-  return `25% × ${rm(FEE_STEP)} + 20% × ${rm(spend - FEE_STEP)} = ${rm(FEE_STEP * FEE_LOW)} + ${rm((spend - FEE_STEP) * FEE_HIGH)} = ${rm(marketingFee(spend) ?? 0)}`;
+  return spend <= 0 ? "No spend, no fee" : "";
 }
 /** A phone as one person's: the digits without Malaysia's 60 and the trunk 0s ("+60 0186…" and "+60186…" agree). */
 const phoneKey = (p: string | null | undefined) => (p ?? "").replace(/\D/g, "").replace(/^60/, "").replace(/^0+/, "");
@@ -438,13 +421,13 @@ export function adsPerfVM(ctx: DeskCtx) {
   const feeSum = feeKnown ? feeMon.reduce((n, m) => n + (m.fee ?? 0), 0) : null, monSpend = feeKnown ? feeMon.reduce((n, m) => n + (m.s ?? 0), 0) : null;
   const monName = (t: number) => MON[new Date(t).getMonth()].slice(0, 3);
   const rmW = (n: number) => `RM ${Math.round(n).toLocaleString("en-MY")}`;
-  const tierOf = (m: (typeof feeMon)[number]) => { const t = feeTier(m.s ?? 0); return { t, line: `Tier ${t.tier.n} · ${t.tier.price}`, next: t.toNext == null ? "Top tier" : `${rmW(t.toNext)} to Tier ${t.tier.n + 1}` }; };
-  const one = feeKnown && feeMon.length === 1 ? tierOf(feeMon[0]) : null;
-  // The month is Total cost's line ("Nov spend + fee") and the hover's; the fee's lines are its tier and the way to the next.
-  const feeSub = !feeKnown ? [] : one ? [one.line, one.next] : [feeMon.map(m => `${monName(m.a)} T${tierOf(m).t.tier.n}`).join(" · "), "Each month billed alone"];
+  // A fixed fee a month since 2026-11-25 (feeTier): its line says so, with nothing to reach.
+  const one = feeKnown && feeMon.length === 1;
+  const billed = feeMon.filter(m => (m.s ?? 0) > 0).length;
+  const feeSub = !feeKnown ? [] : one ? [feeTier(feeMon[0].s ?? 0).tier.price, "Each month"] : [`${FEE_TIERS[0].price} × ${billed} month${billed === 1 ? "" : "s"}`, "Each month billed alone"];
   const feeTitle = [
-    ...FEE_TIERS.map(t => `Tier ${t.n}: ${t.rule}`), "",
-    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)} (Tier ${tierOf(m).t.tier.n})`, feeWorking(m.s ?? 0)].filter(Boolean)) : []),
+    ...FEE_TIERS.map(t => t.rule), "",
+    ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)}`, feeWorking(m.s ?? 0)].filter(Boolean)) : []),
   ].join("\n");
   const feeItems = [
     { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle },

@@ -61,7 +61,11 @@ function keptGet<T>(k: string): T | undefined { try { return (JSON.parse(localSt
 function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, unknown>; all[k] = v; const ks = Object.keys(all); for (const x of ks.slice(0, Math.max(0, ks.length - 24))) delete all[x]; localStorage.setItem(KEPT, JSON.stringify(all)); } catch { /* storage full or off */ } }
 
 /** The desktop's status filter (Ads Performance › All ads · Running · Paused — adStatusOf, as Assignment's). */
-export const AD_STATUSES = ["all", "Running", "Paused"] as const; // no Pending (the owner, 2026-11-08: "广告不会有pending")
+/** The brand row's three, as the Overview's. */
+const BRAND_ROW: [SourcePick, string][] = [["all", "All"], ["conts", "The Conts"], ["dc", "Dream Crafter"]];
+/** How often a range still running is read again while the screen is open (2026-11-25: "所有的数据都要 up to date"). */
+const REFRESH_MS = 10 * 60_000;
+export const AD_STATUSES =["all", "Running", "Paused"] as const; // no Pending (the owner, 2026-11-08: "广告不会有pending")
 export type AdStatusPick = (typeof AD_STATUSES)[number];
 
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: NonNullable<CrmData["adNames"]>; now: Date; live: boolean; manage: boolean;
@@ -71,6 +75,10 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null), [src, setSrc] = useState<SourcePick>("all");
   // The source picked (the owner, 2026-10-27): The Conts / DC, each by WhatsApp · Messenger — the ads, tiles and chart follow it.
   const customers = useMemo(() => p.customers.filter(c => inSource(c, src)), [p.customers, src]);
+  // Meta's figures are read on every open and again every 10 minutes while the page stays open (2026-11-25, the owner: "所有的
+  // 数据都要 up to date"); the server keeps a running range's answer as long.
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick(x => x + 1), REFRESH_MS); return () => clearInterval(t); }, []);
   // Insight's period and comparison (the panel's sheet: Period · Compare to); with no comparison picked, the period before.
   const r = p.range, rb = p.cmp ?? before(r);
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
@@ -114,7 +122,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     void fetchAdDaily(ids, si, ui).then(x => { if (on && x.ok) { setDaily(x.days); keptSet(kD, x.days); } });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantMeta, idKey, si, ui, sb, ub, cmp]);
+  }, [wantMeta, idKey, si, ui, sb, ub, cmp, tick]);
 
   const T = new Date(p.now.getFullYear(), p.now.getMonth(), p.now.getDate()).getTime();
   const feeIds = ads.map(a => a.id).filter(id => /^[0-9]{5,32}$/.test(id)), feeKey = [...feeIds].sort().join(",");
@@ -130,7 +138,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     });
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.live, p.manage, feeKey, feeWantKey, keys.includes("cpl")]);
+  }, [p.live, p.manage, feeKey, feeWantKey, keys.includes("cpl"), tick]);
   // The fee on a range's months as a share of their spend; null until each month is read (the desktop's feeRate).
   const rateOf = (rr: Range): number | null => {
     const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return !got || feeIds.some(id => !(id in got)) ? null : feeIds.reduce((s, id) => s + (got[id]?.spend ?? 0), 0); });
@@ -163,11 +171,24 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const pill: CSSProperties = { ...BTN, flex: "0 1 auto", minWidth: 0, height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "18px", display: "flex", alignItems: "center", gap: "6px", fontSize: fs(13), fontWeight: 500, background: "var(--crm-field)", color: "var(--crm-ink)", whiteSpace: "nowrap" };
   const opt = (on: boolean): CSSProperties => ({ ...BTN, flex: "none", minHeight: "40px", padding: "8px 10px", boxSizing: "border-box", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px", fontSize: fs(13), fontWeight: on ? 600 : 400, background: on ? "var(--crm-field)" : "transparent", color: "var(--crm-ink)", textAlign: "left" });
   const perWord = p.custom ? `${short(r.a)}${r.a !== r.b ? ` – ${short(r.b)}` : ""}` : p.chips.find(c => c.on)?.label ?? "Period";
-  const srcWord = SOURCE_PICKS.find(o => o.v === src)?.label ?? "All sources";
+  // The brand, as the Overview's row (2026-11-25, the owner: "ads performance 要可以选品牌"): All · The Conts · Dream Crafter
+  // over the dropdowns; the source dropdown then offers that brand's channels. Not drawn while the Revenue app's view holds
+  // the CRM to one brand (sourcePickInView offers none but its own).
+  const brand: SourcePick = src === "all" ? "all" : (src.split(":")[0] as SourcePick);
+  const brands = BRAND_ROW.filter(([k]) => k === "all" || (sourcePickInView(p, k) && (!p.view || p.view.brands.length > 1)));
+  const srcOpts = SOURCE_PICKS.filter(o => sourcePickInView(p, o.v) && (brand === "all" || o.v === brand || o.v.startsWith(`${brand}:`)))
+    .map(o => (o.v === brand && brand !== "all" ? { ...o, label: "All sources" } : o));
+  const srcWord = src === brand && brand !== "all" ? "All sources" : SOURCE_PICKS.find(o => o.v === src)?.label ?? "All sources";
 
   return (
     <main style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>
       {head}
+      {brands.length > 1 && (
+        <div role="group" aria-label="Brand" data-ads-brand="" style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "18px", background: "var(--crm-field)" }}>
+          {brands.map(([k, label]) => <button key={k} type="button" onClick={() => { setMenu(null); setSrc(k); }} aria-pressed={brand === k} style={{ ...BTN, flex: 1, height: "30px", borderRadius: "15px", fontSize: fs(12), fontWeight: brand === k ? 600 : 500,
+            background: brand === k ? "#fff" : "transparent", boxShadow: brand === k ? "0 1px 2px #2A160C1F" : "none", color: brand === k ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>)}
+        </div>
+      )}
       {/* v4 8c: the period, the source and the status — one row of three dropdowns (the chip rows and the date line go). */}
       <div data-ads-filters="" style={{ flex: "none", position: "relative", zIndex: 6, display: "flex", alignItems: "center", gap: "6px" }}>
         <button type="button" aria-label={`Period: ${perWord}`} aria-expanded={menu === "per"} onClick={() => setMenu(m => (m === "per" ? null : "per"))} style={pill}><span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{perWord}</span><Ic name="chevron-down" size={13} /></button>
@@ -178,7 +199,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
         {menu && (
           <div role="listbox" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 7, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "50vh", overflowY: "auto" }}>
             {menu === "per" && [...p.chips.map(c => ({ k: c.label, label: c.label, on: c.on && !p.custom, go: c.pick })), { k: "Custom", label: "Custom…", on: p.custom, go: p.openDates }].map(o => <button key={o.k} type="button" role="option" aria-selected={o.on} onClick={() => { setMenu(null); o.go(); }} style={opt(o.on)}>{o.label}</button>)}
-            {menu === "src" && SOURCE_PICKS.filter(o => sourcePickInView(p, o.v)).map(o => <button key={o.v} type="button" role="option" aria-selected={src === o.v} onClick={() => { setMenu(null); setSrc(o.v); }} style={opt(src === o.v)}>{o.label}</button>)}
+            {menu === "src" && srcOpts.map(o => <button key={o.v} type="button" role="option" aria-selected={src === o.v} onClick={() => { setMenu(null); setSrc(o.v); }} style={opt(src === o.v)}>{o.label}</button>)}
             {menu === "st" && AD_STATUSES.map(k => <button key={k} type="button" role="option" aria-selected={stF === k} onClick={() => { setMenu(null); setStF(k); }} style={opt(stF === k)}>{k !== "all" && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: k === "Running" ? "var(--crm-v4-green)" : ST_META[k][1] }} />}{ST_META[k][0]}<span style={{ marginLeft: "auto", color: "var(--crm-faint)" }}>{stCount(k)}</span></button>)}
           </div>
         )}

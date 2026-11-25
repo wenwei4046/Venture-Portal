@@ -8,7 +8,7 @@
  * shared/insight-overview.ts's, the same as the desktop's; Meta's spend is read on the server (CRM · Manage) as the
  * phone's Ads performance reads it, and kept on the phone for the next open.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { readAdFigures } from "./ad-figures-read";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { withoutHiddenAds, type CrmData } from "@/lib/member/crm-data";
@@ -22,6 +22,9 @@ const BTN: CSSProperties = { border: 0, background: "transparent", font: "inheri
 const NUM = (bold: boolean): CSSProperties => ({ textAlign: "right", fontWeight: bold ? 500 : 400, whiteSpace: "nowrap" });
 const BRANDS: [SourcePick, string][] = [["all", "All"], ["conts", "The Conts"], ["dc", "Dream Crafter"]];
 const KEPT = "crm-ov-meta";
+/** How often a range still running is read again while the screen is open (the server keeps Meta's answer as long). */
+export const REFRESH_MS = 10 * 60_000;
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 /** The phone's type, as phone4a.tsx's `fs` (not imported: phone4a.tsx mounts this file). */
 const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
 
@@ -42,19 +45,29 @@ export function PhoneOverview(p: PhoneOverviewProps) {
   const [openTeam, setOpenTeam] = useState<string | null>(null), [openAd, setOpenAd] = useState<string | null>(null), [allAds, setAllAds] = useState(false);
   const [meta, setMeta] = useState<Record<string, Record<string, MetaFig | null>>>(() => (p.live ? kept() : {}));
   const data = useMemo(() => { const d = withoutHiddenAds(p.data); return src === "all" ? d : { ...d, customers: d.customers.filter(c => inSource(c, src)) }; }, [p.data, src]);
-  const f = overviewFigures({ data, r: p.r, prev: p.prev, now: p.now, teams: p.teams, directors: p.directors, directorTeam: p.directorTeam, src, meta, money: p.money && p.live });
+  // Up to date (2026-11-25, the owner: "所有的数据都要 up to date"): what the phone kept shows at once, but every range is read
+  // again for every ad once each time the Overview opens, and a range still running again every 10 minutes while it is open.
+  // Until then a range's kept figure was never asked again — "This month" kept the spend it first read all month (its fee,
+  // read on a key that changes daily, was fresh: RM 6,901 spend against a fee worked out on RM 7,301).
+  const askedAt = useRef(new Map<string, number>()), mounted = useRef(true);
+  const [, setTick] = useState(0);
+  useEffect(() => { mounted.current = true; const t = setInterval(() => setTick(x => x + 1), 60_000); return () => { mounted.current = false; clearInterval(t); }; }, []);
+  const today = isoDay(p.now);
+  const askAll = (key: string, until: string) => { const t = askedAt.current.get(key); return t == null || (until >= today && Date.now() - t > REFRESH_MS); };
+  const f = overviewFigures({ data, r: p.r, prev: p.prev, now: p.now, teams: p.teams, directors: p.directors, directorTeam: p.directorTeam, src, meta, money: p.money && p.live, askAll });
   const needKey = JSON.stringify(f.need);
   useEffect(() => {
     if (!p.live || !p.money || !f.need.length) return;
-    let on = true;
-    // Every range in one GET (ad-figures-read.ts) — not a Server Action a range, queued behind the 5 s re-read.
-    const put = (got: Record<string, Record<string, MetaFig | null>>) => { if (on) setMeta(m => { const v = { ...m }; for (const [k, figs] of Object.entries(got)) v[k] = { ...(m[k] ?? {}), ...figs }; keep(v); return v; }); };
+    const at = Date.now();
+    for (const n of f.need) askedAt.current.set(n.key, at);
+    // Every range in one GET (ad-figures-read.ts) — not a Server Action a range, queued behind the 5 s re-read. Not dropped
+    // when the next drawing asks for less (the asked ranges leave `need` at once): only when the Overview closes.
+    const put = (got: Record<string, Record<string, MetaFig | null>>) => { if (mounted.current) setMeta(m => { const v = { ...m }; for (const [k, figs] of Object.entries(got)) v[k] = { ...(m[k] ?? {}), ...figs }; keep(v); return v; }); };
     void readAdFigures(f.need, put).then(got => {
       // A range that could not be read reads "—" rather than waiting for ever (as before).
       const miss = Object.fromEntries(f.need.filter(n => !got[n.key]).map(n => [n.key, Object.fromEntries(n.ids.map(id => [id, (meta[n.key]?.[id] ?? null) as MetaFig | null]))]));
       if (Object.keys(miss).length) put(miss);
     });
-    return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.live, p.money, needKey]);
 
