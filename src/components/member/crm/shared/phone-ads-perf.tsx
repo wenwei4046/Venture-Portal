@@ -13,7 +13,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily } from "@/app/(member)/member/crm-actions";
 import { readAdFigures } from "./ad-figures-read";
-import { ALL, METRICS, adBrandOf, feeMonths, metaFigures, monthFee } from "../desk/vm/adsperf";
+import { ALL, METRICS, adBrandOf, feeMonths, metaFigures, monthFee, noAdRepeats } from "../desk/vm/adsperf";
 import { ST_META } from "../desk/vm/tokens";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { CrmData } from "@/lib/member/crm-data";
@@ -148,7 +148,9 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
-  const totalLeads = (rr: Range) => customers.filter(c => { const t = day0(new Date(c.createdAt).getTime()); return !(c.adId && p.adNames[c.adId]?.hidden) && t >= rr.a && t <= rr.b; }).length;
+  // Each person once, as the Overview and the desktop (noAdRepeats, 2026-11-25 — the owner: "之前有些事重复到wa & messager 的有减去了嘛？"): a "no ad" chat that is already an ad's lead is not a lead again.
+  const repeats = useMemo(() => noAdRepeats(p.customers), [p.customers]);
+  const totalLeads = (rr: Range) => customers.filter(c => { const t = day0(new Date(c.createdAt).getTime()); return !repeats.has(c.id) && !(c.adId && p.adNames[c.adId]?.hidden) && t >= rr.a && t <= rr.b; }).length;
   const perLeadOf = (rr: Range, fig: Record<string, MetaFig | null>): number | null => {
     const spend = metaFigures(ids.map(i => fig[i]), {}).spend, rate = rateOf(rr), n = totalLeads(rr);
     return spend == null || rate == null || !n ? null : (spend * (1 + rate)) / n;
