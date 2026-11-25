@@ -34,7 +34,7 @@ export class SettingsMobileLogic extends DcLogic {
   flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: "" }), 1800); }
   renderVals() {
     const st = this.state, cfg = st.cfg, rm = n => "RM " + Math.round(n).toLocaleString("en-MY");
-    const tabDefs = [["rooms", "Room types", "M3 10 12 3l9 7v11H3z"], ["cat", "Catalogue", "M4 6h16M4 12h16M4 18h10"], ["styles", "Styles", "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5"]];
+    const tabDefs = [["rooms", "Room types", "M3 10 12 3l9 7v11H3z"], ["cat", "Master list", "M4 6h16M4 12h16M4 18h10"], ["styles", "Styles", "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5"]];
     const base = { back: e => { e && e.preventDefault && e.preventDefault(); this.props.onBack && this.props.onBack(); }, stop: e => e.stopPropagation(), tabs: tabDefs.map(([k, label, d]) => { const on = st.tab === k; return { label, d, bg: on ? "#F5871F" : "transparent", ink: on ? "#111111" : "#6B6B66", w: on ? 700 : 550, pick: () => this.setState({ tab: k, sheet: null }) }; }), toast: st.toast };
     if (!cfg) return { ...base, loading: true, tabQuote: false, hdrD: "flex", tabCat: false, tabRooms: false, tabStyles: false, sheet: false, dirtyText: "", dirtyInk: "#6B6B66", pubBg: "#D2D2CB", publish: () => {} };
     const dirty = JSON.stringify(cfg) !== st.saved, kinds = cfg.catalog.kinds || {};
@@ -101,7 +101,7 @@ export class SettingsMobileLogic extends DcLogic {
           sub: xl.file ? xl.file + " · " + new Date(xl.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "Code, Item Description, Selling Price",
           upLabel: nx ? "Replace" : "Upload", onFile: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) this.readPriceList(f); } } }; })(),
       catMsg: st.catMsg || "", catMsgInk: st.catErr ? "#8A2E1C" : "#387557",
-      items: list.slice(0, st.limit).map(it => { const on = !it.paused, s2 = sw(on); return { name: it.name, code: [it.code, srcOf(it) === "excel" ? "Excel" : srcOf(it) === "manual" ? "Manual" : ""].filter(Boolean).join(" · "), img: this.u(it.img), price: it.cost == null || it.noPrice ? "No price" : rm(it.cost), priceInk: it.cost == null || it.noPrice ? "#8A2E1C" : "#1F1F1C", op: on ? 1 : .5, track: s2.track, knob: s2.knob,
+      items: list.slice(0, st.limit).map(it => { const on = !it.paused, s2 = sw(on); return { name: it.name, code: [it.code, ({ b2b: "b2b", excel: "Excel", manual: "Manual" })[srcOf(it)]].filter(Boolean).join(" · "), img: this.u(it.img), price: it.cost == null || it.noPrice ? "No price" : rm(it.cost), priceInk: it.cost == null || it.noPrice ? "#8A2E1C" : "#1F1F1C", op: on ? 1 : .5, track: s2.track, knob: s2.knob,
         edit: () => this.setState({ sheet: { type: "item", id: it.id } }), toggle: () => setItem(it.id, x => { x.paused = !x.paused; }) }; }),
       noItems: !list.length, more: list.length > st.limit ? { label: `Show more (${list.length - st.limit})`, run: () => this.setState({ limit: st.limit + 40 }) } : false,
       rooms: gList.map(ps => { const ph = (ps[0].spec || {}).photos || []; return { label: ps[0].groupLabel || ps[0].name, prices: priceText(ps), photos: ph.length ? ph.length + " photo" + (ph.length === 1 ? "" : "s") : "No photos yet", cover: this.u(ph[0]), noCover: !ph.length, open: () => this.setState({ sheet: { type: "room", id: ps[0].group }, rtab: "specs", rver: null, warn: "" }) }; }),

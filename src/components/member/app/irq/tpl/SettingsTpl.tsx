@@ -2791,13 +2791,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                   {"\n            "}
                 </select>
                 {"\n            "}
-                <details style={{"position":"relative"}}>
+                <details open={v["tidyOpen"]} style={{"position":"relative"}}>
                   {"\n              "}
-                  <summary style={{"listStyle":"none","display":"flex","alignItems":"center","height":"40px","padding":"0 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13.5px","fontWeight":"600","whiteSpace":"nowrap","cursor":"pointer"}}>
+                  <summary onClick={v["tidyToggle"]} style={{"listStyle":"none","display":"flex","alignItems":"center","height":"40px","padding":"0 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13.5px","fontWeight":"600","whiteSpace":"nowrap","cursor":"pointer"}}>
                     {"Tidy up ▾"}
                   </summary>
                   {"\n              "}
-                  <div style={{"position":"absolute","right":"0","top":"46px","zIndex":"20","display":"flex","flexDirection":"column","gap":"2px","width":"260px","padding":"6px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)","boxShadow":"0 10px 28px rgba(20,20,18,.16)"}}>
+                  <div onClick={v["tidyClose"]} style={{"position":"fixed","inset":"0","zIndex":"19"}} />
+                  <div onClick={v["tidyClose"]} style={{"position":"absolute","right":"0","top":"46px","zIndex":"20","display":"flex","flexDirection":"column","gap":"2px","width":"260px","padding":"6px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)","boxShadow":"0 10px 28px rgba(20,20,18,.16)"}}>
                     {"\n                "}
                     <button onClick={v["useWeb"]} style={{"display":"flex","flexDirection":"column","gap":"2px","padding":"9px 10px","border":"0","borderRadius":"8px","background":"transparent","textAlign":"left","cursor":"pointer"}} className={"irq-p1"}>
                       <span style={{"fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)"}}>

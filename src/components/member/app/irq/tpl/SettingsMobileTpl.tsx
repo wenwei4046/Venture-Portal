@@ -546,7 +546,7 @@ export function renderSettingsMobile(v: DcVals, C: DcComponents) {
                 <svg width={"16"} height={"16"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2"} strokeLinecap={"round"} style={{"stroke":"var(--irq-c-6b6b66)"}}>
                   <path d={"M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"} />
                 </svg>
-                <input value={dcValue(v["sheet"]?.["pick"]?.["q"])} onChange={v["sheet"]?.["pick"]?.["onQ"]} placeholder={"Search Catalogue"} style={{"flex":"1","minWidth":"0","border":"0","outline":"none","background":"transparent","fontSize":"15px"}} />
+                <input value={dcValue(v["sheet"]?.["pick"]?.["q"])} onChange={v["sheet"]?.["pick"]?.["onQ"]} placeholder={"Search Master list"} style={{"flex":"1","minWidth":"0","border":"0","outline":"none","background":"transparent","fontSize":"15px"}} />
               </label>
               {"\n          "}
               <div style={{"display":"flex","flexDirection":"column"}}>
