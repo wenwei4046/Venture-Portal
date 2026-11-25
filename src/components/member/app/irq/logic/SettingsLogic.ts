@@ -8,6 +8,7 @@ import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 import * as catalogImport from "../lib/catalog-import";
 import { sortCatalog, nextCatalogSort } from "../lib/catalog-import";
+import { mergeExcel, srcOf, readPriceListFile, kindsInPackages, uploadMessage } from "../lib/price-list";
 const ICON = {
   home: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
   chart: "M4 20V10m5 10V4m5 16v-7m5 7V8M3 20h18",
@@ -42,7 +43,7 @@ export class SettingsLogic extends DcLogic {
   stage(items, source, page) {
     const ci = this.ci, cfg = this.state.cfg;
     if (!items.length) { this.impMsg("No products found there.", true); return; }
-    const rows = ci.diff(cfg.catalog.items, items);
+    const rows = ci.diff(cfg.catalog.items.filter(x => srcOf(x) === "b2b"), items); // the Excel price list's items are never a b2b row's match (2026-11-24)
     const kindGuess = Object.entries(cfg.catalog.kinds).find(([k, v]) => v.url && page && page.startsWith(v.url.replace(/\/$/, "")))?.[0] || (this.state.kindFilter !== "all" ? this.state.kindFilter : Object.keys(cfg.catalog.kinds)[0] || "");
     const sel = {}; rows.forEach(r => { sel[r.key] = r.status !== "same"; });
     const sing = s => String(s || "").toUpperCase().replace(/[^A-Z]/g, "").replace(/S$/, "");
@@ -171,6 +172,15 @@ export class SettingsLogic extends DcLogic {
       const csv = rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(",")).join("\n");
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" })); a.download = fname + ".csv"; a.click();
     }
+  }
+  // The second source: the company's Excel price list (2026-11-24). Replaces the Excel items, never the b2b ones.
+  async readPriceList(file) {
+    this.setState({ catMsg: "Reading " + file.name + "…", catErr: false });
+    const got = await readPriceListFile(file);
+    if ("error" in got) { this.setState({ catMsg: got.error, catErr: true }); return; }
+    const at = Date.now(), res = mergeExcel(JSON.parse(JSON.stringify(this.state.cfg.catalog)), got.list, file.name, at, p => quoteDocLib.newId(p), kindsInPackages(this.state.cfg)); // the counts, worked out on a copy
+    this.upd(c => { mergeExcel(c.catalog, got.list, file.name, at, p => quoteDocLib.newId(p), kindsInPackages(c)); });
+    this.setState({ kindFilter: "all", catMsg: uploadMessage(res, got.name), catErr: false });
   }
   async readXl(file, pid) {
     let rows = [];
@@ -629,7 +639,7 @@ export class SettingsLogic extends DcLogic {
         id: it.id, selected: !!(st.sel || {})[it.id], onSel: () => this.setState(s => { const m = { ...(s.sel || {}) }; if (m[it.id]) delete m[it.id]; else m[it.id] = true; return { sel: m }; }),
         img: it.img || imgFor(it.code), specs: it.specs || "", initials: "",
         code: it.code || "", name: it.name, kind: it.kind, cost: it.noPrice || it.cost == null ? "" : String(it.cost),
-        chip: it.noPrice ? "NO PRICE" : it.sample ? "SAMPLE" : "", chipBg: it.noPrice ? "#EEEEEA" : it.sample ? "#F5E1AE" : "#E8F3ED", chipInk: it.noPrice ? "#8A2E1C" : it.sample ? "#D96E0B" : "#387557",
+        chip: it.noPrice ? "NO PRICE" : it.sample ? "SAMPLE" : srcOf(it) === "excel" ? "EXCEL" : "", chipBg: it.noPrice ? "#EEEEEA" : it.sample ? "#F5E1AE" : "#E8F3ED", chipInk: it.noPrice ? "#8A2E1C" : it.sample ? "#D96E0B" : "#387557",
         onCode: e => { const v = e.target.value; setC(x => { x.code = v; }); }, onName: e => { const v = e.target.value; setC(x => { x.name = v; }); },
         onKind: e => { const v = e.target.value; setC(x => { x.kind = v; }); }, onCost: e => { const raw = e.target.value, v = num(raw); setC(x => { if (raw.trim() === "") { x.cost = null; x.noPrice = true; } else { x.cost = v; x.sample = false; x.noPrice = false; } }); },
         toggleSample: () => setC(x => { if (!x.noPrice) x.sample = !x.sample; }),
@@ -903,7 +913,13 @@ export class SettingsLogic extends DcLogic {
         return { useWebLabel: mv.length ? `Use website categories (${mv.length})` : "Use website categories", useWeb: () => { if (!mv.length) { this.setState({ catMsg: items.some(i => i.webCat) ? "Every item already follows the website categories." : "Items don't know their website category yet. On b2b: bookmark › Everything › Copy, then Paste from website › Update (this also fills Stock).", catErr: !items.some(i => i.webCat) }); return; } this.upd(c => { c.catalog.items.forEach(x => { if (x.webCat) x.kind = this.kindForCat(c, x.webCat, x.room); }); }); this.setState({ kindFilter: "all", catMsg: `Moved ${mv.length} items to their website categories. Check, then Save and publish.`, catErr: false }); } }; })(),
       catSortH: Object.fromEntries(["code", "name", "kind", "cost", "show"].map(k => { const on = st.catSort && st.catSort.key === k; return [k, { mark: on ? (st.catSort.dir > 0 ? " ▲" : " ▼") : "", go: () => this.setState(s => ({ page: 0, catSort: nextCatalogSort(s.catSort, k) })) }]; })),
       kindFilter: st.kindFilter, onKindFilter: e => this.setState({ kindFilter: e.target.value, sel: {}, page: 0 }),
-      kindSelOpts: [{ v: "all", l: "All categories (" + items.length + ")" }, ...Object.entries(kinds).map(([k, v]) => ({ v: k, l: v.label + " (" + items.filter(i => i.kind === k).length + ")" }))],
+      kindSelOpts: [{ v: "all", l: "All categories (" + items.length + ")" }, ...Object.entries(kinds).map(([k, v]) => ({ v: k, l: v.label + (v.src === "excel" ? " · Excel" : "") + " (" + items.filter(i => i.kind === k).length + ")" }))],
+      // Each source's switch (2026-11-24): off, the quote offers none of its items; each item keeps its own On / Paused.
+      srcs: (() => { const S = cfg.catalog.sources || {}, sw = k => { const on = !(S[k] || {}).off; return { on, label: on ? "On" : "Off", ink: on ? "#387557" : "#97978F", track: on ? "#111111" : "#D5D2C8", knob: on ? "14px" : "2px", title: on ? "Hide every item of this source from IR Quote" : "Show this source's items in IR Quote again", toggle: () => this.upd(c => { const T = (c.catalog.sources = c.catalog.sources || {}); T[k] = { ...(T[k] || {}), off: on }; }) }; };
+        const xl = S.excel || {}, nx = items.filter(i => srcOf(i) === "excel").length, nb = items.length - nx;
+        return { b2b: { ...sw("b2b"), count: nb.toLocaleString("en-MY") + " items" }, xl: { ...sw("excel"), has: nx > 0, count: nx ? nx + " items" : "Not uploaded yet",
+          sub: xl.file ? xl.file + " · " + new Date(xl.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Upload the price list (Code, Item Description, Selling Price)",
+          upLabel: nx ? "Replace Excel" : "Upload Excel", onFile: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) this.readPriceList(f); } } }; })(),
       sync: (() => { const t = cfg.catalog.syncedAt, d = t ? Math.floor((Date.now() - t) / 86400000) : null, old = d == null || d >= 7;
         return { title: d == null ? "Prices not updated yet" : d === 0 ? "Prices updated today" : d === 1 ? "Prices updated yesterday" : (old ? "Prices not updated for " : "Prices updated ") + d + " days" + (old ? "" : " ago"), bg: old ? "#FAF0D8" : "#FFFFFF", line: old ? "#FFC999" : "#E7E7E2", dot: old ? "#F5871F" : "#4E9A6E" }; })(),
       kindChips: [["all", "All", items.length], ...Object.entries(kinds).map(([k, v]) => [k, v.label, items.filter(i => i.kind === k).length])].map(([k, label, count]) => ({ label, count, border: st.kindFilter === k ? "#111111" : "#DEDED8", bg: st.kindFilter === k ? "#FFEBD9" : "#FFFFFF", color: st.kindFilter === k ? "#111111" : "#1F1F1C", weight: st.kindFilter === k ? 650 : 500, pick: () => this.setState({ kindFilter: k }) })),
@@ -915,7 +931,7 @@ export class SettingsLogic extends DcLogic {
         return { catPageRows: rows, ...this.bulkVals(rows, st), pager: { show: n > 25, range: n ? `${pg * per + 1}–${Math.min(n, pg * per + per)} of ${n}` : "", label: `${pg + 1} / ${pages}`, first: pg === 0, last: pg >= pages - 1, prevOp: pg === 0 ? .4 : 1, nextOp: pg >= pages - 1 ? .4 : 1,
           prev: () => this.setState({ page: Math.max(0, pg - 1) }), next: () => this.setState({ page: Math.min(pages - 1, pg + 1) }),
           sizes: [25, 50, 100].map(k => ({ label: String(k), bg: per === k ? "#FFFFFF" : "transparent", ink: per === k ? "#111111" : "#6B6B66", shadow: per === k ? "0 1px 2px rgba(20,20,18,.14)" : "none", pick: () => this.setState({ perPage: k, page: 0 }) })) } }; })(), catCount: `${catRows.length} item${catRows.length === 1 ? "" : "s"}`, catSampleText: [items.filter(i => i.paused || (kinds[i.kind] || {}).paused).length ? `· ${items.filter(i => i.paused || (kinds[i.kind] || {}).paused).length} paused` : "", noPriceN ? `· ${noPriceN} without a price (hidden from IR)` : "", sampleN ? `· ${sampleN} with a sample price` : ""].filter(Boolean).join(" ") || "· every price confirmed",
-      ...(() => { const moves = items.filter(it => { const g = this.guessKind(it.name, kinds); return g && g !== it.kind; });
+      ...(() => { const moves = items.filter(it => { if (srcOf(it) === "excel") return false; const g = this.guessKind(it.name, kinds); return g && g !== it.kind; });
         return { autoSortLabel: moves.length ? `Sort by name (${moves.length} to move)` : "Sort by name", autoSort: () => { if (!moves.length) { this.setState({ catMsg: "Every item is already in the category its name says.", catErr: false }); return; } const ids = {}; moves.forEach(m => { ids[m.id] = this.guessKind(m.name, kinds); }); this.upd(c => { c.catalog.items.forEach(x => { if (ids[x.id]) x.kind = ids[x.id]; }); }); this.setState({ catMsg: `Moved ${moves.length} items to the category their name says. Check, then Save and publish.`, catErr: false }); } }; })(),
       addCatItem: () => { const k = st.kindFilter === "all" ? Object.keys(kinds)[0] : st.kindFilter; this.upd(c => { c.catalog.items.unshift({ id: lib.newId("c"), kind: k, code: "", name: "NEW ITEM", cost: 0 }); }); },
       kindRows: Object.entries(kinds).map(([k, v]) => ({ key: k, label: v.label, url: v.url || "", room: v.room || "", onRoom: e => { const val = e.target.value.toUpperCase(); this.upd(c => { c.catalog.kinds[k].room = val; }); },

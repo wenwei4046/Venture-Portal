@@ -2325,7 +2325,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     </strong>
                     {"\n                "}
                     <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
-                      {"b2b → bookmark → Send"}
+                      {"b2b · "}{dcText(v["srcs"]?.["b2b"]?.["count"])}{" · bookmark → Send"}
                     </span>
                     {"\n              "}
                   </div>
@@ -2347,9 +2347,39 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     <button onClick={v["imp"]?.["paste"]} style={{"height":"36px","padding":"0 14px","borderRadius":"9px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"650","whiteSpace":"nowrap"}}>
                       {"Paste from website"}
                     </button>
+                    <button onClick={v["srcs"]?.["b2b"]?.["toggle"]} title={v["srcs"]?.["b2b"]?.["title"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:36px;padding:0 4px;border:0;background:transparent;font-size:12.5px;font-weight:600;color:${dcS(v["srcs"]?.["b2b"]?.["ink"])};white-space:nowrap`)}>
+                      <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(v["srcs"]?.["b2b"]?.["track"])}`)}>
+                        <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["b2b"]?.["knob"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+                      </span>
+                      {dcText(v["srcs"]?.["b2b"]?.["label"])}
+                    </button>
                     {"\n              "}
                   </div>
                   {"\n            "}
+                </div>
+                {"\n            "}
+                <div style={{"display":"flex","alignItems":"center","gap":"12px","flexWrap":"wrap","padding":"10px 10px 10px 16px","borderRadius":"12px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)"}}>
+                  <span style={{"flex":"0 0 8px","width":"8px","height":"8px","borderRadius":"50%","background":"var(--irq-c-2d5788)"}} />
+                  <div style={{"flex":"1 1 240px","display":"flex","flexDirection":"column","gap":"2px","minWidth":"0"}}>
+                    <strong style={{"fontSize":"13.5px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                      {"Excel price list · "}{dcText(v["srcs"]?.["xl"]?.["count"])}
+                    </strong>
+                    <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
+                      {dcText(v["srcs"]?.["xl"]?.["sub"])}
+                    </span>
+                  </div>
+                  <div style={{"display":"flex","gap":"8px","flexWrap":"wrap","alignItems":"center"}}>
+                    <label style={{"display":"flex","alignItems":"center","height":"36px","padding":"0 14px","borderRadius":"9px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13.5px","fontWeight":"650","whiteSpace":"nowrap","cursor":"pointer"}}>
+                      {dcText(v["srcs"]?.["xl"]?.["upLabel"])}
+                      <input type={"file"} accept={".xlsx,.xls"} onChange={v["srcs"]?.["xl"]?.["onFile"]} style={{"display":"none"}} />
+                    </label>
+                    <button onClick={v["srcs"]?.["xl"]?.["toggle"]} title={v["srcs"]?.["xl"]?.["title"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:36px;padding:0 4px;border:0;background:transparent;font-size:12.5px;font-weight:600;color:${dcS(v["srcs"]?.["xl"]?.["ink"])};white-space:nowrap`)}>
+                      <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(v["srcs"]?.["xl"]?.["track"])}`)}>
+                        <span style={dcCss(`position:absolute;top:2px;left:${dcS(v["srcs"]?.["xl"]?.["knob"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+                      </span>
+                      {dcText(v["srcs"]?.["xl"]?.["label"])}
+                    </button>
+                  </div>
                 </div>
                 {"\n            "}
                 {(v["imp"]?.["showBox"]) ? (<>
