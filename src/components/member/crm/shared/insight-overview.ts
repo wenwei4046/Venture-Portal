@@ -13,7 +13,7 @@
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import type { CrmCustomer, CrmData } from "@/lib/member/crm-data";
 import { BRAND_LABEL, adPageInSource, brandOf, sourceOf, type SourceBrand, type SourcePick } from "@/lib/member/crm-source";
-import { feeMonths, isoOf, marketingFee, noAdRepeats } from "../desk/vm/adsperf";
+import { feeMonths, isoOf, monthFee, noAdRepeats } from "../desk/vm/adsperf";
 import { inRange, numbersOf } from "../panel/vm/common";
 
 export interface OvRange { a: number; b: number }
@@ -143,9 +143,10 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   };
   // The fee is the calendar month's, on every ad of the brand: its share of the months' spend (Ads Performance's feeRate).
   const feeRate = (a: number, b: number): number | null => {
-    const ms = feeMonths(a, b, T).map(([x, y]) => spendOf(paidIds, x, y));
-    if (!ms.length || ms.some(s => s == null)) return null;
-    const spent = ms.reduce((n: number, s) => n + (s ?? 0), 0), fee = ms.reduce((n: number, s) => n + (marketingFee(s) ?? 0), 0);
+    // RM 2,500 a month for each brand that spent (monthFee — "每个品牌各2500", 2026-11-25).
+    const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(paidIds, brandOfAd, ids => spendOf(ids, x, y)));
+    if (!ms.length || ms.some(m => m == null)) return null;
+    const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
   const rate = feeRate(r.a, r.b), ratePrev = feeRate(prev.a, prev.b);

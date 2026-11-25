@@ -13,7 +13,7 @@ import { INS_CARDS, MON, insightDates, insightRange } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
-import { adPageInSource, BRAND_LABEL, brandOf, inSource, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
+import { adPageInSource, BRAND_LABEL, brandOf, inSource, SOURCE_PICKS, sourceLabel, sourceOf, type SourceBrand, type SourcePick } from "@/lib/member/crm-source";
 import { pickedSource, sourcePickInView } from "@/lib/member/crm-view";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
@@ -122,10 +122,32 @@ export function marketingFee(spend: number | null | undefined): number | null {
   return spend > 0 ? FEE_FIXED : 0;
 }
 /** The fee's one rule, as the strip and its hover name it. */
-export const FEE_TIERS = [{ n: 1, price: "Fixed RM 2,500", rule: "Fixed RM 2,500 a month" }] as const;
+export const FEE_TIERS = [{ n: 1, price: "Fixed RM 2,500", rule: "Fixed RM 2,500 a month for each brand that spent" }] as const;
 /** The fee's rule for a month (one rule since 2026-11-25; no next tier). */
 export function feeTier(_spend: number): { tier: (typeof FEE_TIERS)[number]; toNext: number | null } {
   return { tier: FEE_TIERS[0], toNext: null };
+}
+/** An ad's brand: its first lead's number or Page, else the Page Meta named for it. */
+export function adBrandOf(customers: { adId?: string | null; channel: CrmCustomer["channel"]; accountId?: string | null }[], pageOf: (id: string) => string | null | undefined) {
+  return (id: string): SourceBrand | null => { const c = customers.find(x => x.adId === id); return (c ? sourceOf(c).brand : null) ?? brandOf(pageOf(id)); };
+}
+/**
+ * One calendar month's spend and fee over some ads: RM 2,500 for EACH brand that spent (the owner, 2026-11-25: "每个品牌各
+ * 2500") — All with both brands spending is RM 5,000. An ad of no known brand adds its spend; it is billed on its own only
+ * when no brand spent. Null until every ad's spend is read.
+ */
+export function monthFee(ids: string[], brandOfAd: (id: string) => SourceBrand | null, spendOf: (ids: string[]) => number | null): { spent: number; fee: number } | null {
+  const by = new Map<string, string[]>();
+  for (const id of ids) { const k = brandOfAd(id) ?? "none"; by.set(k, [...(by.get(k) ?? []), id]); }
+  let spent = 0, fee = 0, none = 0;
+  for (const [k, g] of by) {
+    const s = spendOf(g);
+    if (s == null) return null;
+    spent += s;
+    if (k === "none") none = s; else fee += marketingFee(s) ?? 0;
+  }
+  if (!fee && none > 0) fee = marketingFee(none) ?? 0;
+  return { spent, fee };
 }
 /** The fee's working in words, for the hover: a fixed fee needs none. */
 export function feeWorking(spend: number): string {
@@ -255,11 +277,13 @@ export function adsPerfVM(ctx: DeskCtx) {
   // the range touches, on that whole month's spend up to today — every ad of the source picked, paused and hidden ones too
   // (they were spent), whatever the Running / Paused filter shows.
   const feeIds = adsAll.map(x => x.id).filter(id => /^[0-9]{5,32}$/.test(id));
+  // RM 2,500 a month for each brand that spent (monthFee).
+  const brandOfFee = adBrandOf(data.customers, id => data.adNames?.[id]?.pageId);
   // The fee on a range's months as a share of their spend (RM 2,500 on RM 3,192 = 78%); null until every month is read.
   const feeRate = (a: number, b: number): number | null => {
-    const ms = feeMonths(a, b, T).map(([x, y]) => metaFigures(metaOf(feeIds, x, y), {}).spend);
-    if (!ms.length || ms.some(s => s == null)) return null;
-    const spent = ms.reduce((n: number, s) => n + (s ?? 0), 0), fee = ms.reduce((n: number, s) => n + (marketingFee(s) ?? 0), 0);
+    const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(feeIds, brandOfFee, ids => metaFigures(metaOf(ids, x, y), {}).spend));
+    if (!ms.length || ms.some(m => m == null)) return null;
+    const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
   // Every lead of the period in the source picked — Overview's Leads: an ad's, a "no ad" chat, one that came back; not a
@@ -416,15 +440,15 @@ export function adsPerfVM(ctx: DeskCtx) {
   // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
   // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after
   // Spent; under the fee, the tier the month has reached and the spend to the next. Total cost = those months' spend + fee.
-  const feeMon = feeRanges.map(([a, b]) => { const s = metaFigures(metaOf(feeIds, a, b), {}).spend; return { a, s, fee: marketingFee(s) }; });
+  const feeMon = feeRanges.map(([a, b]) => { const s = metaFigures(metaOf(feeIds, a, b), {}).spend; return { a, s, fee: monthFee(feeIds, brandOfFee, ids => metaFigures(metaOf(ids, a, b), {}).spend)?.fee ?? marketingFee(s) }; });
   const feeKnown = feeMon.length > 0 && feeMon.every(m => m.s != null);
   const feeSum = feeKnown ? feeMon.reduce((n, m) => n + (m.fee ?? 0), 0) : null, monSpend = feeKnown ? feeMon.reduce((n, m) => n + (m.s ?? 0), 0) : null;
   const monName = (t: number) => MON[new Date(t).getMonth()].slice(0, 3);
   const rmW = (n: number) => `RM ${Math.round(n).toLocaleString("en-MY")}`;
   // A fixed fee a month since 2026-11-25 (feeTier): its line says so, with nothing to reach.
-  const one = feeKnown && feeMon.length === 1;
-  const billed = feeMon.filter(m => (m.s ?? 0) > 0).length;
-  const feeSub = !feeKnown ? [] : one ? [feeTier(feeMon[0].s ?? 0).tier.price, "Each month"] : [`${FEE_TIERS[0].price} × ${billed} month${billed === 1 ? "" : "s"}`, "Each month billed alone"];
+  // Per brand since the same evening ("每个品牌各2500"): RM 2,500 × the brands that spent, each month.
+  const billed = feeMon.reduce((n, m) => n + Math.round((m.fee ?? 0) / FEE_FIXED), 0);
+  const feeSub = !feeKnown ? [] : [`${FEE_TIERS[0].price} × ${billed}`, feeMon.length === 1 ? "Each brand that spent" : "Each brand, each month"];
   const feeTitle = [
     ...FEE_TIERS.map(t => t.rule), "",
     ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)}`, feeWorking(m.s ?? 0)].filter(Boolean)) : []),

@@ -13,7 +13,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily } from "@/app/(member)/member/crm-actions";
 import { readAdFigures } from "./ad-figures-read";
-import { ALL, METRICS, feeMonths, marketingFee, metaFigures } from "../desk/vm/adsperf";
+import { ALL, METRICS, adBrandOf, feeMonths, metaFigures, monthFee } from "../desk/vm/adsperf";
 import { ST_META } from "../desk/vm/tokens";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { CrmData } from "@/lib/member/crm-data";
@@ -127,6 +127,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const T = new Date(p.now.getFullYear(), p.now.getMonth(), p.now.getDate()).getTime();
   const feeIds = ads.map(a => a.id).filter(id => /^[0-9]{5,32}$/.test(id)), feeKey = [...feeIds].sort().join(",");
   const monthsOf = (rr: Range) => feeMonths(rr.a, rr.b, T);
+  const brandOfFee = adBrandOf(p.customers, id => p.adNames[id]?.pageId);
   const [feeFig, setFeeFig] = useState<Record<string, Record<string, MetaFig | null>>>(() => keptGet("fee") ?? {});
   const feeWant = [...monthsOf(r), ...monthsOf(rb)].map(([x, y]) => `${isoOf(x)}|${isoOf(y)}`).filter((k, n, l) => l.indexOf(k) === n), feeWantKey = feeWant.join(",");
   useEffect(() => {
@@ -141,9 +142,10 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [p.live, p.manage, feeKey, feeWantKey, keys.includes("cpl"), tick]);
   // The fee on a range's months as a share of their spend; null until each month is read (the desktop's feeRate).
   const rateOf = (rr: Range): number | null => {
-    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return !got || feeIds.some(id => !(id in got)) ? null : feeIds.reduce((s, id) => s + (got[id]?.spend ?? 0), 0); });
-    if (!ms.length || ms.some(s => s == null)) return null;
-    const spent = ms.reduce((n: number, s) => n + (s ?? 0), 0), fee = ms.reduce((n: number, s) => n + (marketingFee(s) ?? 0), 0);
+    // RM 2,500 a month for each brand that spent (monthFee — "每个品牌各2500", 2026-11-25).
+    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return monthFee(feeIds, brandOfFee, ids => (!got || ids.some(id => !(id in got)) ? null : ids.reduce((s, id) => s + (got[id]?.spend ?? 0), 0))); });
+    if (!ms.length || ms.some(m => m == null)) return null;
+    const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
   const totalLeads = (rr: Range) => customers.filter(c => { const t = day0(new Date(c.createdAt).getTime()); return !(c.adId && p.adNames[c.adId]?.hidden) && t >= rr.a && t <= rr.b; }).length;
