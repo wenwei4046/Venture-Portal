@@ -55,8 +55,9 @@ describe('a person’s own permissions, by view and tab (HR revamp 8)', () => {
     expect(screen.queryByText(/A red dot marks/)).toBeNull()
     expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveAttribute('aria-selected', 'true')
     // 16 Revenue app tabs since the rest of Profile got its boxes (2026-10-11), 17 with IT requests (2026-10-20), 20 with
-    // Free test, Library and their writers' tab (2026-11-16); the Revenue Team sees 15 (the two Profile pages are theirs).
-    expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('15/20')
+    // Free test, Library and their writers' tab (2026-11-16), 21 with Insight · Commission ratio (2026-11-27, a Revenue
+    // Director's — not the Revenue Team's); the Revenue Team sees 15 (the two Profile pages are theirs).
+    expect(screen.getByRole('tab', { name: /Revenue app/ })).toHaveTextContent('15/21')
     fireEvent.click(box('Quote · Create'))
     expect(box('Quote · Create')).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByLabelText('changed for this person')).toBeInTheDocument()
