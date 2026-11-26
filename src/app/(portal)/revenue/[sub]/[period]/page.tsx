@@ -77,6 +77,8 @@ interface BatchRow {
 interface SchemeRow {
   enable_kpi: boolean
   enable_margin_penalty: boolean
+  /** The first month the penalty cuts (2026-11-27), `YYYY-MM-01`; null: every month. */
+  margin_penalty_from?: string | null
   enable_margin_incentive: boolean
 }
 
@@ -167,7 +169,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ? once(
         supabase
           .from('comm_schemes')
-          .select('enable_kpi, enable_margin_penalty, enable_margin_incentive')
+          .select('enable_kpi, enable_margin_penalty, margin_penalty_from, enable_margin_incentive')
           .eq('id', subDept.schemeId)
           .maybeSingle(),
       ).then(({ data }) => data as SchemeRow | null)
@@ -650,7 +652,9 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         switches={subDept.schemeId && scheme ? (
           <SchemeSwitches
             schemeId={subDept.schemeId}
-            margin={scheme.enable_margin_penalty || scheme.enable_margin_incentive}
+            // What THIS month pays (2026-11-27): a penalty that starts in a later month cuts none of its bills.
+            margin={(scheme.enable_margin_penalty && (!scheme.margin_penalty_from || period >= scheme.margin_penalty_from.slice(0, 10)))
+              || scheme.enable_margin_incentive}
             kpi={scheme.enable_kpi}
           />
         ) : undefined}

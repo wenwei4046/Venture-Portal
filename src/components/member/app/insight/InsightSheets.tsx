@@ -86,9 +86,11 @@ export interface OrderNotMineRequest { id: string; status: string }
  * One bill: amount, margin, KPI items and every product line (1779–1805). Its ⋯ (2026-10-21 — the user, circling the
  * deposit chip: "加一个三点，可以 share order request") shares the reader's own bill with colleagues, or opens the request
  * already open on it; a shared bill says who holds what. Beside it (2026-11-14 — the user: "现在是多了一个 function"), *Not my
- * order* sends HR a request to take the reader's own bill off them, or opens the one already with HR.
+ * order* sends HR a request to take the reader's own bill off them, or opens the one already with HR. And for a Revenue
+ * Director (2026-11-27 — the user: "点三个点后可以调动 commission"), *Adjust commission* on a bill that is not theirs: a
+ * team member's, the whole sub-department's.
  */
-export function OrderSheet({ open, vm, onClose, canShare = false, request = null, onShare, onRequest, canNotMine = false, notMine = null, onNotMine, onNotMineRequest }: {
+export function OrderSheet({ open, vm, onClose, canShare = false, request = null, onShare, onRequest, canNotMine = false, notMine = null, onNotMine, onNotMineRequest, canAdjust = false, onAdjust }: {
   open: boolean;
   vm: OrderSheetVM | null;
   onClose: () => void;
@@ -102,13 +104,16 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
   notMine?: OrderNotMineRequest | null;
   onNotMine?: () => void;
   onNotMineRequest?: (id: string) => void;
+  /** Adjust commission is in the ⋯: a holder of Commission ratio · Edit, on a bill that is not theirs (2026-11-27). */
+  canAdjust?: boolean;
+  onAdjust?: () => void;
 }) {
   const st = vm ? TONES[vm.statusTone] : TONES.none;
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const shareItem = canShare || !!request;
-  const notMineItem = canNotMine || !!notMine;
-  const hasMenu = !!vm?.own && (shareItem || notMineItem);
+  const shareItem = !!vm?.own && (canShare || !!request);
+  const notMineItem = !!vm?.own && (canNotMine || !!notMine);
+  const hasMenu = shareItem || notMineItem || canAdjust;
   useEffect(() => { if (!open) setMenu(false); }, [open, vm?.no]);
   useEffect(() => {
     if (!menu) return;
@@ -155,6 +160,11 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
                       <Svg d={ICON.notMine} size={18} sw={1.9} /><span className={t.menuText}>Not my order</span>
                     </button>
                   ))}
+                  {canAdjust && (
+                    <button className={t.menuItem} role="menuitem" onClick={() => { setMenu(false); onAdjust?.(); }}>
+                      <Svg d={ICON.percent} size={18} sw={1.9} /><span className={t.menuText}>Adjust commission</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -177,6 +187,13 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
             <div className={t.shareRow}>
               <span className={t.shareIcon}><Svg d={ICON.share} size={18} sw={1.9} /></span>
               <span className={t.shareText}><span className={t.shareLabel}>SHARED</span><span className={t.shareLine}>{vm.share.line}</span><span className={t.shareSub}>{vm.share.sub}</span></span>
+            </div>
+          )}
+          {/* A Revenue Director's ratio (2026-11-27): it pays and counts at that, in its margin's place. */}
+          {vm.ratio && (
+            <div className={t.shareRow}>
+              <span className={t.shareIcon}><Svg d={ICON.percent} size={18} sw={1.9} /></span>
+              <span className={t.shareText}><span className={t.shareLabel}>COMMISSION</span><span className={t.shareLine}>{vm.ratio.line}</span><span className={t.shareSub}>{vm.ratio.sub}</span></span>
             </div>
           )}
           {/* A margin cut (2026-11-07): what of the bill counts in their sales, cut as its commission is. */}

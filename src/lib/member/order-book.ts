@@ -8,6 +8,7 @@
  * screen says how the cost is made up (user 2026-10-05).
  */
 import type { MemberDownlineRow, MemberScore } from "./types";
+import { commRatioSetFromRow, type CommRatioSet } from "./comm-ratio";
 
 export interface MemberOrderLine {
   name: string;
@@ -102,6 +103,11 @@ export interface MemberBookOrder {
    * 0.5 for half commission; absent when nothing cuts it.
    */
   weight?: number;
+  /**
+   * A Revenue Director's commission ratio on the bill (2026-11-27, mig 20261127140500): it pays and counts at this in
+   * its margin band's place — `weight` is already it (absent at 100%). Who set it, when, why. Absent on every other bill.
+   */
+  ratio?: CommRatioSet;
 }
 
 export interface MemberBookShare {
@@ -226,7 +232,13 @@ function readOrder(value: unknown): MemberBookOrder | null {
     ...(value.commissionOnly === true ? { commissionOnly: true as const, soldBy: text(value.soldBy)?.trim() || null } : {}),
     ...(num(value.fullRevenue) !== null ? { fullRevenue: num(value.fullRevenue)! } : {}),
     ...(num(value.weight) !== null && num(value.weight)! >= 0 && num(value.weight)! < 1 ? { weight: num(value.weight)! } : {}),
+    ...readRatio(value.ratio),
   };
+}
+
+function readRatio(value: unknown): { ratio: CommRatioSet } | Record<string, never> {
+  const ratio = commRatioSetFromRow(value);
+  return ratio ? { ratio } : {};
 }
 
 function readSeller(value: unknown): { id: string; name: string } | null {

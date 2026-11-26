@@ -139,6 +139,8 @@ export interface ClosedBill {
   halfComm?: true
   /** No commission (2026-11-14): it counted in their sales and margin and paid nobody. */
   noComm?: true
+  /** A Revenue Director's commission ratio (2026-11-27), 0–1: it paid and counted at that, in its margin band's place. */
+  commRatio?: number
 }
 
 /** An override line as it stood at close: who it came from, and how much. */
@@ -185,6 +187,7 @@ export function closeSummary(person: WorkbenchPerson, nameOf: (staffId: string) 
       ...(r.commissionOnly ? { commissionOnly: true as const } : {}),
       ...(r.halfComm ? { halfComm: true as const } : {}),
       ...(r.noComm ? { noComm: true as const } : {}),
+      ...(r.commRatio !== undefined ? { commRatio: r.commRatio } : {}),
     })),
     overrides: [...overrides].map(([staffId, amount]) => ({ staffId, name: nameOf(staffId), amount })),
   }
@@ -277,6 +280,7 @@ export function parseCloseSummary(raw: unknown, fallbackName: string): CloseSumm
         ...(r.commissionOnly === true ? { commissionOnly: true as const } : {}),
         ...(r.halfComm === true ? { halfComm: true as const } : {}),
         ...(r.noComm === true ? { noComm: true as const } : {}),
+        ...(typeof r.commRatio === 'number' && Number.isFinite(r.commRatio) && r.commRatio >= 0 && r.commRatio <= 1 ? { commRatio: r.commRatio } : {}),
       }]
     }),
     overrides: overrides.flatMap(v => {

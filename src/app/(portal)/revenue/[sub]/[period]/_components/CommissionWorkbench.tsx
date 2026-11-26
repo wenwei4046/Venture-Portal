@@ -25,6 +25,7 @@ import BillContextMenu, { type BillBrandOutcome, type BillHalfCommOutcome, type 
 import HalfCommNotice from '../orders/_components/HalfCommNotice'
 import { billHalfCommAction, describeHalfComm, HALF_COMM_LABEL, type BillHalfCommAction } from '@/lib/commission/bill-half-comm'
 import { describeNoComm, NO_COMM_LABEL } from '@/lib/commission/bill-no-comm'
+import { commRatioLabel, describeCommRatio } from '@/lib/commission/bill-comm-ratio'
 import BillCountNotice from '../orders/_components/BillCountNotice'
 import BillShareNotice from '../orders/_components/BillShareNotice'
 import BillMoveNotice from '../orders/_components/BillMoveNotice'
@@ -793,9 +794,14 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
           : row.halfComm
             ? <span className="chip danger" title={halfDetail(row.orderId) ?? undefined}><span className="dot" />{HALF_COMM_LABEL}</span>
             : null
+        // A Revenue Director's commission ratio (2026-11-27): in its margin band's place — who, when, why on hover.
+        const ratioMark = row.upsale ? undefined : data.commRatios?.[row.orderId]
+        const ratio = ratioMark
+          ? <span className={`chip ${ratioMark.ratio >= 1 ? 'ledger' : 'danger'}`} title={describeCommRatio(ratioMark)}><span className="dot" />{commRatioLabel(ratioMark.ratio)}</span>
+          : null
         return origin
-          ? <>{half}<span className={`chip ${ORIGIN_TONE[origin.kind]}`}><span className="dot" />{origin.label}</span><small>{origin.detail}</small></>
-          : half ?? <span className={s.muted}>—</span>
+          ? <>{half}{ratio}<span className={`chip ${ORIGIN_TONE[origin.kind]}`}><span className="dot" />{origin.label}</span><small>{origin.detail}</small></>
+          : half || ratio ? <>{half}{ratio}</> : <span className={s.muted}>—</span>
       }
       // An upsale is no bill, so it has no paper of its own.
       case 'ref': return row.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={row.refNo} paperNo={row.paperNo} />

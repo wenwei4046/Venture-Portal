@@ -398,6 +398,12 @@ export async function updateScheme(formData: FormData) {
   if (rateMode && !['fixed', 'variable'].includes(rateMode)) {
     throw new Error('Unknown rate mode')
   }
+  // The month the below-margin penalty cuts from (2026-11-27): `YYYY-MM`, or empty for every month. A page from before
+  // sends no such field — what is stored stays.
+  const penaltyFrom = formData.has('margin_penalty_from') ? text(formData, 'margin_penalty_from') : undefined
+  if (penaltyFrom && !/^\d{4}-(0[1-9]|1[0-2])$/.test(penaltyFrom)) {
+    throw new Error('Pick the month the penalty starts from, or leave it empty for every month.')
+  }
 
   check(
     (
@@ -408,6 +414,7 @@ export async function updateScheme(formData: FormData) {
           enable_kpi: formData.get('enable_kpi') === 'on',
           enable_override: formData.get('enable_override') === 'on',
           enable_margin_penalty: formData.get('enable_margin_penalty') === 'on',
+          ...(penaltyFrom !== undefined ? { margin_penalty_from: penaltyFrom ? `${penaltyFrom}-01` : null } : {}),
           enable_margin_incentive: formData.get('enable_margin_incentive') === 'on',
           enable_group_incentive: groupIncentiveOn,
           group_sales_depth: groupDepth,

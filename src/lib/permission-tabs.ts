@@ -294,6 +294,9 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // …and writing them (2026-11-16): every test with its answers and everybody's scores; write; change, publish, delete.
   tab('rev', 'training', 'Free test & Library · Manage', ['rev_training'],
     { view: ['rev_training.view'], create: ['rev_training.create'], edit: ['rev_training.edit'] }, 'all'),
+  // A bill's commission ratio (2026-11-27, mig 20261127140500 — the user: a Revenue Director "点三个点后可以调动
+  // commission"): the bill's ⋯ › Adjust commission on the bills of the sub-departments they reach on Comm Cal.
+  tab('rev', 'comm_ratio', 'Insight · Commission ratio', ['comm_ratio'], { view: ['comm_ratio.view'], edit: ['comm_ratio.edit'] }, 'all'),
 
   // ── Lead View (2026-10-16, mig 20261016300000): one tab a page ──
   tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),

@@ -40,6 +40,8 @@ interface Form {
   directLimit: string
   overrideKpi: boolean
   depositPct: string
+  /** `YYYY-MM`: the first month whose bills the penalty cuts (2026-11-27); empty for every month. */
+  penaltyFrom: string
   rateMode: 'fixed' | 'variable'
 }
 
@@ -62,6 +64,7 @@ function formOf(scheme: SchemeRow): Form {
     directLimit: blank(scheme.direct_line_limit),
     overrideKpi: scheme.override_includes_kpi,
     depositPct: pct(scheme.deposit_threshold_pct),
+    penaltyFrom: scheme.margin_penalty_from ? scheme.margin_penalty_from.slice(0, 7) : '',
     rateMode: scheme.default_rate_mode,
   }
 }
@@ -84,6 +87,8 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   fd.set('override_depth', f.overrideDepth.trim())
   fd.set('direct_line_limit', f.directLimit.trim())
   fd.set('deposit_threshold_pct', f.depositPct.trim())
+  // Only while the penalty is on: switched off, what is stored stays for when it is on again.
+  if (f.sw.margin_penalty) fd.set('margin_penalty_from', f.penaltyFrom.trim())
   fd.set('default_rate_mode', f.rateMode)
   return fd
 }
@@ -120,6 +125,8 @@ export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; 
         next.overrideDepth = saved.overrideDepth
         next.directLimit = saved.directLimit
       }
+      // The penalty's month, the same: out of sight while it is off, and never sent then.
+      if (k === 'margin_penalty' && !next.sw.margin_penalty) next.penaltyFrom = saved.penaltyFrom
       return next
     })
     setError('')
@@ -217,6 +224,24 @@ export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; 
                       <Toggle on={f.overrideKpi} shadow />
                       {f.overrideKpi ? 'Includes KPI revenue' : 'Leaves KPI revenue out'}
                     </button>,
+                  )}
+                </div>
+              ) : null}
+              {on && sw.k === 'margin_penalty' ? (
+                // The month its cut starts (2026-11-27 — the user, of Fair's: "从十二月开始"): a bill of an earlier
+                // month is paid in full; empty cuts every month.
+                <div className={s.params}>
+                  {param(
+                    'Cuts bills from',
+                    f.penaltyFrom ? 'bills of earlier months pay in full' : 'every month',
+                    <input
+                      className={s.paramValue}
+                      type="month"
+                      value={f.penaltyFrom}
+                      onChange={e => setF(p => ({ ...p, penaltyFrom: e.target.value }))}
+                      disabled={!canManage}
+                      aria-label="Cuts bills from"
+                    />,
                   )}
                 </div>
               ) : null}

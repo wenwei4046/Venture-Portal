@@ -193,8 +193,8 @@ describe('Marketing’s two templates keep their ticks (mig 20261023214000)', ()
 
 it('counts a view the way the rail does', () => {
   // Sixteen Revenue app tabs since 2026-10-11 (the rest of Profile: My honours, My brand weeks, Commission scheme); seventeen
-  // since 2026-10-20 (IT requests — the desk of IT support).
-  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 20 })
+  // since 2026-10-20 (IT requests — the desk of IT support); twenty-one since 2026-11-27 (Insight · Commission ratio).
+  expect(viewCount('rev', new Set([grantOf('rev.today', 'view'), grantOf('rev.quote', 'create')]))).toEqual({ seen: 1, of: 21 })
 })
 
 describe('what the Permissions tab and a person’s window work with', () => {

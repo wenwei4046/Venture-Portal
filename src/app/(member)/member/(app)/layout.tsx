@@ -51,6 +51,8 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
     : null;
   // Free test & Library (2026-11-16): the ACCOUNT's cells — View opens Manage, Create / Edit write.
   const training = { view: canDo(account, "rev_training", "view"), create: canDo(account, "rev_training", "create"), edit: canDo(account, "rev_training", "edit") };
+  // A bill's commission ratio (2026-11-27): the ACCOUNT's Commission ratio · Edit — a bill's ⋯ › Adjust commission.
+  const commRatio = canDo(account, "comm_ratio", "edit");
   // Change view (2026-11-11): a Marketing login the CRM was opened to (CRM · View in People › Permissions) goes back
   // to Marketing from the CRM's desktop module menu — the account's own, as the CRM is.
   const crossViews = isMarketingView(account) ? changeViews(account) : [];
@@ -58,7 +60,7 @@ export default async function MemberAppLayout({ children }: { children: ReactNod
   // The display face (2026-10-14): Inter Tight's variable on a wrapper that draws no box, so the
   // app and its loading frame read it and the portal never downloads the font.
   return <div className={interTight.variable} style={{ display: "contents" }}>
-    <RevenueApp initialData={data} productList={products} crm={crm} itDesk={itDesk} training={training} crossViews={crossViews} closed={appClosed(user.closed)} notices={notices}
+    <RevenueApp initialData={data} productList={products} crm={crm} itDesk={itDesk} training={training} commRatio={commRatio} crossViews={crossViews} closed={appClosed(user.closed)} notices={notices}
       changePassword={password ? changeMyPassword : undefined}
       requestEmail={password ? { load: loadMyEmailChange, send: requestEmailChange, withdraw: withdrawEmailChange } : undefined}
       own={own?.staffId ? { memos: own.memos.map(toMemberMemo) } : undefined}>{children}</RevenueApp>

@@ -41,6 +41,7 @@ const SOMEWHERE_ELSE: Readonly<Record<string, string>> = {
   'rev.it_requests': 'the Revenue app’s IT requests (Profile › IT support › All, the sidebar’s row) — its own cells, IT requests · View / Edit',
   'pri.switch_views': 'the view switcher in the top bar',
   'rev.training': 'writing IR’s Free tests and Library and reading everybody’s scores (Free test’s and Library’s Manage) — its own cells, Free test & Library · View / Create / Edit',
+  'rev.comm_ratio': 'a bill’s ⋯ › Adjust commission on Insight (a team member’s bills, the whole sub-department’s) — its own cells, Commission ratio · View / Edit',
 }
 
 /** Revenue app screens and Profile pages with no box, and why. */
@@ -168,6 +169,8 @@ describe('every tab of every view is in People › Permissions', () => {
       'IT requests',
       // 2026-11-16: writing the Free tests and the Library.
       'Free test & Library · Manage',
+      // 2026-11-27: a Revenue Director's commission ratio on a bill.
+      'Insight · Commission ratio',
     ])
   })
 })

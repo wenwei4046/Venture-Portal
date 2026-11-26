@@ -25,6 +25,8 @@ import { answerShareRequest, cancelShareRequest, fetchShareContext, sendShareReq
 import type { ShareContext, ShareRequest, ShareSendInput } from "@/lib/member/share-requests";
 import { cancelNotMineRequest, fetchNotMineContext, sendNotMineRequest, type fetchNotMineRequests } from "@/app/(member)/member/not-mine-actions";
 import type { NotMineContext, NotMineRequest } from "@/lib/member/not-mine-requests";
+import { fetchCommRatioContext, setBillCommRatio } from "@/app/(member)/member/comm-ratio-actions";
+import type { CommRatioContext, CommRatioSaved } from "@/lib/member/comm-ratio";
 import type { fetchMemberCrmUnread } from "@/app/(member)/member/chat-badge-actions";
 import type { fetchMemberNotices } from "@/app/(member)/member/bell-actions";
 import type { Notices } from "@/lib/push/notices";
@@ -218,6 +220,13 @@ export interface RevenueSource {
   /** Withdraw one HR has not decided. */
   notMineCancel?(id: string): Promise<Outcome<NotMineRequest>>;
   /**
+   * A bill's commission ratio (2026-11-27): the Adjust commission sheet's read — its margin, what its ladder alone pays,
+   * the ratio on it, why it cannot change now — read fresh, never kept on the phone.
+   */
+  commRatioContext?(orderId: string): Promise<Outcome<CommRatioContext>>;
+  /** Set a bill's ratio (0–1), or take it off (null). */
+  commRatioSet?(orderId: string, ratio: number | null, note: string | null): Promise<Outcome<CommRatioSaved>>;
+  /**
    * What the phone kept from an earlier open (the live app only, 2026-10-08):
    * the last answer to a read (`ask.*`), shown while it is read again.
    */
@@ -338,6 +347,9 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     notMineContext: (orderId, context) => fetchNotMineContext(orderId, context),
     notMineSend: (orderId, reason) => sendNotMineRequest(orderId, reason),
     notMineCancel: id => cancelNotMineRequest(id),
+    // A bill's commission ratio (2026-11-27): read fresh, never kept, as a share request.
+    commRatioContext: orderId => fetchCommRatioContext(orderId),
+    commRatioSet: (orderId, ratio, note) => setBillCommRatio(orderId, ratio, note),
     ...(memory ? {
       peek: <T,>(request: MemberRead) => memory.get<T>(readKey(request)),
       keep: (request: MemberRead, value: unknown) => memory.put(readKey(request), value),

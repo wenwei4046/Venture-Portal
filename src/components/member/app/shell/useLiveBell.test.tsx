@@ -33,6 +33,7 @@ vi.mock("@/app/(member)/member/docs-actions", () => ({}));
 vi.mock("@/app/(member)/member/it-actions", () => ({}));
 vi.mock("@/app/(member)/member/share-actions", () => ({}));
 vi.mock("@/app/(member)/member/not-mine-actions", () => ({}));
+vi.mock("@/app/(member)/member/comm-ratio-actions", () => ({}));
 
 const { useLiveBell, AWAY_MS } = await import("./useLiveBell");
 const { LIVE_SETTLE_MS } = await import("./useCrmUnread");
