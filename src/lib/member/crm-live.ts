@@ -12,8 +12,13 @@ import type { CrmAssignConfig, CrmMember, CrmRole } from "./crm-team";
 export interface CrmPeopleRow {
   me: string | null;
   role: CrmRole | null;
-  /** `brands`: the CRM brands each holds (crm_brands_of_user; mig 20261124200000) — null for somebody with no login; absent before it. */
-  people: { id: string; name: string; role: CrmRole; uplineId: string | null; fullTime: boolean; title?: string | null; login?: boolean; paused?: boolean; brands?: string[] | null }[];
+  /**
+   * `brands`: the CRM brands each holds (crm_brands_of_user; mig 20261124200000) — null for somebody with no login; absent before it.
+   * `lines`: their line in each brand's own chart (mig 20261127170000 — The Conts' is IR's Staff Hierarchy, Dream Crafter's
+   * DC's), only where the reader may see it; absent before it. The top-level role / upline / title stay IR's.
+   */
+  people: { id: string; name: string; role: CrmRole; uplineId: string | null; fullTime: boolean; title?: string | null; login?: boolean; paused?: boolean; brands?: string[] | null;
+    lines?: Record<string, { role: CrmRole; uplineId: string | null; title?: string | null }> }[];
   /** People opened to the CRM across teams (CRM · View, no CRM role) — handed only to whoever sees everybody's CRM (mig 20261112010000). */
   viewers?: { id: string; name: string; title?: string | null; reach?: "own" | "dept" | "all" | null; editOwn?: boolean; editAll?: boolean; manage?: boolean }[];
 }

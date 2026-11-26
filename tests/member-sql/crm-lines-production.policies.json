@@ -1,0 +1,56 @@
+[
+  {
+    "cmd": "SELECT",
+    "permissive": "PERMISSIVE",
+    "policyname": "crm_assign_rules_read",
+    "qual": "(( SELECT crm_sees_all() AS crm_sees_all) OR (tl_ids && ARRAY( SELECT crm_my_downline() AS crm_my_downline)))",
+    "roles": "{authenticated}",
+    "tablename": "crm_assign_rules",
+    "with_check": null
+  },
+  {
+    "cmd": "SELECT",
+    "permissive": "PERMISSIVE",
+    "policyname": "crm_contacts_read",
+    "qual": "((( SELECT crm_my_role() AS crm_my_role) IS NOT NULL) AND (( SELECT crm_sees_all() AS crm_sees_all) OR (assigned_to IN ( SELECT crm_my_downline() AS crm_my_downline)) OR ((assigned_to IS NULL) AND (team_id IN ( SELECT crm_my_downline() AS crm_my_downline))) OR (id IN ( SELECT crm_my_shares() AS crm_my_shares))))",
+    "roles": "{authenticated}",
+    "tablename": "crm_contacts",
+    "with_check": null
+  },
+  {
+    "cmd": "SELECT",
+    "permissive": "PERMISSIVE",
+    "policyname": "crm_fulltime_rules_read",
+    "qual": "(( SELECT crm_sees_all() AS crm_sees_all) OR (tl_id IN ( SELECT crm_my_downline() AS crm_my_downline)))",
+    "roles": "{authenticated}",
+    "tablename": "crm_fulltime_rules",
+    "with_check": null
+  },
+  {
+    "cmd": "SELECT",
+    "permissive": "PERMISSIVE",
+    "policyname": "crm_invites_read",
+    "qual": "(( SELECT crm_sees_all() AS crm_sees_all) OR (from_staff = ( SELECT crm_me() AS crm_me)) OR (to_staff = ( SELECT crm_me() AS crm_me)) OR (from_staff IN ( SELECT crm_my_downline() AS crm_my_downline)) OR (to_staff IN ( SELECT crm_my_downline() AS crm_my_downline)))",
+    "roles": "{authenticated}",
+    "tablename": "crm_invites",
+    "with_check": null
+  },
+  {
+    "cmd": "SELECT",
+    "permissive": "PERMISSIVE",
+    "policyname": "crm_staff_read",
+    "qual": "(( SELECT crm_sees_all() AS crm_sees_all) OR (staff_id IN ( SELECT crm_my_downline() AS crm_my_downline)))",
+    "roles": "{authenticated}",
+    "tablename": "crm_staff",
+    "with_check": null
+  },
+  {
+    "cmd": "SELECT",
+    "permissive": "PERMISSIVE",
+    "policyname": "crm_team_settings_read",
+    "qual": "(( SELECT crm_sees_all() AS crm_sees_all) OR (tl_id IN ( SELECT crm_my_downline() AS crm_my_downline)))",
+    "roles": "{authenticated}",
+    "tablename": "crm_team_settings",
+    "with_check": null
+  }
+]
