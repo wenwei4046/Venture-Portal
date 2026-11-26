@@ -50,6 +50,7 @@ import { setUrgencyThresholds } from "@/lib/member/crm";
 import { useNavHistory, type NavFrame } from "./shared/nav-history";
 import { CHAT_LEFT, LEAD_LEFT, navFrameOf, type NavSnap } from "./shared/nav-frame";
 import { useKeepInboxScroll } from "./shared/inbox-scroll";
+import type { CrmViewSwap } from "./shared/view-swap";
 import { roomUnsaved } from "./panel/vm/rooms";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
@@ -69,11 +70,13 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, view = null, viewSub = null, onViewOf }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brands (lib/member/crm-view.ts › crmBrandsOfView: IR → The Conts, DC → Dream Crafter, Fair → none); null — no view, every brand one holds. */ view?: SourceBrand[] | null;
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, view = null, viewSub = null, onViewOf, viewSwap = null }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void; /** The Revenue app's view's brands (lib/member/crm-view.ts › crmBrandsOfView: IR → The Conts, DC → Dream Crafter, Fair → none); null — no view, every brand one holds. */ view?: SourceBrand[] | null;
   /** The view's sub-department (its membership's id): whose Management — settings, showrooms, forms, templates, booking link — the CRM reads and writes (mig 20261124210000). */
   viewSub?: string | null;
   /** A tapped notice of a customer another view holds: the Revenue app moves to that brand's view (false — it has none of it). */
-  onViewOf?: (brand: SourceBrand) => boolean }) {
+  onViewOf?: (brand: SourceBrand) => boolean;
+  /** IR ⇄ DC in the place of both Inboxes' bell, for whoever has both CRM views (shared/view-swap.ts); null — the bell. */
+  viewSwap?: CrmViewSwap | null }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Any bottom sheet closes when pulled down (user 2026-10-13).
   useSwipeToClose();
@@ -106,6 +109,17 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   setUrgencyThresholds(shownAll?.settings ?? data?.settings);
   // A chat's templates read in another view are that one's sub-department's: read again in this one.
   useEffect(() => { setUi(u => (u.templates == null ? u : { ...u, templates: null })); }, [viewKey, viewSub]);
+  // The Inbox's filters that name the old view's things go with it (2026-11-27, the view switch in the bell's place): Mine's
+  // ads (another view has none of them — its list would read empty) and Team's people (its teams are the view's). Statuses,
+  // Unread and a search are any view's and stay. Only on a change of view, never as the CRM first opens.
+  const viewWas = useRef(`${viewKey}|${viewSub}`);
+  useEffect(() => {
+    const key = `${viewKey}|${viewSub}`;
+    if (viewWas.current === key) return;
+    viewWas.current = key;
+    setUi(u => (u.adSel.length || u.adSheet ? { ...u, adSel: [], adSheet: null } : u));
+    setPanelUi(u => (u.inbPeople?.length || u.inbTeam || u.inbWho || u.inbSheet ? { ...u, inbPeople: [], inbTeam: "", inbWho: "", inbSheet: null } : u));
+  }, [viewKey, viewSub]);
   // Drawn — its kept copy, its first read, or the reason it could not read: the Revenue app's curtain may lift
   // (2026-10-17, shell/ViewSwitchCurtain — it never lifts onto an empty screen). Keep it: without it every switch to
   // the CRM holds about 8s on the curtain (CrmApp.ready.test.tsx).
@@ -383,6 +397,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: sub ?? null, qrDraft: null })); }
         : sells ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], profSub: sub ?? null, qrDraft: null })); } : undefined,
       exitApp: onExit, openQuoteSettings: onQuoteSettings, slotCounts, recents,
+      // IR ⇄ DC in the Inbox's bell's place — on one's own Team side, never while viewing somebody's.
+      viewSwap: panelFor.id === me.id ? viewSwap : null,
       // A chat's ⋮ Assign to, by what the SIGNED-IN account may do (2026-10-23, Mine's rule): CRM · Manage gives anyone,
       // whoever's Team is on screen; a TL / STL / TA on their own Team side, their own people; else none.
       assign: vw ? undefined : shownData.can.manage ? "any" : panelFor.id === me.id && ["tl", "stl", "ta"].includes(me.role) ? "team" : undefined,
@@ -445,6 +461,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       toTeam: owner.id !== me.id ? (hasTeamSide(owner) ? () => { setTeamAs(owner.id); setPanelUi({ ...initialPanelUi(), tab: "inbox" }); } : undefined)
         : (full && sells) || leads ? () => { setHodMode("panel"); setViewing(null); setPanelUi(u => ({ ...u, tab: "inbox", lead: null })); } : undefined,
       switchList,
+      // IR ⇄ DC in the Inbox's bell's place — on one's own CRM, never while viewing somebody's.
+      viewSwap: owner.id === me.id ? viewSwap : null,
       // Assign to somebody: assignment is CRM · Manage's.
       assignTo: shownData.can.manage ? (customerId, staffId) => panelAct.sendTo(customerId, staffId) : undefined,
       onSwitch: id => { setViewing(id); setUi(u => ({ ...u, tab: "inbox", chat: null, filter: null, profSub: null })); },

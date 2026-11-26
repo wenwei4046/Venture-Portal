@@ -23,6 +23,19 @@ export function crmBrandsOfView(subCode: string | null | undefined): SourceBrand
   return [];
 }
 
+/**
+ * The phone CRM's view switch (2026-11-27 — the owner, circling the bell on the phone CRM's Inbox: "change this icon of
+ * notification with change view, for ir & dc ( those have crm servcice connected )"): of somebody's views (the Revenue app's
+ * memberships, as RevenueApp matches them — the code, else the name: IR's code is empty on production), the ones with a
+ * CRM of their own — IR (The Conts) and DC (Dream Crafter), never Fair's empty one — in the app's order. In one of them with
+ * another to go to, the switch goes to the next (IR ⇄ DC); else there is none and the bell stays.
+ */
+export function crmViewSwitch<M extends { id: string; code: string; name: string }>(views: readonly M[], currentId: string | null | undefined): { current: M; next: M } | null {
+  const crm = views.filter(m => (crmBrandsOfView(m.code || m.name) ?? []).length > 0);
+  const at = crm.findIndex(m => m.id === currentId);
+  return at < 0 || crm.length < 2 ? null : { current: crm[at], next: crm[(at + 1) % crm.length] };
+}
+
 /** The brands somebody holds, as the database read them (crm_people's `brands`); none read — no login — is IR's alone. */
 export const brandsOfPerson = (p: Pick<CrmPerson, "brands">): SourceBrand[] => p.brands ?? ["conts"];
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crmBrandsOfView, inView, newRoomDraftKey, peopleInView, personInView, pickedSource, sourcePickInView, teamsInView, templatesOfSub } from "./crm-view";
+import { crmBrandsOfView, crmViewSwitch, inView, newRoomDraftKey, peopleInView, personInView, pickedSource, sourcePickInView, teamsInView, templatesOfSub } from "./crm-view";
 import { inBrand } from "@/components/member/crm/desk/vm/insight";
 import { DEFAULT_CRM_SETTINGS, subSettingsFrom, type CrmData, type CrmPerson, type CrmRoom } from "./crm-data";
 
@@ -17,6 +17,28 @@ describe("the brands a Revenue app view holds the CRM to", () => {
     expect(crmBrandsOfView(null)).toBeNull();
     expect(crmBrandsOfView(undefined)).toBeNull();
     expect(crmBrandsOfView("")).toBeNull();
+  });
+});
+
+// The owner, 2026-11-27, circling the bell on the phone CRM's Inbox: "change this icon of notification with change view, for ir
+// & dc ( those have crm servcice connected )".
+describe("the phone CRM's view switch", () => {
+  const v = (id: string, name: string, code = "") => ({ id, name, code });
+  // As production has them: IR's code empty (matched by its name), DC's "DC", Fair's "FAIR".
+  const fair = v("fair", "Fair", "FAIR"), ir = v("ir", "IR"), dc = v("dc", "Dream Crafter", "DC");
+
+  it("goes between the views with a CRM of their own, IR ⇄ DC, never Fair's empty one", () => {
+    expect(crmViewSwitch([fair, ir, dc], "ir")).toEqual({ current: ir, next: dc });
+    expect(crmViewSwitch([fair, ir, dc], "dc")).toEqual({ current: dc, next: ir });
+    expect(crmViewSwitch([dc, ir], "dc")).toEqual({ current: dc, next: ir });
+  });
+
+  it("is none with one such view, or in a view with no CRM (Fair), or with no view", () => {
+    expect(crmViewSwitch([fair, ir], "ir")).toBeNull();
+    expect(crmViewSwitch([fair, dc], "dc")).toBeNull();
+    expect(crmViewSwitch([fair, ir, dc], "fair")).toBeNull();
+    expect(crmViewSwitch([fair, ir, dc], null)).toBeNull();
+    expect(crmViewSwitch([], "ir")).toBeNull();
   });
 });
 

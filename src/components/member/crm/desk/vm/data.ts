@@ -58,15 +58,18 @@ export function chatRows(ctx: DeskCtx): ChatRow[] {
 /** One visit (the prototype's VISITS row), with the customer, salesperson and showroom it names. */
 export interface VisitRow {
   v: CrmVisit; id: string; at: Date; name: string; customerId: string; rep: string; repId: string | null; room: string;
-  team: string | null; status: "Booked" | "Showed up" | "No show" | "To mark" | "Won" | "Follow up" | "Lost";
+  team: string | null; status: VisitStatus;
 }
+export type VisitStatus = "Booked" | "Showed up" | "No show" | "To mark" | "Won" | "Follow up" | "Lost";
+/** How a visit stands: Booked (to come), To mark (past, not marked), No show, or what came of it. */
+export const visitStatus = (v: CrmVisit, now: Date): VisitStatus => v.state === "attended"
+  ? (v.outcome === "won" ? "Won" : v.outcome === "lost" ? "Lost" : v.outcome === "follow_up" ? "Follow up" : "Showed up")
+  : v.state === "no_show" ? "No show" : new Date(v.start) <= now ? "To mark" : "Booked";
 export function visitRows(ctx: DeskCtx): VisitRow[] {
   const { data, now, nameOf } = ctx;
   return data.visits.filter(v => v.state !== "cancelled").map(v => {
     const c = data.customers.find(x => x.id === v.customerId), at = new Date(v.start), repId = c?.assignedTo ?? null;
-    const status: VisitRow["status"] = v.state === "attended"
-      ? (v.outcome === "won" ? "Won" : v.outcome === "lost" ? "Lost" : v.outcome === "follow_up" ? "Follow up" : "Showed up")
-      : v.state === "no_show" ? "No show" : at <= now ? "To mark" : "Booked";
+    const status = visitStatus(v, now);
     return { v, id: v.id, at, name: c?.name ?? "Customer", customerId: v.customerId, rep: repId ? nameOf(repId) : "—", repId,
       room: data.rooms.find(r => r.id === v.showroomId)?.name ?? "Showroom", team: teamNameOf(ctx, repId), status };
   }).sort((a, b) => a.at.getTime() - b.at.getTime());

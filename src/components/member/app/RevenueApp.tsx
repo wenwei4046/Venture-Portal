@@ -117,7 +117,8 @@ import { foodOpenTo, transportPartsFor, type ClaimRates } from "@/lib/member/cla
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
-import { crmBrandsOfView } from "@/lib/member/crm-view";
+import { crmBrandsOfView, crmViewSwitch } from "@/lib/member/crm-view";
+import type { CrmViewSwap } from "../crm/shared/view-swap";
 import type { SourceBrand } from "@/lib/member/crm-source";
 import { IrQuoteScreen, IrQuoteSettingsScreen, type IrQuoteNav } from "./irq/IrQuoteScreens";
 import { useBackStep } from "./useBackStep";
@@ -881,6 +882,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     go({ department: to.id, staff: principal ? route.staff : "" });
     return true;
   }, [data.memberships, membership?.id, go, principal, route.staff]);
+  // The phone CRM's view switch in its Inboxes' bell's place (2026-11-27 — the owner: "change this icon of notification with
+  // change view, for ir & dc ( those have crm servcice connected )"): IR ⇄ DC, the views with a CRM of their own, as the
+  // sub-department sheet moves the app — the CRM stays open on the other one. None with one such view, or in Fair's.
+  const crmSwitch = crmViewSwitch(data.memberships, membership?.id);
+  const viewWord = (m: { code: string; name: string }) => (m.code || "").trim().toUpperCase() || subDeptAbbr(m.name);
+  const crmViewSwap: CrmViewSwap | null = crmSwitch ? { label: viewWord(crmSwitch.current), to: viewWord(crmSwitch.next),
+    swap: () => go({ department: crmSwitch.next.id, staff: principal ? route.staff : "" }) } : null;
 
   // ── this month's Championship, for Today's board ──
   // The KPI rule is the scheme's (Rules), not a month's: this month's summary says it.
@@ -1761,7 +1769,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
-        view={crmBrandsOfView(membership?.code || membership?.name)} viewSub={membership?.id ?? null} onViewOf={crmViewOf}
+        view={crmBrandsOfView(membership?.code || membership?.name)} viewSub={membership?.id ?? null} onViewOf={crmViewOf} viewSwap={crmViewSwap}
         onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqFromCrm : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
