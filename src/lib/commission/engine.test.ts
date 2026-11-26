@@ -1554,6 +1554,18 @@ describe('monthly margin incentive, end to end', () => {
     expect(r.warnings.join(' ')).toMatch(/more than one brand/)
   })
 
+  // 2026-11-27 — the margin switch on from a later month ("从十二月开始"): the month before it pays no margin, so it
+  // asks nothing about a bill's brands — a warning holds its close.
+  it('asks nothing of a bill crossing brands in a month before the margin starts', () => {
+    const crossing = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 6_000, 3_000, 'AKEMI'],
+      ['SOFA', 'S1', 1, 4_000, 2_000, 'ZANOTTI'],
+    ])
+    const r = run({ scheme: { ...SCHEME, marginPenaltyFrom: '2026-08-01' }, orders: [crossing] })
+    expect(r.warnings.join(' ')).not.toMatch(/more than one brand/)
+    expect(run({ scheme: { ...SCHEME, marginPenaltyFrom: '2026-07-01' }, orders: [crossing] }).warnings.join(' ')).toMatch(/more than one brand/)
+  })
+
   // User 2026-09-27: 主体是 Akemi 就跟 Akemi 的 margin ladder — the bill's own
   // brand, whatever rides on it. A Dunlopillo pillow given away on an Akemi
   // bill costs the Akemi margin; it does not make the bill Dunlopillo's.
