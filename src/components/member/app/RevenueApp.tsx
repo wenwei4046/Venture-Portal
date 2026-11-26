@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MemberCatalogue, MemberCatalogueModel, MemberData, MemberMembership, MemberOrgMap, MemberProduct, MemberReadContext, QuoteInput } from "@/lib/member/types";
 import type { ProductListAccess } from "@/lib/member/product-access";
@@ -235,17 +235,24 @@ function useStoredBool(key: string, initial: boolean): [boolean, (next: boolean)
   return [value, set];
 }
 
-/** Width of the app itself, so a 414px preview lays out as a phone in any window. */
-function useDesk(ref: RefObject<HTMLDivElement | null>): boolean {
+/**
+ * Width of the app itself, so a 414px preview lays out as a phone in any window — and whether it has been measured: the
+ * server, and the page until its scripts run, cannot know it and draw a phone. It is measured before the first paint after
+ * hydration (a layout effect), so only the server's drawing goes unmeasured (the CRM's wrapper, below, and shell.module.css).
+ */
+function useDesk(ref: RefObject<HTMLDivElement | null>): [desk: boolean, measured: boolean] {
   const [desk, setDesk] = useState(false);
-  useEffect(() => {
+  const [measured, setMeasured] = useState(false);
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    setDesk(el.getBoundingClientRect().width >= 1024);
+    setMeasured(true);
     const observer = new ResizeObserver(entries => setDesk((entries[0]?.contentRect.width ?? 0) >= 1024));
     observer.observe(el);
     return () => observer.disconnect();
   }, [ref]);
-  return desk;
+  return [desk, measured];
 }
 
 const NO_NOTICES: Notices = { unread: 0, items: [] };
@@ -318,7 +325,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const mainRef = useRef<HTMLElement>(null);
   // The screen itself: it steps back under the CRM's curtain, and the CRM rises in it (shell/ViewSwitchCurtain).
   const screenRef = useRef<HTMLDivElement>(null);
-  const desk = useDesk(appRef);
+  const [desk, deskMeasured] = useDesk(appRef);
   const live = device === "live";
   const today = fixedToday ?? klToday();
   const period = today.slice(0, 7);
@@ -1810,9 +1817,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }
   // The CRM on a phone, with Quotation settings over it when they were opened from it (v4 notes/18-B): one wrapper always,
   // so the CRM is never drawn afresh as they open and close; hidden, not unmounted, under them.
+  // Until the app has measured itself it is also the server's drawing on a COMPUTER, where crm.module.css shows a phone CRM
+  // as a 430px phone in the middle — the owner, 2026-11-27, a reload of the desktop CRM: "跳出来一个像中间的电话 screen 这样
+  // 闪过零点几秒". `data-crm-unmeasured` keeps it from a computer's screen until then (shell.module.css); a phone shows it
+  // from the first paint, as before.
   if (onCrm && crm && !desk) {
     page = (<>
-      <div style={{ display: "contents", visibility: irqOverCrm ? "hidden" : undefined }} aria-hidden={irqOverCrm || undefined}>{page}</div>
+      <div style={{ display: "contents", visibility: irqOverCrm ? "hidden" : undefined }} aria-hidden={irqOverCrm || undefined} data-crm-unmeasured={deskMeasured ? undefined : ""}>{page}</div>
       {irqOverCrm && (
         <div className={s.irqLayer}>
           <IrQuoteSettingsScreen phone inApp={false} rootH="100%" readOnly={!!viewed} offline={data.demo || fixture ? { name: me.name } : undefined}

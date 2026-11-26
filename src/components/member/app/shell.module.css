@@ -543,6 +543,10 @@
   .main.mainProducts { padding-left: 0; padding-right: 0; }
   /* So does the CRM on a computer (2026-10-12): it scrolls inside its own columns. */
   .main.mainCrm { position: relative; overflow: hidden; padding-left: 0; padding-right: 0; }
+  /* The CRM drawn before the app has measured itself (RevenueApp › useDesk) is the phone's — on a computer crm.module.css's
+     430px phone in the middle of the page, which a reload flashed (the owner, 2026-11-27). Not shown on a computer until
+     measured; the desktop CRM follows before the first paint after hydration. */
+  .main [data-crm-unmeasured] { visibility: hidden; }
 }
 
 /* The CRM on a phone is a fixed layer over the page (crm.module.css .app) that scrolls inside its own lists: the page
