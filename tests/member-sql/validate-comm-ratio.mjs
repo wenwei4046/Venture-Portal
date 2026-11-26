@@ -51,8 +51,8 @@ await db.exec(`
   CREATE TABLE public.hr_staff_costs(id uuid PRIMARY KEY, employee_name text, employee_code text, title_id uuid);
   CREATE TABLE public.comm_schemes(id uuid PRIMARY KEY, sub_department_id uuid, is_active boolean NOT NULL DEFAULT true,
     effective_from date NOT NULL DEFAULT '2026-01-01', effective_to date, enable_kpi boolean NOT NULL DEFAULT false,
-    enable_margin_penalty boolean NOT NULL DEFAULT false, deposit_threshold_pct numeric, revenue_cost_divisor numeric(6,4),
-    updated_at timestamptz);
+    enable_margin_penalty boolean NOT NULL DEFAULT false, enable_margin_incentive boolean NOT NULL DEFAULT false,
+    deposit_threshold_pct numeric, revenue_cost_divisor numeric(6,4), updated_at timestamptz);
   CREATE TABLE public.comm_brands(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), scheme_id uuid NOT NULL, code text NOT NULL,
     name text, is_active boolean NOT NULL DEFAULT true, own_scheme boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(), CONSTRAINT uq_comm_brand_code UNIQUE (scheme_id, code));
@@ -497,14 +497,15 @@ check([await one(`SELECT has_table_privilege('authenticated', 'public.sales_orde
   await one(`SELECT has_table_privilege('authenticated', 'public.sales_order_comm_ratios', 'INSERT')`),
   await one(`SELECT has_table_privilege('anon', 'public.sales_order_comm_ratios', 'SELECT')`)], [true, false, false], 'the table: read, never written, by a session')
 
-// ── 20261127140600: Fair's penalty on, from December ──
+// ── 20261127140600: Fair's margin incentive & penalty on — one switch — from December ──
 await setScheme(false, null)
 const switchOn = (await readFile(SWITCH_ON, 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(switchOn)
 await db.exec(switchOn)
-check(await q(`SELECT enable_margin_penalty, margin_penalty_from::text FROM public.comm_schemes WHERE id = $1`, [FS]),
-  [{ enable_margin_penalty: true, margin_penalty_from: DEC }], 'Fair: on, from December — twice the same')
-check(await q(`SELECT enable_margin_penalty FROM public.comm_schemes WHERE id = $1`, [OS]), [{ enable_margin_penalty: false }], 'no other scheme touched')
+check(await q(`SELECT enable_margin_penalty, enable_margin_incentive, margin_penalty_from::text FROM public.comm_schemes WHERE id = $1`, [FS]),
+  [{ enable_margin_penalty: true, enable_margin_incentive: true, margin_penalty_from: DEC }], 'Fair: the penalty and the incentive on together, from December — twice the same')
+check(await q(`SELECT enable_margin_penalty, enable_margin_incentive FROM public.comm_schemes WHERE id = $1`, [OS]),
+  [{ enable_margin_penalty: false, enable_margin_incentive: false }], 'no other scheme touched')
 check(Object.fromEntries(Object.entries(await weights()).filter(([k]) => ['701', '702', '706', '707', '708'].includes(k))),
   { '701': 1, '702': 1, '706': 1, '707': 1, '708': 1 }, "November's bills whole; only the ratios a director set count")
 

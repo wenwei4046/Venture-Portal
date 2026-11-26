@@ -652,9 +652,10 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         switches={subDept.schemeId && scheme ? (
           <SchemeSwitches
             schemeId={subDept.schemeId}
-            // What THIS month pays (2026-11-27): a penalty that starts in a later month cuts none of its bills.
-            margin={(scheme.enable_margin_penalty && (!scheme.margin_penalty_from || period >= scheme.margin_penalty_from.slice(0, 10)))
-              || scheme.enable_margin_incentive}
+            margin={scheme.enable_margin_penalty || scheme.enable_margin_incentive}
+            // The switch's first month, when later than this one (2026-11-27): this month pays no margin either way.
+            marginFrom={scheme.margin_penalty_from && period < scheme.margin_penalty_from.slice(0, 10)
+              ? `from ${label(scheme.margin_penalty_from.slice(0, 10))}` : null}
             kpi={scheme.enable_kpi}
           />
         ) : undefined}

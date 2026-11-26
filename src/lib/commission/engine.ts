@@ -393,14 +393,32 @@ export function penaltyBandFor(
 export const COMM_RATIO_BAND = 'comm_ratio'
 
 /**
+ * Whether the scheme's margin switch reaches this month at all: no first month set, or the month not before it
+ * (`marginPenaltyFrom` — the user turned Fair's margin on "从十二月开始", 2026-11-27). The penalty and the incentive are
+ * one switch (the user: "the penalty and incentive is trigger together, make it into same button"), so one month
+ * starts both.
+ */
+export function marginReachesMonth(scheme: Pick<CommissionScheme, 'marginPenaltyFrom'>, periodMonth: string): boolean {
+  return !scheme.marginPenaltyFrom || periodMonth >= scheme.marginPenaltyFrom
+}
+
+/** Whether the month's margin incentive is paid: the switch on, and the run's month from the switch's first month. */
+export function incentivePaysMonth(
+  scheme: Pick<CommissionScheme, 'enableMarginIncentive' | 'marginPenaltyFrom'>,
+  periodMonth: string,
+): boolean {
+  return scheme.enableMarginIncentive && marginReachesMonth(scheme, periodMonth)
+}
+
+/**
  * Whether the scheme's margin penalty cuts a bill of this month: switched on, and the bill's month not before the one
- * it starts from (`marginPenaltyFrom` — the user turned Fair's on "从十二月开始", 2026-11-27).
+ * it starts from.
  */
 export function penaltyCutsMonth(
   scheme: Pick<CommissionScheme, 'enableMarginPenalty' | 'marginPenaltyFrom'>,
   periodMonth: string,
 ): boolean {
-  return scheme.enableMarginPenalty && (!scheme.marginPenaltyFrom || periodMonth >= scheme.marginPenaltyFrom)
+  return scheme.enableMarginPenalty && marginReachesMonth(scheme, periodMonth)
 }
 
 /**
@@ -1664,7 +1682,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     })
 
     let bandKey: string | null = null
-    if (scheme.enableMarginIncentive && brands.length > 0) {
+    // The month's incentive from the margin switch's first month on (2026-11-27): November pays none when it starts in
+    // December.
+    if (incentivePaysMonth(scheme, input.periodMonth) && brands.length > 0) {
       const inc = marginIncentiveAcrossBrands(brands, input.marginBands)
       bandKey = inc.bandKey
       if (inc.blockedReason) incentiveBlocked.set(d.staffId, inc.blockedReason)

@@ -2736,6 +2736,19 @@ describe('the penalty cuts from the month it starts (2026-11-27)', () => {
     expect(run({ scheme: from('2026-08-01'), orders: [uncosted] }).warnings.some(w => w.includes('have no margin'))).toBe(false)
     expect(run({ scheme: from('2026-07-01'), orders: [uncosted] }).warnings.some(w => w.includes('have no margin'))).toBe(true)
   })
+
+  // The penalty and the incentive are one switch (the user: "the penalty and incentive is trigger together, make it into
+  // same button"): one month starts both.
+  it("pays the month's margin incentive from the same month on — none before it", () => {
+    // 38% margin: Akemi's Incentive Tier 1, RM 1,000.
+    const good = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_200]], { periodMonth: '2026-07-01' })
+    expect(find(run({ scheme: from('2026-08-01'), orders: [good] }).statements, 'rs').marginIncentive).toBe(0)
+    expect(find(run({ scheme: from('2026-07-01'), orders: [good] }).statements, 'rs').marginIncentive).toBe(1_000)
+    expect(find(run({ scheme: from(null), orders: [good] }).statements, 'rs').marginIncentive).toBe(1_000)
+    // The run's own month decides: August's run pays August's incentive on a July bill carried in.
+    const carried = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_200]], { periodMonth: '2026-07-01' })
+    expect(find(run({ periodMonth: '2026-08-01', scheme: from('2026-08-01'), orders: [carried] }).statements, 'rs').marginIncentive).toBe(1_000)
+  })
 })
 
 describe("a Revenue Director's commission ratio stands in the margin band's place (2026-11-27)", () => {

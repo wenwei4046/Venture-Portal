@@ -42,4 +42,14 @@ describe('SchemeSwitches', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not change the switch')
     expect(screen.getByRole('switch', { name: 'KPI item' })).toHaveAttribute('aria-checked', 'true')
   })
+
+  // 2026-11-27 — the margin switch on, starting in a later month ("从十二月开始"): this month pays none of it.
+  it('says when the margin starts, in a month before it', () => {
+    render(<SchemeSwitches {...props} margin marginFrom="from December 2026" />)
+    expect(screen.getByRole('switch', { name: 'Margin incentive & penalty' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('from December 2026')).toBeInTheDocument()
+    cleanup()
+    render(<SchemeSwitches {...props} margin={false} marginFrom="from December 2026" />)
+    expect(screen.queryByText('from December 2026')).toBeNull()
+  })
 })

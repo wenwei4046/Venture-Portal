@@ -11,7 +11,8 @@ import s from './rules.module.css'
 import { Select } from '@/components/hrv/select'
 
 // Rules › Scheme rules (2026-10-10, the HR revamp): the components as
-// switches in the prototype's order — seven since Open Bill went (2026-10-31)
+// switches in the prototype's order — seven since Open Bill went (2026-10-31), six since the margin's penalty and
+// incentive became one (2026-11-27)
 // — a dot on each one changed since the last save, and Save / Saved at the
 // section's top. What a component needs besides its switch — Group
 // incentive's three layer settings (the prototype's), and the ones this scheme
@@ -21,14 +22,16 @@ import { Select } from '@/components/hrv/select'
 // Product List › Costing Setting is the only place it is set, and this Save
 // never writes it.
 
-type SwitchKey = 'product' | 'kpi' | 'override' | 'margin_penalty' | 'margin_incentive' | 'group' | 'deposit'
+// The below-margin penalty and the monthly margin incentive are ONE switch (2026-11-27 — the user: "the penalty and
+// incentive is trigger together, make it into same button"), as the month page's *Margin incentive & penalty* always
+// was: on, a bill below its ladder is cut and a month every brand clears a tier pays; off, neither.
+type SwitchKey = 'product' | 'kpi' | 'override' | 'margin' | 'group' | 'deposit'
 
 const SWITCHES: Array<{ k: SwitchKey; label: string; desc: string }> = [
   { k: 'product', label: 'Product revenue commission', desc: "the salesperson's rate × their commissionable revenue" },
   { k: 'kpi', label: 'KPI item allowance', desc: 'flat RM per unit; that item’s revenue leaves the commission base' },
   { k: 'override', label: 'Hierarchy override', desc: 'uplines earn on their group’s sales' },
-  { k: 'margin_penalty', label: 'Below-margin penalty', desc: 'per bill — also cuts every upline’s override on it' },
-  { k: 'margin_incentive', label: 'Monthly margin incentive', desc: 'every brand sold must clear the tier' },
+  { k: 'margin', label: 'Margin incentive & penalty', desc: 'a bill below its ladder is cut, its uplines’ override too; every brand clearing a tier pays the month’s incentive' },
   { k: 'group', label: 'Group incentive package', desc: 'monthly fixed pay per qualifying direct group' },
   { k: 'deposit', label: 'Deposit gate', desc: '% of the order total before any of it pays' },
 ]
@@ -40,7 +43,7 @@ interface Form {
   directLimit: string
   overrideKpi: boolean
   depositPct: string
-  /** `YYYY-MM`: the first month whose bills the penalty cuts (2026-11-27); empty for every month. */
+  /** `YYYY-MM`: the first month the margin switch reaches — its bills cut, its incentive paid (2026-11-27); empty for every month. */
   penaltyFrom: string
   rateMode: 'fixed' | 'variable'
 }
@@ -54,8 +57,8 @@ function formOf(scheme: SchemeRow): Form {
       product: scheme.enable_product_revenue,
       kpi: scheme.enable_kpi,
       override: scheme.enable_override,
-      margin_penalty: scheme.enable_margin_penalty,
-      margin_incentive: scheme.enable_margin_incentive,
+      // One switch: on while either column is (a scheme saved before they were one keeps what it pays until saved).
+      margin: scheme.enable_margin_penalty || scheme.enable_margin_incentive,
       group: scheme.enable_group_incentive ?? false,
       deposit: scheme.deposit_threshold_pct !== null,
     },
@@ -78,8 +81,7 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   on('enable_product_revenue', f.sw.product)
   on('enable_kpi', f.sw.kpi)
   on('enable_override', f.sw.override)
-  on('enable_margin_penalty', f.sw.margin_penalty)
-  on('enable_margin_incentive', f.sw.margin_incentive)
+  on('enable_margin', f.sw.margin)
   on('enable_group_incentive', f.sw.group)
   on('deposit_gate_on', f.sw.deposit)
   on('override_includes_kpi', f.overrideKpi)
@@ -87,8 +89,8 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   fd.set('override_depth', f.overrideDepth.trim())
   fd.set('direct_line_limit', f.directLimit.trim())
   fd.set('deposit_threshold_pct', f.depositPct.trim())
-  // Only while the penalty is on: switched off, what is stored stays for when it is on again.
-  if (f.sw.margin_penalty) fd.set('margin_penalty_from', f.penaltyFrom.trim())
+  // Only while the margin is on: switched off, what is stored stays for when it is on again.
+  if (f.sw.margin) fd.set('margin_penalty_from', f.penaltyFrom.trim())
   fd.set('default_rate_mode', f.rateMode)
   return fd
 }
@@ -125,8 +127,8 @@ export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; 
         next.overrideDepth = saved.overrideDepth
         next.directLimit = saved.directLimit
       }
-      // The penalty's month, the same: out of sight while it is off, and never sent then.
-      if (k === 'margin_penalty' && !next.sw.margin_penalty) next.penaltyFrom = saved.penaltyFrom
+      // The margin's month, the same: out of sight while it is off, and never sent then.
+      if (k === 'margin' && !next.sw.margin) next.penaltyFrom = saved.penaltyFrom
       return next
     })
     setError('')
@@ -227,20 +229,20 @@ export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; 
                   )}
                 </div>
               ) : null}
-              {on && sw.k === 'margin_penalty' ? (
-                // The month its cut starts (2026-11-27 — the user, of Fair's: "从十二月开始"): a bill of an earlier
-                // month is paid in full; empty cuts every month.
+              {on && sw.k === 'margin' ? (
+                // The month it starts (2026-11-27 — the user, of Fair's: "从十二月开始"): a bill of an earlier month
+                // is paid in full and an earlier month pays no incentive; empty = every month.
                 <div className={s.params}>
                   {param(
-                    'Cuts bills from',
-                    f.penaltyFrom ? 'bills of earlier months pay in full' : 'every month',
+                    'Starts from',
+                    f.penaltyFrom ? 'earlier months: no cut, no incentive' : 'every month',
                     <input
                       className={s.paramValue}
                       type="month"
                       value={f.penaltyFrom}
                       onChange={e => setF(p => ({ ...p, penaltyFrom: e.target.value }))}
                       disabled={!canManage}
-                      aria-label="Cuts bills from"
+                      aria-label="Margin starts from"
                     />,
                   )}
                 </div>

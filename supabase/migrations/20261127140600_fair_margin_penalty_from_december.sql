@@ -1,13 +1,15 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 20261127140600 — Fair's below-margin penalty, on from December 2026's bills (2026-11-27)
+-- 20261127140600 — Fair's margin incentive & penalty, on from December 2026's bills (2026-11-27)
 -- ════════════════════════════════════════════════════════════════════════════
 --
 -- The user, turning Fair's margin penalty on with its new ladder for Akemi and Ergotex (20261127140500): Dunlopillo and
--- Zanotti keep their own; "从十二月开始" — November's bills are paid in full, December's are cut. Applied once the app that
--- reads comm_schemes.margin_penalty_from is live: an older app would cut November's bills the moment the switch is on.
+-- Zanotti keep their own; "从十二月开始" — November's bills are paid in full, December's are cut. And the same day, of the
+-- penalty and the margin incentive: "the penalty and incentive is trigger together, make it into same button" — they
+-- are ONE switch (Rules › Scheme rules › Margin incentive & penalty, as the month page's always was), so both go on, and
+-- both start in December: November pays no margin incentive, December's run does.
 --
--- Nothing else is switched: the margin incentive stays off. Rules › Scheme rules shows the switch and its month.
--- Running it twice changes nothing.
+-- Applied once the app that reads comm_schemes.margin_penalty_from is live: an older app would cut November's bills and
+-- pay November's incentive the moment the switch is on. Running it twice changes nothing.
 -- ════════════════════════════════════════════════════════════════════════════
 
 DO $$
@@ -26,7 +28,8 @@ BEGIN
     RAISE EXCEPTION 'Fair has no active commission scheme';
   END IF;
   UPDATE public.comm_schemes
-     SET enable_margin_penalty = true, margin_penalty_from = DATE '2026-12-01', updated_at = now()
+     SET enable_margin_penalty = true, enable_margin_incentive = true, margin_penalty_from = DATE '2026-12-01', updated_at = now()
    WHERE id = v_scheme
-     AND (enable_margin_penalty IS DISTINCT FROM true OR margin_penalty_from IS DISTINCT FROM DATE '2026-12-01');
+     AND (enable_margin_penalty IS DISTINCT FROM true OR enable_margin_incentive IS DISTINCT FROM true
+          OR margin_penalty_from IS DISTINCT FROM DATE '2026-12-01');
 END $$;

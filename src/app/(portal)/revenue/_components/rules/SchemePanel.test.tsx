@@ -49,8 +49,8 @@ describe('SchemePanel', () => {
       'Product revenue commission',
       'KPI item allowance',
       'Hierarchy override',
-      'Below-margin penalty',
-      'Monthly margin incentive',
+      // One switch since 2026-11-27 — the user: "the penalty and incentive is trigger together, make it into same button".
+      'Margin incentive & penalty',
       'Group incentive package',
       'Deposit gate',
     ])
@@ -89,12 +89,15 @@ describe('SchemePanel', () => {
   it('saves every switch and setting in one go, then refreshes the list of sections', async () => {
     act.saveSchemeRules.mockResolvedValue({ ok: true })
     render(<SchemePanel scheme={ir} canManage />)
-    fireEvent.click(sw('Below-margin penalty'))
+    fireEvent.click(sw('Margin incentive & penalty'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalledTimes(1))
     const fd = act.saveSchemeRules.mock.calls[0][0] as FormData
     expect(fd.get('scheme_id')).toBe('scheme-ir')
-    expect(fd.get('enable_margin_penalty')).toBe('on')
+    // The one switch: the server sets the penalty and the incentive from it.
+    expect(fd.get('enable_margin')).toBe('on')
+    expect(fd.has('enable_margin_penalty')).toBe(false)
+    expect(fd.has('enable_margin_incentive')).toBe(false)
     expect(fd.get('enable_kpi')).toBeNull()
     // Open Bill went (2026-10-31): neither its switch nor its basis is sent.
     expect(fd.has('enable_open_bill')).toBe(false)
@@ -110,10 +113,10 @@ describe('SchemePanel', () => {
   it('says why a save was refused, and keeps the draft', async () => {
     act.saveSchemeRules.mockResolvedValue({ ok: false, reason: 'Give the deposit gate a threshold, or switch it off' })
     render(<SchemePanel scheme={ir} canManage />)
-    fireEvent.click(sw('Below-margin penalty'))
+    fireEvent.click(sw('Margin incentive & penalty'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Give the deposit gate a threshold, or switch it off')
-    expect(sw('Below-margin penalty')).toHaveAttribute('aria-checked', 'true')
+    expect(sw('Margin incentive & penalty')).toHaveAttribute('aria-checked', 'true')
     expect(nav.refresh).not.toHaveBeenCalled()
   })
 
@@ -136,38 +139,51 @@ describe('SchemePanel', () => {
     expect(sw('KPI item allowance')).toHaveAttribute('aria-checked', 'false')
   })
 
-  // 2026-11-27 — the user, turning Fair's penalty on with its new Akemi / Ergotex ladder: "从十二月开始".
-  describe('the month the penalty cuts from', () => {
-    const fair: SchemeRow = { ...ir, id: 'scheme-fair', enable_margin_penalty: true, margin_penalty_from: '2026-12-01' }
+  // 2026-11-27 — the user, turning Fair's margin on with its new Akemi / Ergotex ladder: "从十二月开始"; and of the
+  // penalty and the incentive: "trigger together, make it into same button".
+  describe('the one margin switch and the month it starts', () => {
+    const fair: SchemeRow = { ...ir, id: 'scheme-fair', enable_margin_penalty: true, enable_margin_incentive: true, margin_penalty_from: '2026-12-01' }
 
-    it('shows under the penalty while it is on, the month it starts', () => {
+    it('is on while either half is — a scheme saved before they were one', () => {
+      render(<SchemePanel scheme={{ ...ir, enable_margin_penalty: true }} canManage />)
+      expect(sw('Margin incentive & penalty')).toHaveAttribute('aria-checked', 'true')
+      cleanup()
+      render(<SchemePanel scheme={{ ...ir, enable_margin_incentive: true }} canManage />)
+      expect(sw('Margin incentive & penalty')).toHaveAttribute('aria-checked', 'true')
+    })
+
+    it('shows under the switch while it is on, the month it starts', () => {
       render(<SchemePanel scheme={fair} canManage />)
-      expect(screen.getByLabelText('Cuts bills from')).toHaveValue('2026-12')
-      expect(screen.getByText('bills of earlier months pay in full')).toBeInTheDocument()
+      expect(screen.getByLabelText('Margin starts from')).toHaveValue('2026-12')
+      expect(screen.getByText('earlier months: no cut, no incentive')).toBeInTheDocument()
       cleanup()
       render(<SchemePanel scheme={ir} canManage />)
-      expect(screen.queryByLabelText('Cuts bills from')).toBeNull()
+      expect(screen.queryByLabelText('Margin starts from')).toBeNull()
     })
 
     it('saves the month — empty for every month', async () => {
       act.saveSchemeRules.mockResolvedValue({ ok: true })
       render(<SchemePanel scheme={fair} canManage />)
-      fireEvent.change(screen.getByLabelText('Cuts bills from'), { target: { value: '2027-01' } })
+      fireEvent.change(screen.getByLabelText('Margin starts from'), { target: { value: '2027-01' } })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
       await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalled())
-      expect((act.saveSchemeRules.mock.calls[0][0] as FormData).get('margin_penalty_from')).toBe('2027-01')
-      fireEvent.change(screen.getByLabelText('Cuts bills from'), { target: { value: '' } })
+      const fd = act.saveSchemeRules.mock.calls[0][0] as FormData
+      expect(fd.get('margin_penalty_from')).toBe('2027-01')
+      expect(fd.get('enable_margin')).toBe('on')
+      fireEvent.change(screen.getByLabelText('Margin starts from'), { target: { value: '' } })
       expect(screen.getByText('every month')).toBeInTheDocument()
     })
 
-    it('sends no month while the penalty is off: what is stored stays', async () => {
+    it('sends no month while it is off: what is stored stays', async () => {
       act.saveSchemeRules.mockResolvedValue({ ok: true })
       render(<SchemePanel scheme={fair} canManage />)
-      fireEvent.click(sw('Below-margin penalty'))
-      expect(screen.queryByLabelText('Cuts bills from')).toBeNull()
+      fireEvent.click(sw('Margin incentive & penalty'))
+      expect(screen.queryByLabelText('Margin starts from')).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
       await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalled())
-      expect((act.saveSchemeRules.mock.calls[0][0] as FormData).has('margin_penalty_from')).toBe(false)
+      const fd = act.saveSchemeRules.mock.calls[0][0] as FormData
+      expect(fd.has('margin_penalty_from')).toBe(false)
+      expect(fd.has('enable_margin')).toBe(false)
     })
   })
 })

@@ -392,9 +392,10 @@ export interface CommissionScheme {
   /** Below-margin penalty on a bill's own commission. */
   enableMarginPenalty: boolean
   /**
-   * The first month (YYYY-MM-01) whose bills the penalty cuts (2026-11-27 — the user turned Fair's on "从十二月开始":
+   * The first month (YYYY-MM-01) the margin switch reaches (2026-11-27 — the user turned Fair's on "从十二月开始":
    * November's bills paid in full, December's cut). A bill of an earlier month is cut by no band, whichever month pays
-   * it. Absent or null: every month's, while `enableMarginPenalty` is on.
+   * it; a run of an earlier month pays no margin incentive — the penalty and the incentive are one switch ("make it
+   * into same button"). Absent or null: every month, while the switch is on.
    */
   marginPenaltyFrom?: string | null
   /** Monthly margin incentive (RM1,000 / a further RM1,500). */

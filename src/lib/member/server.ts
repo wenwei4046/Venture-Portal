@@ -589,11 +589,16 @@ export async function loadMemberIncome(
     });
 
     const { data: scheme, error: schemeError } = await admin.from("comm_schemes")
-      .select("enable_kpi, enable_margin_incentive, enable_override, enable_group_incentive")
+      .select("enable_kpi, enable_margin_incentive, margin_penalty_from, enable_override, enable_group_incentive")
       .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
     if (schemeError) throw new Error(schemeError.message);
-    const sw = (scheme ?? {}) as Record<string, boolean | null>;
-    const switches = { kpi: !!sw.enable_kpi, incentive: !!sw.enable_margin_incentive, override: !!sw.enable_override, group: !!sw.enable_group_incentive };
+    const sw = (scheme ?? {}) as Record<string, boolean | string | null>;
+    // The margin incentive from the margin switch's first month on (2026-11-27): a month before it pays none.
+    const marginFrom = typeof sw.margin_penalty_from === "string" ? sw.margin_penalty_from.slice(0, 10) : null;
+    const switches = {
+      kpi: !!sw.enable_kpi, incentive: !!sw.enable_margin_incentive && (!marginFrom || first >= marginFrom),
+      override: !!sw.enable_override, group: !!sw.enable_group_incentive,
+    };
 
     // Closed by HR: the close's own figures, fixed.
     const close = closes.data as { closed_at: string; summary: unknown; statement: StatementDto | null; deferred_orders: { orderId: string }[] | null } | null;
