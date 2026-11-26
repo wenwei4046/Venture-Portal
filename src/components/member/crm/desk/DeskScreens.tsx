@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { crmWrite, fetchAdDaily, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
 import { cachedFigs, keepFigs } from "./meta-cache";
+import { askAgainSoon } from "../shared/ad-figures-read";
 import { metaAdIds, prefetchNeeds } from "./vm/prefetch";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchCrmChannels, saveCrmBusinessProfile, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
@@ -353,6 +354,18 @@ export default function DeskScreens(p: DeskScreensProps) {
   // …on Ads Performance, on Insight › Overview, and on Reports › Ads performance, which draws the same table (2026-10-23).
   const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && (ui.insTab === "ads" || !!v.overview)) || (ui.tab === "reports" && (ui.rpCat === "ads" || ((v.rpNeed as unknown[] | undefined)?.length ?? 0) > 0)) || (ui.tab === "assignment" && ui.adPane === "perf");
   const asked = useRef(new Set<string>());
+  // Old first, then new (2026-11-26, the owner: "先看到之前的记录再跳真正的数据"): a range the server answered from an older read
+  // (`stale`, while it reads Meta again) is asked once more a few seconds on, and the new figures laid over the old.
+  const mergeFresh = (figs: Record<string, Record<string, MetaFig | null>>) => setUi(u => {
+    const m = { ...u.apMeta };
+    for (const [k, f] of Object.entries(figs)) if (f && Object.keys(f).length) { keepFigs(k, f); m[k] = { ...(m[k] ?? {}), ...f }; }
+    return { ...u, apMeta: m };
+  });
+  const staleAware = (body: { figs: Record<string, Record<string, MetaFig | null>>; stale?: string[] }, part: { key: string; since: string; until: string; ids: string[] }[]) => {
+    const again = part.filter(p => body.stale?.includes(p.key));
+    if (again.length) askAgainSoon(again, mergeFresh);
+    return body.figs;
+  };
   // An ad Meta did not answer for (left out of the GET's answer, or the GET failed) is asked again 3 s later, three times
   // at most, then reads "—" (2026-11-24, the owner: "计算还是很慢" — such an ad was marked asked and read "—" for good).
   const metaTries = useRef(new Map<string, number>());
@@ -376,7 +389,7 @@ export default function DeskScreens(p: DeskScreensProps) {
     for (let i = 0; i < ask.length; i += 8) {
       const part = ask.slice(i, i + 8);
       const read = fetch(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(part))}`, { cache: "no-store" })
-        .then(async res => (res.ok ? { ok: true as const, figs: ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs } : { ok: false as const }))
+        .then(async res => (res.ok ? { ok: true as const, figs: staleAware(await res.json(), part) } : { ok: false as const }))
         .catch(() => ({ ok: false as const }));
       void read.then(r => {
         // What did not come: asked again shortly, until its third try, which then reads "—".
@@ -419,7 +432,7 @@ export default function DeskScreens(p: DeskScreensProps) {
       for (let i = 0; i < again.length; i += 8) {
         const part = again.slice(i, i + 8);
         void fetch(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(part))}`, { cache: "no-store" })
-          .then(async res => (res.ok ? ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs : null))
+          .then(async res => (res.ok ? staleAware(await res.json(), part) : null))
           .catch(() => null)
           .then(figs => {
             if (!figs) return;
@@ -445,7 +458,7 @@ export default function DeskScreens(p: DeskScreensProps) {
       for (const part of prefetchNeeds(new Date(), ids, apMetaRef.current ?? {})) {
         part.forEach(n => n.ids.forEach(id => asked.current.add(`${n.key}|${id}`)));
         void fetch(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(part))}`, { cache: "no-store" })
-          .then(async res => (res.ok ? ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs : null))
+          .then(async res => (res.ok ? staleAware(await res.json(), part) : null))
           .catch(() => null)
           .then(figs => {
             // What did not come is left to the screen's own read, which asks again.

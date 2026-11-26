@@ -7,7 +7,8 @@
  *
  *   GET /member/crm-ad-figures?n=<JSON [{ key, since, until, ids }]>  →  { figs: { [key]: { [adId]: MetaFig | null } } }
  */
-import { cacheKey, cachedFigs, keepFigs } from "@/lib/member/ad-figures-cache";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { cacheKey, cachedFigs, keepFigs, once } from "@/lib/member/ad-figures-cache";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { metaAdsFigures, type MetaFig } from "@/lib/member/crm-ad-names-meta";
@@ -27,17 +28,27 @@ const json = (status: number, body: unknown) =>
  * reads of Meta for one answer). An answer missing an ad (Meta did not give it this time) is not kept — the next ask
  * reads Meta again — and the ad is left out, so the screen asks again rather than keeping "—".
  */
-async function rangeFigs(n: Need, token: string, today: string): Promise<Record<string, MetaFig | null>> {
+async function rangeFigs(n: Need, token: string, today: string): Promise<{ figs: Record<string, MetaFig | null>; stale: boolean }> {
   const ids = [...new Set(n.ids)].sort(), until = readUntil(n.since, n.until, today);
   // Kept in the Worker's memory and Cloudflare's cache (ad-figures-cache.ts) — Next's unstable_cache kept nothing on
   // Cloudflare, so every open asked Meta (2026-11-26).
   const key = cacheKey(n.since, until, ids);
+  const read = () => once(key, async () => {
+    const got = (await metaAdsFigures(ids, [{ key: "r", since: n.since, until }], token)).r ?? {};
+    if (!ids.some(id => !(id in got))) await keepFigs(key, got, keepSeconds(until, today));
+    return got;
+  });
   const kept = await cachedFigs(key);
-  if (kept) return kept;
-  const got = (await metaAdsFigures(ids, [{ key: "r", since: n.since, until }], token)).r ?? {};
-  if (ids.some(id => !(id in got))) return got;
-  await keepFigs(key, got, keepSeconds(until, today));
-  return got;
+  if (kept && !kept.stale) return { figs: kept.figs, stale: false };
+  // Old first, then new (the owner: "先看到之前的记录再跳真正的数据"): a stale answer goes at once and Meta is read behind it,
+  // the Worker kept alive for it (waitUntil); the screen asks again a few seconds later for the new one.
+  if (kept) { behind(read().catch(() => undefined)); return { figs: kept.figs, stale: true }; }
+  return { figs: await read(), stale: false };
+}
+
+/** Keeps the Worker running for work after the answer has gone (Cloudflare's waitUntil); in Node the promise just runs. */
+function behind(p: Promise<unknown>) {
+  try { getCloudflareContext().ctx.waitUntil(p); } catch { /* not on Cloudflare */ }
 }
 
 export async function GET(request: Request) {
@@ -52,8 +63,12 @@ export async function GET(request: Request) {
   const today = officeToday();
   try {
     const got = await Promise.all(needs.map(n => rangeFigs(n, token, today)));
-    // An ad Meta did not answer for this time is left out (the screen asks again); null = it never will.
-    return json(200, { figs: Object.fromEntries(needs.map((n, i) => [n.key, Object.fromEntries(n.ids.filter(id => id in got[i]).map(id => [id, got[i][id]]))])) });
+    // An ad Meta did not answer for this time is left out (the screen asks again); null = it never will. `stale` names the
+    // ranges answered from an older read while a new one is made — the screen asks for them again shortly.
+    return json(200, {
+      figs: Object.fromEntries(needs.map((n, i) => [n.key, Object.fromEntries(n.ids.filter(id => id in got[i].figs).map(id => [id, got[i].figs[id]]))])),
+      stale: needs.filter((_, i) => got[i].stale).map(n => n.key),
+    });
   } catch {
     return json(502, { error: "Meta's figures could not be read." });
   }
