@@ -10,6 +10,7 @@ import { windowOpen } from "@/lib/whatsapp/send";
 import { HUMAN_AGENT_APPROVED, messengerWindow } from "@/lib/messenger/send";
 import type { SalesRefs, SalesUi } from "../ui";
 import { FB_BLOCKED } from "../../shared/fb-blocked";
+import type { CrmViewSwap } from "../../shared/view-swap";
 import { formatIntlDate } from "@/lib/utils";
 
 /** A date in the design's words, months always three letters (DESIGN.md › Date format). */
@@ -130,6 +131,8 @@ export interface SalesCtx {
   embedded: { rdMode: boolean; toPanel?: () => void; exitAs?: () => void; switchList?: CrmPerson[]; onSwitch?: (id: string) => void;
     /** Team | Mine: to the Control panel scoped to this person (the Director; leaders with a downline), on its first page. */
     toTeam?: () => void;
+    /** IR ⇄ DC in the Inbox's bell's place (shared/view-swap.ts): one's own CRM, with both CRM views; else none. */
+    viewSwap?: CrmViewSwap | null;
     /** The Principal / Director give a customer to anyone (crm_send_to) — their chat menu's Assign to. */
     assignTo?: (customerId: string, staffId: string) => Promise<boolean> } | null;
 }

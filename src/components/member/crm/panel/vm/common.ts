@@ -12,6 +12,7 @@ import { personInView } from "@/lib/member/crm-view";
 import type { PanelActions } from "../actions";
 import type { PanelUi, Period, Range } from "../ui";
 import type { SalesTab } from "../../sales/ui";
+import type { CrmViewSwap } from "../../shared/view-swap";
 import { DIRECTOR_COLOUR, teamColour, URGENCY_COLOUR } from "../../shared/palette";
 
 export const DAY = 86_400_000;
@@ -60,6 +61,8 @@ export interface PanelCtx {
   exitApp: () => void;
   /** IR Quote (2026-11-05): Profile › Quotation settings, below Ads Performance — handed in only to whoever may edit them, on a phone. */
   openQuoteSettings?: () => void;
+  /** IR ⇄ DC in the Inbox's bell's place (shared/view-swap.ts): one's own Team side, with both CRM views; else none. */
+  viewSwap?: CrmViewSwap | null;
   slotCounts: Record<string, number>;
   /** One's recent emoji, shared with Mine's chat (sales/vm/composer.ts › SharedRecents). */
   recents?: import("../../sales/vm/composer").SharedRecents;

@@ -65,6 +65,7 @@ import { isNewChat } from "../../shared/new-chat";
 import { STATUS, avatarTint } from "../../shared/palette";
 import { saidInChat } from "../../shared/chat-search";
 import { FB_BLOCKED, FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
+import { viewSwapBtn } from "../../shared/view-swap";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
 const listed = (ctx: PanelCtx) => ctx.data.customers.filter(c => c.assignedTo || c.teamId);
@@ -120,6 +121,14 @@ type Row = ReturnType<typeof chatRow>;
 /** The Team inbox's statuses, in Mine's order (MINE AND TEAM SHOW THE SAME CATEGORIES, 2026-10-14). */
 const CATS = ([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"], ["blocked", FB_BLOCKED_CATEGORY]] as const)
   .map(([k, t]) => ({ k, t, dot: STATUS[t].dot }));
+/**
+ * Status › Unread (the owner, 2026-11-27, of the phone's Filter chats beside the desktop's: "in phone view, it should have
+ * unread status pick as well"): the desktop's since 2026-11-16 (desk/vm/inbox.ts › UNREAD), the same rule — the chats with
+ * the red count (crm_contacts.unread) or marked unread (one's own mark, data.prefs). Not a status but a narrowing, kept in
+ * ui.inbSt beside them and offered first: alone it keeps every unread chat; with statuses, the unread ones among them.
+ */
+export const UNREAD_PICK = "unread";
+const PICKS: { k: string; t: string; dot: string }[] = [{ k: UNREAD_PICK, t: "Unread", dot: "var(--crm-rust)" }, ...CATS];
 
 /**
  * v4 · the Team inbox (frame 2d, notes/17; filters exactly frame 2c / 2c·2): People and Status are multi-select — a team
@@ -148,13 +157,20 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
       return people.includes(r.c.assignedTo ?? "");
     };
   };
-  const inSt = (pick: string[]) => (r: Row) => !pick.length || pick.includes(col(r));
+  const marked = (c: CrmCustomer) => !!data.prefs?.[c.id]?.markedUnread;
+  const isUnread = (r: Row) => r.c.unread > 0 || marked(r.c);
+  /** Does a chat belong to this Status pick? The statuses OR; Unread narrows them (UNREAD_PICK). */
+  const inSt = (pick: string[]) => {
+    const only = pick.filter(k => k !== UNREAD_PICK), un = only.length !== pick.length;
+    return (r: Row) => (!un || isUnread(r)) && (!only.length || only.includes(col(r)));
+  };
   const said = (r: Row) => !q || `${r.name} ${r.preview} ${r.c.ad} ${r.who}`.toLowerCase().includes(q) || !!saidInChat(r.c, q);
   const list = all.filter(r => inPeople(sel)(r) && inSt(st)(r) && said(r));
   const write = (people: string[], status: string[]) => set(u => ({ ...u, inbTeam: "", inbWho: "", inbPeople: people, inbSt: status }));
   const labelsOf = (c: CrmCustomer) => (data.customerLabels?.[c.id] ?? []).map(id => data.labels?.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
-  const stMany = st.length !== 1;
-  const catOf = (k: string) => CATS.find(x => x.k === k)!;
+  // A card says its status while more than one is in view — Unread alone leaves every status in view.
+  const stMany = st.filter(k => k !== UNREAD_PICK).length !== 1;
+  const catOf = (k: string) => PICKS.find(x => x.k === k) ?? { k, t: k, dot: "var(--crm-faint-2)" };
 
   // The tags under the buttons: teams, then people (their team's dot), then statuses (a square).
   const nameOfPerson = (pid: string) => teamDefs.flatMap(t => t.people).find(p => p.id === pid)?.name ?? ctx.nameOf(pid);
@@ -192,7 +208,8 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
         ...t.people.map(p => ({ key: p.id, label: p.name, n: all.filter(r => r.c.assignedTo === p.id).length, on: dp.includes(`person:${p.id}`), toggle: () => putSheet({ people: toggle(dp, `person:${p.id}`) }) })),
       ] };
     }),
-    statuses: CATS.map(x => ({ key: x.k, label: x.t, dot: x.dot, n: all.filter(r => col(r) === x.k).length, hot: x.k === "need", on: ds.includes(x.k), toggle: () => putSheet({ st: toggle(ds, x.k) }) })),
+    statuses: PICKS.map(x => ({ key: x.k, label: x.t, dot: x.dot, n: all.filter(x.k === UNREAD_PICK ? isUnread : r => col(r) === x.k).length,
+      hot: x.k === "need" || x.k === UNREAD_PICK, on: ds.includes(x.k), toggle: () => putSheet({ st: toggle(ds, x.k) }) })),
     clear: () => putSheet({ people: [], st: [] }),
     cancel: () => set(u => ({ ...u, inbSheet: null })),
     applyLabel: `Show ${draftN} chat${draftN === 1 ? "" : "s"}`,
@@ -202,6 +219,8 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
   const nP = sel.length, nS = st.length;
 
   return {
+    // IR ⇄ DC where the bell was, for whoever has both CRM views (2026-11-27; shared/view-swap.ts).
+    vs: viewSwapBtn(ctx.viewSwap),
     peopleN: nP, statusN: nS, openPeople: open("people"), openStatus: open("status"),
     tags, count: `${list.length} chat${list.length === 1 ? "" : "s"}`, of: `of ${all.length}`, canClear: !!(nP || nS),
     clearAll: () => write([], []),
@@ -211,7 +230,9 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
     sheet,
     empty: !list.length,
     cards: list.map(r => {
-      const u = urgencyOf(r.c, now), cold = isCold(r.c, now), blocked = isFbBlocked(r.c, data), k = col(r), unread = !!r.c.unread;
+      // A chat one marked unread (the desktop's ⋮, Mine's swipe) shows the badge as a dot, as Mine's row and the desktop's do —
+      // it is in Unread, so the card says why.
+      const u = urgencyOf(r.c, now), cold = isCold(r.c, now), blocked = isFbBlocked(r.c, data), k = col(r), dot = !r.c.unread && marked(r.c), unread = !!r.c.unread || dot;
       return {
         id: r.c.id, name: r.name, ini: r.ini, avBg: r.avBg, avFg: r.avFg,
         chanFg: CHANNEL[r.c.channel].fg, chanIc: (r.c.channel === "whatsapp" ? "phone" : "message-circle") as "phone" | "message-circle", chanName: CHANNEL[r.c.channel].name,
@@ -221,7 +242,7 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
         tags: labelsOf(r.c).map(l => ({ t: l.name, c: l.color })),
         who: r.who, wc: r.wc, toAssign: r.toAssign, ad: r.c.ad,
         stShow: stMany, st: catOf(k).t, stDot: catOf(k).dot,
-        preview: r.preview, unread: r.unread, cold, visit: visitShort(data.visits, r.c.id, now),
+        preview: r.preview, unread: r.unread || (dot ? "\u00a0" : ""), cold, visit: visitShort(data.visits, r.c.id, now),
         open: r.open, down: r.down, move: r.move, up: r.up, cancel: r.cancel, guard: r.guard, noMenu: r.noMenu,
       };
     }),

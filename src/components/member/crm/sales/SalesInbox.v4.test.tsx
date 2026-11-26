@@ -57,6 +57,22 @@ describe("Mine's Inbox (10b)", () => {
     await tap(attention);
     expect(attention).toHaveAttribute("aria-pressed", "true");
   });
+
+  // 2026-11-27 (the owner: "in phone view, it should have unread status pick as well"): Unread right after All, as the
+  // desktop's Status and Team's Filter chats offer it first; its count in the hot colour as Attention's.
+  it("Unread right after All; picked, only the unread chats show, each with its badge", async () => {
+    await mine();
+    const chips = screen.getAllByRole("button").filter(b => b.hasAttribute("aria-pressed") && /\d+$/.test(b.textContent ?? ""));
+    expect(chips.slice(0, 3).map(b => b.textContent!.replace(/\d+$/, ""))).toEqual(["All", "Unread", "New"]);
+    const un = chips[1], n = Number(un.textContent!.match(/(\d+)$/)![1]);
+    expect((un.lastElementChild as HTMLElement).style.color).toBe("var(--crm-oxblood)");
+    await tap(un);
+    expect(un).toHaveAttribute("aria-pressed", "true");
+    const rows = [...document.querySelectorAll<HTMLElement>("[data-inbox-row]")];
+    expect(rows).toHaveLength(n);
+    if (!n) expect(screen.getByText("No unread chats")).toBeTruthy();
+    for (const r of rows) expect([...r.querySelectorAll<HTMLElement>("span")].some(s => s.style.background === "var(--crm-rust)" && !!s.textContent)).toBe(true);
+  });
 });
 
 describe("the wait and the visit (10b / 2d)", () => {

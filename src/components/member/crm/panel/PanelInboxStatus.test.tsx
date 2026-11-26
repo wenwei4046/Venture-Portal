@@ -53,6 +53,29 @@ describe("the Team inbox's Status (2c / 2c·2)", () => {
     expect(countLine().textContent).toBe(`${total} chats`);
   });
 
+  // 2026-11-27 (the owner, the phone's Filter chats beside the desktop's Status: "in phone view, it should have unread status
+  // pick as well"): Unread first, as the desktop's — every unread chat, each card with its badge, a tag to take it off.
+  it("offers Unread first among the statuses; alone it keeps the unread chats, each card with its badge", async () => {
+    await teamInbox();
+    const total = countLine().textContent;
+    await tap(screen.getByRole("button", { name: "Status" }));
+    const labels = within(sheet()!).getAllByRole("button").filter(b => b.hasAttribute("aria-pressed")).map(b => b.textContent?.replace(/\d+$/, ""));
+    expect(labels.indexOf("Unread")).toBe(labels.indexOf("New") - 1);
+    const n = Number(opt("Unread").textContent!.match(/(\d+)$/)![1]);
+    expect(n).toBeGreaterThan(0);
+    await tap(opt("Unread"));
+    expect(opt("Unread")).toHaveAttribute("aria-pressed", "true");
+    await tap(within(sheet()!).getByRole("button", { name: new RegExp(`^Show ${n} chats?$`) }));
+    expect(sheet()).toBeNull();
+    expect(countLine().textContent).toBe(`${n} chat${n === 1 ? "" : "s"}`);
+    expect(screen.getByRole("button", { name: "Status · 1 picked" })).toBeTruthy();
+    const cards = [...document.querySelector("[data-inb-board]")!.firstElementChild!.children].filter(el => el.tagName === "DIV");
+    expect(cards).toHaveLength(n);
+    for (const c of cards) expect([...c.querySelectorAll<HTMLElement>("span")].some(s => s.style.background === "var(--crm-rust)" && !!s.textContent)).toBe(true);
+    await tap(screen.getByRole("button", { name: "Remove Unread" }));
+    expect(countLine().textContent).toBe(total);
+  });
+
   it("Cancel leaves the filters as they were", async () => {
     await teamInbox();
     const before = countLine().textContent;
