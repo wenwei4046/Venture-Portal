@@ -1,4 +1,7 @@
 /**
+ * CORRECTION (the same day): production runs on VERCEL, where Next's data cache works; the route keeps unstable_cache as the
+ * layer shared by every server, and this file is the per-server memory (fresh / stale, a week) in front of it.
+ *
  * Where GET /member/crm-ad-figures keeps Meta's answers (2026-11-26, the owner: "insight 的算法速度还是有点慢，尤其我从进页面，换
  * 时间等"). The route kept them in Next's `unstable_cache`, but on Cloudflare (open-next) that needs an incremental cache the
  * app never set up (`defineCloudflareConfig({})` — the "dummy" cache), so nothing was kept and EVERY open and every period
