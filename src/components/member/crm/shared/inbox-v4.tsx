@@ -19,6 +19,7 @@ import type { InboxVM as MineVM } from "../sales/vm/inbox";
 import type { ShellExtras } from "../sales/vm/header";
 import type { InboxVM as TeamVM } from "../panel/vm/inbox";
 import type { TeamMineSwap } from "./team-mine";
+import type { ViewSwapBtn } from "./view-swap";
 
 const fs = (px: number) => typePx(Math.round((px / 0.92) * 100) / 100);
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -46,6 +47,21 @@ const BellBtn = ({ open, dot, label }: { open: () => void; dot: boolean; label: 
   <button type="button" onClick={open} title="Notifications" aria-label={label} style={{ ...ROUND, position: "relative" }}>
     <Ic name="bell" size={18} />
     {dot && <span style={{ position: "absolute", top: "8px", right: "9px", width: "8px", height: "8px", boxSizing: "content-box", borderRadius: "50%", background: "var(--crm-orange)", border: "2px solid var(--crm-page)" }} />}
+  </button>
+);
+/** Lucide's arrow-left-right: the swap on the view button's corner. */
+const SWAP_D = "M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4";
+/**
+ * The view switch in the bell's place (2026-11-27, shared/view-swap.ts): the bell's 40 px round button with the view one is
+ * in — "IR", "DC" — and a swap badge on its corner, as the avatar wears its channel's; a tap goes to the other view.
+ */
+const ViewBtn = ({ vs }: { vs: ViewSwapBtn }) => (
+  <button type="button" onClick={vs.swap} title={vs.title} aria-label={vs.title} data-view-swap="1"
+    style={{ ...ROUND, position: "relative", fontFamily: TIGHT, fontSize: fs(13), fontWeight: 600, letterSpacing: "0.02em" }}>
+    {vs.label}
+    <span aria-hidden style={{ position: "absolute", right: "-3px", bottom: "-3px", width: "18px", height: "18px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid var(--crm-page)", background: "var(--crm-rust)", color: "var(--crm-page)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d={SWAP_D} /></svg>
+    </span>
   </button>
 );
 
@@ -129,7 +145,8 @@ export function Phone4aInboxHead({ v }: { v: MineHead }) {
       <SearchBtn open={v.openSearch} />
       {!!v.tb && <>
         {!!v.tm?.on && <SwapBtn tm={v.tm} />}
-        <BellBtn open={v.tb.open} dot={!!v.tb.has} label={v.tb.has ? `Notifications · ${v.tb.n} new` : "Notifications"} />
+        {v.vs?.on ? <ViewBtn vs={v.vs} />
+          : <BellBtn open={v.tb.open} dot={!!v.tb.has} label={v.tb.has ? `Notifications · ${v.tb.n} new` : "Notifications"} />}
         <button type="button" onClick={v.exitCrm} title="Back to Revenue app" aria-label="Back to Revenue app" style={ROUND}><Ic name="house" size={18} /></button>
       </>}
     </Head>
@@ -311,7 +328,7 @@ export function Phone4aTeamInbox({ ib, tm, bl, bell }: { ib: TeamVM; tm: TeamMin
           <SearchBtn open={t.openSearch} />
           {bell && <>
             {tm.on && <SwapBtn tm={tm} />}
-            <BellBtn open={bl.openNotifs} dot={!!bl.notifUnread} label="Notifications" />
+            {t.vs.on ? <ViewBtn vs={t.vs} /> : <BellBtn open={bl.openNotifs} dot={!!bl.notifUnread} label="Notifications" />}
           </>}
           <button type="button" onClick={ib.openPc} title="Contacts" aria-label="Contacts" style={ROUND}><Ic name="contact" size={18} /></button>
         </Head>

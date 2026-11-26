@@ -3,6 +3,7 @@ import { day0, firstName, ini, RUST, SUB, stop, type SalesCtx } from "./common";
 import { salesNotifs, unreadNotifs } from "./notifs";
 import { teamName, teamOf, titleOf } from "../../shared/people";
 import { teamMineSwap, type TeamMineSwap } from "../../shared/team-mine";
+import { viewSwapBtn, type ViewSwapBtn } from "../../shared/view-swap";
 import type { SalesTab } from "../ui";
 
 /**
@@ -27,8 +28,12 @@ export function titleBellVM(ctx: SalesCtx) {
 export type TitleBellVM = ReturnType<typeof titleBellVM>;
 /** What the Inbox — the first page — gets beside its own view model (2026-10-14, the owner: the three round buttons on the
  * first page alone): the bell in its title row, the house left of it (the way back to the Revenue app) and, for whoever has
- * a Team side, Team | Mine left of the house. */
-export type ShellExtras = { tb: TitleBellVM; exitCrm: () => void; tm: TeamMineSwap };
+ * a Team side, Team | Mine left of the house. Since 2026-11-27, for whoever has both CRM views, IR ⇄ DC in the bell's place
+ * (`vs`, shared/view-swap.ts). */
+export type ShellExtras = { tb: TitleBellVM; exitCrm: () => void; tm: TeamMineSwap; vs: ViewSwapBtn };
+
+/** IR ⇄ DC (shared/view-swap.ts): CrmApp hands it on one's own CRM only. */
+export const viewSwapVM = (ctx: SalesCtx): ViewSwapBtn => viewSwapBtn(ctx.embedded?.viewSwap);
 
 /**
  * The top bar (round 2, §8.2): gone on Inbox, Contacts, Calendar, Insight and Profile. It stays on Profile's sub-pages with

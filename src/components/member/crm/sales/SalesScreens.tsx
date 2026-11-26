@@ -15,7 +15,7 @@ import SalesInsight from "./SalesInsight";
 import SalesProfile from "./SalesProfile";
 import SalesChat from "./SalesChat";
 import SalesNav from "./SalesNav";
-import { headerVM, navVM, shellVM, teamMineVM, titleBellVM } from "./vm/header";
+import { headerVM, navVM, shellVM, teamMineVM, titleBellVM, viewSwapVM } from "./vm/header";
 import { inboxVM } from "./vm/inbox";
 import { contactsVM } from "./vm/contacts";
 import { calendarVM } from "./vm/calendar";
@@ -42,8 +42,8 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
   useCloseOnOutside(!!ui.hm?.menu, useCallback(() => set(u => ({ ...u, hm: null })), [set]));
   // The phone's Back closes the chat, back to the Inbox (2026-10-15).
   // The Inbox's title row — the first page's alone (2026-10-14): Team | Mine (whoever has a Team side), the house back to
-  // the Revenue app, the bell.
-  const x = { tb: titleBellVM(ctx), exitCrm: onExit, tm: teamMineVM(ctx) };
+  // the Revenue app, the bell — or, with both CRM views, IR ⇄ DC in its place (2026-11-27).
+  const x = { tb: titleBellVM(ctx), exitCrm: onExit, tm: teamMineVM(ctx), vs: viewSwapVM(ctx) };
   return (<>
     <SalesShellBanners v={shellVM(ctx)} />
     {!chat && (<>

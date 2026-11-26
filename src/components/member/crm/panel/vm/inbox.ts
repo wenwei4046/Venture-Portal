@@ -65,6 +65,7 @@ import { isNewChat } from "../../shared/new-chat";
 import { STATUS, avatarTint } from "../../shared/palette";
 import { saidInChat } from "../../shared/chat-search";
 import { FB_BLOCKED, FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
+import { viewSwapBtn } from "../../shared/view-swap";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
 const listed = (ctx: PanelCtx) => ctx.data.customers.filter(c => c.assignedTo || c.teamId);
@@ -218,6 +219,8 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
   const nP = sel.length, nS = st.length;
 
   return {
+    // IR ⇄ DC where the bell was, for whoever has both CRM views (2026-11-27; shared/view-swap.ts).
+    vs: viewSwapBtn(ctx.viewSwap),
     peopleN: nP, statusN: nS, openPeople: open("people"), openStatus: open("status"),
     tags, count: `${list.length} chat${list.length === 1 ? "" : "s"}`, of: `of ${all.length}`, canClear: !!(nP || nS),
     clearAll: () => write([], []),
