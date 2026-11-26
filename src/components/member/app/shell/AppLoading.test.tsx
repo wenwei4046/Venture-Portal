@@ -44,6 +44,24 @@ describe("AppLoading — the app's frame while /member loads", () => {
     for (const button of tab("Profile")) expect(button).toHaveAttribute("aria-current", "page");
   });
 
+  // The owner, 2026-11-27: "relaod time , change to crm frame" — a reload of the CRM on a computer loads in the CRM's frame.
+  it("a reload of the CRM shows the CRM's own frame, at the app's desktop width only", () => {
+    const { container } = open("?page=account&view=crm");
+    const frame = container.querySelector("[data-crm-desk-loading]");
+    expect(frame).not.toBeNull();
+    expect(frame).toHaveTextContent("CRM");
+    expect(frame).toHaveTextContent("Loading your customers…");
+    expect(frame?.parentElement?.className).toMatch(/crmLoadingDesk/);
+  });
+
+  it("no other page's loading has it", () => {
+    for (const query of ["", "?page=insight", "?page=account", "?page=account&view=memos", "?page=quote"]) {
+      const { container } = open(query);
+      expect(container.querySelector("[data-crm-desk-loading]")).toBeNull();
+      cleanup();
+    }
+  });
+
   it("leaves the frame inert and the sidebar without anybody's card", () => {
     const { container } = open("?page=insight");
     const nav = container.querySelector("nav");

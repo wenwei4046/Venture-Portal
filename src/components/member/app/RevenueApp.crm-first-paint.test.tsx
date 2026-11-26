@@ -68,6 +68,12 @@ describe("the CRM's first paint", () => {
     expect(html).toMatch(/<div[^>]*data-crm-unmeasured=""[^>]*><div data-fake-crm="phone"><\/div><\/div>/);
   });
 
+  // The owner, the same night: "relaod time , change to crm frame" — in the phone's place a computer sees the CRM's frame.
+  it("…with the CRM's own loading frame beside it, for a computer's width only", () => {
+    const html = renderToString(app());
+    expect(html).toMatch(/<div class="[^"]*crmLoadingDesk[^"]*"><div data-crm-desk-loading=""/);
+  });
+
   it("on a computer the app measures itself before its first paint: the desktop CRM, nothing marked", async () => {
     appWidth(1440);
     const { container } = render(app());
@@ -75,6 +81,8 @@ describe("the CRM's first paint", () => {
     expect(container.querySelector('[data-fake-crm="desk"]')).not.toBeNull();
     expect(container.querySelector('[data-fake-crm="phone"]')).toBeNull();
     expect(container.querySelector("[data-crm-unmeasured]")).toBeNull();
+    // The CRM now draws its own loading frame itself (CrmApp); the app's is gone.
+    expect(container.querySelector("[data-crm-desk-loading]")).toBeNull();
   });
 
   it("on a phone it stays the phone's CRM, shown", async () => {
@@ -83,6 +91,7 @@ describe("the CRM's first paint", () => {
     await act(async () => {});
     expect(container.querySelector('[data-fake-crm="phone"]')).not.toBeNull();
     expect(container.querySelector("[data-crm-unmeasured]")).toBeNull();
+    expect(container.querySelector("[data-crm-desk-loading]")).toBeNull();
   });
 
   it("only a computer's layout hides the unmeasured drawing; a phone's shows it from the first paint", () => {
@@ -97,5 +106,11 @@ describe("the CRM's first paint", () => {
     const desk = css.slice(start, end), rest = css.slice(0, start) + css.slice(end);
     expect(desk).toMatch(/\.main \[data-crm-unmeasured\] \{ visibility: hidden; \}/);
     expect(rest).not.toContain("data-crm-unmeasured]");
+    // The CRM's loading frame: hidden by default, shown inside the desktop query — the hiding rule comes first, the same
+    // weight, so the desktop one wins where the query holds.
+    expect(desk).toMatch(/\.crmLoadingDesk \{ display: contents; \}/);
+    const hide = css.indexOf(".crmLoadingDesk { display: none; }");
+    expect(hide).toBeGreaterThan(-1);
+    expect(hide).toBeLessThan(start);
   });
 });

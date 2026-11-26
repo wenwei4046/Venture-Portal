@@ -117,6 +117,7 @@ import { foodOpenTo, transportPartsFor, type ClaimRates } from "@/lib/member/cla
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
+import { DeskLoading } from "../crm/desk/DeskLoading";
 import { crmBrandsOfView, crmViewSwitch } from "@/lib/member/crm-view";
 import type { CrmViewSwap } from "../crm/shared/view-swap";
 import type { SourceBrand } from "@/lib/member/crm-source";
@@ -1820,10 +1821,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // Until the app has measured itself it is also the server's drawing on a COMPUTER, where crm.module.css shows a phone CRM
   // as a 430px phone in the middle — the owner, 2026-11-27, a reload of the desktop CRM: "跳出来一个像中间的电话 screen 这样
   // 闪过零点几秒". `data-crm-unmeasured` keeps it from a computer's screen until then (shell.module.css); a phone shows it
-  // from the first paint, as before.
+  // from the first paint, as before. In its place a computer sees the CRM's own frame (crm/desk/DeskLoading — the owner,
+  // the same night: "relaod time , change to crm frame"), as loading.tsx's frame drew it before and the CRM will after.
   if (onCrm && crm && !desk) {
     page = (<>
       <div style={{ display: "contents", visibility: irqOverCrm ? "hidden" : undefined }} aria-hidden={irqOverCrm || undefined} data-crm-unmeasured={deskMeasured ? undefined : ""}>{page}</div>
+      {!deskMeasured && <div className={s.crmLoadingDesk}><DeskLoading line="Loading your customers…" /></div>}
       {irqOverCrm && (
         <div className={s.irqLayer}>
           <IrQuoteSettingsScreen phone inApp={false} rootH="100%" readOnly={!!viewed} offline={data.demo || fixture ? { name: me.name } : undefined}

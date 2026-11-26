@@ -524,6 +524,10 @@
 .homeAndroid { height: 18px; display: flex; align-items: center; justify-content: center; }
 .homeAndroidBar { width: 108px; height: 4px; border-radius: 2px; background: var(--rv-ink); }
 
+/* The CRM's loading frame is a computer's (the desktop block below shows it); a phone keeps its own loading screens.
+   Before that block: the same weight, so the later rule wins where the query holds. */
+.crmLoadingDesk { display: none; }
+
 /* ── desktop: sidebar, top bar, a 760px column, no bottom bar ── */
 @container rv (min-width: 1024px) {
   .screen { padding-left: 240px; --rv-type: 1; }
@@ -547,6 +551,9 @@
      430px phone in the middle of the page, which a reload flashed (the owner, 2026-11-27). Not shown on a computer until
      measured; the desktop CRM follows before the first paint after hydration. */
   .main [data-crm-unmeasured] { visibility: hidden; }
+  /* …and in its place, and in the loading frame's, the CRM's own frame (crm/desk/DeskLoading — the owner, 2026-11-27:
+     "relaod time , change to crm frame"). */
+  .crmLoadingDesk { display: contents; }
 }
 
 /* The CRM on a phone is a fixed layer over the page (crm.module.css .app) that scrolls inside its own lists: the page

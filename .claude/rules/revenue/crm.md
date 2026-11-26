@@ -801,3 +801,15 @@ Same day, the owner ("截图改成大图", then "我要如何下载放到canva�
 - The Week view (a row a person) is unchanged: a person's empty day adds their leave, a day with visits opens the first. Tests: `desk/DeskLeaveCal.day.test.tsx`, `shared/leave-cal-data.day.test.ts`.
 
 **INSIGHT'S FIGURES STAND CLEAR OF THE TAB BAR (2026-11-27; the owner, Insight › Overview beside Closed deals: "你看我这两个图，其中一个图它的空间感是对的 … 我要第一个图也是这样子，它跟那个框之间是要有空间感的"; supersedes 2026-11-24's RIGHT UNDER THE TAB BAR, which read that day's words the wrong way round):** on the desktop, Insight's Overview and Team performance stand **20 px** under the tab bar's rule (`vm/frame4a.ts` › `pad`, `20px 32px 32px`) — the 20 px Ads performance's filter row already had of its own (its body keeps 0), about the 18 px Closed deals leaves between its period row and its box; Up next keeps its 24 px, Team activity its own head. The space is the frame's: `DeskOverview` adds none, with the Brand row or without (its 4 px over the Brand row went), so the Brand row stands where Team performance's does. Test: `desk/DeskOverview.gap.test.tsx`. Kaiyee: `vm/frame4a.ts` and `DeskOverview.tsx` changed (no generator involved) — the owner passes it on.
+
+**A RELOAD LOADS IN THE CRM'S FRAME (2026-11-27; the owner, after a reload's phone flash went (revenue-app.md › A RELOAD OF THE CRM ON A COMPUTER DRAWS NO PHONE FIRST): "relaod time , change to crm frame"):** on a computer, until the CRM has its first answer, the screen is `desk/DeskLoading`. That is the 4a frame a reload opens on, with nothing in it yet:
+- Desk4aSide's ink rail (68 px, the H tile).
+- Its cream nav (237 px, *CRM*). The nav is always open after a reload, because `collapsed` is not a kept place (nav.ts).
+- Desk4aTop's 56 px bar with the date (`topDate`).
+- The line — *Loading your customers…*, or why it could not read — centred in the page.
+- It is fixed over the whole window at z 10, as DeskScreens' root is, so the CRM fills in where it will stand.
+- The rail's icons, the nav's rows, the greeting and the page come with the CRM. No row is guessed, so none can vanish once the user's permissions arrive.
+- `CrmApp` draws it for `!data || !shownAll` with `desk`. The other notices ("no role", "not linked") keep `notice()`.
+- The Revenue app draws the same frame in `loading.tsx` and before it has measured itself (revenue-app.md).
+- A phone's loading is unchanged. Tests: `crm/CrmApp.desk-loading.test.tsx`.
+- Kaiyee: `CrmApp.tsx` (one line) and the new `desk/DeskLoading.tsx` — no generator involved. The owner passes it on. If the 4a frame's widths or colours change, change DeskLoading with them.
