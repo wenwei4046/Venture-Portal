@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MemberBand } from "@/lib/member/types";
-import { brandLadder, rowFor } from "./ladder";
+import { brandLadder, pctText, rowFor } from "./ladder";
 
 // comm_margin_bands as the Fair scheme holds them on 2026-10-04.
 const band = (brand: string, key: string, kind: MemberBand["kind"], threshold: number, multiplier = 1, amount = 0): MemberBand =>
@@ -72,5 +72,38 @@ describe("rowFor — the run's band rule", () => {
   it("has no row without a margin or without a ladder", () => {
     expect(rowFor(null, akemi)).toBeNull();
     expect(rowFor(40, brandLadder([]))).toBeNull();
+  });
+});
+
+// 2026-11-27 — Fair's Akemi / Ergotex ladder is the user's own bounds: "30% 到 33%（即 32.99% 这个区间），只能拿 75% 的
+// commission：27% 到 29.99%：50%、25% 到 26.99%：25%、24.99% 以下：0%".
+describe("Fair's Akemi and Ergotex ladder, read to the hundredth (2026-11-27)", () => {
+  const LADDER: MemberBand[] = [
+    band("AKEMI", "Below margin Tier 4", "penalty", 24.99, 0),
+    band("AKEMI", "Below margin Tier 3", "penalty", 26.99, 0.25),
+    band("AKEMI", "Below margin Tier 2", "penalty", 29.99, 0.5),
+    band("AKEMI", "Below margin Tier 1", "penalty", 32.99, 0.75),
+    band("AKEMI", "Standard margin", "reference", 33),
+    band("AKEMI", "Incentive Tier 1", "incentive", 36, 1, 1000),
+    band("AKEMI", "Incentive Tier 2", "incentive", 43, 1, 1500),
+  ];
+  it("writes each range as the user did", () => {
+    expect(brandLadder(LADDER).rows.map(r => [r.label, r.range, r.effect])).toEqual([
+      ["Incentive Tier 2", "43% +", "Highest margin incentive"],
+      ["Incentive Tier 1", "36 – 43%", "Margin incentive"],
+      ["Standard margin", "33 – 36%", "Normal commission · watch closely"],
+      ["Below margin Tier 1", "30 – 32.99%", "Commission × 0.75"],
+      ["Below margin Tier 2", "27 – 29.99%", "Commission × 0.5"],
+      ["Below margin Tier 3", "25 – 26.99%", "Commission × 0.25"],
+      ["Below margin Tier 4", "24.99% or lower", "No commission"],
+    ]);
+  });
+  const ladder = brandLadder(LADDER);
+  it.each([
+    [36, "Incentive Tier 1"], [33, "Standard margin"], [32.995, "Standard margin"], [32.99, "Below margin Tier 1"], [30, "Below margin Tier 1"],
+    [29.99, "Below margin Tier 2"], [27, "Below margin Tier 2"], [26.99, "Below margin Tier 3"], [25, "Below margin Tier 3"], [24.99, "Below margin Tier 4"], [10, "Below margin Tier 4"],
+  ])("%s%% reads as %s", (m, label) => expect(rowFor(m, ladder)?.label).toBe(label));
+  it("writes a threshold to the hundredth it was keyed at", () => {
+    expect([36, 33.5, 32.99, 27.5, 24.99, 30.004].map(pctText)).toEqual(["36", "33.5", "32.99", "27.5", "24.99", "30"]);
   });
 });

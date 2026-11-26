@@ -135,4 +135,39 @@ describe('SchemePanel', () => {
     fireEvent.click(sw('KPI item allowance'))
     expect(sw('KPI item allowance')).toHaveAttribute('aria-checked', 'false')
   })
+
+  // 2026-11-27 — the user, turning Fair's penalty on with its new Akemi / Ergotex ladder: "从十二月开始".
+  describe('the month the penalty cuts from', () => {
+    const fair: SchemeRow = { ...ir, id: 'scheme-fair', enable_margin_penalty: true, margin_penalty_from: '2026-12-01' }
+
+    it('shows under the penalty while it is on, the month it starts', () => {
+      render(<SchemePanel scheme={fair} canManage />)
+      expect(screen.getByLabelText('Cuts bills from')).toHaveValue('2026-12')
+      expect(screen.getByText('bills of earlier months pay in full')).toBeInTheDocument()
+      cleanup()
+      render(<SchemePanel scheme={ir} canManage />)
+      expect(screen.queryByLabelText('Cuts bills from')).toBeNull()
+    })
+
+    it('saves the month — empty for every month', async () => {
+      act.saveSchemeRules.mockResolvedValue({ ok: true })
+      render(<SchemePanel scheme={fair} canManage />)
+      fireEvent.change(screen.getByLabelText('Cuts bills from'), { target: { value: '2027-01' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalled())
+      expect((act.saveSchemeRules.mock.calls[0][0] as FormData).get('margin_penalty_from')).toBe('2027-01')
+      fireEvent.change(screen.getByLabelText('Cuts bills from'), { target: { value: '' } })
+      expect(screen.getByText('every month')).toBeInTheDocument()
+    })
+
+    it('sends no month while the penalty is off: what is stored stays', async () => {
+      act.saveSchemeRules.mockResolvedValue({ ok: true })
+      render(<SchemePanel scheme={fair} canManage />)
+      fireEvent.click(sw('Below-margin penalty'))
+      expect(screen.queryByLabelText('Cuts bills from')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalled())
+      expect((act.saveSchemeRules.mock.calls[0][0] as FormData).has('margin_penalty_from')).toBe(false)
+    })
+  })
 })

@@ -125,6 +125,12 @@ describe('a notice', () => {
     expect(noticeUrl({ refKind: 'not_mine_request', refId: 'n1' }, 'hr')).toBe('/member?notmine=n1')
     expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'share', title: 'HC-SO-2611-044 · not counted', body: '', refKind: 'not_mine_request', refId: 'n1', at: 'x', read: false }] }).items)
       .toHaveLength(1)
+    // A bill whose commission a Revenue Director adjusted (2026-11-27): the Revenue app's My sales orders, the bill open,
+    // from either app — and the bells read the notice.
+    expect(noticeUrl({ refKind: 'comm_ratio', refId: 'o 1' }, 'revenue')).toBe('/member?page=insight&view=bills&so=o%201')
+    expect(noticeUrl({ refKind: 'comm_ratio', refId: 'o1' }, 'hr')).toBe('/member?page=insight&view=bills&so=o1')
+    expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'share', title: "KRIS set HC-SO-2611-006's commission to 75%", body: '', refKind: 'comm_ratio', refId: 'o1', at: 'x', read: false }] }).items)
+      .toHaveLength(1)
     // A share that took effect on its Accept (2026-11-07), to HR: Comm Cal's month, its Requests tab — nothing else.
     expect(noticeUrl({ refKind: 'share_taken', refId: 'fair/2026-11-01' }, 'hr')).toBe('/revenue/fair/2026-11-01?view=requests')
     expect(noticeUrl({ refKind: 'share_taken', refId: '//evil.example/x' }, 'hr')).toBe('/revenue')

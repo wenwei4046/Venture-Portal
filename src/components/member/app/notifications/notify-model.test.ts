@@ -135,3 +135,26 @@ describe("not my order (2026-11-14)", () => {
     expect(notifGroups(items, "all", null).map(g => [g.title, g.items.map(n => n.id)])).toEqual([["REQUEST UPDATES", ["nt-n9"]]]);
   });
 });
+
+// 2026-11-27 — a Revenue Director adjusted a bill's commission; the salesperson is told ("要通知").
+describe("a bill's commission ratio (2026-11-27)", () => {
+  const set = {
+    id: "n10", kind: "share" as const, title: "KRIS set HC-SO-2611-006's commission to 75%", body: "Its sales count 75% too. Why: repeat customer",
+    refKind: "comm_ratio" as const, refId: "o1", at: "2026-11-27T06:00:00Z", read: false,
+  };
+
+  it("is news that opens the bill", () => {
+    const { items, count } = notifications({ ...base, requests: [], memos: [], notices: [set], shares: [], staffId: "anthony" });
+    expect(items.map(n => [n.id, n.tab, n.open, n.title, n.sub, n.link, n.go])).toEqual([
+      ["nt-n10", "updates", false, "KRIS set HC-SO-2611-006's commission to 75%", "Its sales count 75% too. Why: repeat customer", "Open the bill",
+        { to: "bill", orderId: "o1" }],
+    ]);
+    expect(count).toBe(0);
+  });
+
+  it("is not shown where Insight is closed to them", () => {
+    const { items } = notifications({ ...base, requests: [], memos: [], notices: [set], shares: [], staffId: "anthony",
+      opens: go => go.to !== "bill" });
+    expect(items).toEqual([]);
+  });
+});
