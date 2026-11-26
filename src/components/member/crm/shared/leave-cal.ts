@@ -20,13 +20,16 @@ export interface LeaveModal { editId: string | null; who: string; from: string; 
 export interface LeaveCalUi {
   view: "month" | "week"; month: string; week: string; panel: string | null; pp: boolean; modal: LeaveModal | null;
   showAppt: boolean; showLeave: boolean; pDay: string; toast: string | null;
-  /** The desktop month's open day — its list over the grid (the owner, 2026-11-27). */
+  /** The desktop month's open day — its list over the grid — and the appointment opened in it (the owner, 2026-11-27). */
   dDay: string | null;
+  dSel?: string | null;
 }
+/** One of an appointment's own answers, as its type asks it: "Meeting link", "Place", "Remarks" … (`href`: a web link). */
+export interface CalDetail { k: string; v: string; href?: string }
 export interface CalAppt {
   who: string; day: string; t: string; cust: string; customerId: string; visitId: string;
-  /** Its room's name ("Online meeting" for an online one) and how it stands — the desktop day list's lines. */
-  where?: string; status?: VisitStatus;
+  /** Its room's name ("Online meeting" for an online one), how it stands and its own answers — the desktop day list's. */
+  where?: string; status?: VisitStatus; details?: CalDetail[];
 }
 export interface LeaveCalActs {
   saveLeave(l: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: Reason; note: string }): Promise<boolean>;
@@ -59,7 +62,7 @@ export interface LeaveCalIn {
 export function leaveCalStart(now: string, mode: "calendar" | "people"): LeaveCalUi {
   const today = now.slice(0, 10);
   return { view: "month", month: today.slice(0, 7), week: addDays(today, -dowOf(today)), panel: null, pp: false, modal: null,
-    showAppt: mode === "calendar", showLeave: true, pDay: today, toast: null, dDay: null };
+    showAppt: mode === "calendar", showLeave: true, pDay: today, toast: null, dDay: null, dSel: null };
 }
 
 const TIMES = Array.from({ length: 48 }, (_, i) => ({ v: `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}` }));
@@ -224,9 +227,10 @@ export function leaveCalVM(x: LeaveCalIn) {
       // Calendar: a day (its "+N more" too) opens its list — the owner, 2026-11-27: "点那个 date … 应该是跳出来它的
       // appointment，不是一点就直接按 add leave". People, leave only, keeps Add leave on the day.
       const open = isCal && c.day === st.dDay;
-      return { ...c, dLanes, open, bg: open ? CAL.selBg : c.bg, click: isCal ? () => set({ dDay: c.day }) : c.add,
+      return { ...c, dLanes, open, bg: open ? CAL.selBg : c.bg, click: isCal ? () => set({ dDay: c.day, dSel: null }) : c.add,
+        // An appointment's own line opens its details beside AND its day's list with it picked, its answers shown there.
         appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
-        open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } })), more: extra > 0 ? `+${extra} more` : "" };
+        open: (e: { stopPropagation(): void }) => { e.stopPropagation(); if (isCal) set({ dDay: c.day, dSel: a.visitId }); x.acts.openAppt?.(a); } })), more: extra > 0 ? `+${extra} more` : "" };
     });
     return { key: d0, lanes, bars, days, dDays };
   });
@@ -303,25 +307,27 @@ export function leaveCalVM(x: LeaveCalIn) {
 
   // ── The desktop month's open day (the owner, 2026-11-27) ────────────────────────────────────────────────────────────
   // A day clicked lists what the layers show on it — its leave, then its appointments by time, as the phone lists its day —
-  // in a card over the grid at that day. An appointment opens its details (Customer info on that visit, docked beside) and
-  // the list stays, so the next one is a click away; a leave opens Edit leave (when this viewer may) and the list closes.
+  // in a card over the grid at that day. An appointment opens its details: its own answers (Meeting link, Place, Remarks …)
+  // under it in the card, the customer's (Customer info on that visit) docked beside; the list stays, so the next one is a
+  // click away. A leave opens Edit leave (when this viewer may) and the list closes.
   const dl = (() => {
     const day = st.dDay;
     const wk = isCal && isMonth && day ? weeks.findIndex(w => w.days.some(c => c.day === day)) : -1;
     if (!day || wk < 0) return null;
     const ls = leavesOn(day), aps = apptsOn(null, day), col = dowOf(day), n = weeks.length, down = wk < n / 2, x0 = dd(day);
-    const close = () => set({ dDay: null });
+    const close = () => set({ dDay: null, dSel: null });
     const items = [
       ...ls.map(l => {
         const s = l.fromAt.slice(0, 10), e = l.toAt.slice(0, 10), allDay = s < day && day < e, may = x.canEdit(l.staffId);
         return { key: l.id, t: allDay ? "All day" : s === day ? l.fromAt.slice(11) : "until", tFg: C.listSub, bar: calLeave(l.reason)[0],
           title: `${name(l.staffId)} · ${label(l)}`, sub: rng(l), chip: null as null | { label: string; bg: string; fg: string }, may,
-          go: () => { if (!may) return; close(); edit(l); } };
+          sel: false, details: [] as CalDetail[], go: () => { if (!may) return; close(); edit(l); } };
       }),
       ...aps.map(a => {
         const [bg, fg] = a.status ? ST[a.status] ?? ST.Booked : ["", ""];
         return { key: a.visitId, t: a.t, tFg: C.ink, bar: CAL.apptDot, title: a.cust, sub: [name(a.who), a.where].filter(Boolean).join(" · "),
-          chip: a.status ? { label: a.status, bg, fg } : null, may: !!x.acts.openAppt, go: () => x.acts.openAppt?.(a) };
+          chip: a.status ? { label: a.status, bg, fg } : null, may: !!x.acts.openAppt, sel: st.dSel === a.visitId, details: a.details ?? [],
+          go: () => { set({ dSel: a.visitId }); x.acts.openAppt?.(a); } };
       }),
     ];
     const said = [SA ? (aps.length ? `${aps.length} appointment${aps.length === 1 ? "" : "s"}` : "No appointments") : "", ls.length ? `${ls.length} on leave` : ""];

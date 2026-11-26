@@ -5,7 +5,7 @@
  * shared/leave-cal.ts. The person panel slides in and its scrim fades, as every CRM side panel (the owner, 2026-11-08).
  * The owner, 2026-11-27: a day clicked lists its appointments (DayList), and Book appt + Add leave are one + (DeskCalPlus).
  */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { LeaveCalIn, LeaveCalVM } from "../shared/leave-cal";
 import { useLeaveCal } from "../shared/use-leave-cal";
 import s from "./leave-cal.module.css";
@@ -304,7 +304,8 @@ function DayList({ v }: { v: LeaveCalVM }) {
       </div>
       <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "6px" }}>
         {dl.items.map(it => (
-          <div key={it.key} {...(it.may ? press(it.go) : {})} data-day-item="" className={it.may ? s.row : undefined}
+          <div key={it.key} data-sel={it.sel || undefined} style={{ borderRadius: "8px", background: it.sel ? CAL.selBg : "transparent" }}>
+          <div {...(it.may ? press(it.go) : {})} data-day-item="" aria-expanded={it.details.length ? it.sel : undefined} className={it.may ? s.row : undefined}
             style={{ display: "grid", gridTemplateColumns: "44px minmax(0,1fr)", columnGap: "10px", alignItems: "center", minHeight: "50px", padding: "0 10px", borderRadius: "8px", cursor: it.may ? "pointer" : "default" }}>
             <span style={{ font: `600 12.5px ${TIGHT}`, color: it.tFg, whiteSpace: "nowrap" }}>{it.t}</span>
             <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, alignSelf: "stretch" }}>
@@ -318,6 +319,20 @@ function DayList({ v }: { v: LeaveCalVM }) {
                 <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</span>
               </span>
             </span>
+          </div>
+          {/* The opened appointment's own answers (Meeting link, Place, Remarks …), whole, under it — the customer's are beside. */}
+          {it.sel && it.details.length > 0 && (
+            <div data-appt-details="" style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", columnGap: "12px", rowGap: "5px", padding: "0 12px 12px 77px", fontSize: "12px", lineHeight: "17px" }}>
+              {it.details.map(d => (
+                <Fragment key={d.k}>
+                  <span style={{ color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{d.k}</span>
+                  <span style={{ minWidth: 0, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                    {d.href ? <a href={d.href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--crm-rust)", textDecoration: "underline", textUnderlineOffset: "2px" }}>{d.v} ↗</a> : d.v}
+                  </span>
+                </Fragment>
+              ))}
+            </div>
+          )}
           </div>
         ))}
         {dl.empty && <div style={{ padding: "12px 10px", fontSize: "12.5px", color: "var(--crm-faint)" }}>Nothing this day</div>}

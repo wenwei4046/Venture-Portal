@@ -19,8 +19,11 @@ const leaves = [L("l1", "b", "2026-11-23T09:00", "2026-11-25T18:00")];
 const A = (visitId: string, who: string, day: string, t: string, cust: string, status: CalAppt["status"] = "Booked", where = "Showroom KL"): CalAppt =>
   ({ who, day, t, cust, customerId: `c-${visitId}`, visitId, status, where });
 // Tue 24 Nov: five appointments (more than its cell shows) and Hector's leave; Thu 26 Nov: one.
-const appts = [A("v1", "a", "2026-11-24", "14:00", "Kim Lee"), A("v2", "a", "2026-11-24", "10:30", "Nur Aisyah", "To mark"), A("v3", "b", "2026-11-24", "16:15", "Tan Mei", "Booked", "Online meeting"),
-  A("v4", "a", "2026-11-24", "17:00", "Raj Kumar"), A("v5", "a", "2026-11-24", "18:00", "Siti Hawa"), A("v6", "a", "2026-11-26", "15:15", "Ong Boon")];
+const appts = [A("v1", "a", "2026-11-24", "14:00", "Kim Lee"), A("v2", "a", "2026-11-24", "10:30", "Nur Aisyah", "To mark"),
+  { ...A("v3", "b", "2026-11-24", "16:15", "Tan Mei", "Booked", "Online meeting"),
+    details: [{ k: "Meeting link", v: "https://meet.example.com/abc", href: "https://meet.example.com/abc" }, { k: "Remarks", v: "Bring the floor plan.\nAsks about the L-sofa." }] },
+  A("v4", "a", "2026-11-24", "17:00", "Raj Kumar"), A("v5", "a", "2026-11-24", "18:00", "Siti Hawa"),
+  { ...A("v6", "a", "2026-11-26", "15:15", "Ong Boon"), details: [{ k: "Remarks", v: "Call first" }] }];
 const data = { people, customers: [], visits: [], events: [], ftRules: [], lockedStaff: [], leaves, settings: DEFAULT_CRM_SETTINGS,
   can: { viewAll: true, editAll: true, editOwn: true, manage: true } } as unknown as CrmData;
 const acts = { saveLeave: vi.fn(async () => true), removeLeave: vi.fn(async () => true), setPaused: vi.fn(async () => true), setDays: vi.fn(async () => true),
@@ -45,13 +48,23 @@ describe("the desktop Calendar: a day clicked lists it (the owner, 2026-11-27)",
     expect(cell("2026-11-24").dataset.open).toBe("true");
   });
 
-  it("an appointment opens its details, and the list stays for the next one", () => {
+  it("an appointment opens its details — its own answers under it, the customer's beside — and the list stays for the next one", () => {
     render(<DeskLeaveCalPage mode="calendar" title="Calendar" input={input()} />);
     fireEvent.click(cell("2026-11-24"));
-    fireEvent.click(screen.getByText("Kim Lee"));
-    expect(acts.openAppt).toHaveBeenCalledWith(appts[0]);
+    expect(document.querySelector("[data-appt-details]")).toBeNull();
+    fireEvent.click(screen.getByText("Tan Mei"));
+    expect(acts.openAppt).toHaveBeenCalledWith(appts[2]);
+    const details = document.querySelector<HTMLElement>("[data-appt-details]")!;
+    expect(details.closest("[data-sel]")!.textContent).toContain("Tan Mei");
+    expect(within(details).getByText("Meeting link")).toBeTruthy();
+    expect(within(details).getByRole("link").getAttribute("href")).toBe("https://meet.example.com/abc");
+    expect(within(details).getByRole("link").getAttribute("target")).toBe("_blank");
+    expect(within(details).getByText(/Bring the floor plan\.\s+Asks about the L-sofa\./).style.whiteSpace).toBe("pre-wrap");
+    // The next one: the details move to it (Siti has no answers of her own, so none show).
     fireEvent.click(screen.getByText("Siti Hawa"));
     expect(acts.openAppt).toHaveBeenLastCalledWith(appts[4]);
+    expect(document.querySelector("[data-appt-details]")).toBeNull();
+    expect(document.querySelector("[data-sel]")!.textContent).toContain("Siti Hawa");
     expect(screen.getByRole("dialog", { name: "Tue, 24 Nov" })).toBeTruthy();
   });
 
@@ -63,11 +76,13 @@ describe("the desktop Calendar: a day clicked lists it (the owner, 2026-11-27)",
     expect(within(screen.getByRole("dialog", { name: "Tue, 24 Nov" })).getAllByText(/Showroom KL|Online meeting/)).toHaveLength(5);
   });
 
-  it("an appointment in a cell still opens its details at once", () => {
+  it("an appointment in a cell opens its details at once — beside, and in its day's list, picked", () => {
     render(<DeskLeaveCalPage mode="calendar" title="Calendar" input={input()} />);
     fireEvent.click(cell("2026-11-26").querySelector<HTMLElement>("[title^='15:15']")!);
     expect(acts.openAppt).toHaveBeenCalledWith(appts[5]);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    const list = screen.getByRole("dialog", { name: "Thu, 26 Nov" });
+    expect(list.querySelector("[data-sel]")!.textContent).toContain("Ong Boon");
+    expect(within(list.querySelector<HTMLElement>("[data-appt-details]")!).getByText("Call first")).toBeTruthy();
   });
 
   it("a leave in the list opens Edit leave, and the list closes", () => {
