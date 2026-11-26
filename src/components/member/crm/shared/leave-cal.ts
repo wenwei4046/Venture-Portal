@@ -332,7 +332,7 @@ export function leaveCalVM(x: LeaveCalIn) {
       col, alignRight: col >= 5, down, rows: down ? n - wk : wk + 1, close,
     };
   })();
-  const peopleIds =book.groups.flatMap(g => g.people.map(p => p.id)).filter((id, i, a) => a.indexOf(id) === i && x.canEdit(id));
+  const peopleIds = book.groups.flatMap(g => g.people.map(p => p.id)).filter((id, i, a) => a.indexOf(id) === i && x.canEdit(id));
 
   const layerCount = {
     showAppt: x.appts.filter(a => a.day.slice(0, 7) === st.month).length,
