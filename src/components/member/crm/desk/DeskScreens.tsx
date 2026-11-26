@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { crmWrite, fetchAdDaily, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
 import { cachedFigs, keepFigs } from "./meta-cache";
+import { metaAdIds, prefetchNeeds } from "./vm/prefetch";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchCrmChannels, saveCrmBusinessProfile, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import { readsAds, type CrmData, type CrmEvent, type CrmForm, type CrmNote, type CrmPerson } from "@/lib/member/crm-data";
@@ -429,6 +430,34 @@ export default function DeskScreens(p: DeskScreensProps) {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adsOn, live, data.can.manage, data.can.viewAll]);
+
+  // Read ahead (2026-11-26, the owner: "insight 的算法速度还是有点慢，尤其我从进页面，换时间等"): once Insight's own figures are
+  // asked for, Today / This week / This month, the period before each and their fee months are read too, a second later and
+  // in the background (prefetch.ts) — so switching the period finds its spend already here. Once a page load per day.
+  const aheadDay = useRef("");
+  useEffect(() => {
+    if (!adsOn || !live || !readsAds(data.can) || ui.tab !== "insight") return;
+    const day = new Date().toDateString();
+    if (aheadDay.current === day) return;
+    const t = setTimeout(() => {
+      aheadDay.current = day;
+      const ids = metaAdIds(data.customers, data.adNames);
+      for (const part of prefetchNeeds(new Date(), ids, apMetaRef.current ?? {})) {
+        part.forEach(n => n.ids.forEach(id => asked.current.add(`${n.key}|${id}`)));
+        void fetch(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(part))}`, { cache: "no-store" })
+          .then(async res => (res.ok ? ((await res.json()) as { figs: Record<string, Record<string, MetaFig | null>> }).figs : null))
+          .catch(() => null)
+          .then(figs => {
+            // What did not come is left to the screen's own read, which asks again.
+            for (const n of part) n.ids.forEach(id => { if (!figs?.[n.key] || !(id in figs[n.key])) asked.current.delete(`${n.key}|${id}`); });
+            if (!figs) return;
+            setUi(u => { const m = { ...u.apMeta }; for (const n of part) { const f = figs[n.key]; if (f && Object.keys(f).length) { keepFigs(n.key, f); m[n.key] = { ...f, ...(m[n.key] ?? {}) }; } } return { ...u, apMeta: m }; });
+          });
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adsOn, live, data.can.manage, data.can.viewAll, ui.tab]);
 
   // …and its chart, the same figures day by day for the range on screen (2026-10-23; ui.apDaily), each range and ad once.
   const dayNeed = v.apDayNeed as { key: string; since: string; until: string; ids: string[] } | null | undefined;

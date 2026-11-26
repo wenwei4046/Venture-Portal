@@ -2,12 +2,12 @@
  * Ads Manager's figures for the desktop CRM (2026-11-23, the owner: "overview 的数据还是很慢"). Read-only, so a GET: a
  * Server Action waits behind the screen's other actions (the CRM re-reads every 5 s, one action at a time), a GET does not.
  * Same gate as fetchAdInsightsMany — CRM · Manage, or View at All — and the same token, which never leaves the server.
- * Meta's answers are kept on the server (Next's data cache) for whoever asks next: a range that ended before today for an
+ * Meta's answers are kept on the server (ad-figures-cache.ts) for whoever asks next: a range that ended before today for an
  * hour, one still running for 10 minutes — the gate is asked on every request before the cache is read.
  *
  *   GET /member/crm-ad-figures?n=<JSON [{ key, since, until, ids }]>  →  { figs: { [key]: { [adId]: MetaFig | null } } }
  */
-import { unstable_cache } from "next/cache";
+import { cacheKey, cachedFigs, keepFigs } from "@/lib/member/ad-figures-cache";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { metaAdsFigures, type MetaFig } from "@/lib/member/crm-ad-names-meta";
@@ -20,23 +20,24 @@ export const dynamic = "force-dynamic";
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store" } });
 
-/** An answer Meta left ads out of (rangeFigs): thrown so Next keeps nothing, carrying what did come. */
-class Partial extends Error { constructor(readonly figs: Record<string, MetaFig | null>) { super("partial"); } }
 
 /**
- * One range's figures, kept by Next for the next asker (the key is the range and its ads, never the person). The days after
+ * One range's figures, kept for the next asker (the key is the range and its ads, never the person). The days after
  * today have no spend, so a range is read up to today (2026-11-24: "This month" 1–30 Nov and the fee's 1–24 Nov were two
  * reads of Meta for one answer). An answer missing an ad (Meta did not give it this time) is not kept — the next ask
  * reads Meta again — and the ad is left out, so the screen asks again rather than keeping "—".
  */
 async function rangeFigs(n: Need, token: string, today: string): Promise<Record<string, MetaFig | null>> {
   const ids = [...new Set(n.ids)].sort(), until = readUntil(n.since, n.until, today);
-  const read = unstable_cache(async () => {
-    const got = (await metaAdsFigures(ids, [{ key: "r", since: n.since, until }], token)).r ?? {};
-    if (ids.some(id => !(id in got))) throw new Partial(got);
-    return got;
-  }, ["crm-ad-figures-v2", n.since, until, ids.join(",")], { revalidate: keepSeconds(until, today) });
-  try { return await read(); } catch (e) { if (e instanceof Partial) return e.figs; throw e; }
+  // Kept in the Worker's memory and Cloudflare's cache (ad-figures-cache.ts) — Next's unstable_cache kept nothing on
+  // Cloudflare, so every open asked Meta (2026-11-26).
+  const key = cacheKey(n.since, until, ids);
+  const kept = await cachedFigs(key);
+  if (kept) return kept;
+  const got = (await metaAdsFigures(ids, [{ key: "r", since: n.since, until }], token)).r ?? {};
+  if (ids.some(id => !(id in got))) return got;
+  await keepFigs(key, got, keepSeconds(until, today));
+  return got;
 }
 
 export async function GET(request: Request) {
