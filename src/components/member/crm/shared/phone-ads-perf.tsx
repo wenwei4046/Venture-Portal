@@ -6,7 +6,7 @@
  * a day-by-day chart of them, and every ad with those figures. The CRM's own figures always; Meta's (spend, cost per lead …)
  * read from Ads Manager on the server, as the desktop's (fetchAdInsights / fetchAdDaily, CRM · Manage).
  */
-import { inSource, SOURCE_PICKS, type SourcePick } from "@/lib/member/crm-source";
+import { adPageInSource, inSource, SOURCE_PICKS, type SourcePick } from "@/lib/member/crm-source";
 import { sourcePickInView } from "@/lib/member/crm-view";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
@@ -82,12 +82,20 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   // Insight's period and comparison (the panel's sheet: Period · Compare to); with no comparison picked, the period before.
   const r = p.range, rb = p.cmp ?? before(r);
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
+  // As the desktop's (2026-11-26, the owner: "确保手机版，电脑版都同步" — the phone read 178 leads where the desktop and the
+  // Overview read 190): the leads that came from no ad are rows of their own ("No ad · WhatsApp" / "· Messenger", key
+  // `ch:<channel>`), each person once (noAdRepeats), and an ad added before its first lead whose Page is the source's is listed.
+  const repeats = useMemo(() => noAdRepeats(p.customers), [p.customers]);
   const ads = useMemo(() => {
-    const ids = new Set<string>(); customers.forEach(c => { if (c.adId) ids.add(c.adId); });
-    return [...ids].map(id => { const cs = customers.filter(c => c.adId === id); return { id, name: p.adNames[id]?.name ?? cs[0]?.ad ?? id, cs, hidden: !!p.adNames[id]?.hidden,
+    const keyOf = (c: CrmCustomer) => c.adId ?? `ch:${c.channel}`;
+    const ids = new Set<string>(); customers.forEach(c => { if (!repeats.has(c.id)) ids.add(keyOf(c)); });
+    for (const [id, n] of Object.entries(p.adNames)) if (n.added && !n.hidden && adPageInSource(n.pageId, src)) ids.add(id);
+    return [...ids].map(id => { const cs = customers.filter(c => keyOf(c) === id && !repeats.has(c.id));
+      const name = id.startsWith("ch:") ? `No ad · ${id === "ch:whatsapp" ? "WhatsApp" : "Messenger"}` : p.adNames[id]?.name ?? cs[0]?.ad ?? id;
+      return { id, name, cs, hidden: !!p.adNames[id]?.hidden,
       // The ad itself: the link Meta sent with its leads, else Ads Manager (the owner, 2026-10-24: "加個按鈕可以導入去看那隻廣告").
       url: id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(id)}` }; });
-  }, [customers, p.adNames]);
+  }, [customers, p.adNames, repeats, src]);
   // Each ad's status, as the desktop's filter works it out: Ads Manager's word, else its last lead (the owner, 2026-11-08:
   // "没得选状态？" — the phone had no status filter). An ad of another status leaves the list, the tiles and the chart.
   const [menu, setMenu] = useState<"per" | "src" | "st" | null>(null);
@@ -102,7 +110,8 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const stCount = (k: AdStatusPick) => ads.filter(a => !a.hidden && (k === "all" || statusOf(a) === k)).length;
   // An ad hidden earlier (crm_hide_ad) stays out of the list and the totals; so does one of another status.
   const hidIds = new Set(ads.filter(a => a.hidden || (stF !== "all" && statusOf(a) !== stF)).map(a => a.id));
-  const ids = ads.filter(a => !hidIds.has(a.id)).map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
+  // Meta is asked for real ads only (a "No ad" row has no spend).
+  const ids = ads.filter(a => !hidIds.has(a.id) && /^[0-9]{5,32}$/.test(a.id)).map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
   // Meta's figures, read on the server (CRM · Manage); none on the demo.
   // Drawn from the phone's last answer from the first frame — after the app was closed too — then read again (the owner, 2026-10-24).
   const idKey = [...ids].sort().join(","), kA = `f|${si}|${ui}`, kD = `d|${si}|${ui}`, kB = `f|${sb}|${ub}`; // by dates only: the answers are by ad, so a new ad keeps the rest on screen
@@ -148,20 +157,25 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
-  // Each person once, as the Overview and the desktop (noAdRepeats, 2026-11-25 — the owner: "之前有些事重复到wa & messager 的有减去了嘛？"): a "no ad" chat that is already an ad's lead is not a lead again.
-  const repeats = useMemo(() => noAdRepeats(p.customers), [p.customers]);
+  // Each person once, as the Overview and the desktop (noAdRepeats above, 2026-11-25 — the owner: "之前有些事重复到wa & messager 的有减去了嘛？"): a "no ad" chat that is already an ad's lead is not a lead again.
   const totalLeads = (rr: Range) => customers.filter(c => { const t = day0(new Date(c.createdAt).getTime()); return !repeats.has(c.id) && !(c.adId && p.adNames[c.adId]?.hidden) && t >= rr.a && t <= rr.b; }).length;
   const perLeadOf = (rr: Range, fig: Record<string, MetaFig | null>): number | null => {
     const spend = metaFigures(ids.map(i => fig[i]), {}).spend, rate = rateOf(rr), n = totalLeads(rr);
     return spend == null || rate == null || !n ? null : (spend * (1 + rate)) / n;
   };
   const figsOf = (cs: CrmCustomer[], rr: Range, metaIds: string[], fig: Record<string, MetaFig | null>) => { const c = crmFigs(cs, p.visits, rr); return { ...c, ...metaFigures(metaIds.map(i => fig[i]), c) }; };
-  const all = customers.filter(c => c.adId && !hidIds.has(c.adId));
+  // Every lead of the rows shown — the "No ad" rows' too, as the desktop's strip (each person once).
+  const all = ads.filter(a => !hidIds.has(a.id)).flatMap(a => a.cs);
+  // An ad's own Per lead carries its share of the month's fee, as the desktop's rows and the Overview's (it was spend ÷ leads).
+  const rowCpl = (cs: CrmCustomer[], rr: Range, id: string, fig: Record<string, MetaFig | null>): number | null => {
+    const spend = metaFigures([fig[id]], {}).spend, rate = rateOf(rr), n = crmFigs(cs, p.visits, rr).leads;
+    return spend == null || rate == null || !n ? null : (spend * (1 + rate)) / n;
+  };
   // Per lead, as the desktop's (the owner, 2026-11-17: "ads performance 的 per lead 也一起改"): (ads spend + the marketing
   // fee's share) ÷ every lead of the period in the source picked — the fee is the calendar months' on all the source's ads.
   const tot: Record<string, number | null> = { ...figsOf(all, r, ids, figA), cpl: perLeadOf(r, figA) }, totB: Record<string, number | null> = { ...figsOf(all, rb, ids, figB), cpl: perLeadOf(rb, figB) };
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
-  const rows = ads.filter(a => !hidIds.has(a.id)).map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
+  const rows = ads.filter(a => !hidIds.has(a.id)).map(a => ({ ...a, f: { ...figsOf(a.cs, r, [a.id], figA), cpl: rowCpl(a.cs, r, a.id, figA) } as Record<string, number | null>, fb: cmp ? ({ ...figsOf(a.cs, rb, [a.id], figB), cpl: rowCpl(a.cs, rb, a.id, figB) } as Record<string, number | null>) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
   // The change on the comparison picked — the tiles and every ad's figures (the owner, 2026-10-24: "进行对比后，下方数据并没有显示增多或减少").
   const change = (k: string, a: number | null | undefined, b: number | null | undefined) => {
     if (!cmp || a == null || b == null) return null;
