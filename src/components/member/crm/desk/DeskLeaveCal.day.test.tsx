@@ -40,8 +40,8 @@ describe("the desktop Calendar: a day clicked lists it (the owner, 2026-11-27)",
     const rows = [...list.querySelectorAll<HTMLElement>("[data-day-item]")];
     expect(rows.map(r => r.firstElementChild!.textContent)).toEqual(["All day", "10:30", "14:00", "16:15", "17:00", "18:00"]);
     expect(rows[0].textContent).toContain("Hector Lim · Annual");
-    expect(rows[1].textContent).toBe("10:30Nur AisyahChea Huan · Showroom KLTo mark");
-    expect(rows[3].textContent).toBe("16:15Tan MeiHector Lim · Online meetingBooked");
+    expect(rows[1].textContent).toBe("10:30Nur AisyahTo markChea Huan · Showroom KL");
+    expect(rows[3].textContent).toBe("16:15Tan MeiBookedHector Lim · Online meeting");
     expect(cell("2026-11-24").dataset.open).toBe("true");
   });
 
@@ -81,7 +81,7 @@ describe("the desktop Calendar: a day clicked lists it (the owner, 2026-11-27)",
   it("Esc, × and a press elsewhere close it; another day opens its own; a day with nothing says so", () => {
     render(<DeskLeaveCalPage mode="calendar" title="Calendar" input={input()} />);
     fireEvent.click(cell("2026-11-24"));
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(cell("2026-11-24"));
     fireEvent.click(screen.getByLabelText("Close"));
@@ -93,6 +93,27 @@ describe("the desktop Calendar: a day clicked lists it (the owner, 2026-11-27)",
     expect(within(screen.getByRole("dialog", { name: "Tue, 10 Nov" })).getByText("Nothing this day")).toBeTruthy();
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Esc closes the list alone — the CRM's own Esc (the pane beside, on the window) waits for the next one", () => {
+    const crmEsc = vi.fn();
+    window.addEventListener("keydown", crmEsc);
+    try {
+      render(<DeskLeaveCalPage mode="calendar" title="Calendar" input={input()} />);
+      fireEvent.click(cell("2026-11-24"));
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(crmEsc).not.toHaveBeenCalled();
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(crmEsc).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener("keydown", crmEsc); }
+  });
+
+  it("a press in the pane beside (the appointment's details) keeps the list", () => {
+    render(<><aside data-testid="pane"><span>Customer info</span></aside><DeskLeaveCalPage mode="calendar" title="Calendar" input={input()} /></>);
+    fireEvent.click(cell("2026-11-24"));
+    fireEvent.pointerDown(screen.getByText("Customer info"));
+    expect(screen.getByRole("dialog", { name: "Tue, 24 Nov" })).toBeTruthy();
   });
 
   it("sits at its day: from the left on a weekday, from the right at the weekend; up in the lower weeks, down in the upper", () => {
@@ -143,7 +164,7 @@ describe("the desktop Calendar's one + (the owner, 2026-11-27)", () => {
   it("a press elsewhere or Esc closes the menu", () => {
     render(<DeskLeaveCalPage mode="calendar" title="Calendar" input={input({ bookAppt: vi.fn() })} />);
     fireEvent.click(screen.getByLabelText("Add"));
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
     fireEvent.click(screen.getByLabelText("Add"));
     fireEvent.pointerDown(document.body);

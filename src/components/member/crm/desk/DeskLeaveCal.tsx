@@ -235,10 +235,11 @@ function DeskCalPlus({ appt, leave }: { appt?: () => void; leave?: () => void })
   useEffect(() => {
     if (!open) return;
     const out = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    // Esc closes the menu alone: on the document, before the CRM's own Esc on the window (which closes the pane beside).
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } };
     document.addEventListener("pointerdown", out);
-    window.addEventListener("keydown", key);
-    return () => { document.removeEventListener("pointerdown", out); window.removeEventListener("keydown", key); };
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", out); document.removeEventListener("keydown", key); };
   }, [open]);
   const only = appt ?? leave;
   if (!only) return null;
@@ -269,7 +270,7 @@ function DeskCalPlus({ appt, leave }: { appt?: () => void; leave?: () => void })
  * A day's list (the owner, 2026-11-27: "点那个 date … 跳出来它的 appointment … 可以点进去看这个 appointment 的 details"): a card
  * at the day, over the grid — its leave, then its appointments by time, each with its salesperson, room and how it stands.
  * An appointment opens its details beside the calendar (Customer info on that visit) and the card stays for the next one.
- * A press elsewhere closes it, but not one in that pane; Esc and × close it too.
+ * A press elsewhere closes it, but not one in that pane; × and Esc close it too (Esc it alone, the pane at the next).
  */
 function DayList({ v }: { v: LeaveCalVM }) {
   const dl = v.dl!;
@@ -282,10 +283,12 @@ function DayList({ v }: { v: LeaveCalVM }) {
       if (!t || box.current?.contains(t) || t.closest("aside")) return;
       close.current();
     };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
+    // Esc closes the card alone — on the document, before the CRM's own Esc on the window, which would close the
+    // appointment's details beside it too; a second Esc closes those.
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); close.current(); } };
     document.addEventListener("pointerdown", out);
-    window.addEventListener("keydown", key);
-    return () => { document.removeEventListener("pointerdown", out); window.removeEventListener("keydown", key); };
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", out); document.removeEventListener("keydown", key); };
   }, []);
   const across: CSSProperties = dl.alignRight ? { right: `calc(${6 - dl.col} * 100% / 7 - 6px)` } : { left: `calc(${dl.col} * 100% / 7 - 6px)` };
   return (
@@ -302,16 +305,19 @@ function DayList({ v }: { v: LeaveCalVM }) {
       <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "6px" }}>
         {dl.items.map(it => (
           <div key={it.key} {...(it.may ? press(it.go) : {})} data-day-item="" className={it.may ? s.row : undefined}
-            style={{ display: "grid", gridTemplateColumns: "44px minmax(0,1fr) auto", columnGap: "10px", alignItems: "center", minHeight: "48px", padding: "0 10px", borderRadius: "8px", cursor: it.may ? "pointer" : "default" }}>
+            style={{ display: "grid", gridTemplateColumns: "44px minmax(0,1fr)", columnGap: "10px", alignItems: "center", minHeight: "50px", padding: "0 10px", borderRadius: "8px", cursor: it.may ? "pointer" : "default" }}>
             <span style={{ font: `600 12.5px ${TIGHT}`, color: it.tFg, whiteSpace: "nowrap" }}>{it.t}</span>
             <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, alignSelf: "stretch" }}>
               <span style={{ width: "3px", alignSelf: "stretch", margin: "10px 0", borderRadius: "2px", flex: "none", background: it.bar }} />
-              <span style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
-                <span style={{ fontSize: "13.5px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.title}</span>
+              {/* The customer and how it stands on the first line; who · where on the whole second line. */}
+              <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                  <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "13.5px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.title}</span>
+                  {it.chip && <span style={{ flex: "none", height: "19px", padding: "0 7px", borderRadius: "10px", display: "flex", alignItems: "center", font: `600 10.5px ${INTER}`, background: it.chip.bg, color: it.chip.fg, whiteSpace: "nowrap" }}>{it.chip.label}</span>}
+                </span>
                 <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</span>
               </span>
             </span>
-            {it.chip ? <span style={{ height: "20px", padding: "0 8px", borderRadius: "10px", display: "flex", alignItems: "center", font: `600 11px ${INTER}`, background: it.chip.bg, color: it.chip.fg, whiteSpace: "nowrap" }}>{it.chip.label}</span> : <span />}
           </div>
         ))}
         {dl.empty && <div style={{ padding: "12px 10px", fontSize: "12.5px", color: "var(--crm-faint)" }}>Nothing this day</div>}

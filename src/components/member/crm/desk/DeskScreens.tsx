@@ -31,6 +31,8 @@ import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
 import { ActionSheetHost } from "../shared/action-sheet";
+import { CustomerPickHost } from "../shared/customer-pick";
+import { InviteAskHost } from "../shared/won-files";
 import { inBrand } from "./vm/insight";
 import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
 import { newRoomDraftKey, pickedSource } from "@/lib/member/crm-view";
@@ -544,6 +546,11 @@ export default function DeskScreens(p: DeskScreensProps) {
       <MessageMenu />
       {/* The cold chat's templates (CRM v4 notes/11: the warning row's Template, the + menu's Cold template) — the phone's sheet. */}
       <ActionSheetHost />
+      {/* Calendar › + › Book appointment's customer picker, and Book visit's "Send invitation?" (2026-11-19) — CrmApp mounts
+          them in the phone's shell only, so on a computer the picker never opened and every booking sent the invitation
+          unasked (found 2026-11-27, with the Calendar's one +). */}
+      <CustomerPickHost />
+      <InviteAskHost />
     </div>
   );
 }

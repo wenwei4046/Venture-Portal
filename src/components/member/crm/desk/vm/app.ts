@@ -104,7 +104,7 @@ export function deskVM(ctx: DeskCtx) {
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
     leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
       // Book appt (the owner, 2026-11-19): a customer picked opens their Appointment sheet beside the calendar.
-      bookAppt: () => openCustomerPick({ customers: data.customers, pick: c => patch({ pane: "docked", chat: c.id, kind: "book", book: null, visit: null, infoId: null, menu: false }) }),
+      bookAppt: () => openCustomerPick({ customers: data.customers, title: "Book appointment", pick: c => patch({ pane: "docked", chat: c.id, kind: "book", book: null, visit: null, infoId: null, menu: false }) }),
       openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),
     // Insight › Overview (2026-11-17): ads + team on one page, Insight's first tab (DeskOverview.tsx, vm/overview.ts).
     kInsOv: ui.tab === "insight" && (ui.insTab ?? "overview") === "overview",
