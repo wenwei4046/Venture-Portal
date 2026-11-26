@@ -77,6 +77,8 @@ export interface SchemeRow {
   enable_kpi: boolean
   enable_override: boolean
   enable_margin_penalty: boolean
+  /** The first month (YYYY-MM-01) the penalty cuts (2026-11-27). Absent in older fixtures; null = every month. */
+  margin_penalty_from?: string | null
   enable_margin_incentive: boolean
   enable_group_incentive?: boolean
   group_sales_depth?: number | null
@@ -311,6 +313,11 @@ export interface SalesOrderRow {
   half_comm?: boolean
   /** No commission (2026-11-14, `sales_order_no_comm`): set by the loader, never a column. */
   no_comm?: boolean
+  /**
+   * A Revenue Director's commission ratio on the bill (2026-11-27, `sales_order_comm_ratios`) and who set it: set by
+   * the loader, never a column.
+   */
+  comm_ratio?: { ratio: Num; by: string | null }
   sales_order_lines: SalesLineRow[] | null
 }
 
@@ -405,6 +412,12 @@ function numOrNull(v: Num): number | null {
   if (v === null || v === undefined || v === '') return null
   const n = typeof v === 'number' ? v : Number(v)
   return Number.isFinite(n) ? n : null
+}
+
+/** A director's ratio as the engine reads it (2026-11-27): only a number 0–1 is one; the note names who set it. */
+function commRatioOf(row: SalesOrderRow['comm_ratio']): { commRatio?: { ratio: number; by: string } } {
+  const ratio = row ? numOrNull(row.ratio) : null
+  return ratio !== null && ratio >= 0 && ratio <= 1 ? { commRatio: { ratio, by: row?.by?.trim() || 'a director' } } : {}
 }
 
 /**
@@ -672,6 +685,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       ...(o.half_comm ? { halfComm: true } : {}),
       // No commission (2026-11-14): nobody is paid on the bill; it counts in sales, margin and the KPI count.
       ...(o.no_comm ? { noCommission: true } : {}),
+      // A Revenue Director's ratio (2026-11-27): in the margin band's place. A ratio out of 0–1 is no ratio.
+      ...(commRatioOf(o.comm_ratio)),
       manualMarginPct: numOrNull(o.manual_margin_pct),
       brandCode: o.brand_code?.trim() || null,
       lines: (o.sales_order_lines ?? []).map(l => ({
@@ -713,6 +728,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       enableKpi: rows.scheme.enable_kpi,
       enableOverride: rows.scheme.enable_override,
       enableMarginPenalty: rows.scheme.enable_margin_penalty,
+      marginPenaltyFrom: rows.scheme.margin_penalty_from ?? null,
       enableMarginIncentive: rows.scheme.enable_margin_incentive,
       enableGroupIncentive: rows.scheme.enable_group_incentive ?? false,
       groupSalesDepth: rows.scheme.group_sales_depth ?? null,

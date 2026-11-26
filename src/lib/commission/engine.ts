@@ -23,6 +23,8 @@
 import type {
   BrandMargin,
   CommissionComponent,
+  CommissionScheme,
+  CommRatio,
   DeferredOrder,
   EngineInput,
   EngineResult,
@@ -385,6 +387,66 @@ export function penaltyBandFor(
     if (!worst || b.marginPct < worst.marginPct) worst = b
   }
   return worst
+}
+
+/** The band a Revenue Director's ratio is recorded under (`PenalisedOrder.bandKey`, 2026-11-27). */
+export const COMM_RATIO_BAND = 'comm_ratio'
+
+/**
+ * Whether the scheme's margin penalty cuts a bill of this month: switched on, and the bill's month not before the one
+ * it starts from (`marginPenaltyFrom` — the user turned Fair's on "从十二月开始", 2026-11-27).
+ */
+export function penaltyCutsMonth(
+  scheme: Pick<CommissionScheme, 'enableMarginPenalty' | 'marginPenaltyFrom'>,
+  periodMonth: string,
+): boolean {
+  return scheme.enableMarginPenalty && (!scheme.marginPenaltyFrom || periodMonth >= scheme.marginPenaltyFrom)
+}
+
+/**
+ * What scales a bill's commission — and, the same, its part of the override base and the sales it counts: a Revenue
+ * Director's ratio when one is set on it (`SalesOrder.commRatio`, up or down, whatever the margin says), else the
+ * penalty band its margin falls in while the scheme cuts that month's bills, else nothing (1). `band` is the margin's
+ * band either way — what the ladder alone would have done — so a note can say what the ratio stands in place of.
+ */
+export function billCut(
+  order: Pick<SalesOrder, 'periodMonth' | 'commRatio'>,
+  marginPct: number | null,
+  brandCode: string | null,
+  scheme: Pick<CommissionScheme, 'enableMarginPenalty' | 'marginPenaltyFrom'>,
+  bands: MarginBand[],
+): { band: MarginBand | null; multiplier: number; ratio: CommRatio | null } {
+  const band = marginPct !== null && penaltyCutsMonth(scheme, order.periodMonth) ? penaltyBandFor(marginPct, brandCode, bands) : null
+  const ratio = order.commRatio ?? null
+  return { band, multiplier: ratio ? ratio.ratio : band?.commissionMultiplier ?? 1, ratio }
+}
+
+/** A ratio in a line's note: 0.75 → "75%". */
+function ratioText(ratio: number): string {
+  return `${round2(ratio * 100)}%`
+}
+
+/**
+ * What a bill's commission line says of its cut: the margin's band — "· Below margin Tier 1 (31.2% margin) × 0.75" —
+ * or the ratio a director set in its place — "· commission 100% set by KRIS (24.2% margin, Below margin Tier 2 ×
+ * 0.25)". Nothing on a bill neither cuts.
+ */
+function cutNote(cut: { band: MarginBand | null; multiplier: number; ratio: CommRatio | null }, bill: BillMargin): string {
+  const margin = bill.pct === null ? null : `${round2(bill.pct * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}`
+  if (cut.ratio) {
+    const was = [margin, cut.band ? `${cut.band.label} × ${cut.band.commissionMultiplier}` : null].filter(Boolean).join(', ')
+    return ` · commission ${ratioText(cut.ratio.ratio)} set by ${cut.ratio.by}${was ? ` (${was})` : ''}`
+  }
+  return cut.band ? ` · ${cut.band.label} (${margin}) × ${cut.multiplier}` : ''
+}
+
+/**
+ * What a cut bill is recorded under (`PenalisedOrder`): the director's ratio when one below 1 is set — never one of 1,
+ * which cut nothing — else the margin's band; null when nothing cut it.
+ */
+function penalisedBy(cut: { band: MarginBand | null; ratio: CommRatio | null }): { bandKey: string; bandLabel: string } | null {
+  if (cut.ratio) return cut.ratio.ratio < 1 ? { bandKey: COMM_RATIO_BAND, bandLabel: `Commission ${ratioText(cut.ratio.ratio)} · set by ${cut.ratio.by}` } : null
+  return cut.band ? { bandKey: cut.band.bandKey, bandLabel: cut.band.label } : null
 }
 
 export interface IncentiveResult {
@@ -826,9 +888,15 @@ interface Draft {
 interface BillPenalty {
   base: MarginBase
   bill: BillMargin
+  /** The band its margin falls in while the scheme cuts its month's bills — what the ladder alone would do. */
   band: MarginBand | null
-  /** 1 when no band cuts it (no penalty, no margin yet, or the penalty switched off). */
+  /**
+   * What scales it: a director's ratio when set (2026-11-27), else the band's; 1 when neither cuts it (no penalty, no
+   * margin yet, the penalty switched off or not started for its month).
+   */
   multiplier: number
+  /** The ratio a Revenue Director set on it, in the band's place (`SalesOrder.commRatio`). */
+  ratio: CommRatio | null
   /**
    * The bill is of a brand that follows its own scheme (2026-11-11 — 2990s, the
    * user: "看不到 margin，因为 2990s 本身没有 calculate 进 margin"): in no margin
@@ -1007,7 +1075,10 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   // "只要是 drop com 的情况也是一样的 … 原本 1 万块的 total sales order 也只是算
   // 5,000 块的 sales。当然 commission 还是一样算 1 万块的 50%"; asked where,
   // "连升级业绩也打折". A bill with no margin yet is cut by nothing, as its
-  // commission is not; a department head's own bills by nothing, ever.
+  // commission is not; a department head's own bills by nothing, ever. A
+  // Revenue Director's ratio on a bill (2026-11-27) stands in its band's place,
+  // for its commission and its sales alike; a bill of a month before the
+  // penalty starts (`marginPenaltyFrom`) is cut by no band.
   const penalties = new Map<SalesOrder, BillPenalty>()
   const penaltyOf = (order: SalesOrder): BillPenalty => {
     let hit = penalties.get(order)
@@ -1017,8 +1088,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // A brand with its own scheme has no margin to read: whatever its lines
       // cost, or a margin keyed on the bill, it is judged on none.
       const bill: BillMargin = ownBrand ? { pct: null, source: 'none', cost: 0 } : billMargin(order, base)
-      const band = scheme.enableMarginPenalty && bill.pct !== null ? penaltyBandFor(bill.pct, base.brandCode, input.marginBands) : null
-      hit = { base, bill, band, multiplier: band?.commissionMultiplier ?? 1, ownBrand }
+      // The margin's band from the month the penalty starts (2026-11-27), and a director's ratio in its place.
+      const cut = billCut(order, bill.pct, base.brandCode, scheme, input.marginBands)
+      hit = { base, bill, band: cut.band, multiplier: cut.multiplier, ratio: cut.ratio, ownBrand }
       penalties.set(order, hit)
     }
     return hit
@@ -1279,7 +1351,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // import has a problem and the margin ladder becomes ambiguous. The
       // brand only chooses a margin ladder, so a month that pays no margin
       // has nothing to ask about it (2026-09-27).
-      const { base, bill, band: penaltyBand, multiplier, ownBrand } = penaltyOf(order)
+      const { base, bill, band: penaltyBand, multiplier, ratio, ownBrand } = penaltyOf(order)
       // The rung's rate — or, on a bill of a brand with its own scheme, the rung's rate for that brand (2026-11-11).
       const rate = billRate(draft.staffId, ownBrand)
       // A brand with its own scheme stands outside every margin (2026-11-11):
@@ -1310,7 +1382,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           }
         }
 
-        if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
+        // A bill the penalty would cut, waiting for a cost — not one a director's ratio already decides.
+        if (penaltyCutsMonth(scheme, order.periodMonth) && !ratio && bill.pct === null && base.revenue > 0) ordersWithoutCost++
       }
       // The override base: cut by the margin, halved on a half-comm bill and
       // nothing on a no-commission one (2026-11-14) — kept apart for each
@@ -1323,9 +1396,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + overridden)
       draft.overrideBase.set(ownBrand ?? '', round2((draft.overrideBase.get(ownBrand ?? '') ?? 0) + overridden))
 
-      const penaltyNote = penaltyBand
-        ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
-        : ''
+      const penaltyNote = cutNote({ band: penaltyBand, multiplier, ratio }, bill)
       let withheldOnThisBill = 0
 
       // C1 — one line per order, so the drill-down reads like a ledger.
@@ -1394,18 +1465,19 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         })
       }
 
-      // A bill that pays nothing has nothing withheld.
-      if (penaltyBand && !paysNothing) {
+      // A bill that pays nothing has nothing withheld. A director's ratio below 1 is kept as the band is — what the bill
+      // was paid at, read back by the Revenue app once a close or a run has paid it; one of 1 cut nothing.
+      const cutBy = penalisedBy({ band: penaltyBand, ratio })
+      if (cutBy && !paysNothing) {
         draft.marginPenaltyWithheld = round2(draft.marginPenaltyWithheld + withheldOnThisBill)
         penalised.push({
           staffId: draft.staffId,
           orderId: order.id,
           orderNo: order.orderNo,
           brandCode: base.brandCode,
-          marginPct: bill.pct!,
+          marginPct: bill.pct,
           marginSource: bill.source,
-          bandKey: penaltyBand.bandKey,
-          bandLabel: penaltyBand.label,
+          ...cutBy,
           multiplier,
           withheld: withheldOnThisBill,
         })
@@ -1419,18 +1491,17 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     for (const order of scheme.enableProductRevenue ? draft.commissionOnlyOrders : []) {
       // No commission (2026-11-14): an old bill's commission is all it ever paid — now nothing.
       if (order.noCommission) continue
-      const { base, bill, band: penaltyBand, multiplier, ownBrand } = penaltyOf(order)
+      const { base, bill, band: penaltyBand, multiplier, ratio, ownBrand } = penaltyOf(order)
       const rate = billRate(draft.staffId, ownBrand)
-      if (ownBrand === null && scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
+      if (ownBrand === null && penaltyCutsMonth(scheme, order.periodMonth) && !ratio && bill.pct === null && base.revenue > 0) ordersWithoutCost++
       const line = commissionOnlyLine(order, rate, input.periodMonth, kpiIndexOf(order), groupIndex, {
         multiplier,
-        note: penaltyBand
-          ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
-          : '',
+        note: cutNote({ band: penaltyBand, multiplier, ratio }, bill),
       })
       if (!line) continue
       draft.lines.push(line)
-      if (penaltyBand) {
+      const cutBy = penalisedBy({ band: penaltyBand, ratio })
+      if (cutBy) {
         const full = round2(line.basisAmount * rate)
         const withheld = round2(full - round2(full * multiplier))
         draft.marginPenaltyWithheld = round2(draft.marginPenaltyWithheld + withheld)
@@ -1439,10 +1510,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           orderId: order.id,
           orderNo: order.orderNo,
           brandCode: base.brandCode,
-          marginPct: bill.pct!,
+          marginPct: bill.pct,
           marginSource: bill.source,
-          bandKey: penaltyBand.bandKey,
-          bandLabel: penaltyBand.label,
+          ...cutBy,
           multiplier,
           withheld,
         })

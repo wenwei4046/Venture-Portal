@@ -185,6 +185,16 @@ export interface SalesOrder {
    */
   noCommission?: boolean
   /**
+   * The commission ratio a Revenue Director set on the bill in the Revenue app (2026-11-27,
+   * `sales_order_comm_ratios` — the user: "他可以选 ratio 自己填（25%、50%、75% 都可以调）… below margin 的，他觉得可以调的
+   * 就改成 [standard] margin，不用扣 50% … 如果觉得说这个不应该是属于 normal commission，他可以调成 50%"). It TAKES THE
+   * PLACE of what the bill's margin band would cut it to — up or down, whether or not the scheme cuts by margin, a bill
+   * with no margin yet too — and, as that cut does, scales its commission, its part of the override base and the sales
+   * it counts (`BillPenalty.multiplier`). 1 pays it in full; 0 nothing. Half comm halves after it; No commission wins
+   * over it; a department head's own bills are never set (the database refuses) and never cut. Absent: the margin decides.
+   */
+  commRatio?: CommRatio
+  /**
    * Set on every part of a SHARED bill, the owner's included
    * (`splitOrdersByShares`, 2026-09-30): whose bill it is and who holds which
    * part. Display only — the engine pays each part as the ordinary bill it is,
@@ -192,6 +202,14 @@ export interface SalesOrder {
    */
   share?: BillShare
   lines: SalesLine[]
+}
+
+/** A commission ratio a Revenue Director set on a bill (`SalesOrder.commRatio`). */
+export interface CommRatio {
+  /** 0–1: 0.75 pays three quarters of the bill's commission and counts three quarters of its sales. */
+  ratio: number
+  /** Who set it, as the line's note names them ("KRIS"). */
+  by: string
 }
 
 /** Who holds a shared bill (`sales_order_shares`), as every one of its parts carries it. */
@@ -373,6 +391,12 @@ export interface CommissionScheme {
   enableOverride: boolean
   /** Below-margin penalty on a bill's own commission. */
   enableMarginPenalty: boolean
+  /**
+   * The first month (YYYY-MM-01) whose bills the penalty cuts (2026-11-27 — the user turned Fair's on "从十二月开始":
+   * November's bills paid in full, December's cut). A bill of an earlier month is cut by no band, whichever month pays
+   * it. Absent or null: every month's, while `enableMarginPenalty` is on.
+   */
+  marginPenaltyFrom?: string | null
   /** Monthly margin incentive (RM1,000 / a further RM1,500). */
   enableMarginIncentive: boolean
   /**
@@ -556,13 +580,18 @@ export interface DeferredOrder {
   productRevenue: number
 }
 
-/** A bill whose margin fell into a penalty band. */
+/**
+ * A bill whose margin fell into a penalty band — or whose commission a Revenue Director cut by a ratio below 1
+ * (2026-11-27, `SalesOrder.commRatio`): `bandKey` `COMM_RATIO_BAND`, its label who set it. Kept by a close and a run
+ * as what the bill was paid at: the Revenue app counts a paid bill's sales at this `multiplier`.
+ */
 export interface PenalisedOrder {
   staffId: string
   orderId: string
   orderNo: string
   brandCode: string | null
-  marginPct: number
+  /** The bill's margin; null on a ratio set on a bill with none to read (no cost yet, a brand on its own scheme). */
+  marginPct: number | null
   marginSource: MarginSource
   bandKey: string
   bandLabel: string
