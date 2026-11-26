@@ -398,6 +398,15 @@ export async function updateScheme(formData: FormData) {
   if (rateMode && !['fixed', 'variable'].includes(rateMode)) {
     throw new Error('Unknown rate mode')
   }
+  // The month the margin switch starts from (2026-11-27): `YYYY-MM`, or empty for every month. A page from before
+  // sends no such field — what is stored stays.
+  const penaltyFrom = formData.has('margin_penalty_from') ? text(formData, 'margin_penalty_from') : undefined
+  if (penaltyFrom && !/^\d{4}-(0[1-9]|1[0-2])$/.test(penaltyFrom)) {
+    throw new Error('Pick the month the margin starts from, or leave it empty for every month.')
+  }
+  // The penalty and the incentive are ONE switch (2026-11-27 — the user: "the penalty and incentive is trigger together,
+  // make it into same button"): `enable_margin` sets both — or, from a page opened before, either of the old two.
+  const marginOn = ['enable_margin', 'enable_margin_penalty', 'enable_margin_incentive'].some(k => formData.get(k) === 'on')
 
   check(
     (
@@ -407,8 +416,9 @@ export async function updateScheme(formData: FormData) {
           enable_product_revenue: formData.get('enable_product_revenue') === 'on',
           enable_kpi: formData.get('enable_kpi') === 'on',
           enable_override: formData.get('enable_override') === 'on',
-          enable_margin_penalty: formData.get('enable_margin_penalty') === 'on',
-          enable_margin_incentive: formData.get('enable_margin_incentive') === 'on',
+          enable_margin_penalty: marginOn,
+          ...(penaltyFrom !== undefined ? { margin_penalty_from: penaltyFrom ? `${penaltyFrom}-01` : null } : {}),
+          enable_margin_incentive: marginOn,
           enable_group_incentive: groupIncentiveOn,
           group_sales_depth: groupDepth,
           override_depth: overrideDepth,

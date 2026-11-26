@@ -22,6 +22,9 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   // Not my order (2026-11-14, mig 20261114210000): HR's answer to a salesperson's request that a bill is not theirs — the
   // Revenue app's, whichever app the phone signed up in. (HR is told of a new one by `share_taken`: Comm Cal's Requests tab.)
   | 'not_mine_request'
+  // A bill's commission ratio (2026-11-27, mig 20261127140500): a Revenue Director set, changed or took off the ratio on a
+  // bill — to its holders, the Revenue app's whichever app the phone signed up in. Its id is the bill's.
+  | 'comm_ratio'
   // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them
   // (mkt_notices), never the HR or Revenue app's; a push of one opens Marketing's page.
   | 'mkt_project'
@@ -53,7 +56,7 @@ export interface Notices {
 }
 
 const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share', 'people', 'claims']
-const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'share_taken', 'not_mine_request', 'hr_staff', 'payment_request']
+const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'share_taken', 'not_mine_request', 'comm_ratio', 'hr_staff', 'payment_request']
 
 /** A `share_taken` notice's month on Comm Cal: `fair/2026-11-01` — anything else opens nothing of it. */
 const COMM_CAL_MONTH = /^[a-z0-9][a-z0-9-]*\/\d{4}-\d{2}-01$/
@@ -105,6 +108,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'share_request') return `/member?share=${id}`
   // A Not my order request HR answered (2026-11-14): the Revenue app's, its request open over Today.
   if (n.refKind === 'not_mine_request') return `/member?notmine=${id}`
+  // A bill whose commission a Revenue Director adjusted (2026-11-27): the Revenue app's My sales orders, the bill open.
+  if (n.refKind === 'comm_ratio') return `/member?page=insight&view=bills&so=${id}`
   // A share that took effect (2026-11-07), to HR: Comm Cal's month, its Requests tab — where Cancel share is.
   if (n.refKind === 'share_taken') return COMM_CAL_MONTH.test(n.refId) ? `/revenue/${n.refId}?view=requests` : '/revenue'
   // Marketing's (2026-10-23): its project's page — Marketing is the computer's; a phone opens the same page.

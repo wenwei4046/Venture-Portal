@@ -2685,3 +2685,147 @@ describe('brandRateOf — a rung’s rate for a brand with its own scheme', () =
     expect(brandRateOf(undefined, '2990S', RANKS)).toBe(0)
   })
 })
+
+// 2026-11-27 — Fair's ladder for Akemi and Ergotex (the user: "30% 到 33%（即 32.99% 这个区间），只能拿 75% 的 commission：
+// 27% 到 29.99%：50%、25% 到 26.99%：25%、24.99% 以下：0%"), the month the penalty starts from ("从十二月开始"), and a bill's
+// commission ratio a Revenue Director sets in the Revenue app ("可以选 ratio 自己填 … below margin 的 … 改成 [standard] …
+// 不应该是属于 normal commission，他可以调成 50%").
+describe("Fair's new ladder for Akemi and Ergotex, read at or below the user's own bounds (2026-11-27)", () => {
+  const NEW_AKEMI: MarginBand[] = [
+    ...AKEMI_BANDS.filter(b => b.kind !== 'penalty' && b.bandKey !== 'low'),
+    { brandCode: 'AKEMI', bandKey: 'below_tier_1', label: 'Below margin Tier 1', kind: 'penalty', marginPct: 0.3299, commissionMultiplier: 0.75, monthlyIncentive: 0 },
+    { brandCode: 'AKEMI', bandKey: 'below_tier_2', label: 'Below margin Tier 2', kind: 'penalty', marginPct: 0.2999, commissionMultiplier: 0.5, monthlyIncentive: 0 },
+    { brandCode: 'AKEMI', bandKey: 'below_tier_3', label: 'Below margin Tier 3', kind: 'penalty', marginPct: 0.2699, commissionMultiplier: 0.25, monthlyIncentive: 0 },
+    { brandCode: 'AKEMI', bandKey: 'below_tier_4', label: 'Below margin Tier 4', kind: 'penalty', marginPct: 0.2499, commissionMultiplier: 0, monthlyIncentive: 0 },
+  ]
+  const cut = (margin: number) => penaltyBandFor(margin, 'AKEMI', NEW_AKEMI)?.commissionMultiplier ?? 1
+
+  it.each([
+    [0.40, 1], [0.33, 1], [0.32995, 1], [0.3299, 0.75], [0.31, 0.75], [0.30, 0.75], [0.29995, 0.75],
+    [0.2999, 0.5], [0.28, 0.5], [0.27, 0.5], [0.2699, 0.25], [0.26, 0.25], [0.25, 0.25], [0.2499, 0], [0.20, 0], [-0.1, 0],
+  ])('a %f margin pays × %f', (margin, multiplier) => {
+    expect(cut(margin)).toBe(multiplier)
+  })
+})
+
+describe('the penalty cuts from the month it starts (2026-11-27)', () => {
+  // 26% on Akemi's ladder: Below margin Tier 1 × 0.5.
+  const thin = (id: string, periodMonth: string) => order(id, 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]], { periodMonth })
+  const from = (month: string | null) => ({ ...SCHEME, marginPenaltyFrom: month })
+
+  it('pays a bill of a month before it in full, its sales whole', () => {
+    const rs = find(run({ scheme: from('2026-08-01'), orders: [thin('1', '2026-07-01')] }).statements, 'rs')
+    expect(rs.productCommission).toBe(500) // 10,000 × 5%, uncut
+    expect(rs.productRevenue).toBe(10_000)
+    expect(rs.marginPenaltyWithheld).toBe(0)
+  })
+
+  it('cuts one of its own month, and of a month after', () => {
+    expect(find(run({ scheme: from('2026-07-01'), orders: [thin('1', '2026-07-01')] }).statements, 'rs').productCommission).toBe(250)
+    expect(find(run({ scheme: from(null), orders: [thin('1', '2026-07-01')] }).statements, 'rs').productCommission).toBe(250)
+  })
+
+  it('judges a bill carried in from an earlier month by its own month', () => {
+    // A June bill whose deposit cleared in July, paid in July's run: June is before the penalty's July.
+    const carried = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]], { periodMonth: '2026-06-01', date: '2026-06-20' })
+    expect(find(run({ scheme: from('2026-07-01'), orders: [carried] }).statements, 'rs').productCommission).toBe(500)
+  })
+
+  it('asks for no cost on a bill of a month before it', () => {
+    const uncosted = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]], { periodMonth: '2026-07-01' })
+    expect(run({ scheme: from('2026-08-01'), orders: [uncosted] }).warnings.some(w => w.includes('have no margin'))).toBe(false)
+    expect(run({ scheme: from('2026-07-01'), orders: [uncosted] }).warnings.some(w => w.includes('have no margin'))).toBe(true)
+  })
+
+  // The penalty and the incentive are one switch (the user: "the penalty and incentive is trigger together, make it into
+  // same button"): one month starts both.
+  it("pays the month's margin incentive from the same month on — none before it", () => {
+    // 38% margin: Akemi's Incentive Tier 1, RM 1,000.
+    const good = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_200]], { periodMonth: '2026-07-01' })
+    expect(find(run({ scheme: from('2026-08-01'), orders: [good] }).statements, 'rs').marginIncentive).toBe(0)
+    expect(find(run({ scheme: from('2026-07-01'), orders: [good] }).statements, 'rs').marginIncentive).toBe(1_000)
+    expect(find(run({ scheme: from(null), orders: [good] }).statements, 'rs').marginIncentive).toBe(1_000)
+    // The run's own month decides: August's run pays August's incentive on a July bill carried in.
+    const carried = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_200]], { periodMonth: '2026-07-01' })
+    expect(find(run({ periodMonth: '2026-08-01', scheme: from('2026-08-01'), orders: [carried] }).statements, 'rs').marginIncentive).toBe(1_000)
+  })
+})
+
+describe("a Revenue Director's commission ratio stands in the margin band's place (2026-11-27)", () => {
+  const SIX: HierarchyNode[] = [node('tl', null, 'tl_9'), node('ta', 'tl', 'ta_7'), node('rs', 'ta', 'rs_6')]
+  const ratio = (o: SalesOrder, r: number): SalesOrder => ({ ...o, commRatio: { ratio: r, by: 'KRIS' } })
+  // 26% on Akemi's ladder: Below margin Tier 1 × 0.5. 40%: no band.
+  const thin = (id: string) => order(id, 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]])
+  const good = (id: string) => order(id, 'rs', [['MATTRESS', 'M1', 1, 10_000, 6_000]])
+
+  it('raises a below-margin bill to its full commission and its full sales', () => {
+    const r = run({ hierarchy: SIX, orders: [ratio(thin('1'), 1)] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(600) // 10,000 × 6%, not 300
+    expect(rs.productRevenue).toBe(10_000)
+    expect(rs.marginPenaltyWithheld).toBe(0)
+    expect(r.penalised).toEqual([])
+    expect(rs.lines.find(l => l.component === 'product_revenue')?.note)
+      .toBe('SO-1 · 2026-07-06 · commission 100% set by KRIS (26% margin, Below margin Tier 1 × 0.5)')
+  })
+
+  it('cuts a normal bill to half — its commission, its sales and the override on it', () => {
+    const r = run({ hierarchy: SIX, orders: [ratio(good('1'), 0.5)] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(300)
+    expect(rs.productRevenue).toBe(5_000)
+    expect(find(r.statements, 'ta').overrideCommission).toBe(50) // (7 − 6)% of 5,000
+    expect(find(r.statements, 'ta').groupRevenue).toBe(5_000)
+    expect(rs.marginPenaltyWithheld).toBe(300)
+    expect(r.penalised).toEqual([{
+      staffId: 'rs', orderId: '1', orderNo: 'SO-1', brandCode: 'AKEMI', marginPct: 0.4, marginSource: 'cost',
+      bandKey: 'comm_ratio', bandLabel: 'Commission 50% · set by KRIS', multiplier: 0.5, withheld: 300,
+    }])
+    expect(rs.lines.find(l => l.component === 'product_revenue')?.note).toBe('SO-1 · 2026-07-06 · commission 50% set by KRIS (40% margin)')
+  })
+
+  it('takes any ratio, the band’s or not', () => {
+    const rs = find(run({ hierarchy: SIX, orders: [ratio(thin('1'), 0.75)] }).statements, 'rs')
+    expect(rs.productCommission).toBe(450)
+    expect(rs.productRevenue).toBe(7_500)
+  })
+
+  it('stands whether or not the scheme cuts by margin, and on a bill with no margin yet', () => {
+    const off = run({ hierarchy: SIX, scheme: { ...SCHEME, enableMarginPenalty: false }, orders: [ratio(good('1'), 0.25)] })
+    expect(find(off.statements, 'rs').productCommission).toBe(150)
+    const uncosted = run({ hierarchy: SIX, orders: [ratio(order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]]), 0.5)] })
+    expect(find(uncosted.statements, 'rs').productCommission).toBe(300)
+    expect(uncosted.warnings.some(w => w.includes('have no margin'))).toBe(false)
+    expect(uncosted.penalised[0]).toMatchObject({ marginPct: null, bandKey: 'comm_ratio', multiplier: 0.5 })
+  })
+
+  it('stands before the month the penalty starts, as a band would not', () => {
+    const r = run({ hierarchy: SIX, scheme: { ...SCHEME, marginPenaltyFrom: '2026-12-01' }, orders: [ratio(good('1'), 0.5), thin('2')] })
+    expect(find(r.statements, 'rs').productCommission).toBe(900) // 300 at the ratio + 600 uncut
+  })
+
+  it('halves after it on a half-comm bill; pays nothing on a no-commission one', () => {
+    expect(find(run({ hierarchy: SIX, orders: [{ ...ratio(good('1'), 0.5), halfComm: true }] }).statements, 'rs').productCommission).toBe(150)
+    expect(find(run({ hierarchy: SIX, orders: [{ ...ratio(good('1'), 0.5), noCommission: true }] }).statements, 'rs').productCommission).toBe(0)
+  })
+
+  it('cuts every part of a shared bill, and an old bill topped up', () => {
+    const parts = splitOrdersByShares([ratio(good('1'), 0.5)], [{ orderId: '1', staffId: 'ta', pct: 0.5 }])
+    const r = run({ hierarchy: SIX, orders: parts })
+    expect(find(r.statements, 'rs').productCommission).toBe(150) // 5,000 × 6% × 0.5
+    expect(find(r.statements, 'ta').productCommission).toBe(175) // 5,000 × 7% × 0.5
+    const old = run({ hierarchy: SIX, orders: [{ ...ratio(good('1'), 0.5), commissionOnly: true }] })
+    expect(find(old.statements, 'rs').productCommission).toBe(300)
+    expect(old.penalised[0]).toMatchObject({ bandKey: 'comm_ratio', multiplier: 0.5, withheld: 300 })
+  })
+
+  it("never cuts a department head's own bill", () => {
+    const head = run({
+      hierarchy: SIX, departmentHeadIds: ['director'],
+      directors: [{ staffId: 'director', rankKey: 'rs_6', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0 }],
+      orders: [{ ...ratio(good('1'), 0), staffId: 'director' }],
+    })
+    expect(find(head.statements, 'director').productCommission).toBe(600)
+    expect(find(head.statements, 'director').productRevenue).toBe(10_000)
+  })
+})

@@ -1070,6 +1070,30 @@ describe('CommissionWorkbench — a bill that pays nobody, on its ledger (2026-1
   })
 })
 
+// 2026-11-27 — a Revenue Director's commission ratio, set in the Revenue app (a bill's ⋯ › Adjust commission).
+describe('CommissionWorkbench — a bill a Revenue Director set a ratio on (2026-11-27)', () => {
+  it('wears Commission N% with who, when and why — green at 100%, red below', () => {
+    const data = fixture()
+    data.input = {
+      ...data.input,
+      orders: [sale('one', 1_000, { commRatio: { ratio: 0.5, by: 'KRIS' } }), sale('two', 2_000, { commRatio: { ratio: 1, by: 'PETER' } }), sale('three', 3_000)],
+    }
+    data.commRatios = {
+      one: { ratio: 0.5, note: 'not normal commission', byName: 'KRIS', at: '2026-11-27T02:00:00Z' },
+      two: { ratio: 1, note: null, byName: 'PETER', at: '2026-11-27T03:00:00Z' },
+    }
+    renderBoard(data, 'computed')
+    choose('Anthony')
+    const half = within(salesRow(personalTable(), 'SO-one')).getByText('Commission 50%').closest('.chip')
+    expect(half).toHaveAttribute('title', 'Commission 50% by KRIS on 27 Nov 2026 — not normal commission')
+    expect(half).toHaveClass('danger')
+    const full = within(salesRow(personalTable(), 'SO-two')).getByText('Commission 100%').closest('.chip')
+    expect(full).toHaveAttribute('title', 'Commission 100% by PETER on 27 Nov 2026')
+    expect(full).toHaveClass('ledger')
+    expect(within(salesRow(personalTable(), 'SO-three')).queryByText(/^Commission \d/)).toBeNull()
+  })
+})
+
 describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () => {
   // "I want the right-click, the same as on All bills: right-click the order,
   // choose that it does not count, and it is out of the commission."

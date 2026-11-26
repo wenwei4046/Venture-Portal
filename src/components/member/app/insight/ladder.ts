@@ -46,9 +46,22 @@ const SCALE_MIN = 20;
 const SCALE_MAX = 48;
 const EPS = 1e-9;
 
-/** `36` for 36, `33.5` for 33.5. */
+/**
+ * `36` for 36, `33.5` for 33.5, `32.99` for 32.99 — a threshold as it was keyed, to the hundredth (2026-11-27: Fair's
+ * Akemi / Ergotex ladder is the user's own bounds, "30% 到 33%（即 32.99% 这个区间）").
+ */
 export function pctText(n: number): string {
-  return Number.isInteger(Math.round(n * 10) / 10) ? String(Math.round(n)) : (Math.round(n * 10) / 10).toFixed(1);
+  const hundredths = Math.round(n * 100);
+  return hundredths % 100 === 0 ? String(hundredths / 100) : hundredths % 10 === 0 ? (hundredths / 100).toFixed(1) : (hundredths / 100).toFixed(2);
+}
+
+/**
+ * Where a penalty's range starts, above the next one down (2026-11-27): a bound keyed to the hundredth (29.99) is the
+ * user's "27% 到 29.99%", so the range above it starts at 30; a whole or tenth bound (25) reads as it always did, 25 – 27%.
+ */
+function penaltyFloor(below: number): number {
+  const hundredths = Math.round(below * 100);
+  return hundredths % 10 === 0 ? below : (hundredths + 1) / 100;
 }
 
 /** Where a margin sits on the bar, as a CSS left: 20% → 2%, 48% → 98%. */
@@ -81,7 +94,7 @@ export function brandLadder(bands: readonly MemberBand[]): Ladder {
   upper.forEach((band, i) => {
     const above = i === 0 ? null : upper[i - 1].threshold;
     const lowestRef = band.kind === "reference" && i === upper.length - 1;
-    const lo = lowestRef && topPenalty !== null ? topPenalty : band.threshold;
+    const lo = lowestRef && topPenalty !== null ? penaltyFloor(topPenalty) : band.threshold;
     const isTop = band.kind === "incentive" && i === 0;
     rows.push({
       label: band.key,
@@ -106,7 +119,7 @@ export function brandLadder(bands: readonly MemberBand[]): Ladder {
       short: shortTier(band.key),
       kind: "penalty",
       threshold: band.threshold,
-      range: below === undefined ? `${pctText(band.threshold)}% or lower` : `${pctText(below)} – ${pctText(band.threshold)}%`,
+      range: below === undefined ? `${pctText(band.threshold)}% or lower` : `${pctText(penaltyFloor(below))} – ${pctText(band.threshold)}%`,
       effect: multiplierText(band.multiplier ?? 1),
       dot: last ? "var(--rv-red)" : i === 0 ? "var(--rv-tier-pen1)" : "var(--rv-tier-pen2)",
       tone: "bad",

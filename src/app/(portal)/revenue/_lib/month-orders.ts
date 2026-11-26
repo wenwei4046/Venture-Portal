@@ -5,6 +5,7 @@ import type { HandExclusion } from '@/lib/commission/bill-exclusion'
 import type { BrandOption } from '@/lib/commission/bill-brand'
 import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
 import type { NoCommMark } from '@/lib/commission/bill-no-comm'
+import { isRatio, type CommRatioMark } from '@/lib/commission/bill-comm-ratio'
 
 /**
  * A month's sales orders, as `revenue_month_orders` returns them.
@@ -311,6 +312,30 @@ export async function loadNoComms(
       .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
   )
   return new Map(rows.map(r => [r.order_id, { note: r.note, byName: r.set_by_name, at: r.set_at }]))
+}
+
+// ─── A Revenue Director's commission ratio (2026-11-27) ─────────────────────
+
+/**
+ * The ratios Revenue Directors set on bills in the Revenue app (`sales_order_comm_ratios`), with who, when and why,
+ * by order id. Chunked like the shares: a month is hundreds of ids. Read under the reader's own session — Revenue ·
+ * View opens the table, as it opens the bills.
+ */
+export async function loadCommRatios(
+  supabase: SupabaseClient,
+  orderIds: readonly string[],
+): Promise<Map<string, CommRatioMark>> {
+  type Row = { order_id: string; ratio: number | string; note: string | null; set_by_name: string | null; set_at: string }
+  const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
+    supabase
+      .from('sales_order_comm_ratios')
+      .select('order_id, ratio, note, set_by_name, set_at')
+      .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  )
+  return new Map(rows.flatMap(r => {
+    const ratio = Number(r.ratio)
+    return isRatio(ratio) ? [[r.order_id, { ratio, note: r.note, byName: r.set_by_name, at: r.set_at }] as const] : []
+  }))
 }
 
 // ─── Brands picked by hand (2026-09-27) ─────────────────────────────────────

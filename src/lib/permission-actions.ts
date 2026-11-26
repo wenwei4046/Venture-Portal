@@ -33,6 +33,8 @@ export type FunctionKey =
   | 'it_requests'
   // The Revenue app's Free test and Library for IR (mig 20261117010000).
   | 'rev_training'
+  // A bill's commission ratio, set by a Revenue Director in the Revenue app (mig 20261127140500).
+  | 'comm_ratio'
   // Marketing's own view (mig 20261023214000).
   | 'marketing'
   // Marketing's own pool in that view (mig 20261028120000).
@@ -128,6 +130,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   it_requests: ['it_requests.view', 'it_requests.edit'],
   // The Revenue app's Free test and Library (20261117010000): read everything and everybody's scores; write; change.
   rev_training: ['rev_training.view', 'rev_training.create', 'rev_training.edit'],
+  // A bill's commission ratio (20261127140500): the bill's ⋯ › Adjust commission in the Revenue app — read it; set it.
+  comm_ratio: ['comm_ratio.view', 'comm_ratio.edit'],
   // Marketing's own view (20261023214000): its pages, starting projects, working stages, approving, the manager tools.
   marketing: ['marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve', 'marketing.manage'],
   // Marketing's own pool (20261028120000): Finance's Marketing P&L and Cash Flow, and their Excel and PDF.
@@ -203,6 +207,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'rev_training.create': 'all',
   'rev_training.edit': 'all',
   'rev_training.view': 'all',
+  // A bill's commission ratio (2026-11-27): a Revenue Director's word on a bill of the sub-departments they reach.
+  'comm_ratio.edit': 'all',
+  'comm_ratio.view': 'all',
   // Hiring (round 2, 2026-10-11).
   'hiring.approve': 'all',
   'hiring.create': 'all',

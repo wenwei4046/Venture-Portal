@@ -5,6 +5,7 @@ import { arenaMonthFridays } from "@/lib/member/arena";
 import { brandLadder, rowFor } from "../insight/ladder";
 import { brandName, noSalesBill, OWN_SCHEME_PILL, ownSchemeBill } from "../insight/insight-model";
 import { monthName, monthShort, rm, rm2, shortDay } from "../format";
+import { ratioLabel } from "@/lib/commission/bill-comm-ratio";
 import type { CoRowVM, CoSheetVM, IncomeOrdersVM, IncomePastVM, IncomeRowVM, IncomeVM, Tone } from "./profile-vm";
 
 /**
@@ -32,6 +33,8 @@ export const OLD_BILL_NOTE = "An old bill you collected the top-up for: it pays 
  */
 export const NO_COMMISSION = "No commission";
 export const NO_COMMISSION_NOTE = "HR set this bill to pay no commission. It still counts in your sales and your margin.";
+/** A Revenue Director's ratio on the bill (2026-11-27): "A Revenue Director set its commission to 75%." */
+export const commRatioNote = (ratio: number) => `A Revenue Director set its commission to ${ratioLabel(ratio)}.`;
 
 /** A brand list the way the prototype writes it: "Akemi, Ergotex and Zanotti". */
 function brandList(codes: readonly string[]): string {
@@ -219,7 +222,8 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
       note: waiting ? "Its commission is added in the month the deposit clears."
         : none ? NO_COMMISSION_NOTE
         : old ? `${OLD_BILL_NOTE} Commission is shared across lines by line amount.`
-        : `${b.sharePct !== null ? `Your ${Math.round(b.sharePct * 100)}% of a shared bill. ` : ""}Commission is shared across lines by line amount.${b.kpi > 0 ? " Each KPI item pays as listed." : ""}`,
+        // A Revenue Director's ratio (2026-11-27): it paid at that in its margin's place.
+        : `${b.commRatio !== undefined ? `${commRatioNote(b.commRatio)} ` : ""}${b.sharePct !== null ? `Your ${Math.round(b.sharePct * 100)}% of a shared bill. ` : ""}Commission is shared across lines by line amount.${b.kpi > 0 ? " Each KPI item pays as listed." : ""}`,
     };
     return {
       id, no: b.no, meta: [o?.customer, old ? null : weekOf(o), brand].filter(Boolean).join(" · "),

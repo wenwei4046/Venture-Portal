@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { IncomeBill, IncomeMonth, MemberIncome } from "@/lib/member/income";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
-import { incomeOrdersVM, incomeVM, NO_COMMISSION, NO_COMMISSION_NOTE, OLD_BILL_NOTE } from "./income-model";
+import { commRatioNote, incomeOrdersVM, incomeVM, NO_COMMISSION, NO_COMMISSION_NOTE, OLD_BILL_NOTE } from "./income-model";
 
 const bill = (over: Partial<IncomeBill> = {}): IncomeBill => ({
   orderId: "o1", no: "SO-1", status: "eligible", upsale: false, commissionable: 10000, orderTotal: 10500, personal: 500,
@@ -205,6 +205,16 @@ describe("a bill HR set to pay no commission, in My income", () => {
   it("says No commission alone while it has no margin yet", () => {
     const vm = incomeOrdersVM(data(month({ bills: [{ ...none, marginPct: null }] })), null, [], false);
     expect(vm.sheets[vm.mine.rows[0].id].tag).toBe(NO_COMMISSION);
+  });
+});
+
+// 2026-11-27 — a Revenue Director's ratio on a bill (the bill's ⋯ › Adjust commission): it paid at that, and says so.
+describe("a bill a Revenue Director set a ratio on, in My income", () => {
+  it("says the ratio beside how its commission is shared", () => {
+    const cut = bill({ orderId: "cr", no: "HC-SO-2611-006", commRatio: 0.75, personal: 450, pay: 450, marginPct: 26.5 });
+    const vm = incomeOrdersVM(data(month({ bills: [cut] })), null, [], false);
+    expect(vm.sheets[vm.mine.rows[0].id].note).toBe(`${commRatioNote(0.75)} Commission is shared across lines by line amount.`);
+    expect(commRatioNote(0.75)).toBe("A Revenue Director set its commission to 75%.");
   });
 });
 

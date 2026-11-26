@@ -36,6 +36,8 @@ import ShareOrderSheet from "./insight/share/ShareOrderSheet";
 import ShareRequestSheet from "./insight/share/ShareRequestSheet";
 import { useShareRequests } from "./insight/share/useShareRequests";
 import NotMineSheet from "./insight/notmine/NotMineSheet";
+import CommRatioSheet from "./insight/ratio/CommRatioSheet";
+import type { CommRatioSaved } from "@/lib/member/comm-ratio";
 import NotMineRequestSheet from "./insight/notmine/NotMineRequestSheet";
 import { useNotMineRequests } from "./insight/notmine/useNotMineRequests";
 import { notMineStatus } from "@/lib/member/not-mine-requests";
@@ -176,6 +178,11 @@ export interface RevenueAppProps {
    * scores), Create / Edit write them. Absent: taking the tests and reading the Library only (IR's team).
    */
   training?: TrainingRights | null;
+  /**
+   * A bill's commission ratio (2026-11-27): the ACCOUNT holds Commission ratio · Edit — a bill's ⋯ › Adjust commission on
+   * a bill that is not theirs (a team member's, the whole sub-department's). Absent: no such item.
+   */
+  commRatio?: boolean;
   /** Change view (2026-11-11, lib/marketing/change-view.ts): a Marketing login the CRM was opened to — the CRM's
    *  desktop module menu lists Marketing and the CRM, and goes back to Marketing. */
   crossViews?: readonly ChangeViewRow[];
@@ -248,7 +255,7 @@ const CRM_HOUSE = '[aria-label="Back to Revenue app"], [title="Back to Revenue a
 
 const NO_CROSS_VIEWS: readonly ChangeViewRow[] = [];
 
-export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed: closedBase = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, training = null, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
+export default function RevenueApp({ initialData, initialSearch, children, productList = null, crm = true, closed: closedBase = NOTHING_CLOSED, notices = NO_NOTICES, changePassword, requestEmail, own, itDesk = null, training = null, commRatio = false, crossViews = NO_CROSS_VIEWS, device = "live", today: fixedToday, source: sourceProp, fixture }: RevenueAppProps) {
   // The live app keeps its answers on the phone, per account (2026-10-08, read-memory.ts): the next open shows them
   // at once and reads everything again behind them.
   const account = initialData.demo ? "" : initialData.profile.userId;
@@ -572,6 +579,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const notMines = useNotMineRequests({ source, on: live && !data.demo && !fixture && readable, context, gen, signal: notMineSignal });
   const [notMinePick, setNotMinePick] = useState<string | null>(() => new URLSearchParams(startSearch).get("notmine"));
   const [notMineOrder, setNotMineOrder] = useState<string | null>(null);
+  // ── A bill's commission ratio (2026-11-27): the bill whose Adjust commission sheet is open ──
+  const [ratioOrder, setRatioOrder] = useState<string | null>(null);
   // The bell's dot counts what the database told them since they last opened it; opening it reads those, and they stay
   // marked new in the list until it opens again. One coming in after that counts again.
   const [seenNew, setSeenNew] = useState<ReadonlySet<string>>(() => new Set());
@@ -581,7 +590,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const nf = useMemo(() => notifications({ now: new Date(), memos: principal && !viewed && !ownMode ? [] : memos, requests: principal && !viewed ? [] : requests,
     settled, salary: data.profile.salary, results, readAll, requestCode,
     // News about a page their ticks close is not shown (2026-10-11).
-    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || go.to === "share" || go.to === "notMine" || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : shows(closed, go.to)),
+    opens: go => go.to === "memo" || go.to === "none" || go.to === "it" || go.to === "share" || go.to === "notMine"
+      || (go.to === "requests" ? requestPage(closed, go.kind ?? "claim") !== null : go.to === "bill" ? shows(closed, "insight") : shows(closed, go.to)),
     notices: principal ? [] : shownNotices,
     shares: shares.waiting, staffId: shareStaff,
   }), [memos, requests, settled, data.profile.salary, results, readAll, principal, viewed, ownMode, closed, shownNotices, shares.waiting, shareStaff]);
@@ -847,6 +857,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     else if (n.go.to === "share") setSharePick(n.go.requestId);
     // A Not my order request HR answered (2026-11-14): its sheet, over whatever page is open.
     else if (n.go.to === "notMine") setNotMinePick(n.go.requestId);
+    // A bill whose commission a Revenue Director adjusted (2026-11-27): My sales orders, its sheet once the book holds it.
+    else if (n.go.to === "bill") { goScreen("insight", { ins: "bills" }); setSoPick(n.go.orderId); }
     else if (n.go.to === "none") return;
     else openBoard("sales", settled?.period ?? null);
   };
@@ -911,7 +923,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const [billWeek, setBillWeek] = useState<string | null>(null);
   const [insBrand, setInsBrand] = useState("");
   const [dateOpen, setDateOpen] = useState(false);
-  const [soPick, setSoPick] = useState<string | null>(null);
+  // A tapped commission-ratio notice (2026-11-27, `?so=<bill>` on My sales orders) opens that bill's sheet once its book
+  // holds it (below: the sheet waits for its bill).
+  const [soPick, setSoPick] = useState<string | null>(() => (route.screen === "insight" ? new URLSearchParams(startSearch).get("so") : null));
   const [tiersOpen, setTiersOpen] = useState(false);
   // The current month unless another is picked (user 2026-10-06: "也开在当月") — the month still being
   // closed is in the date sheet, marked Live.
@@ -1037,6 +1051,22 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (res.ok) notMinePut(res.data);
     return res;
   }, [source, notMinePut]);
+  // A bill's commission ratio (2026-11-27 — the user: a Revenue Director "点三个点后可以调动 commission"): on a bill that
+  // is not theirs — a team member's (`?of=`), or the whole sub-department's (the Principal viewing nobody). View as shows
+  // it only on a Revenue Director's app, and changes nothing.
+  const adjustOpen = commRatio && !fixture && !data.demo && !!source.commRatioSet
+    && (principal ? (context ? !!viewed?.director && !!personId : !!deptSource) : !!personId);
+  const adjustReadOnly = principal && !!context;
+  const loadRatio = useCallback((orderId: string) => (source.commRatioContext
+    ? settleRead(source.commRatioContext(orderId)) : Promise.resolve({ ok: false as const, error: "Preview data only." })), [source]);
+  const saveRatio = useCallback((orderId: string, ratio: number | null, note: string | null) => (source.commRatioSet
+    ? settleRead(source.commRatioSet(orderId, ratio, note)) : Promise.resolve({ ok: false as const, error: "Preview data only." })), [source]);
+  // Saved: the bill's sheet again, and every read once more — its commission and its sales moved.
+  const ratioSaved = useCallback((saved: CommRatioSaved) => {
+    setRatioOrder(null);
+    setSoPick(saved.orderId);
+    if (saved.changed) pullRefresh();
+  }, [pullRefresh]);
   const insDateLabel = fixture?.insight?.dateLabel ?? insPeriod.label;
   const dateOptions = useMemo(() => periodOptions(insKind, period, monthState), [insKind, period, monthState]);
 
@@ -1853,14 +1883,15 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             onKind={kind => { setInsKind(kind); setInsFrom(null); setBillWeek(null); }}
             onPick={o => { setInsFrom(o.period.from); setBillWeek(null); setDateOpen(false); }} onClose={() => setDateOpen(false)} />
           {route.ins === "brand" && <TiersSheet open={tiersOpen} vm={insBrandVM} onClose={() => setTiersOpen(false)} />}
-          {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)}
+          {route.ins !== "main" && <OrderSheet open={soPick !== null && soVM !== null} vm={soVM} onClose={() => setSoPick(null)}
             canShare={!personId && !fixture && !data.demo && !!source.shareSend && !closed.sends.includes("requests")}
             request={soRequest ? { id: soRequest.id, status: shareStatus(soRequest).text } : null}
             // The share sheets take the bill sheet's place: it is a peek, and a tap in a sheet above it would close it anyway.
             onShare={() => { setShareOrder(soPick); setSoPick(null); }} onRequest={id => { setSharePick(id); setSoPick(null); }}
             canNotMine={!personId && !fixture && !data.demo && !!source.notMineSend && !closed.sends.includes("requests")}
             notMine={soNotMine ? { id: soNotMine.id, status: notMineStatus(soNotMine).text } : null}
-            onNotMine={() => { setNotMineOrder(soPick); setSoPick(null); }} onNotMineRequest={id => { setNotMinePick(id); setSoPick(null); }} />}
+            onNotMine={() => { setNotMineOrder(soPick); setSoPick(null); }} onNotMineRequest={id => { setNotMinePick(id); setSoPick(null); }}
+            canAdjust={adjustOpen} onAdjust={() => { setRatioOrder(soPick); setSoPick(null); }} />}
         </>
       )}
       {route.screen === "arena" && route.arena === "board" && boardVM && (
@@ -1928,6 +1959,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         onAnswer={answerShare} onWithdraw={withdrawShare} onClose={() => setSharePick(null)} />
       <NotMineSheet open={notMineOrder !== null} orderId={notMineOrder} readOnly={readOnlyView} load={loadNotMine} onSend={sendNotMine}
         onOpenRequest={r => { notMines.put(r); setNotMineOrder(null); setNotMinePick(r.id); }} onClose={() => setNotMineOrder(null)} />
+      <CommRatioSheet open={ratioOrder !== null} orderId={ratioOrder} readOnly={adjustReadOnly} load={loadRatio} onSave={saveRatio}
+        onSaved={ratioSaved} onClose={() => setRatioOrder(null)} />
       <NotMineRequestSheet open={notMinePick !== null} request={notMinePickVM} readOnly={readOnlyView}
         error={notMinePick && !notMinePickVM ? notMines.error ?? (notMines.list ? "That request is not there any more." : null) : null}
         onWithdraw={withdrawNotMine} onClose={() => setNotMinePick(null)} />

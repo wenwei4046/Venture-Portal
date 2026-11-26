@@ -387,6 +387,10 @@
 .done { height: 48px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-white); color: var(--rv-ink); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
 
 .soPanel { padding: 10px 20px 30px; display: flex; flex-direction: column; gap: 16px; }
+/* A long bill scrolls the sheet; nothing in it gives way to fit (2026-11-27 — the user, of a squashed Done on
+   HC-SO-2611-006: "不要这么扁又长，应该是正常的圆"): a column's children shrink by default, so the 48px Done was pressed
+   flat under a bill's lines. As the share sheets' `.body > *` (#600). */
+.soPanel > *, .tiersPanel > * { flex-shrink: 0; }
 .soHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .soNoWrap { min-width: 0; }
 .soNo { display: block; font-family: var(--font-display-rv); font-size: calc(22px * var(--rv-type)); font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }

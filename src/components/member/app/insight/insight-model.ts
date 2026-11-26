@@ -3,7 +3,8 @@ import { kpiLadderUnits, type MemberKpiSummary } from "@/lib/member/kpi-summary"
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { arenaMonthFridays } from "@/lib/member/arena";
 import { holdersLine, pctLabel } from "@/lib/member/share-requests";
-import { dayRange, firstName, initials, monthName, monthShort, rm, shortDay } from "../format";
+import { dayRange, firstName, initials, klDate, monthName, monthShort, rm, shortDay } from "../format";
+import { ratioLabel } from "@/lib/commission/bill-comm-ratio";
 import { barPos, brandLadder, pctText, rowFor, TONES, type Ladder, type LadderRow, type Tone } from "./ladder";
 import type { InsightPeriod } from "./period";
 
@@ -614,6 +615,11 @@ export interface OrderSheetVM {
    * same — "RM 5,000 counted", over why.
    */
   arena?: { line: string; sub: string } | null;
+  /**
+   * A Revenue Director's commission ratio on the bill (2026-11-27): "75% · KRIS", over the day and why — it pays and
+   * counts at that in its margin's place.
+   */
+  ratio?: { line: string; sub: string } | null;
 }
 
 export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM | null {
@@ -650,7 +656,14 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     // 5,000 块的 sales"): its sales count what its commission is.
     arena: !old && o.weight !== undefined ? {
       line: `${rm(o.revenue)} counted`,
-      sub: `Margin cut · ${Math.round(o.weight * 100)}% of its commission and its sales`,
+      // A director's ratio (2026-11-27) stands in its margin's place: it says whose word cut it.
+      sub: o.ratio
+        ? `Commission ${ratioLabel(o.ratio.pct)}${o.ratio.by ? ` · set by ${o.ratio.by}` : ""}`
+        : `Margin cut · ${Math.round(o.weight * 100)}% of its commission and its sales`,
+    } : null,
+    ratio: o.ratio ? {
+      line: [ratioLabel(o.ratio.pct), o.ratio.by].filter(Boolean).join(" · "),
+      sub: [o.ratio.at ? `Set ${shortDay(klDate(o.ratio.at))}` : "Set by a Revenue Director", o.ratio.note].filter(Boolean).join(" · "),
     } : null,
     lines: o.lines.map(l => ({ name: l.name, qty: qty(l.qty), amt: l.amount ? rm(l.amount) : "Free", kpi: l.kpiQty, isKpi: l.kpiQty > 0 })),
     own: o.own,

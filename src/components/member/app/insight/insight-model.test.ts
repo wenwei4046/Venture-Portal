@@ -353,7 +353,26 @@ describe("Insight › the whole bill, and what of it counts", () => {
     for (const o of [whole, before]) {
       expect(billsView(input({ book: book([o]) })).weeks["2026-09-11"].bills[0]).toMatchObject({ amt: "RM 1,000", arena: null });
       expect(orderSheet(input({ book: book([o]) }), o.id)?.arena).toBeNull();
+      expect(orderSheet(input({ book: book([o]) }), o.id)?.ratio).toBeNull();
     }
+  });
+
+  // 2026-11-27 — a Revenue Director's ratio stands in the margin band's place (the user: "点三个点后可以调动 commission").
+  it("names a Revenue Director's ratio: whose word cut it, and the day and why", () => {
+    const cut = order({ id: "11", revenue: 5000, total: 10000, fullRevenue: 10000, weight: 0.5, margin: 40,
+      ratio: { pct: 0.5, by: "KRIS", at: "2026-11-26T18:30:00Z", note: "Not normal commission" } });
+    const vm = orderSheet(input({ book: book([cut]) }), "11");
+    // 02:30 on the 27th in Kuala Lumpur.
+    expect(vm?.ratio).toEqual({ line: "50% · KRIS", sub: "Set 27 Nov · Not normal commission" });
+    expect(vm?.arena).toEqual({ line: "RM 5,000 counted", sub: "Commission 50% · set by KRIS" });
+  });
+
+  it("names one that raised a bill to its full commission, with nothing cut", () => {
+    const raised = order({ id: "12", revenue: 10000, total: 10000, fullRevenue: 10000, margin: 26.5,
+      ratio: { pct: 1, by: "PETER", at: "2026-11-27T03:00:00Z", note: null } });
+    const vm = orderSheet(input({ book: book([raised]) }), "12");
+    expect(vm?.ratio).toEqual({ line: "100% · PETER", sub: "Set 27 Nov" });
+    expect(vm?.arena).toBeNull();
   });
 });
 

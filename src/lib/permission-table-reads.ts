@@ -162,6 +162,8 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   revenue_pay_lines: ['hr_costing.view:own', 'revenue.view:own'],
   sales_import_batches: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_brand_picks: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
+  // A Revenue Director's commission ratio on a bill (2026-11-27, mig 20261127140500): whoever reads a month's bills.
+  sales_order_comm_ratios: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   // The ERP audit trail (mig 20261013010000): whoever reads a month's bills.
   sales_order_erp_changes: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_exclusions: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],

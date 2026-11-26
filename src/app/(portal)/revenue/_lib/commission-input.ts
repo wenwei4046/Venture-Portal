@@ -8,7 +8,7 @@ import { ownSchemeBrandsOf, toEngineInput } from '@/lib/commission/run-payload'
 import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
 import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
-import { loadHalfComms, loadMonthOrders, loadNoComms } from './month-orders'
+import { loadCommRatios, loadHalfComms, loadMonthOrders, loadNoComms } from './month-orders'
 import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
 import { brandCompaniesWith, namesFabricSeries, readBrandSkuModels, readFabricSeries } from './fabric-series'
@@ -35,6 +35,7 @@ import type {
 import type { DirectorTerms, EngineInput } from '@/lib/commission/types'
 import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
 import type { NoCommMark } from '@/lib/commission/bill-no-comm'
+import type { CommRatioMark } from '@/lib/commission/bill-comm-ratio'
 import { sharesOfUpsales, upsaleBillId, type UpsaleRow } from '@/lib/commission/upsales'
 
 interface QueryResult {
@@ -99,6 +100,8 @@ export interface CommissionInputContext {
   halfComms?: Map<string, HalfCommMark>
   /** No commission (2026-11-14): who took which bill's commission off, and why — the chip's tooltip. Absent in older fixtures. */
   noComms?: Map<string, NoCommMark>
+  /** A Revenue Director's commission ratio (2026-11-27): who set which bill's, when and why — the chip's tooltip. Absent in older fixtures. */
+  commRatios?: Map<string, CommRatioMark>
 }
 
 export interface CommissionInputOptions {
@@ -138,7 +141,7 @@ export async function loadCommissionInput(
   const supabase = existingClient ?? (await createClient()) as unknown as SupabaseClient
   const schemes = await readRows<SchemeRow>('the commission scheme', (from, to) =>
     supabase.from('comm_schemes')
-      .select('id, sub_department_id, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth, revenue_cost_divisor')
+      .select('id, sub_department_id, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_override, enable_margin_penalty, margin_penalty_from, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth, revenue_cost_divisor')
       .eq('is_active', true).is('effective_to', null).order('id').range(from, to),
   )
   if (schemes.length === 0) {
@@ -337,7 +340,7 @@ export async function loadCommissionInput(
   // A brand's own KPI items (2026-11-12) are found where its bill's special order charges for them: read for the
   // bills of a brand that has such items, and for no other.
   const brandKpiBills = billsWithBrandKpi(orderRows, brands, [...kpiItems, ...currentKpiItems])
-  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney, noComms, brandSkuModels] = await Promise.all([
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms, upsaleBillBrands, specialMoney, noComms, brandSkuModels, commRatios] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -365,6 +368,8 @@ export async function loadCommissionInput(
     loadNoComms(supabase, orderIds),
     // A brand's own model items (2026-11-14): its SKU master's base models.
     readBrandSkuModels(supabase, modelCompanies),
+    // A Revenue Director's ratio on a bill (2026-11-27): in its margin band's place.
+    loadCommRatios(supabase, orderIds),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
   const ownBrandCodes = new Set(ownBrands.values())
@@ -388,6 +393,8 @@ export async function loadCommissionInput(
     order.sales_order_lines = linesByOrder.get(order.id) ?? []
     if (halfComms.has(order.id)) order.half_comm = true
     if (noComms.has(order.id)) order.no_comm = true
+    const ratio = commRatios.get(order.id)
+    if (ratio) order.comm_ratio = { ratio: ratio.ratio, by: ratio.byName }
   }
 
   // Load statements directly: nested arrays have their own PostgREST row cap.
@@ -464,5 +471,6 @@ export async function loadCommissionInput(
     unmatchedOrderNos: [...new Set(orderRows.filter(order => order.staff_id === null).map(order => order.order_no))],
     halfComms,
     noComms,
+    commRatios,
   }
 }

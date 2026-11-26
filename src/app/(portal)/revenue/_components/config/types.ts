@@ -26,6 +26,11 @@ export interface SchemeRow {
   enable_kpi: boolean
   enable_override: boolean
   enable_margin_penalty: boolean
+  /**
+   * The first month whose bills the below-margin penalty cuts, `YYYY-MM-01` (2026-11-27 — the user, of Fair's: "从十二月
+   * 开始"); null: every month while it is on.
+   */
+  margin_penalty_from?: string | null
   enable_margin_incentive: boolean
   enable_group_incentive?: boolean
   group_sales_depth?: number | null

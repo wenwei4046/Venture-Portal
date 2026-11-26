@@ -46,6 +46,8 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   it_requests: { actions: ['view', 'edit'], scopes: ['all'] },
   // The Revenue app's Free test & Library (mig 20261117010000).
   rev_training: { actions: ['view', 'create', 'edit'], scopes: ['all'] },
+  // A bill's commission ratio in the Revenue app (mig 20261127140500).
+  comm_ratio: { actions: ['view', 'edit'], scopes: ['all'] },
   // Marketing's own view (mig 20261023214000).
   marketing: { actions: ['view', 'create', 'edit', 'approve', 'manage'], scopes: ['all'] },
   // Marketing's own pool (mig 20261028120000).
@@ -74,6 +76,7 @@ export const CELL_KEYS: CellKey[] = [
   K('leads', 'view', 'leads', 'all'),
   K('it_requests', 'view', 'it_requests', 'all'),
   K('rev_training', 'view', 'rev_training', 'all'),
+  K('comm_ratio', 'view', 'comm_ratio', 'all'),
   K('marketing', 'view', 'marketing', 'all'),
   K('marketing_pool', 'view', 'marketing_pool', 'all'),
 ]

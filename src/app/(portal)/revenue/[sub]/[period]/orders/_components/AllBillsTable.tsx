@@ -98,6 +98,8 @@ export interface BillRow {
   halfCommAction?: BillHalfCommAction | null
   /** "Half comm by HR on 10 Nov 2026 — why", while it is half: the Status tooltip. */
   halfCommDetail?: string | null
+  /** "Commission 75% by KRIS on 27 Nov 2026 — why", while a Revenue Director's ratio stands on it (2026-11-27). */
+  ratioDetail?: string | null
 }
 
 type Column =
@@ -372,7 +374,7 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
                 <div>
                   <Link href={r.href}>{r.orderNo}</Link>
                   <small className={r.status === 'Deposit pending' ? 'text-alert' : undefined}
-                    title={r.exclusionDetail ?? r.halfCommDetail ?? undefined}>{r.status}</small>
+                    title={r.exclusionDetail ?? r.halfCommDetail ?? r.ratioDetail ?? undefined}>{r.status}</small>
                 </div>
                 <button type="button" className={s.rowMenuButton} aria-haspopup="menu" data-bill-menu-trigger
                   aria-expanded={isOpenOn(r)} aria-label={`Actions for ${r.orderNo}`}

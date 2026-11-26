@@ -8,6 +8,11 @@ interface Props {
   schemeId: string
   /** On when EITHER the penalty or the incentive is on — the switch sets both. */
   margin: boolean
+  /**
+   * The month the margin switch starts in, when that is after this one (2026-11-27): "from Dec 2026" beside it — the
+   * switch is on, and this month's bills pay in full.
+   */
+  marginFrom?: string | null
   kpi: boolean
 }
 
@@ -31,7 +36,7 @@ const ITEMS: { key: SchemeSwitch; label: string; hint: string }[] = [
  * saving it — the same words twice, one of them doing nothing — so they went
  * and these moved in beside them.
  */
-export default function SchemeSwitches({ schemeId, margin, kpi }: Props) {
+export default function SchemeSwitches({ schemeId, margin, marginFrom = null, kpi }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +77,9 @@ export default function SchemeSwitches({ schemeId, margin, kpi }: Props) {
               <span className="text-xs text-ink" title={item.hint}>
                 {item.label}
               </span>
+              {item.key === 'margin' && on && marginFrom ? (
+                <span className="text-[11px] text-muted" data-margin-from>{marginFrom}</span>
+              ) : null}
               <button
                 type="button"
                 role="switch"

@@ -1,6 +1,6 @@
 import {
-  billMargin, brandKpiUnits, brandRateOf, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, HALF_COMM, indexItemGroups,
-  indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, ownSchemesOf, penaltyBandFor, round2,
+  billCut, billMargin, brandKpiUnits, brandRateOf, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, HALF_COMM, indexItemGroups,
+  indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, ownSchemesOf, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf, kpiUnitPay, type KpiHit } from './kpi'
 import type { BillShare, EngineInput, EngineResult, MarginSource, SalesOrder, Statement } from './types'
@@ -83,6 +83,11 @@ export interface CommissionOrderRow {
    * counts in sales, margin and the KPI count. Absent: it pays.
    */
   noComm?: boolean
+  /**
+   * The commission ratio a Revenue Director set on the bill (2026-11-27, `SalesOrder.commRatio`), 0–1: it stands in
+   * the margin band's place — its commission, its part of the override and its sales. Absent: the margin decides.
+   */
+  commRatio?: number
   /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
   /**
@@ -357,9 +362,8 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     // as any bill's ("need follow the margin as well") — and no upline is paid
     // on it, nor is it in any margin of the month's.
     const commissionOnly = !!order.commissionOnly
-    const penalty = input.scheme.enableMarginPenalty && margin.pct !== null
-      ? penaltyBandFor(margin.pct, base.brandCode, input.marginBands) : null
-    const multiplier = penalty?.commissionMultiplier ?? 1
+    // The engine's own rule (2026-11-27): a director's ratio, else the margin's band from the month the penalty starts.
+    const { multiplier } = billCut(order, margin.pct, base.brandCode, input.scheme, input.marginBands)
     const sourceLines = eligible ? statement?.lines.filter(line => line.sourceOrderId === order.id) ?? [] : []
     const component = (kind: 'product_revenue' | 'kpi_item') => sum(sourceLines.filter(line => line.component === kind).map(line => line.amount))
     const key = `${order.staffId}:${order.id}`
@@ -384,7 +388,10 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       brands: order.brandCode ? [order.brandCode] : [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
       upsale: !!order.upsale, commissionOnly, ...(order.halfComm && !noComm ? { halfComm: true } : {}),
-      ...(noComm ? { noComm: true } : {}), orderTotal: order.orderTotal,
+      ...(noComm ? { noComm: true } : {}),
+      // A Revenue Director's ratio on it (2026-11-27): the Status chip says so.
+      ...(order.commRatio ? { commRatio: order.commRatio.ratio } : {}),
+      orderTotal: order.orderTotal,
       commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
       productRevenue, marginRevenue: ownBrand ? 0 : base.revenue,

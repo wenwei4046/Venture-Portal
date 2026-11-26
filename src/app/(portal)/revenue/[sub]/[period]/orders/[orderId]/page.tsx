@@ -33,7 +33,8 @@ import { holdersLine, holdersOf } from '@/lib/commission/bill-share'
 import { paperRef } from '@/lib/commission/paper-ref'
 import { isOwnSchemeBill, OWN_SCHEME_LABEL, ownSchemeCodes } from '@/lib/commission/brand-rates'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
-import { loadNoComms, loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
+import { loadCommRatios, loadNoComms, loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
+import { describeCommRatio } from '@/lib/commission/bill-comm-ratio'
 import { loadBillMoves } from '../../../../_lib/row-origins'
 import { brandCompaniesWith, namesFabricSeries, readBrandSkuModels, readFabricSeries } from '../../../../_lib/fabric-series'
 import { readSpecialMoney } from '../../../../_lib/special-money'
@@ -223,7 +224,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }, { data: brandDivisorData }, noComms] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }, { data: ownBrandData }, { data: brandDivisorData }, noComms, commRatios] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -310,6 +311,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         : Promise.resolve({ data: null }),
       // No commission (2026-11-14): a bill that counts and pays nobody — who said so, when and why.
       order.cancelled ? Promise.resolve(null) : loadNoComms(supabase, [orderId]),
+      // A Revenue Director's commission ratio (2026-11-27): who set it, to what, when and why.
+      order.cancelled ? Promise.resolve(null) : loadCommRatios(supabase, [orderId]),
     ])
   // A bill of a brand that follows its own scheme: paid at that brand's rate for the rank, in no margin, and found
   // none of the sub-department's KPI items — its brand's own instead — as the run reads it (`ownSchemesOf`).
@@ -320,6 +323,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   )
   const byHand = exclusions?.get(orderId) ?? null
   const noComm = noComms?.get(orderId) ?? null
+  const commRatio = commRatios?.get(orderId) ?? null
   const moved = moves[orderId] ?? null
   const changes = ((changeData ?? []) as unknown as ChangeRow[]).map(change => ({
     ...change,
@@ -549,6 +553,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         <div className="sheet-warning">
           This bill counts in sales and margin and pays nobody:{' '}
           <strong>{describeNoComm(noComm).replace(/^No/, 'no')}</strong>.
+        </div>
+      ) : commRatio ? (
+        // A Revenue Director's ratio (2026-11-27): its commission and the sales it counts, in its margin band's place.
+        <div className="sheet-warning">
+          This bill pays and counts at a Revenue Director&apos;s ratio, not its margin&apos;s:{' '}
+          <strong>{describeCommRatio(commRatio).replace(/^Commission/, 'commission')}</strong>.
         </div>
       ) : null}
 

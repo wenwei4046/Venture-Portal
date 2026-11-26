@@ -12,6 +12,7 @@ import { commissionByBill, type BillCommission } from '@/lib/commission/bill-com
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
 import { billHalfCommAction, describeHalfComm, HALF_COMM_LABEL } from '@/lib/commission/bill-half-comm'
 import { describeNoComm, NO_COMM_LABEL } from '@/lib/commission/bill-no-comm'
+import { commRatioLabel, describeCommRatio } from '@/lib/commission/bill-comm-ratio'
 import { billBrandAction, pickableBrands } from '@/lib/commission/bill-brand'
 import { isOwnSchemeBill, ownSchemeCodes } from '@/lib/commission/brand-rates'
 import { readsNoSales } from '@/lib/commission/no-sales'
@@ -24,6 +25,7 @@ import {
   loadOrderExclusions,
   loadHalfComms,
   loadNoComms,
+  loadCommRatios,
   loadOrderShares,
   loadShareTeam,
   loadUncostedProducts,
@@ -96,7 +98,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   // bill can be, and only where the scheme has a ladder to pick from.
   // …and, for one exhibition, the fair and the ERP booth each bill was
   // written at — the same read the month's Sales exhibition grouped them by.
-  const [shares, team, exclusions, brandOptions, brandPicks, placed, halfComms, noComms] = await Promise.all([
+  const [shares, team, exclusions, brandOptions, brandPicks, placed, halfComms, noComms, commRatios] = await Promise.all([
     loadOrderShares(supabase, all.map(o => o.orderId)),
     loadShareTeam(supabase, subDept.schemeId),
     loadOrderExclusions(supabase, all.filter(o => o.cancelled).map(o => o.orderId)),
@@ -107,6 +109,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     loadHalfComms(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
     // No commission (2026-11-14): which live bills pay nobody, who said so and why.
     loadNoComms(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
+    // A Revenue Director's commission ratio (2026-11-27): which live bills pay at one, who set it and why.
+    loadCommRatios(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
   ])
   const sharesByOrder = new Map<string, typeof shares>()
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
@@ -233,6 +237,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     const byHand = exclusions.get(o.orderId)
     // No commission (2026-11-14): counts in sales and margin, pays nobody.
     const noComm = o.cancelled ? undefined : noComms.get(o.orderId)
+    // A Revenue Director's ratio (2026-11-27): in its margin band's place.
+    const ratio = o.cancelled ? undefined : commRatios.get(o.orderId)
     return {
       orderId: o.orderId,
       orderNo: o.orderNo,
@@ -264,7 +270,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       noSales: readsNoSales(o),
       ownScheme: ownScheme(o),
       status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending'
-        : noComm ? NO_COMM_LABEL : halfComms.has(o.orderId) ? HALF_COMM_LABEL : 'Included'),
+        : noComm ? NO_COMM_LABEL : halfComms.has(o.orderId) ? HALF_COMM_LABEL : ratio ? commRatioLabel(ratio.ratio) : 'Included'),
       cancelled: o.cancelled,
       // Out by hand, or paying nobody by hand (2026-11-14): who, when and why — the Status's tooltip and the menu's.
       exclusionDetail: byHand ? describeExclusion(byHand) : noComm ? describeNoComm(noComm) : null,
@@ -311,6 +317,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       // Half comm (2026-11-10): the menu's row, and the why on the Status — none on a bill that pays nobody.
       halfCommAction: billHalfCommAction({ halfComm: halfComms.has(o.orderId), cancelled: o.cancelled || Boolean(noComm) }, { runLocked, monthLabel }),
       halfCommDetail: halfComms.has(o.orderId) && !noComm ? describeHalfComm(halfComms.get(o.orderId)!) : null,
+      ratioDetail: ratio && !noComm ? describeCommRatio(ratio) : null,
     }
   })
 

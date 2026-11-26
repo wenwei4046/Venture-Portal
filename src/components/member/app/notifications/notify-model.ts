@@ -19,6 +19,8 @@ export type NotifGo =
   | { to: "share"; requestId: string }
   // Not my order (2026-11-14): HR approved or rejected one's request — its sheet.
   | { to: "notMine"; requestId: string }
+  /** A bill whose commission a Revenue Director adjusted (2026-11-27): My sales orders, the bill open. */
+  | { to: "bill"; orderId: string }
   | { to: "none" };
 
 export interface NotifItem {
@@ -182,6 +184,14 @@ export function notifications(input: NotifyInput): { items: NotifItem[]; count: 
       items.push({
         id: `nt-${n.id}`, kind: "req", tab: "requests", icon: ICON.notMine, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
         unread: !n.read, big: null, link: "Open request", done: null, go: { to: "notMine", requestId: n.refId },
+      });
+      continue;
+    }
+    // A Revenue Director set, changed or took off a bill's commission ratio (2026-11-27 — "要通知"): the bill, open.
+    if (n.refKind === "comm_ratio") {
+      items.push({
+        id: `nt-${n.id}`, kind: "share", tab: "updates", icon: ICON.percent, time: ago(n.at, input.now), title: n.title, sub: n.body, open: false,
+        unread: !n.read, big: null, link: "Open the bill", done: null, go: { to: "bill", orderId: n.refId },
       });
       continue;
     }

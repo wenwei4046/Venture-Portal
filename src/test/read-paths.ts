@@ -602,6 +602,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // read by Revenue · View / Edit, decided by Revenue · Edit on the month page's tab.
   'member_not_mine_context', 'member_not_mine_send', 'member_not_mine_cancel', 'member_not_mine_requests',
   'revenue_not_mine_requests', 'revenue_not_mine_decide',
+  // A bill's commission ratio (mig 20261127140500): the sheet read and the write, Commission ratio · View / Edit and the
+  // sub-departments the caller reaches on Comm Cal; the salesperson told.
+  'member_comm_ratio_context', 'member_comm_ratio_set',
   // Whose sale (mig 20261031030000): Comm Cal's held bills read by Revenue · View / Edit, answered by Revenue · Edit;
   // a bill the ERP gave to somebody else answered the same way (mig 20261031040000).
   'revenue_seller_checks', 'revenue_answer_seller_check', 'revenue_answer_seller_move',
