@@ -24,6 +24,19 @@ export function adFigureParts(needs: AdFigNeed[]): { key: string; part: AdFigNee
   return out;
 }
 
+/** How long after an answer from an older read the screen asks again (the server is reading Meta meanwhile). */
+export const AGAIN_MS = 4000;
+
+/** Asks once more, a few seconds on, for ranges the server answered from an older read; `onFigs` hears the new figures. */
+export function askAgainSoon(parts: AdFigNeed[], onFigs: (figs: Figs) => void, fetchImpl: typeof fetch = fetch, wait = AGAIN_MS) {
+  setTimeout(() => {
+    void fetchImpl(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(parts))}`, { cache: "no-store" })
+      .then(async res => (res.ok ? ((await res.json()) as { figs?: Figs }).figs ?? {} : {}))
+      .then(figs => { if (Object.keys(figs).length) onFigs(figs); })
+      .catch(() => { /* the older figures stay on screen */ });
+  }, wait);
+}
+
 /** Reads every range; `onPart` hears each request's answer as it lands, so the first figures show before the last. */
 export async function readAdFigures(needs: AdFigNeed[], onPart?: (figs: Figs) => void, fetchImpl: typeof fetch = fetch): Promise<Figs> {
   const all: Figs = {};
@@ -32,7 +45,15 @@ export async function readAdFigures(needs: AdFigNeed[], onPart?: (figs: Figs) =>
     try {
       const res = await fetchImpl(`/member/crm-ad-figures?n=${encodeURIComponent(JSON.stringify(parts))}`, { cache: "no-store" });
       if (!res.ok) return;
-      const got = ((await res.json()) as { figs?: Figs }).figs ?? {};
+      const body = (await res.json()) as { figs?: Figs; stale?: string[] };
+      const got = body.figs ?? {};
+      // Answered from an older read (the server reads Meta again behind it): asked once more shortly for the new figures.
+      const stale = parts.filter(p => body.stale?.includes(p.key));
+      if (stale.length && onPart) askAgainSoon(stale, got2 => {
+        const fresh: Figs = {};
+        group.forEach(({ key, part: [p] }) => { if (got2[p.key]) fresh[key] = { ...(fresh[key] ?? {}), ...got2[p.key] }; });
+        if (Object.keys(fresh).length) onPart(fresh);
+      }, fetchImpl);
       const figs: Figs = {};
       group.forEach(({ key, part: [p] }) => { if (got[p.key]) figs[key] = { ...(figs[key] ?? {}), ...got[p.key] }; });
       for (const [k, f] of Object.entries(figs)) all[k] = { ...(all[k] ?? {}), ...f };
