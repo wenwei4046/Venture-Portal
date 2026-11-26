@@ -65,6 +65,11 @@ export interface IncomeBill {
    */
   noCommission?: true;
   /**
+   * A Revenue Director's commission ratio on the bill (2026-11-27), 0–1: it paid at that in its margin band's place.
+   * From the engine's row on a live month, the close on a closed one.
+   */
+  commRatio?: number;
+  /**
    * A bill of a brand that follows its own commission scheme (2990s, 2026-11-12): paid the rank's rate for the brand,
    * in no margin — it has none to read and waits for no cost. Live months only (the engine's row); a closed month
    * reads it off the order book.
@@ -173,6 +178,7 @@ function bill(row: CommissionOrderRow): IncomeBill {
     brand: row.brands[0] ?? null,
     ...(row.commissionOnly ? { commissionOnly: true as const } : {}),
     ...(row.noComm ? { noCommission: true as const } : {}),
+    ...(row.commRatio !== undefined ? { commRatio: row.commRatio } : {}),
     ...(row.ownBrand ? { ownScheme: true as const } : {}),
   };
 }
@@ -261,6 +267,7 @@ export function closedIncome(close: {
       pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0)), marginPct: null, sharePct: null, brand: null,
       ...(b.commissionOnly ? { commissionOnly: true as const } : {}),
       ...(b.noComm ? { noCommission: true as const } : {}),
+      ...(b.commRatio !== undefined ? { commRatio: b.commRatio } : {}),
     };
   });
   const overrides: IncomeOverride[] = lines.filter(l => l.component === "override").map(l => {
