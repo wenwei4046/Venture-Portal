@@ -20,7 +20,9 @@ const context = (over: Partial<CommRatioContext> = {}): CommRatioContext => ({
 });
 const saved = (ratio: number | null): CommRatioSaved => ({ orderId: ORDER, orderNo: "HC-SO-2611-006", ratio, changed: true });
 
-function sheet(ctx: CommRatioContext, onSave = vi.fn(async (_o: string, r: number | null) => ({ ok: true as const, data: saved(r) })), readOnly = false) {
+type Save = (orderId: string, ratio: number | null, note: string | null) => Promise<{ ok: true; data: CommRatioSaved } | { ok: false; error: string }>;
+
+function sheet(ctx: CommRatioContext, onSave: Save = vi.fn(async (_o: string, r: number | null) => ({ ok: true as const, data: saved(r) })), readOnly = false) {
   const onSaved = vi.fn();
   render(<CommRatioSheet open orderId={ORDER} readOnly={readOnly} load={async () => ({ ok: true, data: ctx })} onSave={onSave}
     onSaved={onSaved} onClose={() => {}} />);

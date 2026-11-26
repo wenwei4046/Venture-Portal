@@ -322,6 +322,17 @@ const again = { bodies: await q(BODIES, [[...NAMES, 'current_permissions', 'memb
 check(again.bodies, after.bodies, 'the second run changes no body')
 check({ ...again.rows[0], rd_version: null }, { ...after.rows[0], rd_version: null }, 'nor a row it adds')
 check(after.bodies.find(r => r.sig === 'commission_order_period_locked(uuid,date)').md5, PROD['commission_order_period_locked(uuid,date)'], 'the run lock is not touched')
+// What production runs once the migration is in — its dry run on 2026-11-27 (both migrations, rolled back): the bodies
+// here are those, so the file applied is the file tested.
+const PROD_AFTER = {
+  'member_order_facts_with_old_bills(uuid,date,date)': '4560a415e2b9a8cc142173c62887e967',
+  'member_order_book_for_staff(uuid,uuid,date,date)': '73dcbe01784ed412dea50593a63f9f6c',
+  'member_principal_department_order_book(uuid,text,text)': '18a045f6806bc57ecfc0ca8331d89f7a',
+  'member_comm_ratio_set(uuid,numeric,text)': '89c5f495255ca851fc72e8c515f7f9e9',
+  'member_comm_ratio_context(uuid)': 'ab5d1f001c509f9c4abb0ebd920b5144',
+  'comm_ratio_refusal(uuid)': 'cb66f902ce8e4aa8a0764f1552e634c7',
+}
+check(Object.fromEntries(after.bodies.filter(r => r.sig in PROD_AFTER).map(r => [r.sig, r.md5])), PROD_AFTER, "the bodies production's dry run answered")
 
 // ── 1. The ladder ──
 const AE_AFTER = [
