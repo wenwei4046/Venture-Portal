@@ -1376,7 +1376,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // no ladder to choose, nothing tallied into the month's margin or its
       // incentive, and its lines' missing costs hold nothing back.
       if (ownBrand === null) {
-        if (base.mixedBrand && (scheme.enableMarginPenalty || scheme.enableMarginIncentive)) {
+        // …and a month before the margin switch's first one pays none (2026-11-27): every warning holds a close.
+        if (base.mixedBrand && (penaltyCutsMonth(scheme, order.periodMonth) || incentivePaysMonth(scheme, input.periodMonth))) {
           warnings.push(
             `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
           )
