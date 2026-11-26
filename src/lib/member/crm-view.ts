@@ -10,8 +10,14 @@
  * Its Management too (the owner: "Management 这边也不是统一的，IR 是 IR，DC 是 DC，包括 setting 等等都要分开"; mig
  * 20261124210000): given the view's sub-department, `inView` hands every screen that one's Settings › General and
  * appointment types, showrooms, forms, cold lead templates and booking link — Fair's own too, before it has a customer.
+ *
+ * And its own chart (2026-11-27 — the owner, told that Dream Crafter's CRM still drew IR's teams: "need follow by dc
+ * heirachy"; mig 20261127170000): each person's role, upline and title in the view are their line in the view's brand's
+ * own Staff Hierarchy (crm_people's `lines` — The Conts' IR's, Dream Crafter's DC's), so its teams, its leaders and Team |
+ * Mine are that chart's; somebody with no line there is not one of the view's people. The database reads, answers and
+ * deals a customer by the same chart.
  */
-import { virtualRoomId, type CrmData, type CrmPerson } from "./crm-data";
+import { virtualRoomId, type CrmData, type CrmPerson, type CrmPersonLine } from "./crm-data";
 import { brandOf, type SourceBrand, type SourcePick } from "./crm-source";
 
 /** The brands of the sub-department a view is: IR's The Conts, DC's Dream Crafter, any other (Fair) none. Null — no view. */
@@ -38,6 +44,28 @@ export function crmViewSwitch<M extends { id: string; code: string; name: string
 
 /** The brands somebody holds, as the database read them (crm_people's `brands`); none read — no login — is IR's alone. */
 export const brandsOfPerson = (p: Pick<CrmPerson, "brands">): SourceBrand[] => p.brands ?? ["conts"];
+
+/** Somebody's line in a view's own chart: the first of the view's brands they have one in (crm_people's `lines`). */
+export function lineInView(p: Pick<CrmPerson, "lines">, brands: readonly SourceBrand[]): CrmPersonLine | undefined {
+  for (const b of brands) {
+    const l = p.lines?.[b];
+    if (l) return l;
+  }
+  return undefined;
+}
+
+/**
+ * The people as a view draws them: each in their line of the view's chart — role, upline, title — where the database
+ * handed lines (a database before them: everybody as they came, IR's). Somebody with no line there keeps what they came
+ * with, for their name; the view's lists leave them out (`view.people`).
+ */
+export function peopleOfChart(people: CrmPerson[], brands: readonly SourceBrand[]): CrmPerson[] {
+  if (!people.some(p => p.lines)) return people;
+  return people.map(p => {
+    const l = lineInView(p, brands);
+    return l ? { ...p, role: l.role, uplineId: l.uplineId, title: l.title || p.title } : p;
+  });
+}
 
 /** Whether somebody is one of the view's people (anybody, with no view). */
 export const personInView = (d: Pick<CrmData, "view">, id: string | null | undefined): boolean => !d.view || (!!id && d.view.people.includes(id));
@@ -149,12 +177,19 @@ export function inView(d: CrmData, brands: SourceBrand[] | null, sub?: string | 
   const customers = d.customers.filter(c => has(brandOf(c.accountId)));
   const ids = new Set(customers.map(c => c.id));
   const ads = adBrands(d), keepAd = (id: string | null | undefined) => !!id && has(ads.get(id));
-  const people = d.people.filter(p => p.id === d.viewerId || brandsOfPerson(p).some(b => brands.includes(b))).map(p => p.id);
+  // The view's people: whoever holds one of its brands — and, with the charts handed (mig 20261127170000), has a line in
+  // its own chart; a person with no login holds what their line says. Oneself always.
+  const charted = d.people.some(p => p.lines);
+  const drawn = peopleOfChart(d.people, brands);
+  const inChart = (p: CrmPerson) => !charted || !!lineInView(p, brands);
+  const holds = (p: CrmPerson) => (charted && !p.brands) || brandsOfPerson(p).some(b => brands.includes(b));
+  const people = drawn.filter(p => p.id === d.viewerId || (inChart(p) && holds(p))).map(p => p.id);
   const inPeople = new Set(people);
   const visits = d.visits.filter(v => ids.has(v.customerId));
   const own = sub && d.scope ? sub : null;
   return {
     ...d,
+    people: drawn,
     view: { brands, people, ...(own ? { sub: own } : {}) },
     customers,
     visits,

@@ -43,7 +43,16 @@ export interface CrmPerson {
    * no login, or a database before it — reads as IR's (lib/member/crm-view.ts › brandsOfPerson).
    */
   brands?: SourceBrand[] | null;
+  /**
+   * Their line in each brand's own chart (crm_people, mig 20261127170000; the owner, 2026-11-27: "need follow by dc
+   * heirachy"): The Conts' is IR's Staff Hierarchy, Dream Crafter's DC's. A view draws its people from its brand's line
+   * (lib/member/crm-view.ts › inView); absent — a database before it — the top-level role and upline (IR's) stand for all.
+   */
+  lines?: Partial<Record<SourceBrand, CrmPersonLine>>;
 }
+
+/** A person's place in one chart: their role there, whom they report to there, their title there. */
+export interface CrmPersonLine { role: CrmRole; uplineId: string | null; title: string }
 
 /**
  * Appointment types beside Showroom (mig 20261025040000; the owner, 2026-10-24: set on the desktop's Showrooms › Appointment
@@ -780,6 +789,18 @@ export function personName(name: string): string {
   return name.trim().toLowerCase().replace(/(^|[\s\-'’(])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
 }
 
+const CRM_ROLES: ReadonlySet<string> = new Set<CrmRole>(["boss", "hod", "stl", "tl", "ta", "rs"]);
+
+/** crm_people's `lines` → each brand's line, keeping only a brand and a role the CRM knows. */
+export function linesFromRow(raw: Record<string, { role: CrmRole; uplineId: string | null; title?: string | null }>): Partial<Record<SourceBrand, CrmPersonLine>> {
+  const out: Partial<Record<SourceBrand, CrmPersonLine>> = {};
+  for (const brand of ["conts", "dc"] as const) {
+    const l = raw[brand];
+    if (l && CRM_ROLES.has(l.role)) out[brand] = { role: l.role, uplineId: l.uplineId ?? null, title: l.title ?? "" };
+  }
+  return out;
+}
+
 export function crmDataFromRows(rows: CrmDataRows): CrmData {
   const adNames: NonNullable<CrmData["adNames"]> = {};
   for (const a of rows.adNames ?? []) if (a.name?.trim()) adNames[a.ad_source_id] = { name: a.name.trim(), source: a.source === "meta" ? "meta" : "manual", ...(a.meta_status ? { status: a.meta_status, statusAt: a.status_at ?? null } : {}), ...(a.added_at ? { added: true } : {}), ...(a.starts_at || a.ends_at ? { startAt: a.starts_at ?? null, endAt: a.ends_at ?? null } : {}), ...(a.page_id ? { pageId: a.page_id, pageName: a.page_name ?? null } : {}), ...(a.hidden_at ? { hidden: true } : {}) };
@@ -790,7 +811,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
     people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "", login: p.login ?? true, paused: !!p.paused,
-      ...(Array.isArray(p.brands) ? { brands: p.brands.filter((b): b is SourceBrand => b === "conts" || b === "dc") } : {}) })),
+      ...(Array.isArray(p.brands) ? { brands: p.brands.filter((b): b is SourceBrand => b === "conts" || b === "dc") } : {}),
+      ...(p.lines && typeof p.lines === "object" ? { lines: linesFromRow(p.lines) } : {}) })),
     viewers: (rows.people.viewers ?? []).map(v => ({ id: v.id, name: personName(v.name), title: v.title ?? "",
       can: { viewAll: v.reach === "all", editOwn: !!v.editOwn, editAll: !!v.editAll, manage: !!v.manage } })),
     // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read

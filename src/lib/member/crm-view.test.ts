@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { crmBrandsOfView, crmViewSwitch, inView, newRoomDraftKey, peopleInView, personInView, pickedSource, sourcePickInView, teamsInView, templatesOfSub } from "./crm-view";
 import { inBrand } from "@/components/member/crm/desk/vm/insight";
-import { DEFAULT_CRM_SETTINGS, subSettingsFrom, type CrmData, type CrmPerson, type CrmRoom } from "./crm-data";
+import { DEFAULT_CRM_SETTINGS, linesFromRow, subSettingsFrom, type CrmData, type CrmPerson, type CrmRoom } from "./crm-data";
+import { downlineOf, isTeamTop, teamOf } from "@/components/member/crm/shared/people";
 
 // The owner, 2026-11-23, over the Fair view's Insight and Assignment showing The Conts and Dream Crafter together: "IR 的 view
 // 就只可以看到 IR，DC 就只可以看到 DC，同等的 fair 也只能看到 fair。现在全部绑在一起，我不要这样"; "assign 广告的时候也是跟着 view 走的".
@@ -265,4 +266,68 @@ describe("the Revenue Director row in a view", () => {
   it("DC's view lists KRIS and PETER", () => expect(directors(inView(withKris, ["dc"]))).toEqual(["kris", "peter"]));
   it("IR's view lists PETER alone", () => expect(directors(inView(withKris, ["conts"]))).toEqual(["peter"]));
   it("no view lists both", () => expect(directors(withKris)).toEqual(["kris", "peter"]));
+});
+
+// Each view's teams follow its own Staff Hierarchy (the owner, 2026-11-27, told that Dream Crafter's CRM still drew IR's
+// teams: "need follow by dc heirachy"; mig 20261127170000 hands each person's line in each chart). Production's charts that
+// day: CHEA HUAN is IR's Team Assistant with CYRUS and LIM YAU WEI under him, DC's Revenue Specialist with LIM YAU WEI
+// alone, CYRUS under LUCAS; WEI PIN holds Dream Crafter but is in no line of DC's chart.
+describe("a view's own chart", () => {
+  const line = (role: CrmPerson["role"], uplineId: string | null, title = "") => ({ role, uplineId, title });
+  const charted = {
+    ...data,
+    viewerId: "boss",
+    people: [
+      person("boss", ["conts", "dc"], { role: "boss", lines: { conts: line("boss", null), dc: line("boss", null) } }),
+      person("peter", ["conts", "dc"], { role: "hod", lines: { conts: line("hod", null), dc: line("hod", null) } }),
+      person("kris", ["dc"], { role: "hod", lines: { conts: line("hod", null), dc: line("hod", null) } }),
+      person("stanley", ["conts", "dc"], { role: "tl", uplineId: "peter", lines: { conts: line("tl", "peter"), dc: line("tl", "kris") } }),
+      person("lucas", ["conts", "dc"], { role: "ta", uplineId: "stanley", lines: { conts: line("ta", "stanley"), dc: line("ta", "stanley") } }),
+      person("chea", ["conts", "dc"], { role: "ta", uplineId: "lucas", title: "Team Assistant",
+        lines: { conts: line("ta", "lucas", "Team Assistant"), dc: line("rs", "lucas", "Revenue Specialist") } }),
+      person("cyrus", ["conts", "dc"], { uplineId: "chea", lines: { conts: line("rs", "chea"), dc: line("rs", "lucas") } }),
+      person("yauwei", ["conts", "dc"], { uplineId: "chea", lines: { conts: line("rs", "chea"), dc: line("rs", "chea") } }),
+      person("weipin", ["conts", "dc"], { uplineId: "shawn", lines: { conts: line("rs", "shawn") } }),
+      person("shawn", ["conts"], { role: "tl", uplineId: "peter", lines: { conts: line("tl", "peter") } }),
+      person("dcnologin", null, { uplineId: null, lines: { dc: line("rs", "lucas") } }),
+    ],
+  } as unknown as CrmData;
+  const at = (d: CrmData, id: string) => d.people.find(p => p.id === id)!;
+
+  it("draws each person in their line of the view's chart: role, upline, title", () => {
+    const dc = inView(charted, ["dc"]), ir = inView(charted, ["conts"]);
+    expect([at(dc, "chea").role, at(dc, "chea").uplineId, at(dc, "chea").title]).toEqual(["rs", "lucas", "Revenue Specialist"]);
+    expect([at(ir, "chea").role, at(ir, "chea").uplineId, at(ir, "chea").title]).toEqual(["ta", "lucas", "Team Assistant"]);
+    expect(at(dc, "cyrus").uplineId).toBe("lucas");
+    expect(at(ir, "cyrus").uplineId).toBe("chea");
+    expect(at(dc, "stanley").uplineId).toBe("kris");
+  });
+
+  it("lists only the people in its chart who hold its brand — oneself always, somebody with no login by their line", () => {
+    expect(inView(charted, ["dc"]).view?.people).toEqual(["boss", "peter", "kris", "stanley", "lucas", "chea", "cyrus", "yauwei", "dcnologin"]);
+    expect(inView(charted, ["conts"]).view?.people).toEqual(["boss", "peter", "stanley", "lucas", "chea", "cyrus", "yauwei", "weipin", "shawn"]);
+    expect(personInView(inView(charted, ["dc"]), "weipin")).toBe(false);
+  });
+
+  it("makes the teams, the leaders and the downlines the chart's", () => {
+    const dc = inView(charted, ["dc"]), ir = inView(charted, ["conts"]);
+    expect(downlineOf("chea", dc.people)).toEqual(["yauwei"]);
+    expect(downlineOf("chea", ir.people).sort()).toEqual(["cyrus", "yauwei"]);
+    expect(teamOf("cyrus", dc.people)?.id).toBe("stanley");
+    expect(teamOf("weipin", ir.people)?.id).toBe("shawn");
+    // HECTOR-like: a Revenue Specialist with no upline of their own reports to the chart's director — a team of their own.
+    expect(isTeamTop(at(dc, "stanley"), dc.people)).toBe(true);
+    expect(isTeamTop(at(dc, "chea"), dc.people)).toBe(false);
+  });
+
+  it("is the people as they came from a database before the charts", () => {
+    expect(inView(data, ["dc"]).people).toBe(data.people);
+  });
+
+  it("reads crm_people's lines, keeping the brands and roles the CRM knows", () => {
+    expect(linesFromRow({ conts: { role: "ta", uplineId: "x", title: "Team Assistant" }, dc: { role: "rs", uplineId: null },
+      fair: { role: "rs", uplineId: null }, odd: { role: "chief" as never, uplineId: null } }))
+      .toEqual({ conts: { role: "ta", uplineId: "x", title: "Team Assistant" }, dc: { role: "rs", uplineId: null, title: "" } });
+    expect(linesFromRow({ dc: { role: "chief" as never, uplineId: null } })).toEqual({});
+  });
 });
