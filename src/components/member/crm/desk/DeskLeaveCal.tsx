@@ -3,8 +3,9 @@
  * Calendar (appointments + leave) and Assignment › People (leave only) on the desktop — the prototypes' markup
  * (docs/design_handoff_crm/designs/CRM Calendar.dc.html, CRM Assignment People.dc.html) element for element, on
  * shared/leave-cal.ts. The person panel slides in and its scrim fades, as every CRM side panel (the owner, 2026-11-08).
+ * The owner, 2026-11-27: a day clicked lists its appointments (DayList), and Book appt + Add leave are one + (DeskCalPlus).
  */
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { LeaveCalIn, LeaveCalVM } from "../shared/leave-cal";
 import { useLeaveCal } from "../shared/use-leave-cal";
 import s from "./leave-cal.module.css";
@@ -47,10 +48,9 @@ export function DeskLeaveCal({ v, title, tabs, bare, bookAppt }: { v: LeaveCalVM
                 {y.label}<span style={{ fontSize: "12px", color: "var(--crm-faint)" }}>{y.n}</span>
               </span>
             ))}
-            {/* Book appt, top right (the owner, 2026-11-19): pick a customer, then their Book visit. */}
-            {bookAppt && <span {...press(bookAppt)} data-book-appt="" className={s.cta} style={{ height: "34px", padding: "0 14px", borderRadius: "17px", display: "flex", alignItems: "center", gap: "6px", font: `500 13px ${INTER}`, background: "var(--crm-rust)", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>
-              <Svg d="M12 5v14M5 12h14" size={14} w={2.2} />Book appt
-            </span>}
+            {/* ONE + top right (the owner, 2026-11-27: "book appointment 和 add leave … merge 成一个加号 button"): Book
+                appointment (pick a customer, then their Book visit — 2026-11-19) and Add leave, as the phone's. */}
+            <DeskCalPlus appt={bookAppt} leave={v.showLeave && v.canAdd ? v.addLeave : undefined} />
           </div>
         </div>
       ) : bare ? null : (<>
@@ -70,7 +70,7 @@ export function DeskLeaveCal({ v, title, tabs, bare, bookAppt }: { v: LeaveCalVM
           {v.showLeave && <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "10px", height: "10px", borderRadius: "3px", background: "var(--crm-full-time)" }} />Full time</span>}
           {v.legend.map(l => <span key={l.label} style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "10px", height: "10px", borderRadius: "3px", background: l.bg }} />{l.label}</span>)}
         </div>
-        {v.showLeave && v.canAdd && (
+        {!v.isCal && v.showLeave && v.canAdd && (
           <span {...press(v.addLeave)} className={s.cta} style={{ flex: "none", whiteSpace: "nowrap", height: "34px", padding: "0 14px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px", font: `500 13px ${INTER}`, background: "var(--crm-rust)", color: "#fff", cursor: "pointer" }}>
             <Svg d="M12 5v14M5 12h14" size={14} w={2.2} />Add leave
           </span>
@@ -88,7 +88,7 @@ export function DeskLeaveCal({ v, title, tabs, bare, bookAppt }: { v: LeaveCalVM
             {v.weeks.map(w => (
             <div key={w.key} data-cal-week="" style={{ flex: "1 1 0", minHeight: 0, position: "relative", display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))" }}>
             {w.dDays.map(c => (
-              <div key={c.day} onClick={c.add} data-day={c.day} className={s.cell} style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "3px", padding: "6px 6px 4px", boxSizing: "border-box", borderRight: `1px solid ${CAL.grid}`, borderBottom: `1px solid ${CAL.grid}`, background: c.bg, overflow: "hidden", cursor: "pointer" }}>
+              <div key={c.day} onClick={c.click} data-day={c.day} data-open={c.open || undefined} className={s.cell} style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "3px", padding: "6px 6px 4px", boxSizing: "border-box", borderRight: `1px solid ${CAL.grid}`, borderBottom: `1px solid ${CAL.grid}`, background: c.bg, overflow: "hidden", cursor: "pointer" }}>
                 <span style={{ flex: "none", alignSelf: "flex-start", minWidth: "22px", height: "22px", padding: "0 5px", boxSizing: "border-box", borderRadius: "11px", display: "grid", placeItems: "center", font: `500 12px ${INTER}`, background: c.numBg, color: c.numFg }}>{c.num}</span>
                 {c.dLanes > 0 && <span aria-hidden style={{ flex: "none", height: `${c.dLanes * 23 - 3}px` }} />}
                 {c.appts.map(a => (
@@ -105,6 +105,7 @@ export function DeskLeaveCal({ v, title, tabs, bare, bookAppt }: { v: LeaveCalVM
                 left: `calc(${b.c0} * 100% / 7 + ${b.roundL ? 4 : 0}px)`, width: `calc(${b.span} * 100% / 7 - ${(b.roundL ? 4 : 0) + (b.roundR ? 5 : 0)}px)`, boxSizing: "border-box", padding: "0 6px",
                 borderRadius: `${b.roundL ? 4 : 0}px ${b.roundR ? 4 : 0}px ${b.roundR ? 4 : 0}px ${b.roundL ? 4 : 0}px`, background: b.bg, color: b.fg, fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>{b.label}</span>
             ))}
+            {v.dl?.week === w.key && <DayList key={v.dl.day} v={v} />}
             </div>
             ))}
           </div>
@@ -219,10 +220,110 @@ function PersonPanel({ v }: { v: LeaveCalVM }) {
   </>);
 }
 
+const PLUS = "M12 5v14M5 12h14";
+const ICON_APPT = "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
+const ICON_LEAVE = "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 1 0 8a4 4 0 0 1 0-8M17 11h6";
+
+/**
+ * Calendar's one + (the owner, 2026-11-27, on the desktop's Book appt and Add leave: "merge 成一个加号 button … drop down"):
+ * with both ways open it turns 45° and drops a menu — Book appointment · Add leave — as the phone's (shared/PhoneLeaveCal.tsx
+ * › CalPlus, 2026-11-19); with one open the + does that one at once; with neither (View as) there is no button.
+ */
+function DeskCalPlus({ appt, leave }: { appt?: () => void; leave?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const out = (e: PointerEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", out);
+    window.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", out); window.removeEventListener("keydown", key); };
+  }, [open]);
+  const only = appt ?? leave;
+  if (!only) return null;
+  const both = !!appt && !!leave;
+  const label = both ? "Add" : appt ? "Book appointment" : "Add leave";
+  const item = (name: string, icon: string, go: () => void) => (
+    <span {...press(() => { setOpen(false); go(); })} role="menuitem" className={s.opt} style={{ display: "flex", alignItems: "center", gap: "10px", height: "38px", padding: "0 12px", borderRadius: "7px", font: `500 13px ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
+      <Svg d={icon} size={16} style={{ flex: "none", color: "var(--crm-rust)" }} />{name}
+    </span>
+  );
+  return (
+    <span ref={box} style={{ position: "relative", flex: "none", display: "flex" }}>
+      <span {...press(both ? () => setOpen(o => !o) : only)} aria-label={label} title={label} aria-haspopup={both ? "menu" : undefined} aria-expanded={both ? open : undefined} data-cal-plus="" className={s.cta}
+        style={{ width: "34px", height: "34px", borderRadius: "17px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", cursor: "pointer", transition: "transform .18s", transform: open ? "rotate(45deg)" : "none" }}>
+        <Svg d={PLUS} size={16} w={2.2} />
+      </span>
+      {open && both && (
+        <span role="menu" data-cal-plus-menu="" className={s.fadeIn} style={{ position: "absolute", top: "42px", right: 0, zIndex: 30, display: "flex", flexDirection: "column", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", border: "1px solid var(--crm-rule)", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
+          {item("Book appointment", ICON_APPT, appt)}
+          {item("Add leave", ICON_LEAVE, leave)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A day's list (the owner, 2026-11-27: "点那个 date … 跳出来它的 appointment … 可以点进去看这个 appointment 的 details"): a card
+ * at the day, over the grid — its leave, then its appointments by time, each with its salesperson, room and how it stands.
+ * An appointment opens its details beside the calendar (Customer info on that visit) and the card stays for the next one.
+ * A press elsewhere closes it, but not one in that pane; Esc and × close it too.
+ */
+function DayList({ v }: { v: LeaveCalVM }) {
+  const dl = v.dl!;
+  const box = useRef<HTMLDivElement>(null);
+  const close = useRef(dl.close);
+  useEffect(() => { close.current = dl.close; });
+  useEffect(() => {
+    const out = (e: PointerEvent) => {
+      const t = e.target instanceof Element ? e.target : null;
+      if (!t || box.current?.contains(t) || t.closest("aside")) return;
+      close.current();
+    };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
+    document.addEventListener("pointerdown", out);
+    window.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", out); window.removeEventListener("keydown", key); };
+  }, []);
+  const across: CSSProperties = dl.alignRight ? { right: `calc(${6 - dl.col} * 100% / 7 - 6px)` } : { left: `calc(${dl.col} * 100% / 7 - 6px)` };
+  return (
+    <div ref={box} role="dialog" aria-label={dl.title} data-day-list={dl.day} className={s.fadeIn}
+      style={{ position: "absolute", zIndex: 5, ...across, ...(dl.down ? { top: "-6px" } : { bottom: "-6px" }), width: "300px", maxHeight: `calc(${dl.rows} * 100% + 6px)`, boxSizing: "border-box",
+        display: "flex", flexDirection: "column", background: "#fff", borderRadius: "12px", border: "1px solid var(--crm-rule)", boxShadow: "0 14px 36px rgba(42,22,12,.18)", overflow: "hidden", cursor: "default" }}>
+      <div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "8px", padding: "14px 10px 10px 16px", borderBottom: "1px solid var(--crm-rule)" }}>
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}>
+          <span style={{ font: `500 17px ${TIGHT}`, letterSpacing: "-0.01em" }}>{dl.title}</span>
+          {dl.sub && <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{dl.sub}</span>}
+        </span>
+        <span {...press(dl.close)} aria-label="Close" className={s.soft} style={{ flex: "none", width: "28px", height: "28px", borderRadius: "7px", display: "grid", placeItems: "center", color: "var(--crm-muted)", cursor: "pointer" }}><Svg d="M18 6 6 18M6 6l12 12" size={15} /></span>
+      </div>
+      <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "6px" }}>
+        {dl.items.map(it => (
+          <div key={it.key} {...(it.may ? press(it.go) : {})} data-day-item="" className={it.may ? s.row : undefined}
+            style={{ display: "grid", gridTemplateColumns: "44px minmax(0,1fr) auto", columnGap: "10px", alignItems: "center", minHeight: "48px", padding: "0 10px", borderRadius: "8px", cursor: it.may ? "pointer" : "default" }}>
+            <span style={{ font: `600 12.5px ${TIGHT}`, color: it.tFg, whiteSpace: "nowrap" }}>{it.t}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, alignSelf: "stretch" }}>
+              <span style={{ width: "3px", alignSelf: "stretch", margin: "10px 0", borderRadius: "2px", flex: "none", background: it.bar }} />
+              <span style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+                <span style={{ fontSize: "13.5px", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.title}</span>
+                <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</span>
+              </span>
+            </span>
+            {it.chip ? <span style={{ height: "20px", padding: "0 8px", borderRadius: "10px", display: "flex", alignItems: "center", font: `600 11px ${INTER}`, background: it.chip.bg, color: it.chip.fg, whiteSpace: "nowrap" }}>{it.chip.label}</span> : <span />}
+          </div>
+        ))}
+        {dl.empty && <div style={{ padding: "12px 10px", fontSize: "12.5px", color: "var(--crm-faint)" }}>Nothing this day</div>}
+      </div>
+    </div>
+  );
+}
+
 function LeaveModal({ v }: { v: LeaveCalVM }) {
   const lv = v.lv!;
   return (
-    <div onClick={e => e.stopPropagation()} style={{ width: "420px", borderRadius: "12px", padding: "22px", boxSizing: "border-box", background: "#fff", boxShadow: "0 20px 50px rgba(42,22,12,.25)", display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div role="dialog" aria-label={lv.title} onClick={e => e.stopPropagation()} style={{ width: "420px", borderRadius: "12px", padding: "22px", boxSizing: "border-box", background: "#fff", boxShadow: "0 20px 50px rgba(42,22,12,.25)", display: "flex", flexDirection: "column", gap: "16px" }}>
       <div style={{ font: `500 18px ${TIGHT}` }}>{lv.title}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "var(--crm-muted)" }}>Person
         <div style={{ position: "relative" }}>

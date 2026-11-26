@@ -2,6 +2,7 @@
 import type { CrmData, CrmPerson } from "@/lib/member/crm-data";
 import { officeTime } from "@/lib/office-time";
 import type { PanelActions } from "../panel/actions";
+import { visitStatus } from "../desk/vm/data";
 import { downlineOf, teamOf } from "./people";
 import { peopleBook } from "./people-book";
 import type { CalAppt, LeaveCalIn } from "./leave-cal";
@@ -30,11 +31,14 @@ export function leaveCalData(o: {
   const book = peopleBook(d, o.teams, o.directors);
   const may = o.readOnly ? () => false : mayEditPerson(d, o.me.id);
   const byId = new Map(d.customers.map(c => [c.id, c]));
+  const rooms = new Map((d.rooms ?? []).map(r => [r.id, r.name]));
   const appts: CalAppt[] = d.visits.filter(v => v.state !== "cancelled").flatMap(v => {
     const c = byId.get(v.customerId);
     if (!c?.assignedTo) return [];
     const at = officeStamp(v.start);
-    return [{ who: c.assignedTo, day: at.slice(0, 10), t: at.slice(11), cust: c.name, customerId: c.id, visitId: v.id }];
+    // Where and how it stands: the desktop's day list (an Online / other visit's room is named for it — "Online meeting").
+    return [{ who: c.assignedTo, day: at.slice(0, 10), t: at.slice(11), cust: c.name, customerId: c.id, visitId: v.id,
+      where: rooms.get(v.showroomId) ?? "", status: visitStatus(v, o.now) }];
   });
   return {
     book, leaves: d.leaves ?? [], appts, now: officeStamp(o.now),

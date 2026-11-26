@@ -7,6 +7,8 @@
  * Up next, this Calendar and People read the same facts.
  */
 import type { CrmLeave } from "@/lib/member/crm-data";
+import type { VisitStatus } from "../desk/vm/data";
+import { ST } from "../desk/vm/tokens";
 import { C } from "./palette";
 import { CAL, calDay, calLeave } from "./cal-look";
 import {
@@ -18,8 +20,14 @@ export interface LeaveModal { editId: string | null; who: string; from: string; 
 export interface LeaveCalUi {
   view: "month" | "week"; month: string; week: string; panel: string | null; pp: boolean; modal: LeaveModal | null;
   showAppt: boolean; showLeave: boolean; pDay: string; toast: string | null;
+  /** The desktop month's open day — its list over the grid (the owner, 2026-11-27). */
+  dDay: string | null;
 }
-export interface CalAppt { who: string; day: string; t: string; cust: string; customerId: string; visitId: string }
+export interface CalAppt {
+  who: string; day: string; t: string; cust: string; customerId: string; visitId: string;
+  /** Its room's name ("Online meeting" for an online one) and how it stands — the desktop day list's lines. */
+  where?: string; status?: VisitStatus;
+}
 export interface LeaveCalActs {
   saveLeave(l: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: Reason; note: string }): Promise<boolean>;
   removeLeave(id: string): Promise<boolean>;
@@ -51,7 +59,7 @@ export interface LeaveCalIn {
 export function leaveCalStart(now: string, mode: "calendar" | "people"): LeaveCalUi {
   const today = now.slice(0, 10);
   return { view: "month", month: today.slice(0, 7), week: addDays(today, -dowOf(today)), panel: null, pp: false, modal: null,
-    showAppt: mode === "calendar", showLeave: true, pDay: today, toast: null };
+    showAppt: mode === "calendar", showLeave: true, pDay: today, toast: null, dDay: null };
 }
 
 const TIMES = Array.from({ length: 48 }, (_, i) => ({ v: `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}` }));
@@ -213,7 +221,11 @@ export function leaveCalVM(x: LeaveCalIn) {
       const dLanes = topLane(i) + 1, dRoom = Math.max(0, Math.floor((96 - 10 - 22 - 3 - dLanes * 23) / 21));
       const aps = apptsOn(null, c.day), hidden = segs.filter(g => g.k >= LANES && g.c0 <= i && i <= g.c1).length;
       const fit = hidden + aps.length > dRoom ? Math.max(0, dRoom - 1) : aps.length, extra = hidden + aps.length - fit;
-      return { ...c, dLanes, appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
+      // Calendar: a day (its "+N more" too) opens its list — the owner, 2026-11-27: "点那个 date … 应该是跳出来它的
+      // appointment，不是一点就直接按 add leave". People, leave only, keeps Add leave on the day.
+      const open = isCal && c.day === st.dDay;
+      return { ...c, dLanes, open, bg: open ? CAL.selBg : c.bg, click: isCal ? () => set({ dDay: c.day }) : c.add,
+        appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
         open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } })), more: extra > 0 ? `+${extra} more` : "" };
     });
     return { key: d0, lanes, bars, days, dDays };
@@ -288,7 +300,39 @@ export function leaveCalVM(x: LeaveCalIn) {
     }),
     ...apptsOn(null, pd).map(a => ({ key: a.visitId, t: a.t, tFg: C.ink, bar: CAL.apptDot, title: a.cust, sub: `Appointment · ${name(a.who)}`, go: () => x.acts.openAppt?.(a) })),
   ];
-  const peopleIds = book.groups.flatMap(g => g.people.map(p => p.id)).filter((id, i, a) => a.indexOf(id) === i && x.canEdit(id));
+
+  // ── The desktop month's open day (the owner, 2026-11-27) ────────────────────────────────────────────────────────────
+  // A day clicked lists what the layers show on it — its leave, then its appointments by time, as the phone lists its day —
+  // in a card over the grid at that day. An appointment opens its details (Customer info on that visit, docked beside) and
+  // the list stays, so the next one is a click away; a leave opens Edit leave (when this viewer may) and the list closes.
+  const dl = (() => {
+    const day = st.dDay;
+    const wk = isCal && isMonth && day ? weeks.findIndex(w => w.days.some(c => c.day === day)) : -1;
+    if (!day || wk < 0) return null;
+    const ls = leavesOn(day), aps = apptsOn(null, day), col = dowOf(day), n = weeks.length, down = wk < n / 2, x0 = dd(day);
+    const close = () => set({ dDay: null });
+    const items = [
+      ...ls.map(l => {
+        const s = l.fromAt.slice(0, 10), e = l.toAt.slice(0, 10), allDay = s < day && day < e, may = x.canEdit(l.staffId);
+        return { key: l.id, t: allDay ? "All day" : s === day ? l.fromAt.slice(11) : "until", tFg: C.listSub, bar: calLeave(l.reason)[0],
+          title: `${name(l.staffId)} · ${label(l)}`, sub: rng(l), chip: null as null | { label: string; bg: string; fg: string }, may,
+          go: () => { if (!may) return; close(); edit(l); } };
+      }),
+      ...aps.map(a => {
+        const [bg, fg] = a.status ? ST[a.status] ?? ST.Booked : ["", ""];
+        return { key: a.visitId, t: a.t, tFg: C.ink, bar: CAL.apptDot, title: a.cust, sub: [name(a.who), a.where].filter(Boolean).join(" · "),
+          chip: a.status ? { label: a.status, bg, fg } : null, may: !!x.acts.openAppt, go: () => x.acts.openAppt?.(a) };
+      }),
+    ];
+    const said = [SA ? (aps.length ? `${aps.length} appointment${aps.length === 1 ? "" : "s"}` : "No appointments") : "", ls.length ? `${ls.length} on leave` : ""];
+    return {
+      day, week: weeks[wk].key, title: `${DOW[col]}, ${x0.d} ${x0.m}`, sub: said.filter(Boolean).join(" · "), items, empty: !items.length,
+      // At its day: left-aligned from Monday to Friday, right-aligned at the weekend; downwards in the upper weeks, upwards
+      // in the lower ones, never taller than the weeks it has room in (the page scrolls nothing for it).
+      col, alignRight: col >= 5, down, rows: down ? n - wk : wk + 1, close,
+    };
+  })();
+  const peopleIds =book.groups.flatMap(g => g.people.map(p => p.id)).filter((id, i, a) => a.indexOf(id) === i && x.canEdit(id));
 
   const layerCount = {
     showAppt: x.appts.filter(a => a.day.slice(0, 7) === st.month).length,
@@ -303,13 +347,14 @@ export function leaveCalVM(x: LeaveCalIn) {
     }),
     weekLabel: isMonth ? `${MONF[+st.month.slice(5) - 1]} ${st.month.slice(0, 4)}` : w0.m === w6.m ? `${w0.d}–${w6.d} ${w0.m} ${w0.y}` : `${w0.d} ${w0.m} – ${w6.d} ${w6.m} ${w6.y}`,
     notThisWeek: isMonth ? st.month !== THIS_MONTH : st.week !== THIS_MON, todayLabel: isMonth ? "This month" : "This week",
-    thisWeek: () => set({ week: THIS_MON, month: THIS_MONTH, pDay: TODAY }),
-    prevWeek: () => set(s => (s.view === "month" ? { month: shiftMonth(s.month, -1) } : { week: addDays(s.week, -7) })),
-    nextWeek: () => set(s => (s.view === "month" ? { month: shiftMonth(s.month, 1) } : { week: addDays(s.week, 7) })),
-    isMonth, isWeek: !isMonth, dowHead: DOW, monthCells, weeks,
+    // A month or week left closes the open day's list (its day is no longer on screen).
+    thisWeek: () => set({ week: THIS_MON, month: THIS_MONTH, pDay: TODAY, dDay: null }),
+    prevWeek: () => set(s => (s.view === "month" ? { month: shiftMonth(s.month, -1), dDay: null } : { week: addDays(s.week, -7) })),
+    nextWeek: () => set(s => (s.view === "month" ? { month: shiftMonth(s.month, 1), dDay: null } : { week: addDays(s.week, 7) })),
+    isMonth, isWeek: !isMonth, dowHead: DOW, monthCells, weeks, dl,
     views: ([["month", "Month"], ["week", "Week"]] as const).map(([k, lbl]) => {
       const on = st.view === k;
-      return { key: k, label: lbl, bg: on ? "#fff" : "transparent", fg: on ? C.ink : C.muted, sh: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", go: () => set({ view: k }) };
+      return { key: k, label: lbl, bg: on ? "#fff" : "transparent", fg: on ? C.ink : C.muted, sh: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", go: () => set({ view: k, dDay: null }) };
     }),
     days: days.map((day, i) => { const t = day === TODAY; return { day, dow: DOW[i], num: dd(day).d, fg: t ? C.ink : C.muted, w: t ? 600 : 500, numBg: t ? C.rust : "transparent", numFg: t ? "#fff" : "inherit" }; }),
     legend: (SL ? REASONS : []).map(k => ({ label: k, bg: calLeave(k)[0] })),
