@@ -141,7 +141,7 @@ export function Phone4aInboxHead({ v }: { v: MineHead }) {
             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={12} />
           </button>
           <span aria-hidden style={{ flex: "none", width: "1px", margin: "6px 2px", background: "var(--crm-line)" }} />
-          {v.chips3b.map(c => <Chip key={c.label} c={c} hot={c.label === "Attention"} />)}
+          {v.chips3b.map(c => <Chip key={c.label} c={c} hot={c.hot} />)}
         </div>
       )}
   </>);

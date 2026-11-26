@@ -65,8 +65,14 @@ export function inboxVM(ctx: SalesCtx) {
   const blocked = (c: CrmCustomer) => isFbBlocked(c, data);
   const coldOf = (c: CrmCustomer) => !blocked(c) && isCold(c, now);
   const warm = mine.filter(c => !blocked(c) && !isCold(c, now));
+  // Unread: its messages, or one marked unread — this person's own view (2026-10-14).
+  const marked = (c: CrmCustomer) => !!data.prefs[c.id]?.markedUnread;
+  const showsUnread = (c: CrmCustomer) => c.unread > 0 || marked(c);
   const f = ui.filter;
   const match = (c: CrmCustomer) => {
+    // Unread (the owner, 2026-11-27: "in phone view, it should have unread status pick as well" — the desktop's Status ›
+    // Unread since 2026-11-16, and Team's Filter chats the same day): every unread chat, a cold or blocked one too.
+    if (f?.type === "unread") return showsUnread(c);
     if (f?.type === "blocked") return blocked(c);
     if (blocked(c)) return false;
     const cold = isCold(c, now);
@@ -81,6 +87,8 @@ export function inboxVM(ctx: SalesCtx) {
   const usedLabels = data.labels.filter(l => mine.some(c => (data.customerLabels[c.id] ?? []).includes(l.id)));
   const chipDefs: [string, NonNullable<InboxFilter>["type"] | null, string | null, number][] = [
     ["All", null, null, warm.length],
+    // Unread first, as the desktop's Status and Team's Filter chats offer it (MINE AND TEAM SHOW THE SAME CATEGORIES).
+    ["Unread", "unread", "var(--crm-rust)", mine.filter(showsUnread).length],
     // New (2026-10-13): not answered by them since it came or was handed to them — shared/new-chat.ts.
     ["New", "new", STATUS.New.dot, warm.filter(isNewChat).length],
     ["Attention", "urgency", STATUS.Attention.dot, warm.filter(c => urgencyOf(c, now).level !== "none").length],
@@ -92,7 +100,8 @@ export function inboxVM(ctx: SalesCtx) {
   ];
   const chips3b = chipDefs.map(([label, type, dot, n]) => {
     const on = type ? !!f && f.type === type && f.v === label : !f;
-    return { label, n, dot, on, bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : INK, border: on ? "var(--crm-rust)" : BORDER, weight: on ? 650 : 500,
+    // Attention's and Unread's counts in the hot colour (a label of the same name is still a label).
+    return { label, n, dot, on, hot: type === "urgency" || type === "unread", bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : INK, border: on ? "var(--crm-rust)" : BORDER, weight: on ? 650 : 500,
       pick: () => patch({ filter: type ? { type, v: label } : null }) };
   });
 
@@ -109,9 +118,7 @@ export function inboxVM(ctx: SalesCtx) {
   // ── Row swipes ──
   const W = 84;
   const canAssign = (c: CrmCustomer) => !!ctx.embedded?.assignTo || leaderAssignees(ctx, c).length > 0;
-  // Right: Read for an unread chat (its messages, or one marked unread), else Unread — this person's own view (2026-10-14).
-  const marked = (c: CrmCustomer) => !!data.prefs[c.id]?.markedUnread;
-  const showsUnread = (c: CrmCustomer) => c.unread > 0 || marked(c);
+  // Right: Read for an unread chat (its messages, or one marked unread), else Unread (showsUnread, above).
   const canRead = (_c: CrmCustomer) => !ctx.viewingOther;
   const nRight = (c: CrmCustomer) => (canAssign(c) ? 2 : 1), nLeft = (c: CrmCustomer) => (canRead(c) ? 2 : 1);
   const goAssign = (c: CrmCustomer) => { set(u => ({ ...u, swipe: null, swipeR: null, moreLead: null, moreView: "main", chat: c.id, hm: { assign: true, sel: null } })); act.openChat(c.id); };
@@ -213,6 +220,7 @@ export function inboxVM(ctx: SalesCtx) {
 
   // Frame M03: a filter (or a search) with nothing in it says what shows there and offers every chat again.
   const EMPTY: Record<string, [Icon4a, string, string]> = {
+    Unread: ["mail-open", "No unread chats", "A chat shows here while a customer's message waits to be read, or when you mark it unread."],
     New: ["inbox", "No new chats", "A chat shows here when it first comes to you, until you answer it."],
     Attention: ["clock", "Nothing waiting", "A chat shows here when the customer has waited past your reply time."],
     "Follow up": ["message-circle", "No follow-ups", "A chat moves here once you have answered it and are following up."],
