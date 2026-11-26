@@ -25,6 +25,7 @@ import { shellVM } from "./sales/vm/header";
 import { byTeam, downlineOf, jobTitle } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import DeskScreens from "./desk/DeskScreens";
+import { DeskLoading } from "./desk/DeskLoading";
 import { inView, personInView, teamsInView } from "@/lib/member/crm-view";
 import { brandOf, type SourceBrand } from "@/lib/member/crm-source";
 import type { DeskApp as DeskAppFrame } from "./desk/vm/ctx";
@@ -322,7 +323,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const notice = (line: React.ReactNode) => (desk ? <div className={D.desk}><p className={H.loading}>{line}</p></div> : shell(<p className={H.loading}>{line}</p>));
   onScreenChat.current = null;
   panelShown.current = false;
-  if (!data || !shownAll) return notice(problem || "Loading your customers…");
+  // On a computer, waiting for the first answer is the CRM's own frame with nothing in it yet (desk/DeskLoading — the owner,
+  // 2026-11-27: "relaod time , change to crm frame"), as the Revenue app's loading drew it before; not a line in its page.
+  if (!data || !shownAll) return desk ? <DeskLoading line={problem || "Loading your customers…"} /> : notice(problem || "Loading your customers…");
   // The view's own (above): Dream Crafter's view, Dream Crafter's customers alone (2026-11-17); IR's, The Conts'; Fair's, none.
   const shownData = shownAll;
   const me = personOf(shownData.viewerId, shownData.people);
