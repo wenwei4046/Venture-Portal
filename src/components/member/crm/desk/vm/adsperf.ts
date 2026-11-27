@@ -9,7 +9,7 @@ import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
-import { INS_CARDS, MON, insightDates, insightRange } from "./insight";
+import { AD_LEADS, INS_CARDS, MON, insightDates, insightRange } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
@@ -84,6 +84,11 @@ export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number
   const vs = ctx.data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled");
   const appt = new Set(vs.map(v => v.customerId)).size, showup = new Set(vs.filter(v => v.state === "attended").map(v => v.customerId)).size, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
+}
+/** The leads of a range — the Leads figure's customers (crmFigures' `leads`), newest first. */
+export function leadIds(cs: CrmCustomer[], a: number, b: number): string[] {
+  const inR = (iso: string) => { const t = new Date(iso).getTime(); return t >= a && t < b + DAY; };
+  return cs.filter(c => inR(c.createdAt)).sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map(c => c.id);
 }
 /** The leads of a range who booked a visit — the Appointments figure's customers (crmFigures' `appt`). */
 export function apptIds(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number): string[] {
@@ -526,6 +531,9 @@ export function adsPerfVM(ctx: DeskCtx) {
         // The ad itself, asked of Meta by the server (/member/crm-ad), not one customer's referral link (2026-10-29).
         url: a.id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(a.id)}`,
         hidden: !!data.adNames?.[a.id]?.hidden,
+        // A row pressed lists the ad's leads of the range — the Leads cell's customers (the owner, 2026-11-27: "点击后看到所有
+        // 的 leads 名单"), in Insight's list pane, each to Customer info.
+        open: () => ctx.patch({ pane: "overlay", kind: "clist", clist: `${AD_LEADS}${a.name}`, clistIds: leadIds(a.cs, ra, rb), clistSub: rangeTxt(ra, rb), clRep: null, infoId: null, visit: null }),
         hide: data.can.manage && !a.id.startsWith("ch:") ? () => { const on = !data.adNames?.[a.id]?.hidden; void ctx.act.hideAd(a.id, on).then(ok => { if (ok) patch({ toast: on ? `${a.name} hidden from Ads Performance` : `${a.name} shown again` }); }); } : undefined,
         cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
       hiddenN, showHidden: !!ui.apShowHidden, toggleHidden: () => patch({ apShowHidden: !ui.apShowHidden }),

@@ -302,6 +302,9 @@ export function insightVM(ctx0: DeskCtx) {
 }
 
 /** The customers a figure opens (B1 / B6 / E2): its list, sorted by the chosen order, each to Customer info. */
+/** The title an ad's leads list opens under, before the ad's name (Ads performance, 2026-11-27). */
+export const AD_LEADS = "Leads · ";
+
 export function clistVM(ctx: DeskCtx) {
   const { ui, patch, set, data, now } = ctx;
   const key = ui.clist || "Leads";
@@ -312,7 +315,9 @@ export function clistVM(ctx: DeskCtx) {
   const stLabel: Record<string, string> = { "st:New": "New", "st:Overdue": "Attention", "st:Appointment": "Appointment", "st:Follow up": "Follow up", "st:Cold": "Cold leads" };
   type Row = { id: string; name: string; ini: string; sub: string; status: string; ord: number; rep: string };
   let rows: Row[];
-  if (ui.clistIds && key === "Appointments") {
+  // An ad's leads (Ads performance, a row pressed — the owner, 2026-11-27: "点击后看到所有的 leads 名单"): `Leads · <ad>`.
+  const adList = !!ui.clistIds && key.startsWith(AD_LEADS);
+  if (ui.clistIds && (key === "Appointments" || adList)) {
     const want = new Set(ui.clistIds);
     rows = all.filter(x => want.has(x.id)).map((x, i) => ({ id: x.id, name: x.name, ini: x.ini, sub: `${x.ad} · ${x.owner}`, status: x.status, ord: i, rep: x.owner }));
   } else if (key.startsWith("st:")) {
@@ -359,7 +364,7 @@ export function clistVM(ctx: DeskCtx) {
         : k === "Salesperson" ? (a, b) => (a.rep || "~").localeCompare(b.rep || "~") || a.ord - b.ord
           : k === "Name A–Z" ? (a, b) => a.name.localeCompare(b.name)
             : (a, b) => lastOf(b.id) - lastOf(a.id));
-  const isList = key.startsWith("st:") || key === "Appointments" || key === "Leads" || key === "Booked" || key === "Reply 24 h" || key === "Won";
+  const isList = key.startsWith("st:") || adList || key === "Appointments" ||key === "Leads" || key === "Booked" || key === "Reply 24 h" || key === "Won";
   return {
     clistN: isList ? `${rows.length} ${rows.length === 1 ? "customer" : "customers"}` : `${rows.length} ${rows.length === 1 ? "visit" : "visits"}`,
     clistEmpty: ui.kind === "clist" && !rows.length,
@@ -370,12 +375,12 @@ export function clistVM(ctx: DeskCtx) {
     clistRows: sorted.map(x => { const c = ST[x.status.split(" · ")[0]] ?? ST["Follow up"];
       return { name: x.name, ini: x.ini, sub: x.sub, status: x.status, stBg: c[0], stFg: c[1],
         open: () => key.startsWith("st:") ? patch({ kind: "chat", chat: x.id, fromList: true }) : patch({ kind: "info", infoId: x.id, infoFromChat: false }) }; }),
-    clistHead: { title: stLabel[key] ?? key, sub: stLabel[key] ? "Leads by status · tap to open the chat" : `${name} · tap a customer for their info` },
+    clistHead: { title: stLabel[key] ?? key, sub: stLabel[key] ? "Leads by status · tap to open the chat" : `${(ui.clistIds && ui.clistSub) || name} · tap a customer for their info` },
     backStatusLabel: `${stLabel[key] ?? ""} · all chats`, backToStatus: () => patch({ kind: "clist", fromList: false }),
     chatFromList: ui.kind === "chat" && ui.pane === "overlay" && ui.fromList && key.startsWith("st:"),
     // Opened from the chat, back is that chat (the owner, 2026-11-04: "点击后返回到聊天室"); from Leads, back is Leads.
     infoBack: !!ui.infoId && ui.kind === "info" && !ui.visit,
-    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : `${key} · all customers`,
+    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : adList ? "Back to the ad's leads" : `${key} · all customers`,
     backToList: () => patch(ui.infoFromChat && ui.chat ? { kind: "chat", infoFromChat: false } : { kind: "clist", infoId: null, infoFromChat: false }),
     teamNameOf: (id: string | null) => teamNameOf(ctx, id),
     isCold: (c: CrmCustomer) => isCold(c, now), urgency: (c: CrmCustomer) => urgencyOf(c, now),

@@ -1145,7 +1145,7 @@ interface AdsCell { v: string; cv: string; d: string; dc: string; db: string; ba
 interface AdsBits {
   ap4: {
     cols: { id: string; label: string; arrow: string; num: boolean; sort: () => void }[];
-    rows: { name: string; headline: string; brand?: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void }[];
+    rows: { name: string; headline: string; brand?: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void; open?: () => void }[];
     hiddenN?: number; showHidden?: boolean; toggleHidden?: () => void;
     total: { label: string; cells: AdsCell[] };
     cmp: boolean;
@@ -1170,15 +1170,26 @@ function AdName({ r, link = true, font = "500 14px Inter, sans-serif" }: { r: { 
     <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }} onContextMenu={e => { if (!r.url && !r.hide) return; e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
       <span title={r.hide ? "Right click to hide" : undefined} style={{ font, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.hidden ? "var(--crm-faint)" : "var(--crm-ink)" }}>{r.name}{r.hidden ? " · hidden" : ""}</span>
       {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ visibility: link ? "visible" : "hidden", flex: "none", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={11} /></a>}
-      {menu && <>
+      {/* Inside a row that opens the ad's leads: a press on the menu or past it is the menu's alone. */}
+      {menu && <span onClick={e => e.stopPropagation()}>
         <span onClick={() => setMenu(null)} onContextMenu={e => { e.preventDefault(); setMenu(null); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
         <span role="menu" style={{ position: "fixed", left: menu.x, top: menu.y, zIndex: 41, minWidth: "210px", padding: "4px 0", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
           {r.url && <a role="menuitem" href={r.url} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(null)} style={{ ...item, textDecoration: "none" }}><Ic name="arrow-up-right" size={13} />View ad</a>}
           {r.hide && <button type="button" role="menuitem" onClick={() => { setMenu(null); r.hide!(); }} style={{ ...item, color: r.hidden ? "var(--crm-ink)" : "var(--crm-oxblood)" }}><Ic name={r.hidden ? "plus" : "x"} size={13} />{r.hidden ? "Show in Ads Performance" : "Hide from Ads Performance"}</button>}
         </span>
-      </>}
+      </span>}
     </span>
   );
+}
+
+/**
+ * An ad's row opens its leads of the range (the owner, 2026-11-27: "点击后看到所有的 leads 名单"): a click, or Enter /
+ * Space from the keyboard. The ↗ and the right-click menu keep their own presses (AdName stops them).
+ */
+function rowPress(open?: () => void) {
+  if (!open) return {};
+  return { role: "button" as const, tabIndex: 0, title: "Click to see this ad's leads", onClick: open,
+    onKeyDown: (e: { key: string; preventDefault(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } };
 }
 
 /** Frame 05 · Ads Performance's table: the ad (channel, the name managers typed, Meta's headline), the CRM's figures, Meta's "—", the total under an ink rule. */
@@ -1235,8 +1246,8 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
         <button type="button" onClick={v.openMetrics} title="Add columns" style={{ ...BTN, justifySelf: "end", position: "sticky", right: "0", zIndex: 1, width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", border: "1px dashed var(--crm-rust)", background: "var(--crm-cream-nav)", boxShadow: "-10px 0 8px var(--crm-cream-nav)", color: "var(--crm-rust)" }}><Ic name="plus" size={12} /></button>
       </div>
       {A.rows.map((r, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", height: "44px", padding: "0 12px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)",
-          font: "400 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }} className="crm4a-row">
+        <div key={i} {...rowPress(r.open)} style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", height: "44px", padding: "0 12px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)",
+          font: "400 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", cursor: r.open ? "pointer" : undefined }} className="crm4a-row">
           <span style={{ ...pin("#fff"), display: "flex", gap: "10px", minWidth: 0 }}>
             <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
             <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -1374,8 +1385,9 @@ function DeskAdsD2a({ v, C, S }: { v: AdsBits; C: NonNullable<AdsBits["apChartV"
             {A.cols.map(c => <button key={c.id} type="button" onClick={c.sort} style={{ ...BTN, padding: 0, font: "inherit", textAlign: "right", whiteSpace: "nowrap", color: c.arrow ? "var(--crm-ink)" : "inherit" }}>{c.label}{c.arrow ? ` ${c.arrow}` : ""}</button>)}
           </div>
           {A.rows.map((r, i) => (
-            <div key={i} data-ads-row="" onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(h => (h === i ? null : h))}
-              style={{ ...row("58px"), borderBottom: "1px solid var(--crm-rule-soft)", font: "400 14.5px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
+            <div key={i} data-ads-row="" {...rowPress(r.open)} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(h => (h === i ? null : h))}
+              style={{ ...row("58px"), borderBottom: "1px solid var(--crm-rule-soft)", font: "400 14.5px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)",
+                cursor: r.open ? "pointer" : undefined, background: r.open && hov === i ? "var(--crm-hover)" : undefined }}>
               <span style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
                 <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", background: r.ch === "whatsapp" ? "var(--crm-wa-tile)" : "var(--crm-msg-tile)", color: r.ch === "whatsapp" ? "var(--crm-wa-tile-ink)" : "var(--crm-messenger)" }}>
                   <Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={14} />
