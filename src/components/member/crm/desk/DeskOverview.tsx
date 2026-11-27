@@ -7,6 +7,7 @@
  */
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import { DeskFigureTip } from "./Desk4a";
+import { FeeEdit } from "../shared/fee-edit";
 import type { DeskOverview as OV } from "./vm/overview";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -78,14 +79,16 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
     // The space under the tab bar is the frame's (vm/frame4a.ts › pad: 20 px, the owner, 2026-11-27: "它跟那个框之间是要有空间感的"),
     // as Team performance's is — the Overview adds none of its own, with the Brand row or without.
     <div data-insight-overview="" style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
-      {src && (
+      {(src || o.money) && (
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", marginBottom: "-12px" }}>
-          <span style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Brand</span>
+          {src && <><span style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Brand</span>
           <div role="group" aria-label="Brand" style={{ height: "32px", padding: "3px", boxSizing: "border-box", borderRadius: "8px", background: "var(--crm-field)", display: "flex", gap: "2px", font: "500 12px Inter, sans-serif" }}>
             {src.map(s => <button key={s.label} type="button" onClick={s.pick} aria-pressed={s.on} style={{ ...BTN, padding: "0 12px", borderRadius: "6px", font: "inherit", whiteSpace: "nowrap",
               background: s.on ? "#fff" : "transparent", boxShadow: s.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: s.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{s.label}</button>)}
-          </div>
+          </div></>}
           {o.money && !o.ready && <span style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>Reading spend from Ads Manager…</span>}
+          {/* The viewer's own marketing fee (2026-11-27): Total cost, Per lead and ROAS follow it. */}
+          {o.money && <FeeEdit value={o.fee.value} save={o.fee.save} size={12} style={{ marginLeft: o.ready ? "auto" : undefined }} />}
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(o.tiles.length, 4)},minmax(0,1fr))`, rowGap: "22px", padding: "22px 0", borderRadius: "12px", background: "var(--crm-sum)", border: "1px solid var(--crm-sum-line)" }}>

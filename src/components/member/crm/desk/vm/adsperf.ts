@@ -117,12 +117,34 @@ export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<st
  * — until then 25% of the first RM 30,000 + 20% above, never under RM 2,500). Nothing spent, no fee; unknown spend, unknown fee.
  */
 export const FEE_FIXED = 2500;
-export function marketingFee(spend: number | null | undefined): number | null {
-  if (spend == null) return null;
-  return spend > 0 ? FEE_FIXED : 0;
+/**
+ * Each viewer's own fee a brand a month (the owner, 2026-11-27: "RM 2500 的 marketing fee 变成可调整式 … 不同的人去看数据，
+ * 要求的价值有不同"; "DC & IR 都一样" — one figure for every brand): kept per person on the server (crm_save_ui_pref
+ * "mktFee"), RM 2,500 until they change it; 0 takes the fee out of Total cost, Per lead and ROAS everywhere they look.
+ */
+export const FEE_PREF = "mktFee";
+export function feeFixedOf(prefs: Record<string, unknown> | null | undefined): number {
+  const v = prefs?.[FEE_PREF];
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v * 100) / 100, 1_000_000) : FEE_FIXED;
 }
-/** The fee's one rule, as the strip and its hover name it. */
-export const FEE_TIERS = [{ n: 1, price: "Fixed RM 2,500", rule: "Fixed RM 2,500 a month for each brand that spent" }] as const;
+/** What a typed figure saves as: a whole sen amount from 0 to RM 1,000,000; anything else is null (not saved). */
+export function feeTyped(text: string): number | null {
+  const t = text.replace(/[,\s]/g, "").replace(/^rm/i, "");
+  if (!/^\d+(\.\d{0,2})?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n <= 1_000_000 ? n : null;
+}
+export function marketingFee(spend: number | null | undefined, fixed: number = FEE_FIXED): number | null {
+  if (spend == null) return null;
+  return spend > 0 ? fixed : 0;
+}
+const rmFee = (n: number) => `RM ${n.toLocaleString("en-MY", { maximumFractionDigits: 2 })}`;
+/** The fee's one rule, in the viewer's own figure. */
+export function feeRule(fixed: number = FEE_FIXED) {
+  return { n: 1, price: `Fixed ${rmFee(fixed)}`, rule: `Fixed ${rmFee(fixed)} a month for each brand that spent` };
+}
+/** The fee's one rule at the default figure (the hover names the viewer's own through feeRule). */
+export const FEE_TIERS = [feeRule()] as const;
 /** The fee's rule for a month (one rule since 2026-11-25; no next tier). */
 export function feeTier(_spend: number): { tier: (typeof FEE_TIERS)[number]; toNext: number | null } {
   return { tier: FEE_TIERS[0], toNext: null };
@@ -136,18 +158,19 @@ export function adBrandOf(customers: { adId?: string | null; channel: CrmCustome
  * 2500") — All with both brands spending is RM 5,000. An ad of no known brand adds its spend; it is billed on its own only
  * when no brand spent. Null until every ad's spend is read.
  */
-export function monthFee(ids: string[], brandOfAd: (id: string) => SourceBrand | null, spendOf: (ids: string[]) => number | null): { spent: number; fee: number } | null {
+export function monthFee(ids: string[], brandOfAd: (id: string) => SourceBrand | null, spendOf: (ids: string[]) => number | null, fixed: number = FEE_FIXED): { spent: number; fee: number; billed: number } | null {
   const by = new Map<string, string[]>();
   for (const id of ids) { const k = brandOfAd(id) ?? "none"; by.set(k, [...(by.get(k) ?? []), id]); }
-  let spent = 0, fee = 0, none = 0;
+  // `billed` = the brands charged this month, whatever the figure (at RM 0 the fee is 0 but they were still billed).
+  let spent = 0, billed = 0, none = 0;
   for (const [k, g] of by) {
     const s = spendOf(g);
     if (s == null) return null;
     spent += s;
-    if (k === "none") none = s; else fee += marketingFee(s) ?? 0;
+    if (k === "none") none = s; else if (s > 0) billed++;
   }
-  if (!fee && none > 0) fee = marketingFee(none) ?? 0;
-  return { spent, fee };
+  if (!billed && none > 0) billed = 1;
+  return { spent, fee: billed * fixed, billed };
 }
 /** The fee's working in words, for the hover: a fixed fee needs none. */
 export function feeWorking(spend: number): string {
@@ -218,6 +241,8 @@ export function adsPerfVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now } = ctx;
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const monthA = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  // The viewer's own fee a brand a month (feeFixedOf; RM 2,500 until they change it on the Marketing fee figure).
+  const fixed = feeFixedOf(data.uiPrefs);
   // Customise metrics picks for Ads Performance's columns, (ui.mFor "cards") Insight's ad cards, or (ui.mFor "chart") the
   // chart's tiles, six at most — the same pane and list (2026-10-23: the chart's + opens it too).
   const forCards = ui.mFor === "cards", forChart = ui.mFor === "chart";
@@ -281,7 +306,7 @@ export function adsPerfVM(ctx: DeskCtx) {
   const brandOfFee = adBrandOf(data.customers, id => data.adNames?.[id]?.pageId);
   // The fee on a range's months as a share of their spend (RM 2,500 on RM 3,192 = 78%); null until every month is read.
   const feeRate = (a: number, b: number): number | null => {
-    const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(feeIds, brandOfFee, ids => metaFigures(metaOf(ids, x, y), {}).spend));
+    const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(feeIds, brandOfFee, ids => metaFigures(metaOf(ids, x, y), {}).spend, fixed));
     if (!ms.length || ms.some(m => m == null)) return null;
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
@@ -440,21 +465,25 @@ export function adsPerfVM(ctx: DeskCtx) {
   // fee 就只需要在 ads performance 的总览出现"): on the overview only, never an ad's column — the fee is the bill's, worked
   // out on each calendar month's whole spend (feeMonths, feeIds above). Always shown, not one of the picked figures, after
   // Spent; under the fee, the tier the month has reached and the spend to the next. Total cost = those months' spend + fee.
-  const feeMon = feeRanges.map(([a, b]) => { const s = metaFigures(metaOf(feeIds, a, b), {}).spend; return { a, s, fee: monthFee(feeIds, brandOfFee, ids => metaFigures(metaOf(ids, a, b), {}).spend)?.fee ?? marketingFee(s) }; });
+  const feeMon = feeRanges.map(([a, b]) => { const s = metaFigures(metaOf(feeIds, a, b), {}).spend; const m = monthFee(feeIds, brandOfFee, ids => metaFigures(metaOf(ids, a, b), {}).spend, fixed);
+    return { a, s, fee: m?.fee ?? marketingFee(s, fixed), billed: m?.billed ?? (s != null && s > 0 ? 1 : 0) }; });
   const feeKnown = feeMon.length > 0 && feeMon.every(m => m.s != null);
   const feeSum = feeKnown ? feeMon.reduce((n, m) => n + (m.fee ?? 0), 0) : null, monSpend = feeKnown ? feeMon.reduce((n, m) => n + (m.s ?? 0), 0) : null;
   const monName = (t: number) => MON[new Date(t).getMonth()].slice(0, 3);
   const rmW = (n: number) => `RM ${Math.round(n).toLocaleString("en-MY")}`;
   // A fixed fee a month since 2026-11-25 (feeTier): its line says so, with nothing to reach.
   // Per brand since the same evening ("每个品牌各2500"): RM 2,500 × the brands that spent, each month.
-  const billed = feeMon.reduce((n, m) => n + Math.round((m.fee ?? 0) / FEE_FIXED), 0);
-  const feeSub = !feeKnown ? [] : [`${FEE_TIERS[0].price} × ${billed}`, feeMon.length === 1 ? "Each brand that spent" : "Each brand, each month"];
+  // Since 2026-11-27 the figure is the viewer's own (feeFixedOf) — RM 0 keeps the count of brands billed, at RM 0 each.
+  const billed = feeMon.reduce((n, m) => n + m.billed, 0), rule = feeRule(fixed);
+  const feeSub = !feeKnown ? [] : [`${rule.price} × ${billed}`, feeMon.length === 1 ? "Each brand that spent" : "Each brand, each month"];
   const feeTitle = [
-    ...FEE_TIERS.map(t => t.rule), "",
+    rule.rule, "",
     ...(feeKnown ? feeMon.flatMap(m => [`${monName(m.a)} ${new Date(m.a).getFullYear()}: spend ${rmW(m.s ?? 0)} → fee ${rmW(m.fee ?? 0)}`, feeWorking(m.s ?? 0)].filter(Boolean)) : []),
   ].join("\n");
   const feeItems = [
-    { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle },
+    { key: "mktfee", label: "Marketing fee", total: chartFmt(feeSum, "rm"), color: "var(--crm-faint-2)", remove: null, sub: feeSub, title: feeTitle,
+      // Typed in place, the viewer's own (saved on the server per person; every figure that adds the fee follows it).
+      fee: { value: fixed, save: (n: number) => ctx.deskAct.saveUiPref(FEE_PREF, n) } },
     { key: "totalcost", label: "Total cost", total: chartFmt(feeSum == null || monSpend == null ? null : monSpend + feeSum, "rm"), color: "var(--crm-ink)", remove: null,
       sub: feeKnown ? [`${feeMon.map(m => monName(m.a)).join(" + ")} spend + fee`] : [], title: feeKnown ? `${rmW(monSpend ?? 0)} spent + ${rmW(feeSum ?? 0)} marketing fee` : undefined },
   ];

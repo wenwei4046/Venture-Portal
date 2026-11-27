@@ -15,6 +15,7 @@ import { withoutHiddenAds, type CrmData } from "@/lib/member/crm-data";
 import { inSource, type SourcePick } from "@/lib/member/crm-source";
 import { Ic } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
+import { FeeEdit } from "./fee-edit";
 import { mins, overviewFigures, overviewTiles, pctOf, rm, rm2, type OvRange, type OvTeamIn } from "./insight-overview";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -33,6 +34,8 @@ export interface PhoneOverviewProps {
   teams: (OvTeamIn & { c?: string })[]; directors: { id: string; name: string }[]; directorTeam: string; directorColour: string;
   live: boolean; money: boolean;
   openAds?: () => void; openTeam?: () => void;
+  /** The viewer's own marketing fee a brand a month and its save (absent while viewing as somebody). */
+  fee?: { value: number; save?: (n: number) => void };
 }
 
 function kept(): Record<string, Record<string, MetaFig | null>> { try { return JSON.parse(localStorage.getItem(KEPT) || "{}"); } catch { return {}; } }
@@ -54,7 +57,7 @@ export function PhoneOverview(p: PhoneOverviewProps) {
   useEffect(() => { mounted.current = true; const t = setInterval(() => setTick(x => x + 1), 60_000); return () => { mounted.current = false; clearInterval(t); }; }, []);
   const today = isoDay(p.now);
   const askAll = (key: string, until: string) => { const t = askedAt.current.get(key); return t == null || (until >= today && Date.now() - t > REFRESH_MS); };
-  const f = overviewFigures({ data, r: p.r, prev: p.prev, now: p.now, teams: p.teams, directors: p.directors, directorTeam: p.directorTeam, src, meta, money: p.money && p.live, askAll });
+  const f = overviewFigures({ data, r: p.r, prev: p.prev, now: p.now, teams: p.teams, directors: p.directors, directorTeam: p.directorTeam, src, meta, money: p.money && p.live, askAll, fee: p.fee?.value });
   const needKey = JSON.stringify(f.need);
   useEffect(() => {
     if (!p.live || !p.money || !f.need.length) return;
@@ -93,6 +96,7 @@ export function PhoneOverview(p: PhoneOverviewProps) {
       {BRANDS.map(([k, label]) => <button key={k} type="button" onClick={() => setSrc(k)} aria-pressed={src === k} style={{ ...BTN, flex: 1, height: "30px", borderRadius: "15px", fontSize: fs(12), fontWeight: src === k ? 600 : 500,
         background: src === k ? "#fff" : "transparent", boxShadow: src === k ? "0 1px 2px #2A160C1F" : "none", color: src === k ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>)}
     </div>
+    {money && p.fee && <FeeEdit value={p.fee.value} save={p.fee.save} size={12} style={{ alignSelf: "flex-end", flex: "none" }} />}
     <div data-ov-sum="" style={{ flex: "none", display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: "12px", padding: "14px 0", borderRadius: "16px", background: "var(--crm-rust)", color: "#fff" }}>
       {tiles.map((m, i) => (
         <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0, padding: "0 16px", borderLeft: i % 2 ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent" }}>

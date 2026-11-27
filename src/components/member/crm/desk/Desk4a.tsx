@@ -24,6 +24,7 @@ import { AuditTimeline } from "../shared/audit-timeline";
 import { InboxFilter, MenuChip, type InboxFilterBits } from "./DeskMenuChip";
 import { usePanelOpenOn } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
+import { FeeEdit } from "../shared/fee-edit";
 import { avatarTint, STATUS } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
 import { DeskAddCustomer, DeskProfileDrawer, type ProfileDrawerV } from "./DeskExtras";
@@ -1156,7 +1157,7 @@ interface AdsBits {
   /** v4 D2a: the figure strip (absent in the prototype harness, which keeps the old table). */
   apStrip?: AdsStripBits;
 }
-interface AdsStripBits { items: { key: string; label: string; total: string; color: string; remove: (() => void) | null; sub?: string[]; title?: string; open?: () => void }[]; canAdd: boolean; add: () => void; open: boolean; toggle: () => void }
+interface AdsStripBits { items: { key: string; label: string; total: string; color: string; remove: (() => void) | null; sub?: string[]; title?: string; open?: () => void; fee?: { value: number; save: (n: number) => void } }[]; canAdd: boolean; add: () => void; open: boolean; toggle: () => void }
 
 /**
  * An ad's name in Ads Performance: a small ↗ beside it opens the ad (the owner, 2026-10-24: "電腦版也要有可以導入看該廣告");
@@ -1354,6 +1355,8 @@ function DeskAdsD2a({ v, C, S }: { v: AdsBits; C: NonNullable<AdsBits["apChartV"
   };
   return (
     <div data-ads-d2a="" style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
+      {/* The viewer's own marketing fee (2026-11-27): the strip's fee, Total cost and Per lead follow it. */}
+      {(() => { const f = S.items.find(x => x.fee)?.fee; return f ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "-10px" }}><FeeEdit value={f.value} save={f.save} size={12.5} /></div> : null; })()}
       <DeskAdsStrip S={S} />
       {S.open && <DeskAdsChart v={C} head={false} />}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>

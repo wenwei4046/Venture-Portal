@@ -13,7 +13,7 @@
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import type { CrmCustomer, CrmData } from "@/lib/member/crm-data";
 import { BRAND_LABEL, adPageInSource, brandOf, sourceOf, type SourceBrand, type SourcePick } from "@/lib/member/crm-source";
-import { feeMonths, isoOf, monthFee, noAdRepeats } from "../desk/vm/adsperf";
+import { feeFixedOf, feeMonths, isoOf, monthFee, noAdRepeats } from "../desk/vm/adsperf";
 import { inRange, numbersOf } from "../panel/vm/common";
 
 export interface OvRange { a: number; b: number }
@@ -41,6 +41,8 @@ export interface OverviewIn {
    * date" — the phone kept the first spend it read for "This month" all month). Absent: only what is missing.
    */
   askAll?: (key: string, until: string) => boolean;
+  /** The viewer's marketing fee a brand a month; absent = their saved figure (`data.uiPrefs.mktFee`), else RM 2,500. */
+  fee?: number;
 }
 
 export interface OvMoney { spend: number | null; fee: number | null; cost: number | null; cpl: number | null }
@@ -105,6 +107,7 @@ export function salesOf(cs: CrmCustomer[], r: OvRange): number {
 export function overviewFigures(p: OverviewIn): OverviewFigures {
   const { data, r, prev, now, meta } = p;
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const fixed = p.fee ?? feeFixedOf(data.uiPrefs);
   const repeats = noAdRepeats(data.customers);
   const adCs = data.customers.filter(c => !repeats.has(c.id));
   // Leads count each PERSON once, everywhere (the owner, 2026-11-23: 185 / 180 / 186 → "能不能统一"; picked "一人只算一次"):
@@ -143,8 +146,8 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   };
   // The fee is the calendar month's, on every ad of the brand: its share of the months' spend (Ads Performance's feeRate).
   const feeRate = (a: number, b: number): number | null => {
-    // RM 2,500 a month for each brand that spent (monthFee — "每个品牌各2500", 2026-11-25).
-    const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(paidIds, brandOfAd, ids => spendOf(ids, x, y)));
+    // The viewer's own fee a month for each brand that spent (monthFee; RM 2,500 until they change it — feeFixedOf, 2026-11-27).
+    const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(paidIds, brandOfAd, ids => spendOf(ids, x, y), fixed));
     if (!ms.length || ms.some(m => m == null)) return null;
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
