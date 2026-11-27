@@ -304,6 +304,8 @@ export function insightVM(ctx0: DeskCtx) {
 /** The customers a figure opens (B1 / B6 / E2): its list, sorted by the chosen order, each to Customer info. */
 /** The title an ad's leads list opens under, before the ad's name (Ads performance, 2026-11-27). */
 export const AD_LEADS = "Leads · ";
+/** …and an ad's appointments (its Appts cell pressed, 2026-11-27). */
+export const AD_APPTS = "Appointments · ";
 
 export function clistVM(ctx: DeskCtx) {
   const { ui, patch, set, data, now } = ctx;
@@ -316,7 +318,8 @@ export function clistVM(ctx: DeskCtx) {
   type Row = { id: string; name: string; ini: string; sub: string; status: string; ord: number; rep: string };
   let rows: Row[];
   // An ad's leads (Ads performance, a row pressed — the owner, 2026-11-27: "点击后看到所有的 leads 名单"): `Leads · <ad>`.
-  const adList = !!ui.clistIds && key.startsWith(AD_LEADS);
+  const adAppts = !!ui.clistIds && key.startsWith(AD_APPTS);
+  const adList = (!!ui.clistIds && key.startsWith(AD_LEADS)) || adAppts;
   if (ui.clistIds && (key === "Appointments" || adList)) {
     const want = new Set(ui.clistIds);
     rows = all.filter(x => want.has(x.id)).map((x, i) => ({ id: x.id, name: x.name, ini: x.ini, sub: `${x.ad} · ${x.owner}`, status: x.status, ord: i, rep: x.owner }));
@@ -380,7 +383,7 @@ export function clistVM(ctx: DeskCtx) {
     chatFromList: ui.kind === "chat" && ui.pane === "overlay" && ui.fromList && key.startsWith("st:"),
     // Opened from the chat, back is that chat (the owner, 2026-11-04: "点击后返回到聊天室"); from Leads, back is Leads.
     infoBack: !!ui.infoId && ui.kind === "info" && !ui.visit,
-    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : adList ? "Back to the ad's leads" : `${key} · all customers`,
+    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : adAppts ? "Back to the ad's appointments" : adList ? "Back to the ad's leads" : `${key} · all customers`,
     backToList: () => patch(ui.infoFromChat && ui.chat ? { kind: "chat", infoFromChat: false } : { kind: "clist", infoId: null, infoFromChat: false }),
     teamNameOf: (id: string | null) => teamNameOf(ctx, id),
     isCold: (c: CrmCustomer) => isCold(c, now), urgency: (c: CrmCustomer) => urgencyOf(c, now),

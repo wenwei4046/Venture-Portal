@@ -1141,7 +1141,18 @@ export function DeskCalendar4a({ v }: { v: CalPageBits }) {
   );
 }
 
-interface AdsCell { v: string; cv: string; d: string; dc: string; db: string; bar?: number | null }
+interface AdsCell { v: string; cv: string; d: string; dc: string; db: string; bar?: number | null; open?: () => void }
+/**
+ * A figure that opens its own customers (an ad's Appts, 2026-11-27): underlined, and its press is its own, never the row's.
+ */
+function cellPress(c: AdsCell) {
+  if (!c.open) return {};
+  const open = c.open;
+  return { role: "button" as const, tabIndex: 0, title: "Click to see these appointments",
+    onClick: (e: { stopPropagation(): void }) => { e.stopPropagation(); open(); },
+    onKeyDown: (e: { key: string; preventDefault(): void; stopPropagation(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open(); } },
+    style: { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } as CSSProperties };
+}
 interface AdsBits {
   ap4: {
     cols: { id: string; label: string; arrow: string; num: boolean; sort: () => void }[];
@@ -1223,7 +1234,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     return (
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", minWidth: 0 }}>
         {/* Appt rate is its figure alone, no bar (the owner, 2026-10-18). */}
-        {<span style={{ color: meta && !total ? "var(--crm-faint-2)" : undefined, whiteSpace: "nowrap" }}>{/%$/.test(c.v) ? (id === "showrate" || id === "apptrate" ? `${Math.round(parseFloat(c.v))}%` : c.v.replace(/(\.\d)\d%$/, "$1%")) : c.v}</span>}
+        {<span {...cellPress(c)} style={{ ...cellPress(c).style, color: meta && !total ? "var(--crm-faint-2)" : undefined, whiteSpace: "nowrap" }}>{/%$/.test(c.v) ? (id === "showrate" || id === "apptrate" ? `${Math.round(parseFloat(c.v))}%` : c.v.replace(/(\.\d)\d%$/, "$1%")) : c.v}</span>}
         {A.cmp && c.d && <span style={{ alignSelf: "flex-end", font: "500 10px Inter, sans-serif", padding: "0 5px", borderRadius: "4px", background: c.db, color: c.dc }}>{c.d}</span>}
       </span>
     );
@@ -1359,7 +1370,7 @@ function DeskAdsD2a({ v, C, S }: { v: AdsBits; C: NonNullable<AdsBits["apChartV"
     const t = adsShown(c, id), faint = adsFaint(t);
     return (
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", minWidth: 0 }}>
-        <span style={{ whiteSpace: "nowrap", fontWeight: lead && !faint ? 600 : undefined, color: faint ? "var(--crm-faint)" : "var(--crm-ink)" }}>{t}</span>
+        <span {...cellPress(c)} style={{ ...cellPress(c).style, whiteSpace: "nowrap", fontWeight: lead && !faint ? 600 : undefined, color: faint ? "var(--crm-faint)" : "var(--crm-ink)" }}>{t}</span>
         {A.cmp && c.d && <span style={{ font: "500 10px Inter, sans-serif", padding: "0 5px", borderRadius: "4px", background: c.db, color: c.dc, whiteSpace: "nowrap" }}>{c.d}</span>}
       </span>
     );

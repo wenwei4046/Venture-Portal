@@ -9,7 +9,7 @@ import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
-import { AD_LEADS, INS_CARDS, MON, insightDates, insightRange } from "./insight";
+import { AD_APPTS, AD_LEADS, INS_CARDS, MON, insightDates, insightRange } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
@@ -535,7 +535,11 @@ export function adsPerfVM(ctx: DeskCtx) {
         // 的 leads 名单"), in Insight's list pane, each to Customer info.
         open: () => ctx.patch({ pane: "overlay", kind: "clist", clist: `${AD_LEADS}${a.name}`, clistIds: leadIds(a.cs, ra, rb), clistSub: rangeTxt(ra, rb), clRep: null, infoId: null, visit: null }),
         hide: data.can.manage && !a.id.startsWith("ch:") ? () => { const on = !data.adNames?.[a.id]?.hidden; void ctx.act.hideAd(a.id, on).then(ok => { if (ok) patch({ toast: on ? `${a.name} hidden from Ads Performance` : `${a.name} shown again` }); }); } : undefined,
-        cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
+        cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb);
+          // The Appts cell opens that ad's leads who booked a visit (the owner, 2026-11-27: "我要如何看到appt 的时候呢？") — the
+          // cell's own customers (apptIds, as the strip's Appointments), only when there are some.
+          const appts = m[0] === "appt" && raw ? () => ctx.patch({ pane: "overlay", kind: "clist", clist: `${AD_APPTS}${a.name}`, clistIds: apptIds(a.cs, ctx, ra, rb), clistSub: rangeTxt(ra, rb), clRep: null, infoId: null, visit: null }) : undefined;
+          return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null, ...(appts ? { open: appts } : {}) }; }) })),
       hiddenN, showHidden: !!ui.apShowHidden, toggleHidden: () => patch({ apShowHidden: !ui.apShowHidden }),
       total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(x => x.id)))) },
       cmp,

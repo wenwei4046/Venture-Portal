@@ -28,6 +28,21 @@ describe("an ad's row on Ads Performance", () => {
     expect(open).toHaveBeenCalledTimes(2);
   });
 
+  it("an Appts figure that opens its customers opens them, not the row's leads", () => {
+    const open = vi.fn(), appts = vi.fn();
+    render(<DeskAdsTable4a v={{
+      ap4: {
+        cols: [{ id: "appt", label: "Appts", arrow: "", num: true, sort: () => {} }],
+        rows: [{ name: "Skyline", headline: "", ch: "whatsapp", cells: [{ ...cell("1"), open: appts }], open }],
+        total: { label: "All 1 ads", cells: [cell("1")] }, cmp: false,
+      },
+      apNameArrow: "↕", apSortName: () => {}, openMetrics: () => {},
+    }} />);
+    fireEvent.click(screen.getByTitle("Click to see these appointments"));
+    expect(appts).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
+  });
+
   it("the ↗ opens the ad, not the list", () => {
     const { open } = draw();
     fireEvent.click(screen.getByRole("link", { name: "View ad" }));
