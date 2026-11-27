@@ -15,6 +15,12 @@ const BTN: CSSProperties = { border: 0, background: "transparent", font: "inheri
 const HEAD: CSSProperties = { display: "grid", padding: "8px 0", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)", borderBottom: "1px solid var(--crm-rule)" };
 const ROW: CSSProperties = { ...BTN, width: "100%", display: "grid", alignItems: "center", minHeight: "46px", font: "400 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", borderBottom: "1px solid var(--crm-rule-soft)" };
 const R: CSSProperties = { textAlign: "right" };
+/** An ad's Leads / Appt that open their customers (2026-11-27): their own press, never the row's fold. */
+const figPress = (open: (() => void) | undefined, what: string) => !open ? {} : {
+  role: "button" as const, tabIndex: 0, title: `Click to see these ${what}`,
+  onClick: (e: { stopPropagation(): void }) => { e.stopPropagation(); open(); },
+  onKeyDown: (e: { key: string; preventDefault(): void; stopPropagation(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open(); } } };
+const figLink = (open: (() => void) | undefined): CSSProperties => (open ? { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } : {});
 
 function Section({ title, go, goLabel, children }: { title: string; go: () => void; goLabel: string; children: ReactNode }) {
   return (
@@ -129,7 +135,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
               </span>
               <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.brand || "—"}</span>
               {o.money && <><span style={R}>{a.spend}</span><span style={R}>{a.cpl}</span></>}
-              <span style={{ ...R, fontWeight: 500 }}>{a.leads}</span><span style={R}>{a.appt}</span><span style={R}>{a.won}</span>{extra(a.extra)}
+              <span {...figPress(a.openLeads, "leads")} style={{ ...R, fontWeight: 500, ...figLink(a.openLeads) }}>{a.leads}</span><span {...figPress(a.openAppts, "appointments")} style={{ ...R, ...figLink(a.openAppts) }}>{a.appt}</span><span style={R}>{a.won}</span>{extra(a.extra)}
             </button>
             {a.open && a.teams.map(t => (
               <div key={t.name} style={{ ...ROW, cursor: "default", minHeight: "38px", gridTemplateColumns: adCols, background: "var(--crm-hover)", fontSize: "13px" }}>

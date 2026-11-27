@@ -50,6 +50,13 @@ function crmFigs(cs: CrmCustomer[], visits: CrmVisit[], r: Range): Record<string
   const appt = new Set(vs.map(v => v.customerId)).size, showup = vs.filter(v => v.state === "attended").length, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
 }
+/** An ad's leads of a range (newest first) and those of them who booked a visit — the Leads and Appts figures' customers. */
+export function adLists(cs: CrmCustomer[], visits: CrmVisit[], r: Range): { leads: string[]; appts: string[] } {
+  const inR = (iso: string) => { const t = new Date(iso).getTime(); return t >= r.a && t < r.b + DAY; };
+  const leads = cs.filter(c => inR(c.createdAt)).sort((x, y) => y.createdAt.localeCompare(x.createdAt)).map(c => c.id), ids = new Set(leads);
+  const booked = new Set(visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled").map(v => v.customerId));
+  return { leads, appts: leads.filter(id => booked.has(id)) };
+}
 /** Rates as whole percents on the phone; money and counts as the desktop writes them. */
 const show = (k: string, v: number | null | undefined) => { const f = chartFmtOf(defOf(k)?.[3] ?? "n"); return f === "pct" && v != null ? `${Math.round(v)}%` : chartFmt(v, f); };
 /** Short names where a long one would be cut (an ad's figures, four across). */
@@ -74,7 +81,9 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   view?: CrmData["view"];
   /** The viewer's own marketing fee a brand a month (2026-11-27) and its save (absent while viewing as somebody). */
   fee?: { value: number; save?: (n: number) => void };
-  range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
+  range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void;
+  /** Opens a list of customers (an ad's leads or appointments) in the panel's list sheet (2026-11-27). */
+  openList?: (title: string, ids: string[]) => void }; head?: ReactNode }) {
   const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null), [src, setSrc] = useState<SourcePick>("all");
   // The source picked (the owner, 2026-10-27): The Conts / DC, each by WhatsApp · Messenger — the ads, tiles and chart follow it.
   const customers = useMemo(() => p.customers.filter(c => inSource(c, src)), [p.customers, src]);
@@ -256,6 +265,14 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
             {on && <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", paddingTop: "8px", borderTop: "1px solid var(--crm-rule-soft)", fontSize: fs(12), color: "var(--crm-muted)" }}>
               {["leads", "appt", "showup", "won", "spend", "cpl"].filter(k => !keys.includes(k)).map(k => <span key={k} style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}><span>{label(k)}</span><b style={{ fontWeight: 500, color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{show(k, a.f[k])}</b></span>)}
             </span>}
+            {/* The ad's own customers (the owner, 2026-11-27: "手机版也可以吗？" — the desktop's row and Appts open them): its
+                leads of the period and those who booked a visit, each list exactly its figure. */}
+            {on && p.openList && (() => { const L = adLists(a.cs, p.visits, r), when = perWord; const go = (t: string, ids: string[]) => (e: { stopPropagation(): void }) => { e.stopPropagation(); p.openList!(t, ids); };
+              const btn: CSSProperties = { ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: fs(12.5), fontWeight: 500, background: "var(--crm-field)", color: "var(--crm-ink)" };
+              return <span data-ad-lists="" style={{ display: "flex", gap: "8px" }}>
+                <button type="button" disabled={!L.leads.length} onClick={go(`Leads · ${a.name} · ${when}`, L.leads)} style={{ ...btn, opacity: L.leads.length ? 1 : 0.45 }}><Ic name="users" size={13} />{L.leads.length} {L.leads.length === 1 ? "lead" : "leads"}</button>
+                <button type="button" disabled={!L.appts.length} onClick={go(`Appointments · ${a.name} · ${when}`, L.appts)} style={{ ...btn, opacity: L.appts.length ? 1 : 0.45 }}><Ic name="calendar" size={13} />{L.appts.length} {L.appts.length === 1 ? "appt" : "appts"}</button>
+              </span>; })()}
           </div>); })}
       </div>
       {!p.live && <span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>Spend and costs come from Ads Manager on the live CRM.</span>}

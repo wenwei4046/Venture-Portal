@@ -25,7 +25,7 @@ export function calendarListVM(ctx: PanelCtx, cal: Pick<ReturnType<typeof calend
   const unit = (n: number) => isV ? n + (n === 1 ? " visit" : " visits") : n + (n === 1 ? " lead" : " leads");
   return {
     open: !!k && !!cal, close: () => patch({ cLs: false }), stop,
-    title: (k === "up" ? "Upcoming" : k === "came" ? "Showed up" : "Leads") + " · " + (cal?.cRangeBtn ?? ""),
+    title: k === "ad" ? ui.cLsAd?.title ?? "" : (k === "up" ? "Upcoming" : k === "came" ? "Showed up" : "Leads") + " · " + (cal?.cRangeBtn ?? ""),
     count: unit(items.length), empty: !items.length, hasRows: !!items.length,
     emptyText: k === "up" ? "No upcoming visits in this period." : k === "came" ? "Nobody showed up in this period yet." : "No leads in this period.",
     rows: items.map(({ c, at }, n) => ({

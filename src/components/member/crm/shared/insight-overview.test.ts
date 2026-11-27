@@ -169,3 +169,18 @@ describe("Insight › Overview's fee on a whole month", () => {
     expect(overviewFigures(base({ r: MONTH, meta, fee: undefined })).ads).toMatchObject({ fee: 0, cost: 8_235 });
   });
 });
+
+describe("Insight › Overview: an ad's Leads and Appt open their customers (the owner, 2026-11-27: \"overview 也要\")", () => {
+  it("each ad carries exactly the customers its Leads and Appt count", () => {
+    const f = overviewFigures(base());
+    const c = f.adRows.find(a => a.id === AD_C)!;
+    // c0 came in October: not this period's lead.
+    expect(c.leadIds).toEqual(["c2", "c1"]);
+    expect(c.apptIds).toEqual(["c2", "c1"]);
+    expect(c.leadIds.length).toBe(c.leads);
+    expect(c.apptIds.length).toBe(c.appt);
+    const dc = f.adRows.find(a => a.id === AD_D)!;
+    expect(dc.leadIds).toEqual(["d1"]);
+    expect(dc.apptIds).toEqual([]);
+  });
+});

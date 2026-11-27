@@ -50,7 +50,10 @@ export interface PanelUi {
   pForm: CustomerForm | null;
   /** rev 1011 §5: Calendar › Customer info (a visit, or a list row), and the Leads / Upcoming / Showed up list open. */
   calInfo: string | null;
-  cLs: "leads" | "up" | "came" | false;
+  /** "ad": an ad's leads or appointments from Ads Performance (cLsAd, 2026-11-27). */
+  cLs: "leads" | "up" | "came" | "ad" | false;
+  /** The list "ad" shows: its title and its customers. */
+  cLsAd?: { title: string; ids: string[] } | null;
   /** The Leads list for these people only (Team Insight's Revenue Director row, 2026-10-24); null = everybody's. */
   cLsWho?: string[] | null;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
