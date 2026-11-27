@@ -192,7 +192,9 @@ export function panelAppVM(ctx: PanelCtx) {
       custom: ui.period === "custom",
       openDates: () => set(u => ({ ...u, ovSheet: { a: periodRange(u.period, u.ovRange, now).a, b: periodRange(u.period, u.ovRange, now).b, per: u.period === "custom" ? null : (u.period as "day" | "week" | "month"), ca: u.cmp?.a ?? null, cb: u.cmp?.b ?? null, tab: "a", only: false, cm: [new Date(periodRange(u.period, u.ovRange, now).a).getFullYear(), new Date(periodRange(u.period, u.ovRange, now).a).getMonth()], step: 0 } })),
       openCompare: () => set(u => { const r = periodRange(u.period, u.ovRange, now), c = u.cmp; return { ...u, ovSheet: { a: r.a, b: r.b, per: u.period === "custom" ? null : (u.period as "day" | "week" | "month"), ca: c?.a ?? null, cb: c?.b ?? null, tab: "b", only: true, cm: c ? [new Date(c.a).getFullYear(), new Date(c.a).getMonth()] : [new Date(r.a).getMonth() ? new Date(r.a).getFullYear() : new Date(r.a).getFullYear() - 1, (new Date(r.a).getMonth() + 11) % 12], step: 0 } }; }),
-      clearCompare: () => set(u => ({ ...u, cmp: null })) },
+      clearCompare: () => set(u => ({ ...u, cmp: null })),
+      // An ad's "N leads" / "N appts" (the owner, 2026-11-27: "手机版也可以吗？") open the list sheet, each row to Customer info.
+      openList: (title: string, ids: string[]) => set(u => ({ ...u, cLs: "ad", cLsAd: { title, ids }, calInfo: null })) },
     // The house left of the bell (switch-back.cjs, 2026-10-14); Profile's card is gone.
     exitCrm: () => ctx.exitApp(), enterNext,
     // The Insight line: "All access" for whoever sees everybody, else their team (a leader on the Team side).
@@ -200,7 +202,8 @@ export function panelAppVM(ctx: PanelCtx) {
     // Member work type, Showrooms, Cold lead templates, Ads Performance: CRM · Manage only.
     pfAdmin: ctx.data.can.manage,
     chromeBg: "var(--crm-page)",
-    cl: calendarListVM(ctx, cal ?? (ov0 && ui.cLs === "leads" ? { cLeadIds: ui.cLsWho ? ov0.leadIds.filter(id => { const w = ctx.data.customers.find(c => c.id === id)?.assignedTo; return !!w && ui.cLsWho!.includes(w); }) : ov0.leadIds, cUpV: [], cCameV: [], cRangeBtn: ov0.heroLabel } : undefined)), ci: calendarInfoVM(ctx),
+    // An ad's leads or appointments, opened from Ads Performance (2026-11-27), in the same list sheet.
+    cl: calendarListVM(ctx, cal ?? (ui.cLs === "ad" && ui.cLsAd ? { cLeadIds: ui.cLsAd.ids, cUpV: [], cCameV: [], cRangeBtn: "" } : undefined) ?? (ov0 && ui.cLs === "leads" ? { cLeadIds: ui.cLsWho ? ov0.leadIds.filter(id => { const w = ctx.data.customers.find(c => c.id === id)?.assignedTo; return !!w && ui.cLsWho!.includes(w); }) : ov0.leadIds, cUpV: [], cCameV: [], cRangeBtn: ov0.heroLabel } : undefined)), ci: calendarInfoVM(ctx),
     ov: ov0 ?? off<ReturnType<typeof overviewVM>>(),
     ib: show.ib ? inboxVM(ctx) : off<ReturnType<typeof inboxVM>>(),
     ld,
