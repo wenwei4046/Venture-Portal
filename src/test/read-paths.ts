@@ -637,6 +637,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'reverse_voucher_pool_rows', 'revert_terms_change', 'rnp_invoice_events', 'save_revenue_payroll_row',
   'set_fund_source_min_pay_interest', 'set_fund_source_notes', 'set_fund_source_repayment_start', 'set_loan_funding_source',
   'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields',
+  // A repaid deal's unpaid interest waived or owed (mig 20261127090952): on the deal's page — Treasury · Edit.
+  'set_fund_source_interest_waived', 'set_loan_interest_waived',
   'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
   'withdraw_pending_fund_source',
   // A deal's terms change filed for the Principal (mig 20261025110000): filed and withdrawn on the deal's page

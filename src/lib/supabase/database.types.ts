@@ -3851,6 +3851,7 @@ export type Database = {
           maturity_date: string | null
           min_pay_interest: boolean
           min_pay_interest_from: string | null
+          interest_waived: boolean
           principal_per_month: number | null
           notes: string | null
           penalty_on_early: number | null
@@ -3885,6 +3886,7 @@ export type Database = {
           maturity_date?: string | null
           min_pay_interest?: boolean
           min_pay_interest_from?: string | null
+          interest_waived?: boolean
           principal_per_month?: number | null
           notes?: string | null
           penalty_on_early?: number | null
@@ -3919,6 +3921,7 @@ export type Database = {
           maturity_date?: string | null
           min_pay_interest?: boolean
           min_pay_interest_from?: string | null
+          interest_waived?: boolean
           principal_per_month?: number | null
           notes?: string | null
           penalty_on_early?: number | null
@@ -5145,6 +5148,7 @@ export type Database = {
           id: string
           min_pay_interest: boolean
           min_pay_interest_from: string | null
+          interest_waived: boolean
           principal_per_month: number | null
           principal: number
           repayment_start_month: string | null
@@ -5171,6 +5175,7 @@ export type Database = {
           id?: string
           min_pay_interest?: boolean
           min_pay_interest_from?: string | null
+          interest_waived?: boolean
           principal_per_month?: number | null
           principal: number
           repayment_start_month?: string | null
@@ -5197,6 +5202,7 @@ export type Database = {
           id?: string
           min_pay_interest?: boolean
           min_pay_interest_from?: string | null
+          interest_waived?: boolean
           principal_per_month?: number | null
           principal?: number
           repayment_start_month?: string | null
@@ -8335,6 +8341,10 @@ export type Database = {
         Returns: string
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
+      set_fund_source_interest_waived: {
+        Args: { p_fund_source_id: string; p_value: boolean }
+        Returns: undefined
+      }
       set_fund_source_min_pay_interest: {
         Args: { p_from?: string; p_fund_source_id: string; p_value: boolean }
         Returns: undefined
@@ -8349,6 +8359,10 @@ export type Database = {
       }
       set_loan_funding_source: {
         Args: { p_loan_id: string; p_source: string }
+        Returns: undefined
+      }
+      set_loan_interest_waived: {
+        Args: { p_loan_id: string; p_value: boolean }
         Returns: undefined
       }
       set_loan_min_pay_interest: {

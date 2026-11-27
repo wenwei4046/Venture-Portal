@@ -44,3 +44,6 @@
 }
 .btn:hover { background: rgb(var(--hvs-nav-hover)); color: var(--ds-ink); text-decoration: none; }
 .btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Over a schedule, inside its card (2026-11-27 — a repaid deal's interest left, InterestLeftNotice). */
+.flush { margin: 0 0 14px; }

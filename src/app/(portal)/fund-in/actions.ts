@@ -1191,3 +1191,18 @@ export async function listPayableFundSources(
     })
     .sort((a, b) => b.remaining_periods - a.remaining_periods)
 }
+
+// ─── A repaid deal's unpaid interest: waived or still owed (2026-11-27, mig 20261127090952) ─────────────────────
+// The user: CONTS's 10,000 repaid with its interest unpaid — "要收"; the deals settled some other way — "schedule 也别
+// 显示还欠" · "完全不显示". Waived, its schedule shows none of what was left; not, it is owed until it comes in.
+// Display only — no journal.
+export async function setFundSourceInterestWaived(id: string, value: boolean): Promise<{ error: string } | undefined> {
+  await requireActionOn('/fund-in', 'treasury', 'edit')
+  const supabase = await createClient()
+  if (!id) return { error: 'Deal id is required' }
+  const { error } = await supabase.rpc('set_fund_source_interest_waived' as never, { p_fund_source_id: id, p_value: value } as never)
+  if (error) return { error: `Could not save: ${error.message}` }
+  revalidatePath(`/fund-in/${id}`)
+  revalidatePath('/repayment-schedule')
+  return undefined
+}
