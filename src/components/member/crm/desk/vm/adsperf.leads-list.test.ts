@@ -53,6 +53,24 @@ describe("an ad's row opens its leads", () => {
     expect(vm.clistHead).toEqual({ title: "Leads · Skyline", sub: "1 Nov – 11 Nov · tap a customer for their info" });
   });
 
+  it("the Appts cell opens that ad's leads who booked a visit (not a cancelled one), and a 0 opens nothing", () => {
+    const visit = (id: string, customerId: string, state: string) => ({ id, customerId, state, start: new Date(2026, 10, 12, 14).toISOString(), showroomId: "kl" });
+    const withVisits = { ...data, visits: [visit("v1", "amy", "booked"), visit("v2", "ben", "cancelled"), visit("v3", "cat", "booked")] } as unknown as CrmData;
+    const patches: Partial<DeskUi>[] = [];
+    const ctx = { ...ctxOf({}, patches), data: withVisits } as DeskCtx;
+    const vm = adsPerfVM(ctx);
+    const at = vm.ap4.cols.findIndex(c => c.id === "appt");
+    const sky = vm.ap4.rows.find(r => r.name === "Skyline")!.cells[at] as { v: string; open?: () => void };
+    expect(sky.v).toBe("1");
+    sky.open!();
+    expect(patches[0]).toMatchObject({ pane: "overlay", kind: "clist", clist: "Appointments · Skyline", clistIds: ["amy"] });
+    const none = adsPerfVM({ ...ctxOf({}), data } as DeskCtx).ap4.rows.find(r => r.name === "Skyline")!.cells[at] as { open?: () => void };
+    expect(none.open).toBeUndefined();
+    const list = clistVM(ctxOf({ kind: "info", pane: "overlay", infoId: "amy", clist: "Appointments · Skyline", clistIds: ["amy"] }));
+    expect(list.clistRows.map(r => r.name)).toEqual(["amy"]);
+    expect(list.infoBackLabel).toBe("Back to the ad's appointments");
+  });
+
   it("a customer opened from it comes back to the ad's leads", () => {
     const patches: Partial<DeskUi>[] = [];
     const vm = clistVM(ctxOf({ kind: "info", pane: "overlay", infoId: "amy", clist: "Leads · Skyline", clistIds: ["ben", "amy"] }, patches));
