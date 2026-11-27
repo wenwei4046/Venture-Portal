@@ -11,7 +11,7 @@ import { pickedSource } from "@/lib/member/crm-view";
 import { colValue, colsFor, keptCols, mins, overviewFigures, overviewTiles, pctOf, rm, rm2, type OvColKey } from "../../shared/insight-overview";
 import { FEE_PREF, feeFixedOf } from "./adsperf";
 import type { DeskCtx } from "./ctx";
-import { compareRange, compareWords, inBrand, insightRange } from "./insight";
+import { AD_APPTS, AD_LEADS, compareRange, compareWords, inBrand, insightRange } from "./insight";
 import { rangeLine } from "./frame4a";
 import { DIRECTOR_C, DIRECTOR_TEAM, teamColours } from "./tokens";
 
@@ -63,6 +63,9 @@ export function deskOverviewVM(ctx: DeskCtx) {
       return { id: a.id, name: a.name, brand: a.brand, spend: a.paid ? rm(a.spend) : "—", leads: String(a.leads), cpl: a.paid ? rm2(a.cpl) : "—", appt: String(a.appt), won: String(a.won),
         extra: cells(adCol.keys, a.paid ? a : { ...a, cost: null }),
         open, canOpen: !!split?.teams.length, toggle: () => patch({ insOvAd: open ? null : a.id }),
+        // Its Leads and Appt open their customers (the owner, 2026-11-27: "overview 也要"), as Ads Performance's.
+        openLeads: a.leadIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_LEADS}${a.name}`, clistIds: a.leadIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
+        openAppts: a.apptIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_APPTS}${a.name}`, clistIds: a.apptIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         teams: open && split ? split.teams.map(t => ({ name: t.name, dot: t.key ? dotOf(t.key) : "var(--crm-faint-2)", leads: String(t.leads), share: a.leads ? `${Math.round((t.leads / a.leads) * 100)}%` : "—", appt: String(t.booked), won: String(t.won),
           extra: cells(adCol.keys, { ...t, cost: null, fig: null }) })) : [] };
     }),

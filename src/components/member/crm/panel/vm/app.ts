@@ -105,6 +105,7 @@ export function phoneOverviewProps(ctx: PanelCtx): PhoneOverviewProps {
     directorTeam: "Revenue Director", directorColour: DIRECTOR.c, live: ctx.live, money: readsAds(ctx.data.can),
     openAds: readsAds(ctx.data.can) ? () => patch({ ovSum: false, ovAds: true, ovUp: false, ovAct: false }) : undefined,
     openTeam: () => patch({ ovSum: false, ovAds: false, ovUp: false, ovAct: false }),
+    openList: (title: string, ids: string[]) => patch({ cLs: "ad", cLsAd: { title, ids }, calInfo: null }),
     // The viewer's own marketing fee (2026-11-27), saved per person as the desktop's — the same figure on both.
     fee: { value: feeFixedOf(ctx.data.uiPrefs), save: ctx.viewingAs ? undefined : (n: number) => ctx.act.saveUiPref(FEE_PREF, n) } };
 }

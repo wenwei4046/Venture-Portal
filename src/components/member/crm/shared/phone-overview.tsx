@@ -34,6 +34,8 @@ export interface PhoneOverviewProps {
   teams: (OvTeamIn & { c?: string })[]; directors: { id: string; name: string }[]; directorTeam: string; directorColour: string;
   live: boolean; money: boolean;
   openAds?: () => void; openTeam?: () => void;
+  /** An ad's leads or appointments in the panel's list sheet (2026-11-27, "overview 也要"). */
+  openList?: (title: string, ids: string[]) => void;
   /** The viewer's own marketing fee a brand a month and its save (absent while viewing as somebody). */
   fee?: { value: number; save?: (n: number) => void };
 }
@@ -86,6 +88,11 @@ export function PhoneOverview(p: PhoneOverviewProps) {
       {go && <button type="button" onClick={go} style={{ ...BTN, marginLeft: "auto", fontSize: fs(12), fontWeight: 500, color: "var(--crm-rust)" }}>{goLabel} ›</button>}
     </div>
   );
+  // An ad's Leads / Appt open their customers in the list sheet (2026-11-27, "overview 也要"); their tap is not the row's fold.
+  const fig = (title: string, ids: string[]) => (!p.openList || !ids.length ? {} : {
+    role: "button" as const, tabIndex: 0, "aria-label": `${title} · ${ids.length}`,
+    onClick: (e: { stopPropagation(): void }) => { e.stopPropagation(); p.openList!(title, ids); } });
+  const link = (ids: string[]): CSSProperties => (p.openList && ids.length ? { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } : {});
   const cols = (c: string, labels: string[]) => (
     <div style={{ display: "grid", gridTemplateColumns: c, columnGap: "6px", padding: "8px 0 6px", fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)" }}>
       {labels.map((l, i) => <span key={l} style={{ textAlign: i ? "right" : "left" }}>{l}</span>)}
@@ -137,8 +144,8 @@ export function PhoneOverview(p: PhoneOverviewProps) {
                 </span>
                 {canOpen && <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)", transform: `rotate(${open ? 90 : 0}deg)`, transition: "transform 150ms" }}><Ic name="chevron-right" size={12} /></span>}
               </span>
-              {money ? <><span style={NUM(false)}>{a.paid ? rm(a.spend) : "—"}</span><span style={NUM(true)}>{a.leads}</span><span style={NUM(false)}>{a.paid ? rm2(a.cpl) : "—"}</span></>
-                : <><span style={NUM(true)}>{a.leads}</span><span style={NUM(false)}>{a.appt}</span><span style={NUM(false)}>{a.won}</span></>}
+              {money ? <><span style={NUM(false)}>{a.paid ? rm(a.spend) : "—"}</span><span {...fig(`Leads · ${a.name}`, a.leadIds)} style={{ ...NUM(true), ...link(a.leadIds) }}>{a.leads}</span><span style={NUM(false)}>{a.paid ? rm2(a.cpl) : "—"}</span></>
+                : <><span {...fig(`Leads · ${a.name}`, a.leadIds)} style={{ ...NUM(true), ...link(a.leadIds) }}>{a.leads}</span><span {...fig(`Appointments · ${a.name}`, a.apptIds)} style={{ ...NUM(false), ...link(a.apptIds) }}>{a.appt}</span><span style={NUM(false)}>{a.won}</span></>}
             </div>
             {open && split!.teams.map(t => (
               <div key={t.name} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 44px 44px 44px", columnGap: "6px", alignItems: "center", minHeight: "36px", padding: "0 0 0 12px", fontSize: fs(12), fontVariantNumeric: "tabular-nums", color: "var(--crm-ink-soft)" }}>

@@ -47,6 +47,8 @@ export interface OverviewIn {
 
 export interface OvMoney { spend: number | null; fee: number | null; cost: number | null; cpl: number | null }
 export interface OvAdRow extends OvMoney { id: string; name: string; brand: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; paid: boolean;
+  /** The customers its Leads and Appt count (2026-11-27, "overview 也要"): the period's leads newest first, those who booked. */
+  leadIds: string[]; apptIds: string[];
   /** Meta's figures for the period (a paid ad, read); null until read or with no money. */ fig: MetaFig | null }
 export interface OvBrandRow extends OvMoney { key: SourceBrand | "none"; label: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; fig: MetaFig | null }
 export interface OvWork { leads: number; avgReply: number | null; booked: number; apptRate: number | null; came: number; due: number; showRate: number | null; won: number;
@@ -173,7 +175,10 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     const first = data.customers.find(c => adKey(c) === id);
     const name = first?.adId ? first.ad : first ? `No ad · ${first.channel === "whatsapp" ? "WhatsApp" : "Messenger"}` : data.adNames?.[id]?.name ?? id;
     const b = brandOfAd(id);
-    return { id, name, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
+    // numbersOf's own leads and booked, as ids.
+    const lc = cs.filter(c => inRange(c.createdAt, r)).sort((x, y) => y.createdAt.localeCompare(x.createdAt)), leadIds = lc.map(c => c.id);
+    const apptIds = lc.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).map(c => c.id);
+    return { id, name, leadIds, apptIds, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
   }).filter(a => a.leads > 0 || (a.paid && (a.spend ?? 0) > 0) || (a.paid && a.spend == null && p.money))
     .sort((x, y) => y.leads - x.leads || (y.spend ?? 0) - (x.spend ?? 0) || x.name.localeCompare(y.name));
 
