@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
-import { setLoanInterestWaived } from '@/app/(portal)/fund-out/actions'
-import { setFundSourceInterestWaived } from '@/app/(portal)/fund-in/actions'
 import { formatMoneyBare } from '@/lib/utils'
 import c from './terms-request.module.css'
 
@@ -15,13 +13,14 @@ import c from './terms-request.module.css'
 
 export default function InterestLeftNotice({
   kind,
-  dealId,
   owed,
   waived,
   canEdit,
+  onSave,
 }: {
   kind: 'loan' | 'fund_source'
-  dealId: string
+  /** The page's own action (each deal page imports its side's, so the write gates name one page). */
+  onSave: (value: boolean) => Promise<{ error: string } | undefined>
   /** What its plan leaves unpaid. */
   owed: number
   waived: boolean
@@ -44,7 +43,7 @@ export default function InterestLeftNotice({
     setBusy(true)
     setError(null)
     try {
-      const res = await (kind === 'loan' ? setLoanInterestWaived : setFundSourceInterestWaived)(dealId, !waived)
+      const res = await onSave(!waived)
       if (res?.error) {
         setError(res.error)
         return
