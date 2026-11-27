@@ -13,7 +13,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily } from "@/app/(member)/member/crm-actions";
 import { readAdFigures } from "./ad-figures-read";
-import { ALL, FEE_FIXED, METRICS, adBrandOf, feeMonths, metaFigures, monthFee, noAdRepeats } from "../desk/vm/adsperf";
+import { ALL, FEE_DEFAULT, METRICS, adBrandOf, feeMonths, metaFigures, monthFee, noAdRepeats } from "../desk/vm/adsperf";
 import { FeeEdit } from "./fee-edit";
 import { ST_META } from "../desk/vm/tokens";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
@@ -146,7 +146,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   // The fee on a range's months as a share of their spend; null until each month is read (the desktop's feeRate).
   const rateOf = (rr: Range): number | null => {
     // The viewer's own fee a month for each brand that spent (monthFee; RM 2,500 until they change it — 2026-11-27).
-    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return monthFee(feeIds, brandOfFee, ids => (!got || ids.some(id => !(id in got)) ? null : ids.reduce((s, id) => s + (got[id]?.spend ?? 0), 0)), p.fee?.value ?? FEE_FIXED); });
+    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return monthFee(feeIds, brandOfFee, ids => (!got || ids.some(id => !(id in got)) ? null : ids.reduce((s, id) => s + (got[id]?.spend ?? 0), 0)), p.fee?.value ?? FEE_DEFAULT); });
     if (!ms.length || ms.some(m => m == null)) return null;
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;

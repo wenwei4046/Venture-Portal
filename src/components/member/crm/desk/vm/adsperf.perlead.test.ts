@@ -14,6 +14,7 @@ const cust = (id: string, o: Record<string, unknown>) => ({ id, name: "Amy", pho
   createdAt: new Date(2026, 10, 3, 10).toISOString(), lastCustomerAt: null, unread: 0, details: { type: "", size: "", loc: "", req: "", budget: "" }, messages: [], ...o });
 // One ad lead, then the same person writing again with no ad (a repeat: no lead of an ad's, but a lead of the period).
 const data = {
+  uiPrefs: { mktFee: 2_500 }, // a viewer who set RM 2,500 (the default is RM 0 since 2026-11-27)
   customers: [cust("a", {}), cust("b", { adId: null, ad: "", name: "Ben", phone: "60199999999", createdAt: new Date(2026, 10, 5, 10).toISOString() })],
   adNames: { [AD]: { name: "Skyline", added: true, pageId: "p" } },
   visits: [], events: [], adRules: [], can: { viewAll: true, manage: true, editAll: true },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL, FEE_FIXED, feeFixedOf, feeMonths, feeRule, feeTier, feeTyped, feeWorking, marketingFee, monthFee, noAdRepeats, runSplit } from "./adsperf";
+import { ALL, FEE_DEFAULT, feeFixedOf, feeMonths, feeRule, feeTier, feeTyped, feeWorking, marketingFee, monthFee, noAdRepeats, runSplit } from "./adsperf";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 
 describe("the Revenue Team's marketing fee", () => {
@@ -96,13 +96,13 @@ describe("the fee for each brand", () => {
 describe("the viewer's own fee", () => {
   const BRAND: Record<string, "conts" | "dc" | null> = { c1: "conts", d1: "dc" };
   const spendOf = (ids: string[]) => ids.length * 1_000;
-  it("is RM 2,500 until the viewer sets it, then their figure — 0 too", () => {
-    expect(feeFixedOf(undefined)).toBe(FEE_FIXED);
-    expect(feeFixedOf({})).toBe(2_500);
+  it("is RM 0 until the viewer sets it (the owner: \"先default marketing fee 都是0\"), then their figure", () => {
+    expect(feeFixedOf(undefined)).toBe(FEE_DEFAULT);
+    expect(feeFixedOf({})).toBe(0);
     expect(feeFixedOf({ mktFee: 1_800 })).toBe(1_800);
     expect(feeFixedOf({ mktFee: 0 })).toBe(0);
-    expect(feeFixedOf({ mktFee: -5 })).toBe(2_500);
-    expect(feeFixedOf({ mktFee: "900" })).toBe(2_500);
+    expect(feeFixedOf({ mktFee: -5 })).toBe(0);
+    expect(feeFixedOf({ mktFee: "900" })).toBe(0);
   });
   it("is the same figure for every brand, and RM 0 bills the brands at nothing", () => {
     expect(monthFee(["c1", "d1"], id => BRAND[id], spendOf, 1_800)).toEqual({ spent: 2_000, fee: 3_600, billed: 2 });

@@ -6,7 +6,7 @@
  * Total cost, Per lead and ROAS on Overview and Ads Performance all follow it. RM 0 leaves the fee out of them.
  */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { FEE_FIXED, feeTyped } from "../desk/vm/adsperf";
+import { FEE_DEFAULT, feeTyped } from "../desk/vm/adsperf";
 import { typePx } from "./type";
 
 const rm = (n: number) => `RM ${n.toLocaleString("en-MY", { maximumFractionDigits: 2 })}`;
@@ -42,7 +42,7 @@ export function FeeEdit({ value, save, tone = "ink", size = 12.5, style }: {
           <input ref={box} value={text} inputMode="decimal" aria-label="Marketing fee a brand a month" onChange={e => setText(e.target.value)} onBlur={done}
             onKeyDown={e => { if (e.key === "Enter") done(); if (e.key === "Escape") setText(null); }}
             style={{ width: "76px", padding: "2px 6px", borderRadius: "6px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", ...font }} />
-          {value !== FEE_FIXED && <button type="button" onMouseDown={e => { e.preventDefault(); setText(null); save?.(FEE_FIXED); }}
+          {value !== FEE_DEFAULT && <button type="button" onMouseDown={e => { e.preventDefault(); setText(null); save?.(FEE_DEFAULT); }}
             style={{ border: 0, background: "transparent", padding: 0, color: tone === "light" ? "#fff" : "var(--crm-rust)", cursor: "pointer", ...font }}>Reset</button>}
         </span>
       )}

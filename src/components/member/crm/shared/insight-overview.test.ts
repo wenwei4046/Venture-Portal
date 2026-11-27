@@ -38,7 +38,9 @@ function data(): CrmData {
 
 const base = (o: Partial<OverviewIn> = {}): OverviewIn => ({
   data: data(), r: NOV, prev: OCT, now: NOW, directorTeam: "Revenue Director", directors: [{ id: "dir", name: "PETER" }],
-  teams: [{ id: "t1", name: "Team Ann", people: [{ id: "p1", name: "ANN" }, { id: "p2", name: "BEN" }] }], src: "all", meta: undefined, money: true, ...o,
+  teams: [{ id: "t1", name: "Team Ann", people: [{ id: "p1", name: "ANN" }, { id: "p2", name: "BEN" }] }], src: "all", meta: undefined, money: true,
+  fee: 2_500, // a viewer who set RM 2,500 (the default is RM 0 since 2026-11-27)
+  ...o,
 });
 const fig = (spend: number) => ({ spend, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 });
 
