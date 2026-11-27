@@ -1192,7 +1192,7 @@ export async function listPayableFundSources(
     .sort((a, b) => b.remaining_periods - a.remaining_periods)
 }
 
-// ─── A repaid deal's unpaid interest: waived or still owed (2026-11-27, mig 20261127180000) ─────────────────────
+// ─── A repaid deal's unpaid interest: waived or still owed (2026-11-27, mig 20261127090952) ─────────────────────
 // The user: CONTS's 10,000 repaid with its interest unpaid — "要收"; the deals settled some other way — "schedule 也别
 // 显示还欠" · "完全不显示". Waived, its schedule shows none of what was left; not, it is owed until it comes in.
 // Display only — no journal.
