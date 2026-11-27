@@ -173,6 +173,7 @@ const LOAN = (over: Partial<LoanPageModel> = {}): LoanPageModel => ({
   fundingSource: 'King',
   repaymentTerms: 'EMI · 资金来源: King',
   plan: PLAN,
+  interestLeft: null,
   repayments: [
     { id: 'r1', date: '2026-04-20', type: 'principal', amount: 8333.33, notes: '[LO#2] principal 1/1' },
     { id: 'r2', date: '2026-04-20', type: 'interest', amount: 2000, notes: null },
@@ -217,6 +218,7 @@ const SOURCE = (over: Partial<SourcePageModel> = {}): SourcePageModel => ({
   fullyRepaid: '2030-06-15',
   rate: '0.500% /mo',
   plan: { ...PLAN, rows: [] },
+  interestLeft: null,
   repayments: [{ id: 'fr1', date: '2025-07-15', type: 'principal', amount: 1333.33, voucherNo: 'HV-PV-202509-0101', notes: 'first' }],
   termsSegments: [seg({})],
   termsChanges: [],

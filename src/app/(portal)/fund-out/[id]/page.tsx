@@ -12,6 +12,7 @@ import VoidRepaymentButton from './_components/VoidRepaymentButton'
 import UndoContraButton from '@/components/treasury/UndoContraButton'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/RepaymentScheduleSection'
+import InterestLeftNotice from '@/components/treasury/InterestLeftNotice'
 import PrintSchedule from '@/components/treasury/PrintSchedule'
 import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import DealPageSteps from '@/components/treasury/DealPageSteps'
@@ -129,6 +130,9 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
           </FullCard>
 
           <FullCard n={++n} title="Repayment schedule" aside={scheduleCount(plan)}>
+            {loan.interestLeft ? (
+              <InterestLeftNotice kind="loan" dealId={loan.id} owed={loan.interestLeft.owed} waived={loan.interestLeft.waived} canEdit={can.edit} />
+            ) : null}
             <RepaymentScheduleSection
               bare
               plan={plan}

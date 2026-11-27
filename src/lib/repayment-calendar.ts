@@ -37,13 +37,17 @@ export interface CalendarEntry extends CalendarDeal {
   rolled: number
 }
 
+/** A repaid deal's unpaid interest is not shown as owed once waived (2026-11-27, `interest_waived`). */
+export const hidesOwed = (status: string | null | undefined, waived: boolean | null | undefined = true): boolean =>
+  (status === 'fully_repaid' || status === 'repaid') && waived !== false
+
 /**
  * A deal already repaid (2026-11-13 — the user chose "页面不显示（数据不改）"): its instalments still owing something —
- * interest its terms ask that was never recorded — are not shown as owed; what it paid still is. The deal's own page
- * and its terms are unchanged.
+ * interest its terms ask that was never recorded — are not shown as owed; what it paid still is. Only once its rest is
+ * waived (2026-11-27 — CONTS's 10,000: "要收"): a deal repaid with interest still owed shows it until it comes in.
  */
-export function shownForStatus(entries: CalendarEntry[], status: string | null | undefined): CalendarEntry[] {
-  return status === 'fully_repaid' || status === 'repaid' ? entries.filter((e) => e.outstanding <= 0.005) : entries
+export function shownForStatus(entries: CalendarEntry[], status: string | null | undefined, waived: boolean | null | undefined = true): CalendarEntry[] {
+  return hidesOwed(status, waived) ? entries.filter((e) => e.outstanding <= 0.005) : entries
 }
 
 /** A row paid in full before its own month began — paid ahead, or settled early with the deal. */

@@ -11,6 +11,7 @@ import NotesEditor from './_components/NotesEditor'
 import RecordRepaymentForm from './_components/RecordRepaymentForm'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/RepaymentScheduleSection'
+import InterestLeftNotice from '@/components/treasury/InterestLeftNotice'
 import PrintSchedule from '@/components/treasury/PrintSchedule'
 import { printedLine, scheduleMeta } from '@/lib/deal-print'
 import DealPageSteps from '@/components/treasury/DealPageSteps'
@@ -124,6 +125,9 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
           </FullCard>
 
           <FullCard n={++n} title="Repayment schedule" aside={scheduleCount(plan)}>
+            {source.interestLeft ? (
+              <InterestLeftNotice kind="fund_source" dealId={source.id} owed={source.interestLeft.owed} waived={source.interestLeft.waived} canEdit={can.financeEdit} />
+            ) : null}
             <RepaymentScheduleSection
               bare
               plan={plan}

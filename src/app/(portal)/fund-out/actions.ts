@@ -1242,3 +1242,18 @@ export async function exportLoansCSV(): Promise<string> {
 
   return [header, ...rows].join('\n')
 }
+
+// ─── A repaid deal's unpaid interest: waived or still owed (2026-11-27, mig 20261127180000) ─────────────────────
+// The user: CONTS's 10,000 repaid with its interest unpaid — "要收"; the deals settled some other way — "schedule 也别
+// 显示还欠" · "完全不显示". Waived, its schedule shows none of what was left; not, it is owed until it comes in.
+// Display only — no journal.
+export async function setLoanInterestWaived(id: string, value: boolean): Promise<{ error: string } | undefined> {
+  await requireActionOn('/fund-out', 'treasury', 'edit')
+  const supabase = await createClient()
+  if (!id) return { error: 'Deal id is required' }
+  const { error } = await supabase.rpc('set_loan_interest_waived' as never, { p_loan_id: id, p_value: value } as never)
+  if (error) return { error: `Could not save: ${error.message}` }
+  revalidatePath(`/fund-out/${id}`)
+  revalidatePath('/repayment-schedule')
+  return undefined
+}

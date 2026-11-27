@@ -5,7 +5,8 @@ import type { User } from '@/types'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
-import { buildRepaymentPlan, type RepaymentPlan } from '@/lib/repayment-plan'
+import { buildRepaymentPlan, waivedPlan, type RepaymentPlan } from '@/lib/repayment-plan'
+import { hidesOwed } from '@/lib/repayment-calendar'
 import { minPayPlanFrom } from '@/lib/min-pay'
 import { fundSourceStart, type RepaymentStart } from '@/lib/repayment-start'
 import { dealChangeLine, type DealChange } from '@/lib/deal-audit'
@@ -83,6 +84,8 @@ export interface SourcePageModel {
   /** "0.850% /mo". */
   rate: string
   plan: RepaymentPlan
+  /** Repaid with interest left unpaid (2026-11-27): how much, and whether it is waived; null otherwise. */
+  interestLeft: { owed: number; waived: boolean } | null
   repayments: SourceRepaymentRow[]
   termsSegments: TermsSegment[]
   termsChanges: TermsChangeComparison[]
@@ -243,7 +246,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
 
   // The repayment start (2026-10-12): the date the first instalment falls due — the Expected repayment — and every instalment's day.
   const start = fundSourceStart(source)
-  const plan = buildRepaymentPlan({
+  const planned = buildRepaymentPlan({
     terms,
     payments: repaymentsList.map((r) => ({
       date: String(r.payment_date).slice(0, 10),
@@ -257,6 +260,10 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     status: source.status,
     minPayFromYM: minPayPlanFrom(source as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
   })
+  // Repaid with interest left unpaid (2026-11-27): owed till it is paid, or waived — then the schedule shows none of it.
+  const waived = (source as { interest_waived?: boolean }).interest_waived === true
+  const interestLeft = isRepaid && planned.outstandingDue > 0.005 ? { owed: planned.outstandingDue, waived } : null
+  const plan = hidesOwed(status, waived) ? waivedPlan(planned) : planned
 
   // Record repayment (2026-10-02): the voucher Create payment files in loan-repayment mode — its banks, pools and accounts.
   const canRecordRepayment = canRaise && (isActive || isMatured) && outstanding > 0
@@ -323,6 +330,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     fullyRepaid,
     rate: rateWords(Number(source.cost_rate), rateBasisOf((source as { rate_basis?: string | null }).rate_basis)),
     plan,
+    interestLeft,
     repayments: repaymentsList.map((r) => ({
       id: r.id as string,
       date: r.payment_date as string,

@@ -6,7 +6,8 @@ import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { canDo } from '@/lib/permission-actions'
 import { fundingSourceFromTerms } from '@/lib/utils'
-import { buildRepaymentPlan, type RepaymentPlan } from '@/lib/repayment-plan'
+import { buildRepaymentPlan, waivedPlan, type RepaymentPlan } from '@/lib/repayment-plan'
+import { hidesOwed } from '@/lib/repayment-calendar'
 import { minPayPlanFrom } from '@/lib/min-pay'
 import { loanStart, type RepaymentStart } from '@/lib/repayment-start'
 import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
@@ -60,6 +61,8 @@ export interface LoanPageModel {
   fundingSource: string | null
   repaymentTerms: string | null
   plan: RepaymentPlan
+  /** Repaid with interest left unpaid (2026-11-27): how much, and whether it is waived; null otherwise. */
+  interestLeft: { owed: number; waived: boolean } | null
   repayments: LoanRepaymentRow[]
   termsSegments: TermsSegment[]
   termsChanges: TermsChangeComparison[]
@@ -159,7 +162,7 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
   // The repayment start (2026-10-12): the date the first instalment falls due, and every instalment's day.
   const start = loanStart(loan)
   const today = officeToday()
-  const plan = buildRepaymentPlan({
+  const planned = buildRepaymentPlan({
     terms,
     payments: repaymentList.map((r) => ({
       date: String(r.payment_date).slice(0, 10),
@@ -173,6 +176,10 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     status: loan.status,
     minPayFromYM: minPayPlanFrom(loan as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
   })
+  // Repaid with interest left unpaid (2026-11-27): owed till it comes in, or waived — then the schedule shows none of it.
+  const waived = (loan as { interest_waived?: boolean }).interest_waived === true
+  const interestLeft = isRepaid && planned.outstandingDue > 0.005 ? { owed: planned.outstandingDue, waived } : null
+  const plan = hidesOwed(loan.status, waived) ? waivedPlan(planned) : planned
   // Overdue (2026-10-12): an instalment past its day unpaid, on this plan.
   const late = isActive ? overdueOf(plan, today) : null
   const thisRow = plan.rows.find((r) => r.ym === officeMonth()) ?? plan.rows[plan.rows.length - 1] ?? null
@@ -235,6 +242,7 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     fundingSource: fundingSourceFromTerms(loan.repayment_terms as string | null),
     repaymentTerms: (loan.repayment_terms as string | null) ?? null,
     plan,
+    interestLeft,
     repayments: repaymentList.map((r) => ({
       id: r.id as string,
       date: r.payment_date as string,

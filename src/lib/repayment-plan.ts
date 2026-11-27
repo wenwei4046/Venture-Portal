@@ -829,3 +829,51 @@ function termCompoundPlan(
   return plan
 }
 
+
+/**
+ * A repaid deal whose rest is waived (2026-11-27 — the user: "这几笔其实收完了，schedule 也别显示还欠" · "完全不显示"):
+ * its schedule as paid — an instalment's unpaid part comes off its interest (then its principal) and the row reads
+ * settled; one nothing came in on is not shown; nothing owed, nothing overdue. Display only: the interest in suspense
+ * reads the plan itself (lib/iis).
+ */
+export function waivedPlan(plan: RepaymentPlan): RepaymentPlan {
+  // Nothing left owed — nothing to waive: a 利滚利 deal paid off in one sum keeps its months rolled in and paid.
+  if (plan.outstandingDue <= EPS) return plan
+  const rows: PlanRow[] = []
+  for (const r of plan.rows) {
+    if (r.outstanding <= EPS) {
+      // 利滚利: a month whose unpaid interest rolled into the balance — none of it is shown; what came in on it is.
+      const rolled = r.toBalance ?? 0
+      if (rolled > EPS && (r.paid ?? 0) <= EPS) continue
+      rows.push(rolled > EPS ? { ...r, installment: r2(r.installment - rolled), interest: r2(Math.max(0, r.interest - rolled)), toBalance: 0, remark: 'Settled', tone: '' } : r)
+      continue
+    }
+    const paid = r2(Math.max(0, r.installment - r.outstanding))
+    // Nothing came in on it and no principal was repaid with it — not shown. (A month-by-month plan's row repaid the
+    // principal beside its interest: its installment is the interest alone.)
+    if (paid <= EPS && !((r.principal ?? 0) > EPS)) continue
+    const fromInterest = Math.min(r.interest, r.outstanding)
+    const fromPrincipal = r2(r.outstanding - fromInterest)
+    rows.push({
+      ...r,
+      installment: paid,
+      interest: r2(r.interest - fromInterest),
+      principal: r.principal == null ? null : r2(Math.max(0, r.principal - fromPrincipal)),
+      outstanding: 0,
+      remark: 'Settled',
+      tone: '',
+      late: false,
+    })
+  }
+  return {
+    ...plan,
+    rows,
+    paidCount: rows.length,
+    outstandingDue: 0,
+    overdue: 0,
+    overdueSince: null,
+    overdueDays: 0,
+    totalInterest: r2(rows.reduce((t, r) => t + r.interest, 0)),
+    compound: plan.compound ? { ...plan.compound, owedNow: 0, addedToBalance: 0, addedFrom: null, addedTo: null } : null,
+  }
+}

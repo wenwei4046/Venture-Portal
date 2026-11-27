@@ -7,7 +7,7 @@ import { buildTermsSegments, compoundRoll, currentSegment, principalDueIn, princ
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { buildRepaymentPlan, compoundsByInstalment, type PlanInput, type RepaymentPlan } from '@/lib/repayment-plan'
 import { fundSourceStart, loanStart } from '@/lib/repayment-start'
-import { arrearsBefore, monthEvents, shownForStatus, type CalendarEntry } from '@/lib/repayment-calendar'
+import { arrearsBefore, hidesOwed, monthEvents, shownForStatus, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
@@ -64,7 +64,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, rate_basis, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
+      .select('id, company_id, principal, effective_rate, rate_basis, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month, interest_waived')
       .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
@@ -279,7 +279,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, notes, rate_basis, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
+    supabase.from('fund_sources').select('id, status, notes, rate_basis, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month, interest_waived'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -525,6 +525,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     plan: RepaymentPlan,
     deal: Parameters<typeof monthEvents>[1],
     status: string,
+    waived: boolean,
     payments: Array<{ date: string; type: string; amount: number }>,
     compounding: boolean,
     head: Pick<DealFacts, 'side' | 'company' | 'companyKey' | 'tag' | 'words' | 'bf' | 'bfInterest' | 'ahead'>,
@@ -532,7 +533,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     const { byMonth, last } = actualsOf(payments)
     const months: Record<string, DealMonth> = {}
     for (const ym of window) {
-      const due = dueOfEntries(shownForStatus(monthEvents(plan, deal, ym, today), status), compounding)
+      const due = dueOfEntries(shownForStatus(monthEvents(plan, deal, ym, today), status, waived), compounding)
       const act = byMonth[ym] ?? { got: 0, gotInterest: 0, settled: 0, penalty: 0 }
       months[ym] = { ...due, ...act }
     }
@@ -543,7 +544,8 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       href: deal.href,
       next: !repaid && plan.next ? { due: plan.next.due, amount: plan.next.amount } : null,
       last,
-      owe: repaid ? 0 : owedNowOf(plan).total,
+      // A repaid deal owes what is left of its interest until it is waived (2026-11-27).
+      owe: hidesOwed(status, waived) ? 0 : repaid ? plan.outstandingDue : owedNowOf(plan).total,
       months,
     }
   }
@@ -554,13 +556,13 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // since is read as running (its plan then); once repaid, an instalment still owing now — interest never recorded, not
   // shown as owed (shownForStatus) — is no overdue either.
   const monthStart = `${currentYM}-01`
-  const atStart = (input: PlanInput, plan: RepaymentPlan, deal: Parameters<typeof monthEvents>[1], compounding: boolean): { bf: number; bfInterest: number; ahead: number } => {
+  const atStart = (input: PlanInput, plan: RepaymentPlan, deal: Parameters<typeof monthEvents>[1], compounding: boolean, waived: boolean): { bf: number; bfInterest: number; ahead: number } => {
     if (!isCurrentMonth || compounding) return { bf: 0, bfInterest: 0, ahead: 0 }
     const repaid = input.status === 'fully_repaid' || input.status === 'repaid'
     const before = input.payments.filter((p) => p.date < monthStart)
     const then = buildRepaymentPlan({ ...input, payments: before, status: repaid && before.length < input.payments.length ? 'active' : input.status })
     const owedNow = new Map(plan.rows.map((r) => [r.no, r.outstanding]))
-    const late = arrearsBefore(then, deal, currentYM, today).filter((e) => !repaid || (owedNow.get(e.no) ?? 0) <= 0.005)
+    const late = arrearsBefore(then, deal, currentYM, today).filter((e) => !hidesOwed(input.status, waived) || (owedNow.get(e.no) ?? 0) <= 0.005)
     const own = monthEvents(then, deal, currentYM, today).filter((e) => e.rolled <= 0.005)
     return {
       bf: r2(late.reduce((t, e) => t + e.outstanding, 0)),
@@ -592,17 +594,17 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     }
     const plan = buildRepaymentPlan(planInput)
     const deal = { kind: 'collect' as const, id: l.id as string, name: (co?.short_code ?? co?.name ?? '—') as string, href: fromCalendar(`/fund-out/${l.id}`, month), rate: Number(l.effective_rate), principal: Number(l.principal) }
-    events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), l.status as string))
-    if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), l.status as string))
+    events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), l.status as string, (l as { interest_waived?: boolean }).interest_waived === true))
+    if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), l.status as string, (l as { interest_waived?: boolean }).interest_waived === true))
     const compound = (l as { compound_interest?: boolean }).compound_interest === true
     deals.push(
-      factsOf(plan, deal, l.status as string, payments, collectCompoundIds.has(l.id as string), {
+      factsOf(plan, deal, l.status as string, (l as { interest_waived?: boolean }).interest_waived === true, payments, collectCompoundIds.has(l.id as string), {
         side: 'collect',
         company: deal.name,
         companyKey: l.company_id ? `co:${l.company_id}` : `loan:${l.id}`,
         tag: dealTag(l.repayment_terms),
         words: dealWords(Number(l.principal), Number(l.effective_rate), (l as { rate_basis?: unknown }).rate_basis, plan.months, compound),
-        ...atStart(planInput, plan, deal, collectCompoundIds.has(l.id as string)),
+        ...atStart(planInput, plan, deal, collectCompoundIds.has(l.id as string), (l as { interest_waived?: boolean }).interest_waived === true),
       }),
     )
   }
@@ -644,10 +646,10 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     }
     const plan = buildRepaymentPlan(planInput)
     const deal = { kind: 'pay' as const, id, name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }
-    events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), m.status as string))
-    if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), m.status as string))
+    events.push(...shownForStatus(monthEvents(plan, deal, currentYM, today), m.status as string, (m as { interest_waived?: boolean }).interest_waived === true))
+    if (isCurrentMonth) arrears.push(...shownForStatus(arrearsBefore(plan, deal, currentYM, today), m.status as string, (m as { interest_waived?: boolean }).interest_waived === true))
     deals.push(
-      factsOf(plan, deal, m.status as string, payments, repayCompoundIds.has(id), {
+      factsOf(plan, deal, m.status as string, (m as { interest_waived?: boolean }).interest_waived === true, payments, repayCompoundIds.has(id), {
         side: 'pay',
         company: name,
         // By id, as its name is chosen; a lender typed as text is the deal's own.
@@ -662,7 +664,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
                 : `fs:${id}`,
         tag: dealTag(m.notes),
         words: dealWords(Number(m.amount), Number(m.cost_rate), m.rate_basis, plan.months, m.compound_interest === true),
-        ...atStart(planInput, plan, deal, repayCompoundIds.has(id)),
+        ...atStart(planInput, plan, deal, repayCompoundIds.has(id), (m as { interest_waived?: boolean }).interest_waived === true),
       }),
     )
   }
