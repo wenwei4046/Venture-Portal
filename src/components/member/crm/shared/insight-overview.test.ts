@@ -38,7 +38,9 @@ function data(): CrmData {
 
 const base = (o: Partial<OverviewIn> = {}): OverviewIn => ({
   data: data(), r: NOV, prev: OCT, now: NOW, directorTeam: "Revenue Director", directors: [{ id: "dir", name: "PETER" }],
-  teams: [{ id: "t1", name: "Team Ann", people: [{ id: "p1", name: "ANN" }, { id: "p2", name: "BEN" }] }], src: "all", meta: undefined, money: true, ...o,
+  teams: [{ id: "t1", name: "Team Ann", people: [{ id: "p1", name: "ANN" }, { id: "p2", name: "BEN" }] }], src: "all", meta: undefined, money: true,
+  fee: 2_500, // a viewer who set RM 2,500 (the default is RM 0 since 2026-11-27)
+  ...o,
 });
 const fig = (spend: number) => ({ spend, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 });
 
@@ -145,5 +147,25 @@ describe("Insight › Overview's Leads count each person once", () => {
     const g = overviewFigures(base());
     expect(f.work.leads).toBe(g.work.leads);
     expect(f.teams.find(t => t.key === "t1")!.leads).toBe(g.teams.find(t => t.key === "t1")!.leads);
+  });
+});
+
+// 2026-11-27 (the owner's screenshot: "+ fee RM 2,505" for a RM 2,500 month): a range that is its fee month is billed the
+// month's own fee, though its spend and the month's were read from Ads Manager moments apart.
+describe("Insight › Overview's fee on a whole month", () => {
+  const MONTH = { a: d(1, 0).getTime(), b: d(30, 0).getTime() }, TO_TODAY = { a: d(1, 0).getTime(), b: d(17, 0).getTime() };
+  it("is the month's fee exactly, not the range's spend × the month's rate", () => {
+    const meta = { [metaKey(MONTH.a, MONTH.b)]: { [AD_C]: fig(8_235), [AD_D]: fig(0) }, [metaKey(TO_TODAY.a, TO_TODAY.b)]: { [AD_C]: fig(8_227), [AD_D]: fig(0) } };
+    const f = overviewFigures(base({ r: MONTH, meta }));
+    expect(f.ads).toMatchObject({ spend: 8_235, fee: 2_500, cost: 10_735 });
+  });
+  it("keeps the share on part of a month", () => {
+    const part = { a: d(3, 0).getTime(), b: d(17, 0).getTime() };
+    const meta = { [metaKey(part.a, part.b)]: { [AD_C]: fig(500), [AD_D]: fig(0) }, [metaKey(TO_TODAY.a, TO_TODAY.b)]: { [AD_C]: fig(1_000), [AD_D]: fig(0) } };
+    expect(overviewFigures(base({ r: part, meta })).ads.fee).toBeCloseTo(1_250, 6);
+  });
+  it("is nothing at the default RM 0", () => {
+    const meta = { [metaKey(MONTH.a, MONTH.b)]: { [AD_C]: fig(8_235), [AD_D]: fig(0) }, [metaKey(TO_TODAY.a, TO_TODAY.b)]: { [AD_C]: fig(8_227), [AD_D]: fig(0) } };
+    expect(overviewFigures(base({ r: MONTH, meta, fee: undefined })).ads).toMatchObject({ fee: 0, cost: 8_235 });
   });
 });

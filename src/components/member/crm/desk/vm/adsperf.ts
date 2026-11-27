@@ -117,15 +117,17 @@ export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<st
  * — until then 25% of the first RM 30,000 + 20% above, never under RM 2,500). Nothing spent, no fee; unknown spend, unknown fee.
  */
 export const FEE_FIXED = 2500;
+/** What a viewer who never set their own fee sees (the owner, 2026-11-27: "先default marketing fee 都是0，然后他们可以自己调整"). */
+export const FEE_DEFAULT = 0;
 /**
  * Each viewer's own fee a brand a month (the owner, 2026-11-27: "RM 2500 的 marketing fee 变成可调整式 … 不同的人去看数据，
  * 要求的价值有不同"; "DC & IR 都一样" — one figure for every brand): kept per person on the server (crm_save_ui_pref
- * "mktFee"), RM 2,500 until they change it; 0 takes the fee out of Total cost, Per lead and ROAS everywhere they look.
+ * "mktFee"), RM 0 until they change it (FEE_DEFAULT); 0 takes the fee out of Total cost, Per lead and ROAS everywhere they look.
  */
 export const FEE_PREF = "mktFee";
 export function feeFixedOf(prefs: Record<string, unknown> | null | undefined): number {
   const v = prefs?.[FEE_PREF];
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v * 100) / 100, 1_000_000) : FEE_FIXED;
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v * 100) / 100, 1_000_000) : FEE_DEFAULT;
 }
 /** What a typed figure saves as: a whole sen amount from 0 to RM 1,000,000; anything else is null (not saved). */
 export function feeTyped(text: string): number | null {
