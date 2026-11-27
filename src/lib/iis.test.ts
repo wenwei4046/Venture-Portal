@@ -86,3 +86,45 @@ describe('planIisMonth', () => {
     expect(planIisMonth(book, '2026-10', '2026-11-13')).toEqual([])
   })
 })
+
+// 2026-11-27 — CONTS's 10,000 of 8 Jul 2026: principal repaid 13 Nov, its 4 × 400.01 in suspense, the interest owed
+// ("要收"); waived, it comes back out ("iis 你帮我修改").
+describe('a repaid deal’s interest left in suspense', () => {
+  const rows = ['2026-08', '2026-09', '2026-10', '2026-11'].map((ym, i) => ({
+    no: i + 1, ym, due: `${ym}-08`, installment: 400.01, principal: i === 3 ? 10000 : null, interest: 400.01, balance: i === 3 ? 0 : 10000, outstanding: 400.01, remark: '', tone: '' as const,
+  }))
+  const conts: IisDeal = {
+    kind: 'loan',
+    id: 'conts-10k',
+    start: '2026-07-08',
+    principal: 10000,
+    words: '利滚利挂账(未定还款)',
+    segments: [seg({ fromYM: '2026-08', rate: 0.040001, months: null, base: 10000, interestPerMonth: 400.01, principalPerMonth: 0 })],
+    plan: { rows, interestPaid: 0 },
+    payments: [{ date: '2026-11-13', type: 'principal', amount: 10000 }],
+  }
+  const posted = { accrued: 1600.04, recognized: {} }
+
+  it('still owed: stays in suspense, nothing new', () => {
+    expect(monthRunFor(conts, '2026-11', posted, '2026-11-27')).toEqual({ accrual: 0, recognition: 0 })
+  })
+
+  it('received: comes out to interest income', () => {
+    const paid = { ...conts, plan: { rows, interestPaid: 1600.04 }, payments: [...conts.payments, { date: '2026-12-02', type: 'interest', amount: 1600.04 }] }
+    expect(monthRunFor(paid, '2026-12', posted, '2026-12-05')).toEqual({ accrual: 0, recognition: 1600.04 })
+  })
+
+  it('waived: what was put in comes back out — Dr IIS / Cr the deal', () => {
+    const run = monthRunFor({ ...conts, waived: true }, '2026-11', posted, '2026-11-27')
+    expect(run).toEqual({ accrual: -1600.04, recognition: 0 })
+    expect(monthLinesFor('loan', { deal: '3113', iis: '3513' }, run.accrual, 0, 'CONTS').map((l) => [l.account_code, l.debit, l.credit])).toEqual([
+      ['3113', 0, 1600.04], ['3513', 1600.04, 0],
+    ])
+  })
+
+  it('waived after part of it came in: only the rest comes back out', () => {
+    const part = { ...conts, waived: true, plan: { rows, interestPaid: 400.01 }, payments: [...conts.payments, { date: '2026-11-20', type: 'interest', amount: 400.01 }] }
+    expect(accrualsOf(part, '2026-11-27').reduce((t, a) => t + a.amount, 0)).toBe(400.01)
+    expect(monthRunFor(part, '2026-11', { accrued: 1600.04, recognized: {} }, '2026-11-27')).toEqual({ accrual: -1200.03, recognition: 400.01 })
+  })
+})

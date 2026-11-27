@@ -39,6 +39,8 @@ export interface IisDeal {
   segments: readonly TermsSegment[]
   plan: Pick<RepaymentPlan, 'rows' | 'interestPaid'>
   payments: readonly IisPayment[]
+  /** Repaid with the rest of its interest waived (2026-11-27, `interest_waived`): only what came in was ever owed. */
+  waived?: boolean
 }
 
 export interface IisAccrual {
@@ -74,6 +76,9 @@ export const inSuspense = (d: Pick<IisDeal, 'segments' | 'words'>) => d.segments
 /** Every amount the deal puts into suspense (taken out, when negative), by date, up to `today`'s due rows. */
 export function accrualsOf(d: IisDeal, today: string): IisAccrual[] {
   if (!inSuspense(d)) return []
+  // Repaid, the rest waived (2026-11-27 — the user: "iis 你帮我修改"): what goes into suspense is what came in, so what
+  // was put in beyond it comes back out (Dr IIS / Cr the deal on a loan) the next run.
+  if (d.waived) return interestPaymentsOf(d).map((p) => ({ date: p.date, amount: p.amount, why: 'Interest received — the rest waived' }))
   const out: IisAccrual[] = []
   const segs = d.segments
   for (let i = 0; i < segs.length; i++) {
