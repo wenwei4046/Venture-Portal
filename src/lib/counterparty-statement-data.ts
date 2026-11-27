@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { buildTermsSegments, type PositionTerms, type TermsSegment } from '@/lib/treasury-terms'
-import { buildRepaymentPlan, compoundsByInstalment } from '@/lib/repayment-plan'
+import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { fundSourceStart, loanStart } from '@/lib/repayment-start'
 import {
   fetchTermsHistory,
@@ -132,7 +132,10 @@ export async function fetchCounterpartyStatement(
     return co ? ((co.short_code as string | null) ?? (co.name as string)) : null
   }
 
-  // A deal that compounds by instalment (2026-11-04): what its repayment plan — the deal page's own — says is owed now.
+  // A compounding deal: what its repayment plan — the deal page's own — says is owed now. By instalment first
+  // (2026-11-04); every compounding deal since 2026-11-27 (the user: "好，改") — a month-by-month one had read a roll
+  // that took a repayment off a month late, so LO#30's 10,150 of 29 Jun bore a month's interest more (474.97 over its
+  // page), BI#30's 129.45.
   const today = officeToday()
   const planOwed = (
     terms: PositionTerms,
@@ -143,7 +146,7 @@ export async function fetchCounterpartyStatement(
     status: string,
     minPay: { min_pay_interest?: boolean; min_pay_interest_from?: string | null },
   ): number | null => {
-    if (!compoundsByInstalment(segments)) return null
+    if (!segments[segments.length - 1]?.compounding) return null
     const plan = buildRepaymentPlan({
       terms,
       payments: reps.map(rp => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type, amount: rp.amount, ref: null })),
