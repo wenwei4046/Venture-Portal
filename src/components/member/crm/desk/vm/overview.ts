@@ -9,6 +9,7 @@ import { readsAds, withoutHiddenAds } from "@/lib/member/crm-data";
 import type { SourcePick } from "@/lib/member/crm-source";
 import { pickedSource } from "@/lib/member/crm-view";
 import { colValue, colsFor, keptCols, mins, overviewFigures, overviewTiles, pctOf, rm, rm2, type OvColKey } from "../../shared/insight-overview";
+import { FEE_PREF, feeFixedOf } from "./adsperf";
 import type { DeskCtx } from "./ctx";
 import { compareRange, compareWords, inBrand, insightRange } from "./insight";
 import { rangeLine } from "./frame4a";
@@ -19,7 +20,7 @@ export function deskOverviewVM(ctx: DeskCtx) {
   const data = inBrand(withoutHiddenAds(ctx.data), ui.insSrc as SourcePick | undefined);
   const { r } = insightRange(ctx), prev = compareRange(ui, r), money = readsAds(ctx.data.can);
   const f = overviewFigures({ data, r, prev, now: ctx.now, teams: ctx.teams, directors: ctx.directors, directorTeam: DIRECTOR_TEAM,
-    src: pickedSource(ctx.data, ui.insSrc as SourcePick | undefined), meta: ui.apMeta, money });
+    src: pickedSource(ctx.data, ui.insSrc as SourcePick | undefined), meta: ui.apMeta, money, fee: feeFixedOf(ctx.data.uiPrefs) });
   const dotOf = (key: string) => { if (key === DIRECTOR_TEAM) return DIRECTOR_C[0]; const k = ctx.teams.findIndex(t => t.id === key); return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
   const maxLeads = Math.max(1, ...f.teams.map(t => t.leads));
   // The tables keep every column they have; "+" adds more, each with × (the owner, 2026-11-17: "目前有的这些可以保留，此外是 +
@@ -49,6 +50,8 @@ export function deskOverviewVM(ctx: DeskCtx) {
   const cells = (keys: OvColKey[], x: Parameters<typeof colValue>[1]) => keys.map(k => colValue(k, x));
   return {
     money,
+    // The viewer's own marketing fee a brand a month, typed beside the brand pills (feeFixedOf; 2026-11-27).
+    fee: { value: feeFixedOf(ctx.data.uiPrefs), save: (n: number) => ctx.deskAct?.saveUiPref?.(FEE_PREF, n) },
     // What every tile's change is against: "vs Oct", "vs last week", "vs 1–17 Oct" (Custom's Compare with).
     vs: compareWords(ui, prev),
     ready: f.ads.ready,

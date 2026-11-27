@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL, feeMonths, feeTier, feeWorking, marketingFee, monthFee, noAdRepeats, runSplit } from "./adsperf";
+import { ALL, FEE_FIXED, feeFixedOf, feeMonths, feeRule, feeTier, feeTyped, feeWorking, marketingFee, monthFee, noAdRepeats, runSplit } from "./adsperf";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 
 describe("the Revenue Team's marketing fee", () => {
@@ -77,17 +77,47 @@ describe("the fee for each brand", () => {
   const SPEND: Record<string, number> = { c1: 4_000, c2: 2_901, d1: 600, x1: 50 };
   const spendOf = (ids: string[]) => ids.reduce((n, id) => n + SPEND[id], 0);
   it("is RM 2,500 for each brand with spend", () => {
-    expect(monthFee(["c1", "c2", "d1"], id => BRAND[id], spendOf)).toEqual({ spent: 7_501, fee: 5_000 });
-    expect(monthFee(["c1", "c2"], id => BRAND[id], spendOf)).toEqual({ spent: 6_901, fee: 2_500 });
+    expect(monthFee(["c1", "c2", "d1"], id => BRAND[id], spendOf)).toMatchObject({ spent: 7_501, fee: 5_000 });
+    expect(monthFee(["c1", "c2"], id => BRAND[id], spendOf)).toMatchObject({ spent: 6_901, fee: 2_500 });
   });
   it("bills no brand that spent nothing", () => {
-    expect(monthFee(["c1", "d1"], id => BRAND[id], ids => (ids.includes("d1") ? 0 : 4_000))).toEqual({ spent: 4_000, fee: 2_500 });
+    expect(monthFee(["c1", "d1"], id => BRAND[id], ids => (ids.includes("d1") ? 0 : 4_000))).toMatchObject({ spent: 4_000, fee: 2_500 });
   });
   it("adds an ad of no known brand's spend, billing it alone only when no brand spent", () => {
-    expect(monthFee(["c1", "x1"], id => BRAND[id], spendOf)).toEqual({ spent: 4_050, fee: 2_500 });
-    expect(monthFee(["x1"], id => BRAND[id], spendOf)).toEqual({ spent: 50, fee: 2_500 });
+    expect(monthFee(["c1", "x1"], id => BRAND[id], spendOf)).toMatchObject({ spent: 4_050, fee: 2_500 });
+    expect(monthFee(["x1"], id => BRAND[id], spendOf)).toMatchObject({ spent: 50, fee: 2_500 });
   });
   it("is unknown until every ad's spend is read", () => {
     expect(monthFee(["c1", "d1"], id => BRAND[id], ids => (ids.includes("d1") ? null : 1))).toBeNull();
+  });
+});
+
+// 2026-11-27 (the owner: "RM 2500 的 marketing fee 变成可调整式 … 调整为0时，其他数据也会跟着变动"; "DC & IR 都一样").
+describe("the viewer's own fee", () => {
+  const BRAND: Record<string, "conts" | "dc" | null> = { c1: "conts", d1: "dc" };
+  const spendOf = (ids: string[]) => ids.length * 1_000;
+  it("is RM 2,500 until the viewer sets it, then their figure — 0 too", () => {
+    expect(feeFixedOf(undefined)).toBe(FEE_FIXED);
+    expect(feeFixedOf({})).toBe(2_500);
+    expect(feeFixedOf({ mktFee: 1_800 })).toBe(1_800);
+    expect(feeFixedOf({ mktFee: 0 })).toBe(0);
+    expect(feeFixedOf({ mktFee: -5 })).toBe(2_500);
+    expect(feeFixedOf({ mktFee: "900" })).toBe(2_500);
+  });
+  it("is the same figure for every brand, and RM 0 bills the brands at nothing", () => {
+    expect(monthFee(["c1", "d1"], id => BRAND[id], spendOf, 1_800)).toEqual({ spent: 2_000, fee: 3_600, billed: 2 });
+    expect(monthFee(["c1", "d1"], id => BRAND[id], spendOf, 0)).toEqual({ spent: 2_000, fee: 0, billed: 2 });
+    expect(marketingFee(5_000, 0)).toBe(0);
+    expect(feeRule(0).price).toBe("Fixed RM 0");
+    expect(feeRule(1_800).rule).toBe("Fixed RM 1,800 a month for each brand that spent");
+  });
+  it("reads what is typed as ringgit to the sen, refusing anything else", () => {
+    expect(feeTyped("2,000")).toBe(2_000);
+    expect(feeTyped("RM 1500.50")).toBe(1_500.5);
+    expect(feeTyped("0")).toBe(0);
+    expect(feeTyped("")).toBeNull();
+    expect(feeTyped("-1")).toBeNull();
+    expect(feeTyped("abc")).toBeNull();
+    expect(feeTyped("2000000")).toBeNull();
   });
 });

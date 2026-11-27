@@ -66,6 +66,8 @@ export interface SalesActions {
   readNotifs(keys: string[], all?: boolean): void;
   /** The chat composer's Recents (mig 20261014251500): kept on the server a moment after the last emoji picked. */
   saveRecentEmoji(list: string[]): void;
+  /** One's own screen choice on the server (crm_save_ui_pref, mig 20261110120000), as the desktop's saveUiPref: the marketing fee. */
+  saveUiPref(key: "mktFee", value: unknown): void;
   invite(kind: "share" | "move", customerId: string, to: string): Promise<boolean>;
   answerInvite(inviteId: string, accept: boolean): Promise<void>;
   /** The templates switched on — `customerId`'s sub-department's (IR's, DC's …; mig 20261124210000). */
@@ -414,6 +416,16 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       setData(d => ({ ...d, notifRead: all ? [] : [...new Set([...d.notifRead, ...keys])], notifsSeenAt: all ? new Date().toISOString() : d.notifsSeenAt }));
       if (live) void crmWrite("crm_read_notifs", { p_keys: keys, p_all: all });
     },
+    saveUiPref: (() => {
+      // A burst of typing is one write per key, as the desktop's (DeskScreens).
+      const timers = new Map<string, ReturnType<typeof setTimeout>>();
+      return (key: string, value: unknown) => {
+        setData(d => ({ ...d, uiPrefs: { ...(d.uiPrefs ?? {}), [key]: value } }));
+        if (!live) return;
+        const t = timers.get(key); if (t) clearTimeout(t);
+        timers.set(key, setTimeout(() => { timers.delete(key); void crmWrite("crm_save_ui_pref", { p_key: key, p_value: value ?? null }); }, 600));
+      };
+    })(),
     saveRecentEmoji: (() => {
       let timer: ReturnType<typeof setTimeout> | null = null;
       return (list: string[]) => {

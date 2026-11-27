@@ -34,6 +34,7 @@ import { allClosedDeals, dealsView } from "../../sales/vm/deals";
 import { createClient } from "@/lib/supabase/client";
 import { DIRECTOR, first, ini, periodRange, type PanelCtx } from "./common";
 import type { PhoneOverviewProps } from "../../shared/phone-overview";
+import { FEE_PREF, feeFixedOf } from "../../desk/vm/adsperf";
 
 /** The ad editor's numbers (rev 1011 §8): Enter moves to the next visible number box and selects it; on the last one the
  * keyboard closes. Never a submit. The prototype's own handler, over the page (the app has no screen-label root). */
@@ -103,7 +104,9 @@ export function phoneOverviewProps(ctx: PanelCtx): PhoneOverviewProps {
   return { data: ctx.data, r, prev, now, teams: ctx.teams.map(t => ({ id: t.id, name: t.name, c: t.c, people: t.people })), directors: ctx.directors,
     directorTeam: "Revenue Director", directorColour: DIRECTOR.c, live: ctx.live, money: readsAds(ctx.data.can),
     openAds: readsAds(ctx.data.can) ? () => patch({ ovSum: false, ovAds: true, ovUp: false, ovAct: false }) : undefined,
-    openTeam: () => patch({ ovSum: false, ovAds: false, ovUp: false, ovAct: false }) };
+    openTeam: () => patch({ ovSum: false, ovAds: false, ovUp: false, ovAct: false }),
+    // The viewer's own marketing fee (2026-11-27), saved per person as the desktop's — the same figure on both.
+    fee: { value: feeFixedOf(ctx.data.uiPrefs), save: ctx.viewingAs ? undefined : (n: number) => ctx.act.saveUiPref(FEE_PREF, n) } };
 }
 
 function insightHead(ctx: PanelCtx, house: boolean, adsOn: boolean, up: boolean, act = false, sum = false) {
@@ -182,6 +185,7 @@ export function panelAppVM(ctx: PanelCtx) {
     deals6: show.pf && ctx.ui.pDeals ? deals6(ctx) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
     adp: { customers: ctx.data.customers, visits: ctx.data.visits, adNames: ctx.data.adNames ?? {}, now, live: ctx.live, manage: readsAds(ctx.data.can), view: ctx.data.view,
+      fee: { value: feeFixedOf(ctx.data.uiPrefs), save: ctx.viewingAs ? undefined : (n: number) => ctx.act.saveUiPref(FEE_PREF, n) },
       // Insight's period and its sheet (the owner, 2026-10-24: "日曆顏色有點突兀，換成跟insight 一樣的 … 無法自定義要對比的時間段").
       range: periodRange(ui.period, ui.ovRange, now), cmp: ui.cmp,
       chips: (([["day", "Today"], ["week", "This week"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: ui.period === k, pick: () => set(u => ({ ...u, period: k, ovRange: null })) }))),

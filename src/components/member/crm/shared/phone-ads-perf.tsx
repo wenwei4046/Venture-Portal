@@ -13,7 +13,8 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily } from "@/app/(member)/member/crm-actions";
 import { readAdFigures } from "./ad-figures-read";
-import { ALL, METRICS, adBrandOf, feeMonths, metaFigures, monthFee, noAdRepeats } from "../desk/vm/adsperf";
+import { ALL, FEE_FIXED, METRICS, adBrandOf, feeMonths, metaFigures, monthFee, noAdRepeats } from "../desk/vm/adsperf";
+import { FeeEdit } from "./fee-edit";
 import { ST_META } from "../desk/vm/tokens";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { CrmData } from "@/lib/member/crm-data";
@@ -71,6 +72,8 @@ export type AdStatusPick = (typeof AD_STATUSES)[number];
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: NonNullable<CrmData["adNames"]>; now: Date; live: boolean; manage: boolean;
   /** The Revenue app's view (2026-11-23): only its own brand's sources are offered. */
   view?: CrmData["view"];
+  /** The viewer's own marketing fee a brand a month (2026-11-27) and its save (absent while viewing as somebody). */
+  fee?: { value: number; save?: (n: number) => void };
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
   const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null), [src, setSrc] = useState<SourcePick>("all");
   // The source picked (the owner, 2026-10-27): The Conts / DC, each by WhatsApp · Messenger — the ads, tiles and chart follow it.
@@ -142,8 +145,8 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [p.live, p.manage, feeKey, feeWantKey, keys.includes("cpl"), tick]);
   // The fee on a range's months as a share of their spend; null until each month is read (the desktop's feeRate).
   const rateOf = (rr: Range): number | null => {
-    // RM 2,500 a month for each brand that spent (monthFee — "每个品牌各2500", 2026-11-25).
-    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return monthFee(feeIds, brandOfFee, ids => (!got || ids.some(id => !(id in got)) ? null : ids.reduce((s, id) => s + (got[id]?.spend ?? 0), 0))); });
+    // The viewer's own fee a month for each brand that spent (monthFee; RM 2,500 until they change it — 2026-11-27).
+    const ms = monthsOf(rr).map(([x, y]) => { const got = feeFig[`${isoOf(x)}|${isoOf(y)}`]; return monthFee(feeIds, brandOfFee, ids => (!got || ids.some(id => !(id in got)) ? null : ids.reduce((s, id) => s + (got[id]?.spend ?? 0), 0)), p.fee?.value ?? FEE_FIXED); });
     if (!ms.length || ms.some(m => m == null)) return null;
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
@@ -193,6 +196,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
             background: brand === k ? "#fff" : "transparent", boxShadow: brand === k ? "0 1px 2px #2A160C1F" : "none", color: brand === k ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>)}
         </div>
       )}
+      {p.manage && p.fee && <FeeEdit value={p.fee.value} save={p.fee.save} size={12} style={{ alignSelf: "flex-end", flex: "none" }} />}
       {/* v4 8c: the period, the source and the status — one row of three dropdowns (the chip rows and the date line go). */}
       <div data-ads-filters="" style={{ flex: "none", position: "relative", zIndex: 6, display: "flex", alignItems: "center", gap: "6px" }}>
         <button type="button" aria-label={`Period: ${perWord}`} aria-expanded={menu === "per"} onClick={() => setMenu(m => (m === "per" ? null : "per"))} style={pill}><span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{perWord}</span><Ic name="chevron-down" size={13} /></button>
