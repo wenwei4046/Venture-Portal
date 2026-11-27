@@ -183,10 +183,14 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
           currentYM,
           paymentsByMonth: p.paymentsByMonth,
         })
+    // The roll stops as the month began; what came in this month comes off too (2026-11-27 — 2990's 60,000 at 6% a
+    // month, 30,000 + 10,000 repaid in November: the roll's 75,748.62 had stood whole, its 20,000 principal off it
+    // as 55,748.62 interest; its plan says 35,748.62).
+    const owed = Math.max(0, cs.balance - (p.paymentsByMonth[currentYM] ?? 0))
     return {
       ...base,
       kind: 'compound',
-      interestOutstanding: r2(Math.max(0, cs.balance - p.outstanding)),
+      interestOutstanding: r2(Math.max(0, owed - p.outstanding)),
       remainingPeriods: null,
       finishYM: null,
     }

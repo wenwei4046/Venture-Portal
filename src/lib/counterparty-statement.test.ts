@@ -76,6 +76,27 @@ describe('buildPositionRow — compound / no-term / settled', () => {
     expect(r.finishYM).toBeNull()
   })
 
+  // 2026-11-27 — 2990's 60,000 at 6% a month from 24 Jul, 30,000 + 10,000 principal repaid in November: the roll to
+  // November's 1st is 75,748.62, and November's 40,000 comes off it — 35,748.62 owed, 15,748.62 of it interest.
+  it('利滚利: what came in this month comes off the rolled balance', () => {
+    const r = buildPositionRow(
+      {
+        ...base,
+        principal: 60000,
+        monthlyRate: 0.06,
+        tenureMonths: 1,
+        compounding: true,
+        startDate: '2026-07-24',
+        principalPaid: 40000,
+        outstanding: 20000,
+        paymentsByMonth: { '2026-11': 40000 },
+      },
+      '2026-11',
+    )!
+    expect(r.interestOutstanding).toBe(15748.62)
+    expect(r.principalOutstanding + r.interestOutstanding).toBe(35748.62)
+  })
+
   // 2026-11-04 — a deal that compounds by instalment reads its accrued interest off its repayment plan (what it
   // says is owed now, less the principal still owed), not off a rolled balance.
   it('利滚利 by instalment: interest outstanding = the plan’s owed now − principal outstanding', () => {
