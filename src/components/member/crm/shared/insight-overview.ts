@@ -146,15 +146,24 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   };
   // The fee is the calendar month's, on every ad of the brand: its share of the months' spend (Ads Performance's feeRate).
   const feeRate = (a: number, b: number): number | null => {
-    // The viewer's own fee a month for each brand that spent (monthFee; RM 2,500 until they change it — feeFixedOf, 2026-11-27).
+    // The viewer's own fee a month for each brand that spent (monthFee; RM 0 until they change it — feeFixedOf, 2026-11-27).
     const ms = feeMonths(a, b, T).map(([x, y]) => monthFee(paidIds, brandOfAd, ids => spendOf(ids, x, y), fixed));
     if (!ms.length || ms.some(m => m == null)) return null;
     const spent = ms.reduce((n: number, m) => n + (m?.spent ?? 0), 0), fee = ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
     return spent > 0 ? fee / spent : 0;
   };
   const rate = feeRate(r.a, r.b), ratePrev = feeRate(prev.a, prev.b);
-  const money = (spend: number | null, leads: number, rt: number | null): OvMoney => {
-    const fee = spend == null || rt == null ? null : spend * rt, cost = fee == null || spend == null ? null : spend + fee;
+  // A range that IS its fee months (This month, a whole past month) is billed the months' own fee, not spend × rate: the
+  // range and the month are two reads of Ads Manager taken moments apart, and the share drifted off the bill (the owner's
+  // 2026-11-27 screenshot: RM 2,505 for a RM 2,500 month, spend RM 8,235 against a month read at RM 8,227).
+  const wholeFee = (a: number, b: number): number | null => {
+    const fm = feeMonths(a, b, T);
+    if (!fm.length || a !== fm[0][0] || b < new Date(new Date(fm[fm.length - 1][0]).getFullYear(), new Date(fm[fm.length - 1][0]).getMonth() + 1, 0).getTime()) return null;
+    const ms = fm.map(([x, y]) => monthFee(paidIds, brandOfAd, ids => spendOf(ids, x, y), fixed));
+    return ms.some(m => m == null) ? null : ms.reduce((n: number, m) => n + (m?.fee ?? 0), 0);
+  };
+  const money = (spend: number | null, leads: number, rt: number | null, whole: number | null = null): OvMoney => {
+    const fee = spend == null || rt == null ? null : whole ?? spend * rt, cost = fee == null || spend == null ? null : spend + fee;
     return { spend, fee, cost, cpl: cost == null || !leads ? null : cost / leads };
   };
   const leadsIn = (cs: CrmCustomer[], rr: OvRange) => cs.filter(c => inRange(c.createdAt, rr));
@@ -171,9 +180,9 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
   const leadsNow = leadsIn(adCs, r).length;
   const nAll = numbersOf(adCs, data.visits, r, now);
   const spendNow = spendOf(paidIds, r.a, r.b);
-  const ads = { ...money(spendNow, leadsNow, rate), leads: leadsNow, appt: nAll.booked, won: nAll.won, sales: salesOf(adCs, r), ready: !p.money || spendNow != null };
+  const ads = { ...money(spendNow, leadsNow, rate, wholeFee(r.a, r.b)), leads: leadsNow, appt: nAll.booked, won: nAll.won, sales: salesOf(adCs, r), ready: !p.money || spendNow != null };
   const leadsPrev = leadsIn(adCs, prev).length;
-  const adsPrev = { ...money(spendOf(paidIds, prev.a, prev.b), leadsPrev, ratePrev), leads: leadsPrev, sales: salesOf(adCs, prev) };
+  const adsPrev = { ...money(spendOf(paidIds, prev.a, prev.b), leadsPrev, ratePrev, wholeFee(prev.a, prev.b)), leads: leadsPrev, sales: salesOf(adCs, prev) };
 
   // By brand: each brand's ads (a lead's brand is its account's; an ad with none yet, its Page's).
   const brandKeys: (SourceBrand | "none")[] = ["conts", "dc", "none"];
