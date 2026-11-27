@@ -53,6 +53,8 @@ export interface DeskUi {
   clist: string;
   /** A list of given customers (Ads performance's Appointments, 2026-11-23): `clist` is its title. */
   clistIds?: string[] | null;
+  /** The line under a given list's title (an ad's leads: its range, 2026-11-27); null = Insight's period. */
+  clistSub?: string | null;
   clSort: string;
   clSortOpen: boolean;
   /** Leads › the one salesperson shown (the owner, 2026-11-09: "要能选 sales person"); null = everybody. */
