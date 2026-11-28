@@ -51,6 +51,8 @@ export default function TaskScreen(p: TaskScreenProps) {
   const [bad, setBad] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [nudged, setNudged] = useState(false)
+  // The moment the page was read: what is late, and by how much, as of then.
+  const [now, setNow] = useState(() => new Date())
   const saved = useRef<Record<string, FlowValue>>({})
   const saving = useRef<Promise<unknown>[]>([])
 
@@ -59,6 +61,7 @@ export default function TaskScreen(p: TaskScreenProps) {
     void readTaskNow(p.taskKey).then(pg => {
       if (!live) return
       setPage(pg)
+      setNow(new Date())
       // A choice naming a shared list (③d-2) offers that list's options.
       if (pg?.stages.some(st => st.form.some(f => f.list))) void readOptionListsNow().then(l => { if (live && l) setLists(l) })
     })
@@ -69,7 +72,6 @@ export default function TaskScreen(p: TaskScreenProps) {
   const baseline = useMemo(() => (page ? flowFromPage(page).values : {}), [page])
   useEffect(() => { saved.current = { ...baseline } }, [baseline])
 
-  const now = useMemo(() => new Date(), [page])
   const v = useMemo(() => (page ? taskScreenView(page, p.may, now, typed, lists) : null), [page, p.may, now, typed, lists])
 
   if (page === undefined) return <Shell title="Task" onBack={p.onBack}><div className={s.loading}>…</div></Shell>

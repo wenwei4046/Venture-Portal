@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0;background:rgb(233 230 224)}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}
+@keyframes pIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes pNew{0%,100%{transform:translateY(0)}40%{transform:translateY(-12px) scale(1.05)}}
+@keyframes pBusy{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes pOver{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+@keyframes pSleep{0%,100%{transform:scale(1,.93)}50%{transform:scale(1,1.02)}}
+@keyframes pEat{0%,100%{transform:scale(1,1)}50%{transform:scale(1.07,.9)}}
+@keyframes pEx{0%,100%{transform:translateY(0) scale(1,1)}15%{transform:translateY(0) scale(1.1,.85)}50%{transform:translateY(-18px) scale(.95,1.05)}}
+@keyframes pLvl{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(180deg) scale(1.25)}100%{transform:rotateY(360deg) scale(1)}}
+@keyframes pHungry{0%,100%{transform:translateY(2px) rotate(-6deg)}50%{transform:translateY(3px) rotate(-2deg)}}
+@keyframes pBub{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+</style>
+</helmet>
+<section id="t1" style="width:max-content;padding:64px 72px 96px;display:flex;flex-direction:column;gap:72px;font-family:'Inter',system-ui,sans-serif;color:rgb(51 36 27);line-height:normal">
+
+<div style="max-width:900px">
+  <div style="font-size:34px;font-weight:600;letter-spacing:-0.01em">Marketing · 手机版</div>
+  <div style="font-size:15px;color:rgb(74 64 58);margin-top:10px;line-height:1.6;text-wrap:pretty">已选定 <a href="#1b">1b</a>：Tasks · Projects · ＋ · Space · More。可点击的完整原型在 <a href="Marketing App.dc.html">Marketing App</a>。下面是 <a href="#pet">宠物逻辑台</a> 和 <a href="#desktop">桌面版对照</a>。</div>
+</div>
+
+<!-- 1a -->
+<div id="1b" style="display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="font-family:'Chivo Mono',monospace;font-size:13px;font-weight:500;background:rgb(51 36 27);color:#fff;border-radius:6px;padding:4px 9px">1b</span>
+    <span style="font-size:22px;font-weight:600">Space 单独一个 Tab</span>
+    <span style="font-size:14px;color:rgb(117 100 86)">Tasks · Projects · ＋ · Space · More</span>
+  </div>
+  <div style="display:flex;gap:40px;align-items:flex-start">
+
+    <!-- B1 Tasks -->
+    <div data-screen-label="1b-01 Tasks" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:600;color:rgb(74 64 58)">01 · Tasks</div>
+      <div style="width:390px;height:844px;border-radius:46px;border:9px solid rgb(43 31 23);background:rgb(243 243 241);overflow:hidden;display:flex;flex-direction:column;position:relative;font-size:14px">
+        <div style="flex:none;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-weight:600"><span>9:41</span><span style="width:22px;height:11px;border:1.5px solid rgb(51 36 27);border-radius:3px"></span></div>
+        <div style="flex:none;padding:2px 14px 10px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:22px;font-weight:600;flex:1">Tasks</span><span style="height:44px;padding:0 12px;border-radius:12px;background:#fff;border:1px solid rgb(229 228 223);display:flex;align-items:center;gap:6px;font-weight:500">🕘 Punch in</span><span style="position:relative;width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid rgb(229 228 223);display:flex;align-items:center;justify-content:center;font-size:18px">🔔<span style="position:absolute;top:4px;right:3px;min-width:16px;height:16px;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">2</span></span></div>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(236 233 228);border-radius:10px"><div style="flex:1;height:38px;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgb(51 36 27/.14);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px">👉 My turn<span style="min-width:18px;height:18px;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;display:flex;align-items:center;justify-content:center">3</span></div><div style="flex:1;height:38px;display:flex;align-items:center;justify-content:center;gap:6px">⏳ Waiting<span style="font-size:11px;color:rgb(117 100 86)">1</span></div><div style="flex:1;height:38px;display:flex;align-items:center;justify-content:center;gap:6px">📤 Delegated<span style="font-size:11px;color:rgb(117 100 86)">1</span></div></div>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:0 14px 18px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ turnCards }}" as="c" hint-placeholder-count="3">
+            <div style="flex:none;background:{{ c.bg }};border:1px solid {{ c.line }};border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:7px">
+              <div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgb(74 64 58)"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ c.dot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.meta }}</span></div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:3px 8px;border-radius:999px;border:1px solid {{ c.pillLine }};background:{{ c.pillBg }};color:{{ c.pillFg }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.pillDot }}"></span>{{ c.label }}</span>
+                <span style="flex:1"></span>
+                <span style="font-size:13px;font-weight:{{ c.actWeight }};padding:8px 14px;border-radius:8px;background:{{ c.actBg }};border:1px solid {{ c.actLine }};color:rgb(43 31 23)">{{ c.act }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <div style="border-radius:12px;background:#fff;border:1px solid rgb(236 231 224);padding:12px 14px;display:flex;flex-direction:column;gap:8px;margin-top:4px">
+            <div style="font-weight:600">🗓️ This week</div>
+            <sc-for list="{{ week }}" as="w" hint-placeholder-count="3"><div style="display:flex;gap:10px;align-items:baseline;min-height:28px"><span style="font-family:'Chivo Mono',monospace;font-size:11px;width:50px;flex:none;color:{{ w.fg }}">{{ w.when }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.title }}</span></div></sc-for>
+          </div>
+        </div>
+        <div style="flex:none;height:80px;background:#fff;border-top:1px solid rgb(229 222 211);display:grid;grid-template-columns:repeat(5,1fr);padding:0 6px 18px;box-sizing:border-box">
+          <sc-for list="{{ tabsB.tasks }}" as="t" hint-placeholder-count="5">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ t.color }};font-weight:{{ t.weight }}"><span style="position:relative;width:{{ t.box }}px;height:{{ t.box }}px;margin-top:{{ t.mt }}px;border-radius:{{ t.radius }};background:{{ t.bg }};box-shadow:{{ t.shadow }};display:flex;align-items:center;justify-content:center;font-size:{{ t.size }}px;color:rgb(43 31 23)">{{ t.emoji }}<sc-if value="{{ t.badge }}"><span style="position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">{{ t.badge }}</span></sc-if></span><span style="font-size:10.5px">{{ t.label }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- B2 Space -->
+    <div data-screen-label="1b-02 Space" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:600;color:rgb(74 64 58)">02 · Space（房间 · 宠物 · 大厅 · Chat 入口）</div>
+      <div style="width:390px;height:1180px;border-radius:46px;border:9px solid rgb(43 31 23);background:rgb(246 244 240);overflow:hidden;display:flex;flex-direction:column;position:relative;font-size:14px">
+        <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column">
+          <div style="height:150px;flex:none;position:relative;background:linear-gradient(135deg,oklch(0.86 0.07 60),oklch(0.84 0.07 20) 50%,oklch(0.82 0.06 330))">
+            <div style="position:absolute;left:28px;top:14px;font-weight:600">9:41</div>
+            <div style="position:absolute;left:16px;bottom:-36px;width:80px;height:80px;border-radius:50%;box-sizing:border-box;border:4px solid #fff;background:oklch(0.94 0.04 235);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600">J</div>
+            <div style="position:absolute;left:104px;bottom:-32px">{{ petCover }}</div>
+          </div>
+          <div style="padding:46px 16px 0">
+            <div style="font-size:20px;font-weight:600;letter-spacing:-0.01em">Jason Lim <span style="font-size:13px;font-weight:400;color:rgb(117 100 86)">· Social Media Executive</span></div>
+            <div style="margin-top:6px;font-size:13px;color:rgb(74 64 58)"><span style="border-bottom:1px dashed rgb(214 204 190);padding-bottom:2px">Editing reels all week</span> <span style="color:rgb(117 100 86)">· {{ petName }} Lv {{ lab.level }} · {{ lab.bubble }} {{ lab.stateLabel }}</span></div>
+          </div>
+          <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+            <div style="height:230px;flex:none;position:relative;border-radius:14px;overflow:hidden;border:1px solid rgb(236 231 224);background:#f3dcc8">
+              <div style="position:absolute;left:7%;top:12%;height:30%;width:26%;border:6px solid #fff;border-radius:4px;box-sizing:border-box;background:linear-gradient(#fbe3b0,#cfe4f2)"><span style="position:absolute;right:6px;top:4px;font-size:16px;line-height:1">🌤️</span></div>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:30%;background:repeating-linear-gradient(90deg,#e9cfa8 0 56px,#dcbd92 56px 58px)"></div>
+              <div style="position:absolute;left:0;right:0;bottom:30%;height:6px;background:rgb(255 255 255 / .5)"></div>
+              <sc-for list="{{ furnM }}" as="i" hint-placeholder-count="6"><div style="position:absolute;left:{{ i.x }}%;bottom:{{ i.bottom }};transform:translateX(-50%);z-index:{{ i.z }}"><span style="display:block;line-height:1;font-size:{{ i.size }}px;filter:drop-shadow(0 3px 0 rgb(0 0 0 / .12))">{{ i.emoji }}</span></div></sc-for>
+              <div style="position:absolute;left:52%;bottom:9%;transform:translateX(-50%);z-index:50">{{ petRoom }}</div>
+              <span style="position:absolute;left:12px;top:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">🏠 My room</span>
+              <span style="position:absolute;right:12px;top:6px;height:32px;display:flex;align-items:center;font-size:12px;font-weight:500;padding:0 12px;border-radius:999px;background:rgb(255 255 255 / .9)">🎨 Decorate</span>
+            </div>
+            <div style="border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);padding:12px;display:flex;gap:12px;align-items:center">
+              <div style="width:60px;flex:none;display:flex;justify-content:center">{{ petTile }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;font-size:15px">{{ petName }}</span><span style="flex:1"></span><span style="font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:#EC9B55;color:rgb(43 31 23)">Lv {{ lab.level }}</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:rgb(117 100 86);width:44px">XP</span><div style="flex:1;height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ lab.xpPct }}%;background:#EC9B55;transition:width .4s"></div></div></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:rgb(117 100 86);width:44px">Energy</span><div style="flex:1;height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ lab.energy }}%;background:{{ lab.energyColor }};transition:width .4s"></div></div></div>
+                <div style="display:flex;gap:6px">
+                  <div onClick="{{ feed }}" style="flex:1;height:44px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">🍙 Feed · {{ lab.snacks }}</div>
+                  <div onClick="{{ workout }}" style="flex:1;height:44px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">🏃 {{ lab.workoutsLeft }}/3 left</div>
+                </div>
+              </div>
+            </div>
+            <div style="height:56px;flex:none;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);display:flex;align-items:center;gap:10px;padding:0 14px"><span style="font-size:18px">💬</span><span style="font-weight:600;flex:1">Chat</span><span style="font-size:12.5px;color:rgb(117 100 86)">Siti: Sure, by 3pm 👍</span><span style="min-width:20px;height:20px;border-radius:10px;background:rgb(176 40 34);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">2</span></div>
+            <div style="height:170px;flex:none;position:relative;border-radius:14px;overflow:hidden;border:1px solid rgb(236 231 224);background:#efe6d8">
+              <div style="position:absolute;left:0;right:0;bottom:0;height:42%;background:repeating-linear-gradient(90deg,#e9dfcf 0 40px,#e1d4c0 40px 42px)"></div>
+              <span style="position:absolute;left:12px;top:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">🏛️ Lobby · 5</span>
+              <sc-for list="{{ lobby }}" as="l" hint-placeholder-count="5"><div style="position:absolute;left:{{ l.x }}%;bottom:{{ l.y }}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center"><sc-if value="{{ l.say }}"><span style="max-width:130px;margin-bottom:4px;padding:4px 8px;border-radius:10px;background:#fff;box-shadow:0 2px 6px rgb(51 36 27 / .15);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.say }}</span></sc-if><span style="font-size:30px;line-height:1;filter:{{ l.filter }}">{{ l.emoji }}</span><span style="font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:999px;background:rgb(255 255 255 / .92);white-space:nowrap;margin-top:2px">{{ l.name }}</span></div></sc-for>
+            </div>
+            <div style="border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600">🏆 Trophies</div>
+              <div style="display:flex;gap:4px;font-size:26px;line-height:1.1"><span>🏆</span><span>🥇</span><span>🎖️</span><span style="opacity:.25;filter:grayscale(1)">🏅</span><span style="opacity:.25;filter:grayscale(1)">🥈</span></div>
+              <div style="font-size:12px;color:rgb(117 100 86)">3 projects finished this quarter</div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;height:80px;background:#fff;border-top:1px solid rgb(229 222 211);display:grid;grid-template-columns:repeat(5,1fr);padding:0 6px 18px;box-sizing:border-box">
+          <sc-for list="{{ tabsB.space }}" as="t" hint-placeholder-count="5">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ t.color }};font-weight:{{ t.weight }}"><span style="position:relative;width:{{ t.box }}px;height:{{ t.box }}px;margin-top:{{ t.mt }}px;border-radius:{{ t.radius }};background:{{ t.bg }};box-shadow:{{ t.shadow }};display:flex;align-items:center;justify-content:center;font-size:{{ t.size }}px;color:rgb(43 31 23)">{{ t.emoji }}<sc-if value="{{ t.badge }}"><span style="position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">{{ t.badge }}</span></sc-if></span><span style="font-size:10.5px">{{ t.label }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pet lab -->
+<div id="pet" style="display:flex;flex-direction:column;gap:22px;width:1500px">
+  <div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:22px;font-weight:600">宠物逻辑台</span><span style="font-size:14px;color:rgb(117 100 86)">按现在代码里的规则（space.ts · my-space.ts）跑。上面手机里的宠物也跟着这里变。</span></div>
+  <div style="display:grid;grid-template-columns:420px 1fr 1fr;gap:20px;align-items:start">
+    <div style="background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);overflow:hidden">
+      <div style="height:230px;position:relative;background:#f3dcc8">
+        <div style="position:absolute;left:0;right:0;bottom:0;height:30%;background:repeating-linear-gradient(90deg,#e9cfa8 0 56px,#dcbd92 56px 58px)"></div>
+        <div style="position:absolute;left:50%;bottom:14%;transform:translateX(-50%)">{{ petLab }}</div>
+        <span style="position:absolute;left:12px;top:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">{{ lab.stateLabel }}</span>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;font-size:13px">
+        <div style="padding:10px 12px;border-radius:10px;background:rgb(250 248 244);line-height:1.5"><b>为什么是这个状态：</b>{{ lab.why }}</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:10px 12px;align-items:center">
+          <span>My turn 卡片数 <span style="color:rgb(117 100 86)">plate.count</span></span><span style="display:flex;align-items:center;gap:8px"><span onClick="{{ countDown }}" style="width:32px;height:32px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">−</span><b style="width:20px;text-align:center">{{ lab.count }}</b><span onClick="{{ countUp }}" style="width:32px;height:32px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">+</span></span>
+          <span>逾期数（My turn + Waiting）<span style="color:rgb(117 100 86)">plate.red</span></span><span style="display:flex;align-items:center;gap:8px"><span onClick="{{ redDown }}" style="width:32px;height:32px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">−</span><b style="width:20px;text-align:center">{{ lab.red }}</b><span onClick="{{ redUp }}" style="width:32px;height:32px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">+</span></span>
+          <span>24 小时内有新阶段 <span style="color:rgb(117 100 86)">plate.fresh</span></span><span onClick="{{ toggleFresh }}" style="width:44px;height:24px;border-radius:12px;background:{{ lab.freshBg }};position:relative;cursor:pointer;justify-self:end"><span style="position:absolute;top:2px;left:{{ lab.freshLeft }}px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s"></span></span>
+        </div>
+        <div style="height:1px;background:rgb(240 236 230)"></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:52px;color:rgb(117 100 86)">XP</span><div style="flex:1;height:8px;border-radius:4px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ lab.xpPct }}%;background:#EC9B55;transition:width .4s"></div></div><span style="font-family:'Chivo Mono',monospace;font-size:11px;width:150px;text-align:right">{{ lab.xpLabel }}</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:52px;color:rgb(117 100 86)">Energy</span><div style="flex:1;height:8px;border-radius:4px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ lab.energy }}%;background:{{ lab.energyColor }};transition:width .4s"></div></div><span style="font-family:'Chivo Mono',monospace;font-size:11px;width:150px;text-align:right">{{ lab.energy }}/100</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div onClick="{{ feed }}" style="height:40px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">🍙 Feed · {{ lab.snacks }} snacks</div>
+          <div onClick="{{ workout }}" style="height:40px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">🏃 Exercise · {{ lab.workoutsLeft }}/3 left</div>
+          <div onClick="{{ finishStage }}" style="height:40px;border-radius:9px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer">✓ 完成一个阶段</div>
+          <div onClick="{{ resetLab }}" style="height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86);text-decoration:underline;text-underline-offset:3px">Reset</div>
+        </div>
+        <div style="min-height:18px;font-size:12.5px;color:rgb(90 62 43)">{{ lab.toast }}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);padding:18px">
+        <div style="font-weight:600;font-size:15px;margin-bottom:12px">9 个状态 · 现在的画风（系统 emoji + CSS 动画）</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <sc-for list="{{ stateSheet }}" as="s" hint-placeholder-count="9">
+            <div style="border-radius:12px;border:1.5px solid {{ s.border }};padding:26px 8px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;background:rgb(250 248 244)">{{ s.node }}<div style="font-size:12.5px;font-weight:600">{{ s.label }}</div><div style="font-size:11px;color:rgb(117 100 86);text-align:center;line-height:1.35;min-height:30px">{{ s.rule }}</div></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);padding:18px">
+        <div style="font-weight:600;font-size:15px;margin-bottom:12px">等级 · 进化 · 颜色</div>
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
+          <sc-for list="{{ levelSheet }}" as="v" hint-placeholder-count="6">
+            <div style="border-radius:10px;border:1.5px solid {{ v.border }};padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:112px;box-sizing:border-box"><span style="font-size:{{ v.size }}px;line-height:1;filter:{{ v.filter }}">{{ v.emoji }}</span><span style="font-size:12px;font-weight:600">Lv {{ v.lv }}</span><span style="font-family:'Chivo Mono',monospace;font-size:10px;color:rgb(117 100 86)">{{ v.xp }} XP</span></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <sc-for list="{{ speciesOpts }}" as="o" hint-placeholder-count="4"><span onClick="{{ o.pick }}" style="height:34px;padding:0 12px;border-radius:999px;border:1px solid {{ o.line }};background:{{ o.bg }};color:{{ o.fg }};display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">{{ o.emoji }} {{ o.label }}</span></sc-for>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <sc-for list="{{ colorOpts }}" as="o" hint-placeholder-count="7"><span onClick="{{ o.pick }}" title="{{ o.label }}" style="width:26px;height:26px;border-radius:50%;background:{{ o.swatch }};box-shadow:{{ o.ring }};cursor:pointer"></span></sc-for>
+          <span style="font-size:12px;color:rgb(117 100 86);margin-left:6px">{{ colorLabel }} · 颜色是加在 emoji 上的 CSS filter</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);padding:18px;font-size:13px;line-height:1.55">
+        <div style="font-weight:600;font-size:15px;margin-bottom:10px">现在的规则</div>
+        <div style="display:grid;grid-template-columns:22px 1fr;gap:6px 8px">
+          <b>1</b><span>Energy &lt; 20 → <b>Hungry</b>（盖过其它所有状态）</span>
+          <b>2</b><span>逾期 ≥ 2 或 My turn ≥ 4 → <b>Overloaded</b></span>
+          <b>3</b><span>24 小时内有新开的阶段且未逾期 → <b>New task!</b></span>
+          <b>4</b><span>My turn ≥ 1 → <b>Working</b></span>
+          <b>5</b><span>My turn = 0 → <b>Sleeping</b></span>
+          <b>⚡</b><span>Feed 后 Eating 2.5 秒；Exercise 后 Working out 3 秒；升级后 Level up! 3.5 秒，然后回到上面的规则</span>
+        </div>
+        <div style="height:1px;background:rgb(240 236 230);margin:12px 0"></div>
+        <div style="display:grid;grid-template-columns:86px 1fr;gap:6px 8px">
+          <span style="color:rgb(117 100 86)">Feed</span><span>−1 snack，+20 energy（上限 100）</span>
+          <span style="color:rgb(117 100 86)">Exercise</span><span>−15 energy；每天前 3 次 +10 XP</span>
+          <span style="color:rgb(117 100 86)">Snack</span><span>开始 3 个；每完成一个阶段 +1</span>
+          <span style="color:rgb(117 100 86)">Energy</span><span>开始 64</span>
+          <span style="color:rgb(117 100 86)">等级</span><span>0 / 100 / 250 / 450 / 700 / 1000 XP；Lv 3、Lv 5 进化；自己上传的动物不进化</span>
+          <span style="color:rgb(117 100 86)">奖杯</span><span>本季度完成、且自己做过任一阶段的项目；最多显示 6 个</span>
+        </div>
+      </div>
+      <div style="background:rgb(255 250 238);border-radius:16px;border:1px solid rgb(236 214 164);padding:18px;font-size:13px;line-height:1.55">
+        <div style="font-weight:600;font-size:15px;margin-bottom:10px">读代码时看到、需要你确认的 6 点</div>
+        <div style="display:grid;grid-template-columns:22px 1fr;gap:8px">
+          <b>1</b><span><b>Chilling（idle）永远不会出现。</b>petState() 只返回 hungry / overload / newTask / busy / sleeping，没事做时直接是 Sleeping。</span>
+          <b>2</b><span><b>Waiting 里的逾期也会让宠物 Overloaded</b>（plate.red 算了 My turn + Waiting），但那是别人手上的事。</span>
+          <b>3</b><span><b>逾期的卡不算 New task</b>，所以新任务一到就已逾期时不会有 ❗。</span>
+          <b>4</b><span><b>第 4 次起 Exercise 仍然扣 15 energy 但没有 XP。</b>界面只在做完后才提示。</span>
+          <b>5</b><span><b>Energy 只会因 Exercise 下降</b>，不随时间掉。不运动的人永远不会 Hungry。</span>
+          <b>6</b><span><b>XP 每阶段给多少在数据库里</b>（handoff 写的是 阶段 × 难度 S1/M2/L3 × 10）。这里的「完成一个阶段」按 M = +20 XP 演示。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Desktop reference -->
+<div id="desktop" data-screen-label="Desktop My Space" style="display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:22px;font-weight:600">桌面版对照</span><span style="font-size:14px;color:rgb(117 100 86)">My Space · 按 MktShell / MySpace 源码还原（默认布局）</span></div>
+  <div style="width:1440px;height:1270px;display:flex;background:rgb(243 243 241);font-size:13px;overflow:hidden;border-radius:12px;border:1px solid rgb(214 204 190)">
+    <aside style="width:248px;flex:none;display:flex;flex-direction:column;background:rgb(248 245 240);border-right:1px solid rgb(229 222 211)">
+      <div style="padding:20px 8px 22px 16px;display:flex;align-items:center;gap:8px">
+        <div style="width:32px;height:32px;flex:none;border-radius:9px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600">H</div>
+        <div style="flex:1;min-width:0"><div style="font-size:1.04em;font-weight:500;line-height:1.3">HOUZS Marketing</div><div style="font-size:.85em;color:rgb(117 100 86);line-height:1.4">8 subsidiaries</div></div>
+        <div style="width:28px;height:28px;flex:none;border-radius:50%;background:oklch(0.94 0.04 235);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">J</div>
+        <div style="width:20px;height:24px;flex:none;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);font-size:14px">«</div>
+      </div>
+      <div style="flex:1;padding:2px 10px 12px;display:flex;flex-direction:column;gap:2px;overflow:hidden">
+        <sc-for list="{{ deskNav }}" as="r" hint-placeholder-count="12">
+          <sc-if value="{{ r.isNav }}"><div style="position:relative;flex:none;height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;border-radius:8px;background:{{ r.bg }};color:{{ r.color }};font-weight:{{ r.weight }};font-size:1.04em;white-space:nowrap"><sc-if value="{{ r.on }}"><div style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 2px 2px 0;background:rgb(90 62 43)"></div></sc-if><div style="width:28px;height:28px;flex:none;border-radius:8px;background:{{ r.tone }};display:flex;align-items:center;justify-content:center;font-size:15px">{{ r.emoji }}</div><span style="flex:1">{{ r.label }}</span><sc-if value="{{ r.count }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if></div></sc-if>
+          <sc-if value="{{ r.isSub }}"><div style="flex:none;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px 0 16px;border-radius:6px;font-size:.96em;color:rgb(74 64 58);white-space:nowrap"><span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ r.dot }}"></span><span style="font-size:13px;width:18px;text-align:center;flex:none">{{ r.emoji }}</span><span style="flex:1">{{ r.label }}</span><sc-if value="{{ r.count }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if></div></sc-if>
+        </sc-for>
+      </div>
+      <div style="border-top:1px solid rgb(229 222 211);padding:10px;display:flex;flex-direction:column;gap:2px">
+        <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;color:rgb(74 64 58);font-size:1.04em"><div style="width:28px;height:28px;border-radius:8px;background:rgb(230 237 241);display:flex;align-items:center;justify-content:center;font-size:15px">🚪</div>Meeting Rooms</div>
+        <div style="height:38px;display:flex;align-items:center;gap:10px;padding:0 8px 0 5px;color:rgb(74 64 58);font-size:1.04em"><div style="width:28px;height:28px;border-radius:8px;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:15px">⚙️</div>Settings</div>
+      </div>
+    </aside>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div style="height:60px;flex:none;box-sizing:border-box;background:#fff;margin:10px 10px 0;border-radius:16px;border:1px solid rgb(229 228 223);padding:0 12px 0 22px;display:flex;align-items:center;gap:20px">
+        <div style="display:flex;align-items:center;gap:8px;color:rgb(43 31 23)"><span style="font-size:15px">🏠</span><span style="font-size:1.04em;font-weight:500">My Space</span></div>
+        <div style="width:440px;height:36px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:0 10px 0 12px;background:rgb(246 246 244);border:1px solid rgb(232 225 216);border-radius:8px;color:rgb(117 100 86)"><span style="flex:1;font-size:.96em">Search Track ID, task or person</span><span style="font-family:'Chivo Mono',monospace;font-size:10.5px;border:1px solid rgb(229 222 211);background:#fff;border-radius:4px;padding:2px 5px">⌘K</span></div>
+        <div style="flex:1"></div>
+        <div style="height:34px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);font-weight:500"><span style="font-size:15px;line-height:1">+</span>New Project</div>
+        <div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px">🔔<div style="position:absolute;top:3px;right:2px;min-width:16px;height:16px;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">2</div></div>
+      </div>
+      <div style="flex:1;min-height:0;margin:10px;background:#fff;border-radius:16px;border:1px solid rgb(229 228 223);overflow:hidden">
+        <div style="max-width:1240px;margin:0 auto;padding:20px 28px 64px;box-sizing:border-box">
+          <div style="border-radius:18px;overflow:hidden;background:rgb(246 244 240);border:1px solid rgb(236 231 224)">
+            <div style="height:190px;position:relative;background:linear-gradient(135deg,oklch(0.86 0.07 60),oklch(0.84 0.07 20) 50%,oklch(0.82 0.06 330))">
+              <div style="position:absolute;right:14px;top:14px;font-size:.84em;padding:6px 10px;border-radius:8px;background:rgb(255 255 255 / .88)">🖼️ Change cover</div>
+              <div style="position:absolute;left:28px;bottom:-44px;width:96px;height:96px;border-radius:50%;box-sizing:border-box;border:5px solid #fff;background:oklch(0.94 0.04 235);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:600">J</div>
+              <div style="position:absolute;left:112px;bottom:-40px;z-index:2">{{ petCover }}</div>
+            </div>
+            <div style="padding:56px 28px 0;display:flex;align-items:flex-end;gap:12px">
+              <div style="flex:1"><div style="font-size:1.6em;font-weight:600;letter-spacing:-.01em">Jason Lim <span style="font-size:.56em;font-weight:400;color:rgb(117 100 86)">· Social Media Executive</span></div><div style="display:flex;gap:6px;margin-top:6px;font-size:.94em;color:rgb(74 64 58)"><span style="border-bottom:1px dashed rgb(214 204 190);padding:2px 0;width:320px">Editing reels all week</span><span style="color:rgb(117 100 86)">· {{ petName }} Lv {{ lab.level }} · {{ lab.bubble }} {{ lab.stateLabel }}</span></div></div>
+              <div style="height:34px;display:flex;align-items:center;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;font-size:.92em;font-weight:500">✥ Edit layout</div>
+            </div>
+            <div style="padding:14px 28px 0;color:rgb(74 64 58)">Good morning, Jason ☀️ <span style="color:rgb(117 100 86)">— you have 3 things on your plate</span></div>
+            <div style="padding:16px 16px 28px 28px">
+              <div style="position:relative;height:716px">
+                <div style="position:absolute;left:0;top:0;width:calc(50% - 12px);height:352px;box-sizing:border-box;border-radius:14px;border:1px solid rgb(236 231 224);overflow:hidden;background:#f3dcc8">
+                  <div style="position:absolute;left:7%;top:12%;height:30%;width:20%;border:6px solid #fff;border-radius:4px;box-sizing:border-box;background:linear-gradient(#fbe3b0,#cfe4f2)"><span style="position:absolute;right:6px;top:4px;font-size:16px;line-height:1">🌤️</span></div>
+                  <div style="position:absolute;left:0;right:0;bottom:0;height:30%;background:repeating-linear-gradient(90deg,#e9cfa8 0 56px,#dcbd92 56px 58px)"></div>
+                  <div style="position:absolute;left:0;right:0;bottom:30%;height:6px;background:rgb(255 255 255 / .5)"></div>
+                  <sc-for list="{{ furnD }}" as="i" hint-placeholder-count="6"><div style="position:absolute;left:{{ i.x }}%;bottom:{{ i.bottom }};transform:translateX(-50%);z-index:{{ i.z }}"><span style="display:block;line-height:1;font-size:{{ i.size }}px;filter:drop-shadow(0 3px 0 rgb(0 0 0 / .12))">{{ i.emoji }}</span></div></sc-for>
+                  <div style="position:absolute;left:50%;bottom:9%;transform:translateX(-50%);z-index:50">{{ petRoom }}</div>
+                  <span style="position:absolute;left:12px;top:10px;font-size:.8em;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">🏠 My room</span>
+                  <span style="position:absolute;right:12px;top:10px;font-size:.8em;font-weight:500;padding:4px 10px;border-radius:999px;background:rgb(255 255 255 / .9)">🎨 Decorate</span>
+                </div>
+                <div style="position:absolute;left:50%;top:0;width:calc(25% - 12px);height:352px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 190 184);box-shadow:0 1px 2px rgb(51 36 27 / .04);padding:12px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-size:14px">👉</span><span style="font-weight:600;font-size:.96em">My turn</span><span style="min-width:18px;height:18px;border-radius:9px;background:rgb(176 40 34);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">3</span></div>
+                  <sc-for list="{{ turnCards }}" as="c" hint-placeholder-count="3"><div style="background:{{ c.bg }};border:1px solid {{ c.line }};border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;min-width:0"><span style="font-weight:600;font-size:.92em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</span><div style="display:flex;align-items:center;gap:6px;font-size:.78em;color:rgb(74 64 58);white-space:nowrap;overflow:hidden"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ c.dot }}"></span><span style="overflow:hidden;text-overflow:ellipsis">{{ c.meta }}</span></div><div style="display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:center;gap:5px;font-size:.76em;font-weight:500;padding:2px 7px;border-radius:999px;border:1px solid {{ c.pillLine }};background:{{ c.pillBg }};color:{{ c.pillFg }};white-space:nowrap;overflow:hidden;min-width:0"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ c.pillDot }}"></span>{{ c.label }}</span><span style="flex:1"></span><span style="font-size:.78em;font-weight:500;padding:4px 10px;border-radius:6px;border:1px solid rgb(229 222 211);background:#fff">Open</span></div></div></sc-for>
+                </div>
+                <div style="position:absolute;left:75%;top:0;width:calc(25% - 12px);height:170px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);box-shadow:0 1px 2px rgb(51 36 27 / .04);padding:10px 12px;display:flex;gap:8px;align-items:center">
+                  <div style="width:52px;flex:none;display:flex;justify-content:center;align-items:flex-end;height:100%;padding-bottom:12px;box-sizing:border-box">{{ petTile }}</div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;font-size:.84em"><div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;font-size:1.1em">{{ petName }}</span><span style="flex:1"></span><span style="font-size:.9em;font-weight:600;padding:2px 7px;border-radius:999px;background:#EC9B55;color:rgb(43 31 23)">Lv {{ lab.level }}</span></div><div style="height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ lab.xpPct }}%;background:#EC9B55"></div></div><div style="height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ lab.energy }}%;background:{{ lab.energyColor }}"></div></div><div style="color:rgb(74 64 58)">{{ lab.bubble }} {{ lab.stateLabel }}</div><div style="display:flex;gap:6px"><div style="flex:1;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center">🍙 {{ lab.snacks }}</div><div style="flex:1;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center">🏃</div></div></div>
+                </div>
+                <div style="position:absolute;left:75%;top:182px;width:calc(25% - 12px);height:534px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);box-shadow:0 1px 2px rgb(51 36 27 / .04);display:flex;flex-direction:column;overflow:hidden">
+                  <div style="display:flex;gap:2px;padding:3px;margin:8px 10px 0;background:rgb(246 244 240);border-radius:8px"><div style="flex:1;height:26px;border-radius:6px;background:#fff;box-shadow:0 1px 2px rgb(51 36 27 / .14);font-weight:600;font-size:.8em;display:flex;align-items:center;justify-content:center">💬 My chats</div><div style="flex:1;height:26px;font-size:.8em;display:flex;align-items:center;justify-content:center;gap:5px">🏛️ Lobby<span style="width:7px;height:7px;border-radius:50%;background:rgb(200 52 42)"></span></div></div>
+                  <div style="padding:6px;display:flex;flex-direction:column;gap:2px"><sc-for list="{{ peers }}" as="p" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:9px;padding:7px 6px"><span style="position:relative;width:30px;height:30px;flex:none;border-radius:50%;background:{{ p.bg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ p.init }}<sc-if value="{{ p.unread }}"><span style="position:absolute;right:-1px;top:-1px;width:9px;height:9px;border-radius:50%;background:rgb(200 52 42);border:1.5px solid #fff"></span></sc-if></span><span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="display:flex;align-items:baseline;gap:6px"><span style="flex:1;font-size:.86em;font-weight:{{ p.weight }}">{{ p.name }}</span><span style="font-size:.7em;color:rgb(117 100 86)">{{ p.time }}</span></span><span style="font-size:.78em;color:{{ p.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.last }}</span></span></div></sc-for></div>
+                </div>
+                <div style="position:absolute;left:0;top:364px;width:calc(25% - 12px);height:170px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);box-shadow:0 1px 2px rgb(51 36 27 / .04);padding:12px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-size:14px">⏳</span><span style="font-weight:600;font-size:.96em">Waiting on others</span><span style="min-width:18px;height:18px;border-radius:9px;background:rgb(236 231 224);color:rgb(117 100 86);font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">1</span></div>
+                  <div style="border:1px solid rgb(236 231 224);border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:.92em">Dreamcrafter launch post</span><div style="display:flex;align-items:center;gap:6px;font-size:.78em;color:rgb(74 64 58)"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.56 0.15 270)"></span>Dreamcrafter · Due 2 Dec</div><div style="display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:center;gap:5px;font-size:.76em;font-weight:500;padding:2px 7px;border-radius:999px;border:1px solid rgb(226 223 217);background:rgb(243 242 239);color:rgb(98 92 86)"><span style="width:6px;height:6px;border-radius:50%;background:rgb(160 154 146)"></span>Design · with Siti</span><span style="flex:1"></span><span style="font-size:.78em;font-weight:500;padding:4px 10px;border-radius:6px;border:1px solid rgb(229 222 211)">Open</span></div></div>
+                </div>
+                <div style="position:absolute;left:25%;top:364px;width:calc(25% - 12px);height:170px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);box-shadow:0 1px 2px rgb(51 36 27 / .04);padding:12px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:7px"><span style="font-size:14px">📤</span><span style="font-weight:600;font-size:.96em">Delegated by me</span><span style="min-width:18px;height:18px;border-radius:9px;background:rgb(236 231 224);color:rgb(117 100 86);font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">1</span></div>
+                  <div style="border:1px solid rgb(236 231 224);border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:6px"><span style="font-weight:600;font-size:.92em">Thumbnail options</span><div style="display:flex;align-items:center;gap:6px;font-size:.78em;color:rgb(74 64 58);white-space:nowrap;overflow:hidden"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:oklch(0.64 0.15 295)"></span>2990 Home · Red Truck Reels · with Ali</div><div style="display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:center;gap:5px;font-size:.76em;font-weight:500;padding:2px 7px;border-radius:999px;border:1px solid rgb(236 214 164);background:rgb(251 243 225);color:rgb(138 92 10)"><span style="width:6px;height:6px;border-radius:50%;background:rgb(214 152 30)"></span>Ready</span><span style="flex:1"></span><span style="font-size:.78em;font-weight:600;padding:4px 10px;border-radius:6px;background:#EC9B55;color:rgb(43 31 23)">Review</span></div></div>
+                </div>
+                <div style="position:absolute;left:50%;top:364px;width:calc(25% - 12px);height:170px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);box-shadow:0 1px 2px rgb(51 36 27 / .04);padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+                  <div style="font-weight:600;font-size:.96em">🏆 Trophies</div><div style="display:flex;gap:4px;font-size:26px;line-height:1.1"><span>🏆</span><span>🥇</span><span>🎖️</span><span style="opacity:.25;filter:grayscale(1)">🏅</span><span style="opacity:.25;filter:grayscale(1)">🥈</span></div><div style="font-size:.8em;color:rgb(117 100 86);margin-top:auto">3 projects finished this quarter</div>
+                </div>
+                <div style="position:absolute;left:0;top:546px;width:calc(50% - 12px);height:170px;box-sizing:border-box;border-radius:14px;border:1px solid rgb(236 231 224);overflow:hidden;background:#efe6d8">
+                  <div style="position:absolute;left:0;right:0;bottom:0;height:42%;background:repeating-linear-gradient(90deg,#e9dfcf 0 40px,#e1d4c0 40px 42px)"></div>
+                  <span style="position:absolute;left:12px;top:10px;font-size:.8em;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">🏛️ Lobby · 5</span>
+                  <sc-for list="{{ lobby }}" as="l" hint-placeholder-count="5"><div style="position:absolute;left:{{ l.x }}%;bottom:{{ l.y }}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center"><sc-if value="{{ l.say }}"><span style="max-width:140px;margin-bottom:4px;padding:4px 8px;border-radius:10px;background:#fff;box-shadow:0 2px 6px rgb(51 36 27 / .15);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.say }}</span></sc-if><span style="font-size:30px;line-height:1;filter:{{ l.filter }}">{{ l.emoji }}</span><span style="font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:999px;background:rgb(255 255 255 / .92);white-space:nowrap;margin-top:2px">{{ l.name }}</span></div></sc-for>
+                </div>
+                <div style="position:absolute;left:50%;top:546px;width:calc(25% - 12px);height:170px;box-sizing:border-box;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);box-shadow:0 1px 2px rgb(51 36 27 / .04);padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+                  <div style="font-weight:600;font-size:.96em">🗓️ This week</div>
+                  <sc-for list="{{ week }}" as="w" hint-placeholder-count="3"><div style="display:flex;gap:8px;align-items:baseline;font-size:.84em"><span style="font-family:'Chivo Mono',monospace;font-size:10.5px;width:46px;flex:none;color:{{ w.fg }}">{{ w.when }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.title }}</span></div></sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;petSpecies&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cat&quot;,&quot;dog&quot;,&quot;bird&quot;,&quot;dragon&quot;],&quot;default&quot;:&quot;cat&quot;,&quot;tsType&quot;:&quot;'cat'|'dog'|'bird'|'dragon'&quot;,&quot;section&quot;:&quot;Pet&quot;},&quot;petColor&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;original&quot;,&quot;cocoa&quot;,&quot;snow&quot;,&quot;rose&quot;,&quot;mint&quot;,&quot;sky&quot;,&quot;midnight&quot;],&quot;default&quot;:&quot;original&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Pet&quot;},&quot;petName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Kopi&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Pet&quot;}}">
+const LEVELS = [0, 100, 250, 450, 700, 1000];
+const SIZE = [30, 34, 38, 42, 46, 52];
+const SPECIES = {
+  cat: { label: 'Cat', forms: ['🐱', '🐈', '🦁'], names: ['Kitten', 'Cat', 'Lion'] },
+  dog: { label: 'Dog', forms: ['🐶', '🐕', '🐺'], names: ['Puppy', 'Dog', 'Wolf'] },
+  bird: { label: 'Bird', forms: ['🐣', '🐦', '🦅'], names: ['Chick', 'Bird', 'Eagle'] },
+  dragon: { label: 'Dragon', forms: ['🥚', '🦎', '🐉'], names: ['Egg', 'Lizard', 'Dragon'] },
+};
+const STATES = {
+  idle: ['Chilling', '', 'pIdle 2.4s ease-in-out infinite', '代码里没有任何规则会给出它'],
+  newTask: ['New task!', '❗', 'pNew .6s ease-in-out infinite', '24h 内有新阶段'],
+  busy: ['Working', '💻', 'pBusy .4s ease-in-out infinite', 'My turn ≥ 1'],
+  overload: ['Overloaded', '💦', 'pOver .16s linear infinite', '逾期 ≥ 2 或 My turn ≥ 4'],
+  sleeping: ['Sleeping', '💤', 'pSleep 3s ease-in-out infinite', 'My turn = 0'],
+  eating: ['Eating', '🍙', 'pEat .3s ease-in-out infinite', 'Feed 后 2.5 秒'],
+  exercising: ['Working out', '💪', 'pEx .55s ease-in-out infinite', 'Exercise 后 3 秒'],
+  levelUp: ['Level up!', '✨', 'pLvl 1s ease-in-out infinite', '升级后 3.5 秒'],
+  hungry: ['Hungry', '🍽️', 'pHungry 2s ease-in-out infinite', 'Energy < 20'],
+};
+const FILTER = {
+  original: 'none', cocoa: 'sepia(.7) saturate(1.3) brightness(.75)', snow: 'grayscale(1) brightness(1.3)',
+  rose: 'hue-rotate(300deg) saturate(1.3)', mint: 'hue-rotate(110deg) saturate(1.1)', sky: 'hue-rotate(180deg) saturate(1.2)',
+  midnight: 'hue-rotate(220deg) saturate(1.4) brightness(.6)',
+};
+const SWATCH = { original: '#f0b45a', cocoa: '#8a5a3c', snow: '#f1f1ee', rose: '#e9a3b8', mint: '#9fd6b4', sky: '#9cc7ea', midnight: '#3b3a5c' };
+const TONE = {
+  red: { bg: 'rgb(252 236 233)', line: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)' },
+  wait: { bg: 'rgb(251 243 225)', line: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', line: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  draft: { bg: 'rgb(243 242 239)', line: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  meet: { bg: 'oklch(0.96 0.025 235)', line: 'oklch(0.88 0.04 235)', fg: 'oklch(0.42 0.10 235)', dot: 'oklch(0.60 0.12 235)' },
+};
+const SUB = { carres: 'oklch(0.70 0.12 235)', h2990: 'oklch(0.64 0.15 295)', hookka: 'oklch(0.70 0.13 345)', dream: 'oklch(0.56 0.15 270)', century: 'oklch(0.52 0.06 55)' };
+const START = { count: 3, red: 1, fresh: true, energy: 64, xp: 260, snacks: 3, workouts: 0 };
+const levelOf = xp => Math.max(1, LEVELS.filter(x => xp >= x).length);
+const formOf = lv => (lv <= 2 ? 0 : lv <= 4 ? 1 : 2);
+
+class Component extends DCLogic {
+  state = { ...START, flash: null, toast: '', species: null, color: null };
+  componentWillUnmount() { clearTimeout(this.t); }
+  flash(state, ms, toast) {
+    clearTimeout(this.t);
+    this.setState({ flash: state, toast: toast || '' });
+    this.t = setTimeout(() => this.setState({ flash: null }), ms);
+  }
+  petState() {
+    const s = this.state;
+    if (s.flash) return s.flash;
+    if (s.energy < 20) return 'hungry';
+    if (s.red >= 2 || s.count >= 4) return 'overload';
+    if (s.fresh) return 'newTask';
+    if (s.count >= 1) return 'busy';
+    return 'sleeping';
+  }
+  why() {
+    const s = this.state;
+    if (s.flash) return '临时状态，几秒后回到规则 1–5。';
+    if (s.energy < 20) return `Energy ${s.energy} < 20（规则 1，最优先）。`;
+    if (s.red >= 2) return `逾期 ${s.red} ≥ 2（规则 2）。`;
+    if (s.count >= 4) return `My turn ${s.count} ≥ 4（规则 2）。`;
+    if (s.fresh) return '24 小时内有新开的阶段（规则 3）。';
+    if (s.count >= 1) return `My turn ${s.count} ≥ 1（规则 4）。`;
+    return 'My turn 是空的（规则 5）。';
+  }
+  pet(emoji, size, state, color) {
+    const h = React.createElement;
+    const st = STATES[state];
+    return h('div', { style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+      st[1] ? h('span', { style: { position: 'absolute', left: '60%', bottom: Math.round(size * 0.75) + Math.round(size * 0.16), fontSize: 12, lineHeight: 1, background: '#fff', borderRadius: 10, padding: '3px 5px', boxShadow: '0 2px 6px rgb(51 36 27 / .15)', animation: 'pBub 1.6s ease-in-out infinite', whiteSpace: 'nowrap', zIndex: 2 } }, st[1]) : null,
+      h('div', { style: { transformOrigin: 'bottom center', lineHeight: 1, animation: st[2], filter: FILTER[color] } }, h('span', { style: { display: 'block', fontSize: size } }, emoji)),
+      h('div', { style: { width: Math.round(size * 0.7), height: Math.round(size * 0.16), borderRadius: '50%', background: 'rgb(0 0 0 / .14)', marginTop: -2 } }));
+  }
+  tabs(list, active) {
+    return list.map(([key, emoji, label, badge]) => key === 'plus'
+      ? { emoji: '+', label: 'New', box: 52, mt: -24, radius: '50%', bg: '#EC9B55', shadow: '0 6px 14px rgb(51 36 27 / .22)', size: 28, color: 'rgb(74 64 58)', weight: 500, badge: 0 }
+      : { emoji, label, box: 30, mt: 0, radius: '9px', bg: key === active ? 'rgb(236 229 219)' : 'transparent', shadow: 'none', size: 17, color: key === active ? 'rgb(51 36 27)' : 'rgb(117 100 86)', weight: key === active ? 600 : 400, badge: badge || 0 });
+  }
+  renderVals() {
+    const s = this.state;
+    const species = s.species ?? this.props.petSpecies ?? 'cat';
+    const color = s.color ?? this.props.petColor ?? 'original';
+    const petName = this.props.petName ?? 'Kopi';
+    const level = levelOf(s.xp);
+    const cur = LEVELS[level - 1], next = LEVELS[level];
+    const state = this.petState();
+    const emoji = SPECIES[species].forms[formOf(level)];
+    const eTone = s.energy < 20 ? TONE.red.dot : s.energy < 50 ? TONE.wait.dot : TONE.done.dot;
+    const bump = (k, d, min, max) => () => this.setState(p => ({ [k]: Math.max(min, Math.min(max, p[k] + d)) }));
+    const gain = (xp, before) => {
+      const to = levelOf(xp);
+      if (to > before) {
+        const evolved = formOf(to) > formOf(before);
+        this.flash('levelUp', 3500, `${petName} reached Lv ${to}${evolved ? ` and evolved into a ${SPECIES[species].names[formOf(to)]}!` : '!'}`);
+        return true;
+      }
+      return false;
+    };
+    const A = [['home', '🏠', 'My Space', 3], ['calendar', '📅', 'Calendar', 1], ['plus'], ['chat', '💬', 'Chat', 2], ['more', '☰', 'More']];
+    const B = [['tasks', '👉', 'Tasks', 3], ['projects', '📁', 'Projects'], ['plus'], ['space', '🏠', 'Space', 2], ['more', '☰', 'More']];
+    const card = (title, dot, meta, tone, label, act, red) => ({
+      title, dot, meta, label, act, bg: red ? 'rgb(255 247 245)' : '#fff', line: red ? TONE.red.line : 'rgb(236 231 224)',
+      pillBg: TONE[tone].bg, pillLine: TONE[tone].line, pillFg: TONE[tone].fg, pillDot: TONE[tone].dot,
+      actBg: act === 'Review' ? '#EC9B55' : '#fff', actLine: act === 'Review' ? '#EC9B55' : 'rgb(229 222 211)', actWeight: act === 'Review' ? 600 : 500,
+    });
+    const strip = (mark, name, who, mini, st) => ({
+      mark, name, who, mini,
+      border: st === 'late' ? 'rgb(51 36 27)' : 'rgb(236 231 224)', shadow: st === 'late' ? '0 4px 12px rgb(51 36 27 / .12)' : 'none',
+      bar: st === 'done' ? TONE.done.dot : st === 'late' ? TONE.red.dot : 'rgb(236 231 224)',
+      numBg: st === 'done' ? TONE.done.bg : st === 'late' ? '#EC9B55' : 'rgb(243 242 239)', numFg: st === 'done' ? TONE.done.fg : 'rgb(43 31 23)',
+      miniFg: st === 'done' ? TONE.done.fg : st === 'late' ? TONE.red.fg : 'rgb(117 100 86)',
+    });
+    const ev = (icon, title, dot, line2, tone, label, due) => ({ icon, title, dot, line2, label, bg: due ? '#fff' : TONE[tone].bg, line: TONE[tone].line, fg: TONE[tone].fg, style: due ? 'dashed' : 'solid' });
+    const day = (wd, n, dots, today) => ({ wd, n, dots, bg: 'transparent', weight: today ? 600 : 400, numBg: today ? 'rgb(90 62 43)' : 'transparent', numFg: today ? 'rgb(246 238 230)' : 'rgb(74 64 58)' });
+    const peer = (init, name, bg, last, time, unread) => ({ init, name, bg, last, time, unread, weight: unread ? 700 : 500, fg: unread ? 'rgb(51 36 27)' : 'rgb(117 100 86)' });
+    const nav = (emoji, label, tone, count, on) => ({ isNav: true, emoji, label, tone, count: count || 0, on: !!on, bg: on ? 'rgb(236 229 219)' : 'transparent', color: on ? 'rgb(51 36 27)' : 'rgb(74 64 58)', weight: on ? 500 : 400 });
+    const sub = (emoji, label, dot, count) => ({ isSub: true, emoji, label, dot, count: count || 0 });
+    const sand = 'rgb(239 228 217)', mist = 'rgb(230 237 241)', peach = 'rgb(249 231 216)', cream = 'rgb(246 238 222)';
+    const row = (emoji, label, tone, count) => ({ emoji, label, tone, count: count || 0 });
+    const furn = scale => [['🛏️', 64, 14, 0], ['🪴', 46, 32, 0], ['🖼️', 36, 48, 1], ['🖥️', 48, 66, 0], ['🪑', 42, 80, 0], ['🕰️', 32, 86, 1]]
+      .map(([e, size, x, wall]) => ({ emoji: e, size: Math.round(size * scale), x, bottom: wall ? '56%' : '20%', z: wall ? 1 : 10 + Math.round(x / 10) }));
+    const file = (emoji, title, track, who, due, tone, label) => ({ emoji, title, track, who, due, label, pillBg: TONE[tone].bg, pillLine: TONE[tone].line, pillFg: TONE[tone].fg, pillDot: TONE[tone].dot });
+    return {
+      petName,
+      colorLabel: color.charAt(0).toUpperCase() + color.slice(1),
+      lab: {
+        count: s.count, red: s.red, energy: s.energy, snacks: s.snacks, workoutsLeft: Math.max(0, 3 - s.workouts), level,
+        xpPct: next == null ? 100 : Math.round(((s.xp - cur) / (next - cur)) * 100),
+        xpLabel: next == null ? 'Max level' : `${s.xp - cur}/${next - cur} XP to Lv ${level + 1}`,
+        energyColor: eTone, stateLabel: STATES[state][0], bubble: STATES[state][1] || '🙂', why: this.why(), toast: s.toast,
+        freshBg: s.fresh ? 'rgb(90 62 43)' : 'rgb(214 204 190)', freshLeft: s.fresh ? 22 : 2,
+      },
+      petHome: this.pet(emoji, 44, state, color),
+      petCover: this.pet(emoji, 44, state, color),
+      petRoom: this.pet(emoji, Math.round(SIZE[level - 1] * 1.15), state, color),
+      petTile: this.pet(emoji, 50, state, color),
+      petLab: this.pet(emoji, SIZE[level - 1] * 2, state, color),
+      countUp: bump('count', 1, 0, 9), countDown: bump('count', -1, 0, 9),
+      redUp: bump('red', 1, 0, 9), redDown: bump('red', -1, 0, 9),
+      toggleFresh: () => this.setState(p => ({ fresh: !p.fresh })),
+      feed: () => {
+        if (s.snacks < 1) return this.setState({ toast: '没有 snack 了 — 完成一个阶段才会有。' });
+        this.setState({ snacks: s.snacks - 1, energy: Math.min(100, s.energy + 20) });
+        this.flash('eating', 2500, '+20 energy');
+      },
+      workout: () => {
+        const earns = s.workouts < 3;
+        const xp = s.xp + (earns ? 10 : 0);
+        this.setState({ energy: Math.max(0, s.energy - 15), workouts: s.workouts + 1, xp });
+        if (!gain(xp, level)) this.flash('exercising', 3000, earns ? `+10 XP · ${petName} worked out` : '3/3 workouts today. No more XP until tomorrow');
+      },
+      finishStage: () => {
+        const xp = s.xp + 20;
+        this.setState({ xp, snacks: s.snacks + 1, count: Math.max(0, s.count - 1), fresh: false });
+        if (!gain(xp, level)) this.setState({ toast: '+20 XP · +1 snack' });
+      },
+      resetLab: () => { clearTimeout(this.t); this.setState({ ...START, flash: null, toast: '' }); },
+      stateSheet: Object.keys(STATES).map(k => ({ node: this.pet(emoji, 34, k, color), label: STATES[k][0], rule: STATES[k][3], border: k === state ? '#EC9B55' : k === 'idle' ? TONE.red.line : 'rgb(236 231 224)' })),
+      levelSheet: LEVELS.map((xp, i) => ({ lv: i + 1, xp, size: SIZE[i], emoji: SPECIES[species].forms[formOf(i + 1)], filter: FILTER[color], border: i + 1 === level ? '#EC9B55' : 'rgb(236 231 224)' })),
+      speciesOpts: Object.keys(SPECIES).map(k => ({ emoji: SPECIES[k].forms[0], label: SPECIES[k].label, pick: () => this.setState({ species: k }), bg: k === species ? 'rgb(51 36 27)' : '#fff', fg: k === species ? '#fff' : 'rgb(74 64 58)', line: k === species ? 'rgb(51 36 27)' : 'rgb(229 222 211)' })),
+      colorOpts: Object.keys(FILTER).map(k => ({ label: k, swatch: SWATCH[k], pick: () => this.setState({ color: k }), ring: k === color ? '0 0 0 2px #fff, 0 0 0 4px rgb(51 36 27), inset 0 0 0 1px rgb(0 0 0 / .08)' : 'inset 0 0 0 1px rgb(0 0 0 / .08)' })),
+      tabsA: { home: this.tabs(A, 'home'), calendar: this.tabs(A, 'calendar'), chat: this.tabs(A, 'chat'), more: this.tabs(A, 'more') },
+      tabsB: { tasks: this.tabs(B, 'tasks'), space: this.tabs(B, 'space') },
+      turnCards: [
+        card('Red Truck Reels', SUB.h2990, '2990 Home · Stage 3/5 · Caption & schedule · Due 27 Nov', 'red', 'Changes requested · Rachel', 'Open', true),
+        card('Carres Year-End Video', SUB.carres, 'Carres · Stage 2/4 · Storyboard · Due 1 Dec', 'wait', 'Your turn', 'Open', false),
+        card('Cut 3 story frames', SUB.hookka, 'Hookka · CNY teaser · Due 30 Nov', 'wait', 'In progress', 'Open', false),
+      ],
+      week: [
+        { when: '27 Nov', title: 'Red Truck Reels', fg: TONE.red.fg },
+        { when: '29 Nov', title: 'Thumbnail options', fg: 'rgb(74 64 58)' },
+      ],
+      stripA: [
+        strip('✓', 'Script', 'Mei', '2d', 'done'), strip('✓', 'Shoot & edit', 'Ali', '4d', 'done'),
+        strip('3', 'Caption', 'You', '1d late', 'late'), strip('4', 'PIC approval', 'Ms Tan', '2d', ''), strip('5', 'Post', 'Jason', '1d', ''),
+      ],
+      weekDays: [
+        day('Mon', 23, [TONE.done.dot]), day('Tue', 24, []), day('Wed', 25, [TONE.done.dot, TONE.meet.dot]), day('Thu', 26, []),
+        day('Fri', 27, [TONE.red.dot]), day('Sat', 28, [TONE.wait.dot, TONE.wait.dot], true), day('Sun', 29, [TONE.draft.dot]),
+      ],
+      agenda: [
+        { label: '27 Nov', wd: 'Fri · overdue', fg: TONE.red.fg, events: [ev('⏱', 'Red Truck Reels', SUB.h2990, '2990 Home · Caption & schedule', 'red', '1d overdue', true)] },
+        { label: 'Today · 28 Nov', wd: 'Sat', fg: 'rgb(90 62 43)', events: [
+          ev('📣', 'Hookka CNY teaser', SUB.hookka, 'Hookka · Instagram · 6:00 pm', 'wait', 'Scheduled', false),
+          ev('🗓️', 'Carres showroom shoot', SUB.carres, 'Carres · 2:00 pm · Ali, Jason', 'meet', 'Shoot', false),
+        ] },
+        { label: '29 Nov', wd: 'Sun', fg: 'rgb(74 64 58)', events: [ev('⏱', 'Thumbnail options', SUB.h2990, '2990 Home · subtask · Ali', 'draft', 'Due', true)] },
+        { label: '1 Dec', wd: 'Tue', fg: 'rgb(74 64 58)', events: [
+          ev('⏱', 'Carres Year-End Video', SUB.carres, 'Carres · Storyboard', 'wait', 'Your turn', true),
+          ev('📣', 'Dreamcrafter launch post', SUB.dream, 'Dreamcrafter · Facebook', 'draft', 'Draft', false),
+        ] },
+      ],
+      peers: [
+        peer('S', 'Siti', 'oklch(0.94 0.04 350)', 'Sure, by 3pm 👍', '09:31', true),
+        peer('R', 'Rachel', 'oklch(0.94 0.03 60)', '📎 Red Truck Reels', '08:50', true),
+        peer('A', 'Ali', 'oklch(0.94 0.04 295)', 'You: thumbnails look good', 'Fri', false),
+        peer('M', 'Mei', 'oklch(0.94 0.04 295)', 'Script v3 is in the folder', 'Thu', false),
+        peer('W', 'Wei Lun', 'oklch(0.94 0.04 270)', 'You: 👋', '21 Nov', false),
+      ],
+      folders: [
+        { title: '2990 Home · Social Monthly · Nov 2026', meta: '6 tasks · 1 late' },
+        { title: '2990 Home · Reels Pack · Oct 2026', meta: '4 tasks' },
+      ],
+      files: [
+        file('⚡', 'Red Truck Reels', 'MKT-2990-2610-018', 'Jason', '27 Nov', 'red', 'Changes'),
+        file('🔁', 'Weekly promo story', 'RCR-2990-2611-003', 'Jason', '30 Nov', 'wait', 'Your turn'),
+        file('⚡', 'Store signage refresh', 'TSK-2990-2611-009', 'Siti', '3 Dec', 'draft', 'With Siti'),
+      ],
+      moreMain: [row('🧾', 'Claim & approve', cream, 2), row('🏢', 'Subsidiaries', peach), row('📁', 'Projects', sand, 3), row('📚', 'Library', mist)],
+      moreMgr: [
+        row('📊', 'Tracking Dashboard', sand, 5), row('🧩', 'Workflow Builder', mist), row('📦', 'Product Builder', peach), row('📝', 'Minutes Builder', cream),
+        row('🔁', 'Replace Person', mist), row('💰', 'Billing', peach), row('🏦', 'Pool', sand),
+      ],
+      moreFoot: [row('🚪', 'Meeting Rooms', mist), row('🔀', 'Change view', mist), row('⚙️', 'Settings', sand)],
+      furnM: furn(0.75), furnD: furn(1),
+      lobby: [
+        { x: 10, y: 8, emoji: '🐕', name: 'Ali', filter: 'none', say: '' },
+        { x: 30, y: 18, emoji: SPECIES[species].forms[formOf(level)], name: 'Jason (you)', filter: FILTER[color], say: '' },
+        { x: 52, y: 8, emoji: '🦁', name: 'Rachel', filter: 'none', say: 'Shoot moved to 2pm' },
+        { x: 72, y: 18, emoji: '🐣', name: 'Siti', filter: FILTER.rose, say: '' },
+        { x: 90, y: 8, emoji: '🦎', name: 'Wei Lun', filter: 'none', say: '' },
+      ],
+      deskNav: [
+        nav('🏠', 'My Space', sand, 3, true), nav('📅', 'Calendar', mist, 1), nav('🧾', 'Claim', cream), nav('🏢', 'Subsidiaries', peach),
+        sub('🏡', '2990 Home', SUB.h2990, 2), sub('🛋️', 'Carres', SUB.carres, 1), sub('🏛️', 'Houzs Century', SUB.century), sub('🪴', 'Hookka', SUB.hookka),
+        sub('🛏️', 'Colive', 'oklch(0.66 0.10 195)'), sub('✨', 'Dreamcrafter', SUB.dream), sub('🔩', 'CMI', 'oklch(0.60 0.03 250)'), sub('🚚', 'The Conts', 'oklch(0.62 0.12 320)'),
+        nav('📁', 'Projects', sand), nav('📚', 'Library', mist),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

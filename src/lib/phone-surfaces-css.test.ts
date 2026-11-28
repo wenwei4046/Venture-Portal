@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest'
 // box focused blue and stood 44px tall (the phone audit, 2026-10-11).
 
 const css = fs.readFileSync(path.resolve(__dirname, '../app/globals.css'), 'utf8')
-const SURFACES = ['[data-revenue-app] *', '[data-hr-app] *', '[data-guest-page] *', '[data-soft-menu] *']
+// The Marketing app (2026-11-28) too: its fields are the handoff's, its titles its shell's own face.
+const SURFACES = ['[data-revenue-app] *', '[data-hr-app] *', '[data-guest-page] *', '[data-soft-menu] *', '[data-mkt-app] *']
 
 function rulesMatching(selectorPart: RegExp): string[] {
   return css
@@ -37,6 +38,14 @@ describe('the portal’s field rules leave the prototype-drawn surfaces alone', 
     const floor = css.slice(css.indexOf("keep their prototypes' own control heights"))
     const block = floor.slice(0, floor.indexOf('}'))
     expect(block.match(/\[data-lead-view\] \*/g)).toHaveLength(3)
+  })
+
+  // 2026-11-28, the Marketing app on a phone: its *Tasks* came out in the portal's 36px Newsreader page title.
+  it('the portal’s display title leaves the phone apps’ own titles alone', () => {
+    // Every h1 selector the portal styles as its title, the narrow screens' too.
+    const titles = css.match(/h1:not\(\.sr-only\):not\(:where\([^)]*\)\)/g) ?? []
+    expect(titles.length).toBeGreaterThanOrEqual(2)
+    for (const sel of titles) for (const s of ['[data-revenue-app] *', '[data-hr-app] *', '[data-mkt-app] *']) expect(sel).toContain(s)
   })
 
   it('the markers are on the guest page and the soft menu', () => {
