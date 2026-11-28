@@ -59,7 +59,7 @@ describe("the Team inbox's Filter chats › Status › Unread", () => {
     expect(s.statuses.map(x => x.label)).toEqual(["Unread", "New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked", "Replied", "No reply"]); // + Replied / No reply after our template (2026-11-28)
     expect(s.statuses[0]).toMatchObject({ key: UNREAD_PICK, n: UNREAD_IDS.length, hot: true, dot: "var(--crm-rust)", on: false });
     // The statuses still count as before: every chat in one.
-    expect(s.statuses.slice(1).reduce((n, x) => n + x.n, 0)).toBe(customers.length);
+    expect(s.statuses.slice(1, -2).reduce((n, x) => n + x.n, 0)).toBe(customers.length);
   });
 
   it("alone keeps every unread chat, each card saying its status; Show N chats, the tag and the Status button follow it", () => {
@@ -137,7 +137,7 @@ const salesCtx = (filter: { type: string; v: string } | null, d = data) => ({
 describe("Mine's chip row › Unread", () => {
   it("sits right after All with its count, in the hot colour as Attention's", () => {
     const chips = salesInbox(salesCtx(null)).chips3b;
-    expect(chips.map(c => c.label)).toEqual(["All", "Unread", "New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked"]);
+    expect(chips.map(c => c.label)).toEqual(["All", "Unread", "New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked", "Replied"]); // + Replied once a chat answered our first message (2026-11-28)
     const n = Object.fromEntries(chips.map(c => [c.label, c.n]));
     // All is the warm chats (Cold leads and Blocked have their own chips); Unread is every unread one, the cold one too.
     expect(n).toMatchObject({ All: customers.length - 1, Unread: UNREAD_IDS.length });
