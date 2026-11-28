@@ -66,7 +66,8 @@ export function deskOverviewVM(ctx: DeskCtx) {
         // Its Leads and Appt open their customers (the owner, 2026-11-27: "overview 也要"), as Ads Performance's.
         openLeads: a.leadIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_LEADS}${a.name}`, clistIds: a.leadIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         // After our template: replied (cyan) and no reply (yellow), each opening its customers (2026-11-28).
-        replied: a.repliedIds.length, noReply: a.noReplyIds.length,
+        replied: a.repliedIds, noReply: a.noReplyIds, tplAppt: a.tplApptIds,
+        openTplAppt: a.tplApptIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_APPTS}${a.name}`, clistIds: a.tplApptIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         openReplied: a.repliedIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_REPLIED}${a.name}`, clistIds: a.repliedIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         openNoReply: a.noReplyIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_NOREPLY}${a.name}`, clistIds: a.noReplyIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         openAppts: a.apptIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_APPTS}${a.name}`, clistIds: a.apptIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,

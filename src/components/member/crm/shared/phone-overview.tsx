@@ -150,7 +150,8 @@ export function PhoneOverview(p: PhoneOverviewProps) {
             </div>
             {/* After our template: replied (cyan) · no reply (yellow), each to its customers (2026-11-28). */}
             {a.repliedIds.length + a.noReplyIds.length > 0 && <div data-ov-replies="" style={{ padding: "0 0 10px" }}>
-              <ReplyBar replied={a.repliedIds.length} noReply={a.noReplyIds.length} size={11} bar={44}
+              <ReplyBar replied={a.repliedIds} noReply={a.noReplyIds} appt={a.tplApptIds} size={11} bar={44}
+                openAppt={p.openList && a.tplApptIds.length ? () => p.openList!(`Appointments · ${a.name}`, a.tplApptIds) : undefined}
                 openReplied={p.openList && a.repliedIds.length ? () => p.openList!(`Replied · ${a.name}`, a.repliedIds) : undefined}
                 openNoReply={p.openList && a.noReplyIds.length ? () => p.openList!(`No reply · ${a.name}`, a.noReplyIds) : undefined} />
             </div>}
