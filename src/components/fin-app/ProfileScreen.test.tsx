@@ -58,7 +58,7 @@ describe('the Finance app’s Profile', () => {
     draw({ view: 'principal', canSwitch: true })
     const views = screen.getByLabelText('Switch view')
     expect(within(views).getAllByRole('button').map(b => b.textContent)).toEqual([
-      'PrincipalYou are here', 'FinanceThis app›', 'HRThe HR app›', 'MarketingThe portal›', 'Revenue teamThe Revenue app›',
+      'PrincipalYou are here', 'FinanceThis app›', 'HRThe HR app›', 'MarketingThe Marketing app›', 'Revenue teamThe Revenue app›',
       'Lead ViewThe portal›', 'View as a person…Read-only›',
     ])
     fireEvent.click(within(views).getByRole('button', { name: /View as a person/ }))

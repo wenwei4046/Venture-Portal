@@ -7941,6 +7941,11 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-cv-blank: 214 190 160; --mk-cv-blank-key: 196 170 140; --mk-cv-blank-focus: 150 120 90; --mk-cv-stripe: 253 252 250;
   --mk-cv-pk-line: 226 223 217; --mk-cv-pk-line-2: 236 234 230; --mk-cv-pk-soft: 248 247 245; --mk-cv-pk-text: 98 92 86;
   --mk-cv-col-off: 243 241 237; --mk-cv-col-off-ink: 130 120 110; --mk-cv-shadow-icons: 0 12px 30px rgb(51 36 27 / .16);
+  /* The Marketing app (2026-11-28, `Marketing App iOS + Android.dc.html`): the Tasks segment's ground, the dark hero's
+     second line, the sheet's scrim, the raised ＋, the toast, a screen pushed over the tabs and a sheet rising. */
+  --mk-seg: 236 233 228; --mk-on-ink-2: 200 186 172; --mk-app-scrim: rgb(51 36 27 / .45);
+  --mk-shadow-plus: 0 6px 14px rgb(51 36 27 / .22); --mk-shadow-toast: 0 8px 24px rgb(51 36 27 / .25);
+  --mk-shadow-push: -12px 0 32px rgb(51 36 27 / .08); --mk-shadow-up: 0 -12px 32px rgb(51 36 27 / .12);
   background: rgb(var(--mk-app));
 }
 /* The PIC's link, /t/<code> (⑤-1, `PIC Link.dc.html`): the client-facing page in the handoff's own cooler palette,
