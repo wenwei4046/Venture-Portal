@@ -306,6 +306,8 @@ export function insightVM(ctx0: DeskCtx) {
 export const AD_LEADS = "Leads · ";
 /** …and an ad's appointments (its Appts cell pressed, 2026-11-27). */
 export const AD_APPTS = "Appointments · ";
+/** …and, after our template, who replied and who did not (Overview's Replies, 2026-11-28). */
+export const AD_REPLIED = "Replied · ", AD_NOREPLY = "No reply · ";
 
 export function clistVM(ctx: DeskCtx) {
   const { ui, patch, set, data, now } = ctx;
@@ -319,7 +321,8 @@ export function clistVM(ctx: DeskCtx) {
   let rows: Row[];
   // An ad's leads (Ads performance, a row pressed — the owner, 2026-11-27: "点击后看到所有的 leads 名单"): `Leads · <ad>`.
   const adAppts = !!ui.clistIds && key.startsWith(AD_APPTS);
-  const adList = (!!ui.clistIds && key.startsWith(AD_LEADS)) || adAppts;
+  const adReply = !!ui.clistIds && (key.startsWith(AD_REPLIED) || key.startsWith(AD_NOREPLY));
+  const adList = (!!ui.clistIds && key.startsWith(AD_LEADS)) || adAppts || adReply;
   if (ui.clistIds && (key === "Appointments" || adList)) {
     const want = new Set(ui.clistIds);
     rows = all.filter(x => want.has(x.id)).map((x, i) => ({ id: x.id, name: x.name, ini: x.ini, sub: `${x.ad} · ${x.owner}`, status: x.status, ord: i, rep: x.owner }));
@@ -383,7 +386,7 @@ export function clistVM(ctx: DeskCtx) {
     chatFromList: ui.kind === "chat" && ui.pane === "overlay" && ui.fromList && key.startsWith("st:"),
     // Opened from the chat, back is that chat (the owner, 2026-11-04: "点击后返回到聊天室"); from Leads, back is Leads.
     infoBack: !!ui.infoId && ui.kind === "info" && !ui.visit,
-    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : adAppts ? "Back to the ad's appointments" : adList ? "Back to the ad's leads" : `${key} · all customers`,
+    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : adAppts ? "Back to the ad's appointments" : adReply ? (key.startsWith(AD_REPLIED) ? "Back to who replied" : "Back to who has not replied") : adList ? "Back to the ad's leads" : `${key} · all customers`,
     backToList: () => patch(ui.infoFromChat && ui.chat ? { kind: "chat", infoFromChat: false } : { kind: "clist", infoId: null, infoFromChat: false }),
     teamNameOf: (id: string | null) => teamNameOf(ctx, id),
     isCold: (c: CrmCustomer) => isCold(c, now), urgency: (c: CrmCustomer) => urgencyOf(c, now),

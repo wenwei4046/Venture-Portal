@@ -8,6 +8,7 @@
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import { DeskFigureTip } from "./Desk4a";
 import { FeeEdit } from "../shared/fee-edit";
+import { ReplyBar } from "../shared/reply-bar";
 import type { DeskOverview as OV } from "./vm/overview";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -21,6 +22,10 @@ const figPress = (open: (() => void) | undefined, what: string) => !open ? {} : 
   onClick: (e: { stopPropagation(): void }) => { e.stopPropagation(); open(); },
   onKeyDown: (e: { key: string; preventDefault(): void; stopPropagation(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open(); } } };
 const figLink = (open: (() => void) | undefined): CSSProperties => (open ? { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } : {});
+/** The Replies cell: after our template, replied (cyan) · no reply (yellow) — 2026-11-28. */
+function Replies({ a }: { a: OV["ads"][number] }) {
+  return <span style={{ minWidth: 0, overflow: "hidden", paddingLeft: "16px" }}><ReplyBar replied={a.replied} noReply={a.noReply} openReplied={a.openReplied} openNoReply={a.openNoReply} /></span>;
+}
 
 function Section({ title, go, goLabel, children }: { title: string; go: () => void; goLabel: string; children: ReactNode }) {
   return (
@@ -77,7 +82,8 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
   const [hov, setHov] = useState<string | null>(null);
   // Each table's own columns, then the ones added with "+" (o.adCol / o.teamCol), then the "+" itself.
   const more = (n: number) => (n ? ` repeat(${n},minmax(0,0.8fr))` : "") + " 30px";
-  const adCols = (o.money ? "minmax(0,2.2fr) minmax(0,1fr) repeat(5,minmax(0,0.8fr))" : "minmax(0,2.2fr) minmax(0,1fr) repeat(3,minmax(0,0.8fr))") + more(o.adCol.cols.length);
+  // Replies after Won (2026-11-28): the cyan / yellow bar with its two numbers.
+  const adCols = (o.money ? "minmax(0,2.2fr) minmax(0,1fr) repeat(5,minmax(0,0.8fr))" : "minmax(0,2.2fr) minmax(0,1fr) repeat(3,minmax(0,0.8fr))") + " minmax(0,1.7fr)" + more(o.adCol.cols.length);
   const brCols = (o.money ? "minmax(0,2fr) repeat(5,minmax(0,1fr))" : "minmax(0,2fr) repeat(3,minmax(0,1fr))") + more(o.adCol.cols.length);
   const tmCols = "minmax(0,2fr) minmax(0,1.4fr) repeat(4,minmax(0,0.8fr))" + more(o.teamCol.cols.length);
   const extra = (v: string[]) => <>{v.map((x, k) => <span key={k} style={R}>{x}</span>)}<span /></>;
@@ -125,7 +131,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
           ))}
           <div style={{ height: "18px" }} />
         </>)}
-        <div style={{ ...HEAD, gridTemplateColumns: adCols }}><div>Ad</div><div>Brand</div>{o.money && <><div style={R}>Spend</div><div style={R}>Per lead</div></>}<div style={R}>Leads</div><div style={R}>Appt</div><div style={R}>Won</div>{o.adCol.cols.map(c => <ColHead key={c.key} c={c} />)}<ColAdd c={o.adCol} /></div>
+        <div style={{ ...HEAD, gridTemplateColumns: adCols }}><div>Ad</div><div>Brand</div>{o.money && <><div style={R}>Spend</div><div style={R}>Per lead</div></>}<div style={R}>Leads</div><div style={R}>Appt</div><div style={R}>Won</div><div title="Of the leads sent a template: replied after it (cyan) · not yet (yellow)" style={{ paddingLeft: "16px" }}>Replies</div>{o.adCol.cols.map(c => <ColHead key={c.key} c={c} />)}<ColAdd c={o.adCol} /></div>
         {o.ads.map(a => (
           <Fragment key={a.id}>
             <button type="button" onClick={a.canOpen ? a.toggle : undefined} aria-expanded={a.canOpen ? a.open : undefined} className="crm4a-row" style={{ ...ROW, gridTemplateColumns: adCols, cursor: a.canOpen ? "pointer" : "default" }}>
@@ -135,7 +141,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
               </span>
               <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.brand || "—"}</span>
               {o.money && <><span style={R}>{a.spend}</span><span style={R}>{a.cpl}</span></>}
-              <span {...figPress(a.openLeads, "leads")} style={{ ...R, fontWeight: 500, ...figLink(a.openLeads) }}>{a.leads}</span><span {...figPress(a.openAppts, "appointments")} style={{ ...R, ...figLink(a.openAppts) }}>{a.appt}</span><span style={R}>{a.won}</span>{extra(a.extra)}
+              <span {...figPress(a.openLeads, "leads")} style={{ ...R, fontWeight: 500, ...figLink(a.openLeads) }}>{a.leads}</span><span {...figPress(a.openAppts, "appointments")} style={{ ...R, ...figLink(a.openAppts) }}>{a.appt}</span><span style={R}>{a.won}</span><Replies a={a} />{extra(a.extra)}
             </button>
             {a.open && a.teams.map(t => (
               <div key={t.name} style={{ ...ROW, cursor: "default", minHeight: "38px", gridTemplateColumns: adCols, background: "var(--crm-hover)", fontSize: "13px" }}>
@@ -144,7 +150,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
                 </span>
                 <span style={{ fontSize: "12px", color: "var(--crm-faint)" }}>{t.share} of leads</span>
                 {o.money && <><span /><span /></>}
-                <span style={R}>{t.leads}</span><span style={R}>{t.appt}</span><span style={R}>{t.won}</span>{extra(t.extra)}
+                <span style={R}>{t.leads}</span><span style={R}>{t.appt}</span><span style={R}>{t.won}</span><span />{extra(t.extra)}
               </div>
             ))}
           </Fragment>

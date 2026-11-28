@@ -16,6 +16,7 @@ import { inSource, type SourcePick } from "@/lib/member/crm-source";
 import { Ic } from "./icons4a";
 import { PHONE_TYPE, typePx } from "./type";
 import { FeeEdit } from "./fee-edit";
+import { ReplyBar } from "./reply-bar";
 import { mins, overviewFigures, overviewTiles, pctOf, rm, rm2, type OvRange, type OvTeamIn } from "./insight-overview";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -147,6 +148,12 @@ export function PhoneOverview(p: PhoneOverviewProps) {
               {money ? <><span style={NUM(false)}>{a.paid ? rm(a.spend) : "—"}</span><span {...fig(`Leads · ${a.name}`, a.leadIds)} style={{ ...NUM(true), ...link(a.leadIds) }}>{a.leads}</span><span style={NUM(false)}>{a.paid ? rm2(a.cpl) : "—"}</span></>
                 : <><span {...fig(`Leads · ${a.name}`, a.leadIds)} style={{ ...NUM(true), ...link(a.leadIds) }}>{a.leads}</span><span {...fig(`Appointments · ${a.name}`, a.apptIds)} style={{ ...NUM(false), ...link(a.apptIds) }}>{a.appt}</span><span style={NUM(false)}>{a.won}</span></>}
             </div>
+            {/* After our template: replied (cyan) · no reply (yellow), each to its customers (2026-11-28). */}
+            {a.repliedIds.length + a.noReplyIds.length > 0 && <div data-ov-replies="" style={{ padding: "0 0 10px" }}>
+              <ReplyBar replied={a.repliedIds.length} noReply={a.noReplyIds.length} size={11} bar={44}
+                openReplied={p.openList && a.repliedIds.length ? () => p.openList!(`Replied · ${a.name}`, a.repliedIds) : undefined}
+                openNoReply={p.openList && a.noReplyIds.length ? () => p.openList!(`No reply · ${a.name}`, a.noReplyIds) : undefined} />
+            </div>}
             {open && split!.teams.map(t => (
               <div key={t.name} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 44px 44px 44px", columnGap: "6px", alignItems: "center", minHeight: "36px", padding: "0 0 0 12px", fontSize: fs(12), fontVariantNumeric: "tabular-nums", color: "var(--crm-ink-soft)" }}>
                 <span style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>

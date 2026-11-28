@@ -419,6 +419,9 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-orange: #EE5E08;
   --crm-amber: #FFA91F;
   --crm-amber-line: #FFC75A;
+  /* Overview's reply colours (2026-11-28): replied after our template — cyan; not replied — yellow. */
+  --crm-replied: #17A6B4;
+  --crm-noreply: #F2C230;
   --crm-oxblood: #8A1F0A;
   --crm-brown: #6F402C;
   --crm-deep: #2A160C;
