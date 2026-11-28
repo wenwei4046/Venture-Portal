@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { handLeadToGroup, leadMediaLinks, markUnread, readThread, replyToLead, saveLeadCard, sendLeadMedia, setContactOutlet } from '@/lib/leads/actions'
 import { copyText } from '@/lib/leads/clipboard'
 import { insertAt } from '@/lib/leads/emoji'
 import { handoffText } from '@/lib/leads/handoff'
@@ -31,6 +30,7 @@ import ProfileScreen from './ProfileScreen'
 import SignOutSheet from './SignOutSheet'
 import SwitchViewSheet from './SwitchViewSheet'
 import TabBar, { type TabItem } from './TabBar'
+import { LIVE_ACTIONS, type LeadAppActions } from './live-actions'
 import { Scrim, Toast, lv } from './parts'
 import {
   brandPills, byLastUpdate, chatSub, inboxBadge, inboxChips, initials, leadRowOf, matchesLead, matchesQuery, passes, rowOf, salesGroup, stageChips,
@@ -75,6 +75,10 @@ export interface LeadAppProps {
   now: string
   /** Why the Inbox could not be read, in words. */
   problem: string | null
+  /** What it reads and writes (the desktop Inbox's own); the preview and the tests hand in theirs. */
+  actions?: LeadAppActions
+  /** The preview's clock stands still at `now` (its sample's waits stay the handoff's). */
+  stillClock?: boolean
 }
 
 /**
@@ -86,15 +90,18 @@ export interface LeadAppProps {
  */
 export default function LeadApp(p: LeadAppProps) {
   const router = useRouter()
+  const act = p.actions ?? LIVE_ACTIONS
   const brands = useMemo(() => new Map(p.config.brands.map(b => [b.id, b])), [p.config.brands])
   const brandName = useCallback((id: string) => brands.get(id)?.name ?? '', [brands])
   const firstTab: Tab = p.open.inbox ? 'inbox' : p.open.leads ? 'leads' : 'profile'
   const [tab, setTab] = useState<Tab>(() => (p.initialTab === 'leads' && p.open.leads) || (p.initialTab === 'profile') ? p.initialTab : firstTab)
   const [now, setNow] = useState(() => new Date(p.now))
+  const still = !!p.stillClock
   useEffect(() => {
+    if (still) return
     const t = window.setInterval(() => setNow(new Date()), 30_000)
     return () => window.clearInterval(t)
-  }, [])
+  }, [still])
 
   // ── The toast ──
   const [toast, setToast] = useState<string | null>(null)
@@ -136,7 +143,7 @@ export default function LeadApp(p: LeadAppProps) {
   const boxRef = useRef<HTMLTextAreaElement>(null)
 
   const readNow = useCallback(async (id: string): Promise<boolean> => {
-    const r = await readThread(id)
+    const r = await act.readThread(id)
     if (!r.ok) { flash(r.reason, true); return false }
     if (r.data) {
       const t = r.data
@@ -145,7 +152,7 @@ export default function LeadApp(p: LeadAppProps) {
       setMarks(m => { if (!m.has(id)) return m; const n = new Set(m); n.delete(id); return n })
     }
     return true
-  }, [flash])
+  }, [flash, act])
   const reload = useCallback((id: string) => { startBusy(async () => { await readNow(id) }) }, [readNow])
 
   const openChat = (id: string) => {
@@ -205,8 +212,8 @@ export default function LeadApp(p: LeadAppProps) {
   useEffect(() => {
     const missing = [...new Set((thread?.messages ?? []).map(m => m.mediaPath).filter((x): x is string => !!x && !links[x]))]
     if (!missing.length) return
-    void leadMediaLinks(missing).then(r => { if (r.ok) setLinks(l => ({ ...l, ...r.data })) })
-  }, [thread, links])
+    void act.leadMediaLinks(missing).then(r => { if (r.ok) setLinks(l => ({ ...l, ...r.data })) })
+  }, [thread, links, act])
   // A new bubble, or the chat opened: the wall to its foot.
   const wallCount = wall.length
   useLayoutEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight }, [wallCount, shownId])
@@ -223,7 +230,7 @@ export default function LeadApp(p: LeadAppProps) {
     setPending(m => ({ ...m, [id]: [...(m[id] ?? []), mine] }))
     setDrafts(d => ({ ...d, [id]: '' }))
     startBusy(async () => {
-      const r = await replyToLead(id, text)
+      const r = await act.replyToLead(id, text)
       if (!r.ok) {
         flash(r.reason, true)
         setDrafts(d => ({ ...d, [id]: d[id] ? d[id] : text }))
@@ -245,10 +252,10 @@ export default function LeadApp(p: LeadAppProps) {
       const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
       const path = `chat/${id}/${crypto.randomUUID()}-${name}`
       const mime = file.type || 'application/octet-stream'
-      const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: mime, upsert: false })
-      if (up.error) flash('The file could not be uploaded — 25 MB at most.', true)
+      const refused = await act.upload(path, file, mime)
+      if (refused) flash(refused, true)
       else {
-        const r = await sendLeadMedia(id, path, mime, caption)
+        const r = await act.sendLeadMedia(id, path, mime, caption)
         if (!r.ok) flash(r.reason, true)
         else if (r.data.notSent) flash('Saved but not sent: ' + r.data.notSent, true)
         await readNow(id)
@@ -298,7 +305,7 @@ export default function LeadApp(p: LeadAppProps) {
 
   const saveCard = (c: LeadContact, fields: LeadCardFields, done: string) => {
     startBusy(async () => {
-      const r = await saveLeadCard(c.id, fields)
+      const r = await act.saveLeadCard(c.id, fields)
       if (!r.ok) { flash(r.reason, true); return }
       flash(done)
       await readNow(c.id)
@@ -308,7 +315,7 @@ export default function LeadApp(p: LeadAppProps) {
   const confirmPhone = (c: LeadContact) => saveCard(c, { phone: c.phone ?? '' }, 'Number confirmed')
   const notPhone = (c: LeadContact) => saveCard(c, { phone: '' }, 'Removed — not a phone')
   const saveInfo = async (c: LeadContact, fields: LeadCardFields): Promise<string | null> => {
-    const r = await saveLeadCard(c.id, fields)
+    const r = await act.saveLeadCard(c.id, fields)
     if (!r.ok) return r.reason
     flash('Saved')
     await readNow(c.id)
@@ -317,7 +324,7 @@ export default function LeadApp(p: LeadAppProps) {
   }
   const pickOutlet = (c: LeadContact, choice: string) => {
     startBusy(async () => {
-      const r = await setContactOutlet(c.id, choice)
+      const r = await act.setContactOutlet(c.id, choice)
       if (!r.ok) { flash(r.reason, true); return }
       await readNow(c.id)
       router.refresh()
@@ -343,7 +350,7 @@ export default function LeadApp(p: LeadAppProps) {
     setSheet(null)
     setMenu(false)
     startBusy(async () => {
-      const r = await handLeadToGroup(c.id)
+      const r = await act.handLeadToGroup(c.id)
       if (!r.ok) { flash(r.reason, true); return }
       flash(`Handed to ${brand} sales · WhatsApp opened`)
       await readNow(c.id)
@@ -353,7 +360,7 @@ export default function LeadApp(p: LeadAppProps) {
   const markLater = (c: LeadContact) => {
     setMenu(false)
     startBusy(async () => {
-      const r = await markUnread(c.id)
+      const r = await act.markUnread(c.id)
       if (!r.ok) { flash(r.reason, true); return }
       setMarks(m => new Set(m).add(c.id))
       setReadAt(m => { const n = { ...m }; delete n[c.id]; return n })
@@ -432,7 +439,7 @@ export default function LeadApp(p: LeadAppProps) {
   const scrimOn = sheet !== null
 
   return (
-    <div ref={root} data-lead-view="" className={`${s.app} ${figtree.variable}`} style={{ display: 'flex', flexDirection: 'column' }}>
+    <div ref={root} data-lead-view="" data-lead-app="" className={`${s.app} ${figtree.variable}`} style={{ display: 'flex', flexDirection: 'column' }}>
       {p.viewingAs ? <ViewingAsBanner name={p.viewingAs} /> : null}
       {/* The top inset in the colour of the screen's top: Profile's wash, else white. */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingTop: 'var(--lv-top)',
