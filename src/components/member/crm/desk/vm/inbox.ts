@@ -23,6 +23,7 @@ import { jobTitle, personOf, teamAssignees } from "../../shared/people";
 import { labelsOn } from "./labels";
 import { deskChatMenu } from "./chat-menu";
 import { FB_BLOCKED, FB_BLOCKED_CATEGORY } from "../../shared/fb-blocked";
+import { bookedIds, NOREPLY_PICK, REPLIED_PICK, REPLY_MARK, replyPickOk, replyTag } from "../../shared/reply-groups";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 /** The Inbox's Status picker's Unread (2026-11-16): kept in ui.inbF beside the statuses. */
@@ -103,9 +104,12 @@ export function inboxVM(ctx: DeskCtx) {
       // marked unread from its ⋮ menu (its dot). Not a status of its own but a narrowing: picked with statuses it keeps
       // the unread chats among them (Unread + Follow up = the unread Follow-up chats); alone, every unread chat.
       const isUnread = (x: ChatRow) => x.c.unread > 0 || !!pref(x.id)?.markedUnread;
-      const stSel = stPicked(ui.inbF, [...T4.map(t => t[0]), UNREAD]);
-      const stOk = (st: string[]) => { const only = st.filter(l => l !== UNREAD), un = st.includes(UNREAD);
-        return (x: ChatRow) => (!un || isUnread(x)) && (!only.length || only.some(l => !!T4.find(t => t[0] === l)?.[1](x))); };
+      // Replied / No reply after our template (2026-11-28, "同时能不能直接在聊天室做这个记号"): narrowings too, as Unread.
+      const RP = [REPLIED_PICK, NOREPLY_PICK];
+      const stSel = stPicked(ui.inbF, [...T4.map(t => t[0]), UNREAD, ...RP]);
+      const stOk = (st: string[]) => { const only = st.filter(l => l !== UNREAD && !RP.includes(l)), un = st.includes(UNREAD), rp = st.filter(l => RP.includes(l));
+        return (x: ChatRow) => (!un || isUnread(x)) && (!rp.length || rp.some(l => replyPickOk(l, x.c))) && (!only.length || only.some(l => !!T4.find(t => t[0] === l)?.[1](x))); };
+      const booked = bookedIds(data.visits);
       const stF = stOk(stSel);
       const cur: [string, (x: ChatRow) => boolean, boolean] = ["", stF, false];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
@@ -123,7 +127,7 @@ export function inboxVM(ctx: DeskCtx) {
         const k = teams.findIndex(t => (id && (t.id === id || t.people.some(p => p.id === id))) || (!id && (x.teamId === t.id || x.team === t.name)));
         return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
       const STATUS_DOT: Record<string, string> = { New: STATUS.New.dot, Attention: STATUS.Attention.dot, "Follow up": STATUS["Follow up"].dot, Appointment: STATUS.Appointment.dot,
-        Won: STATUS.Won.dot, Lost: STATUS.Lost.dot, "Cold leads": STATUS["Cold leads"].dot, [FB_BLOCKED_CATEGORY]: STATUS.Blocked.dot, [UNREAD]: "var(--crm-rust)" };
+        Won: STATUS.Won.dot, Lost: STATUS.Lost.dot, "Cold leads": STATUS["Cold leads"].dot, [FB_BLOCKED_CATEGORY]: STATUS.Blocked.dot, [UNREAD]: "var(--crm-rust)", [REPLIED_PICK]: REPLY_MARK.replied.color, [NOREPLY_PICK]: REPLY_MARK.noreply.color };
       // People: what one person / a whole team matches (ui.whoSel's own rule); a draft is counted before it is applied.
       const countFor = (who: string[], st: string[]) => all.filter(x => !who.length || who.some(w => match1(w, x)))
         .filter(stOk(st)).filter(hasLab).filter(hit).length;
@@ -141,7 +145,8 @@ export function inboxVM(ctx: DeskCtx) {
           teams: teamOpts.map(t => ({ key: t.key, val: t.val, label: t.label, dot: t.dot, n: t.val ? all.filter(x => match1(t.val!, x)).length : all.filter(x => ctx.directors.some(d => d.id === x.ownerId)).length,
             people: t.people.map(p => ({ id: p.id, label: p.name, n: all.filter(x => x.ownerId === p.id).length })) })),
           statuses: [{ label: UNREAD, dot: STATUS_DOT[UNREAD], n: shown.filter(isUnread).filter(hasLab).length, hot: true },
-            ...T4.filter(t => t[0] !== "All").map(([label, f, hot]) => ({ label, dot: STATUS_DOT[label] ?? "var(--crm-faint-2)", n: shown.filter(f).filter(hasLab).length, hot }))],
+            ...T4.filter(t => t[0] !== "All").map(([label, f, hot]) => ({ label, dot: STATUS_DOT[label] ?? "var(--crm-faint-2)", n: shown.filter(f).filter(hasLab).length, hot })),
+            ...RP.map(label => ({ label, dot: STATUS_DOT[label], n: shown.filter(x => replyPickOk(label, x.c)).filter(hasLab).length, hot: false }))],
           chips: [...whoSel.map(w => ({ key: w, label: whoName(w), dot: w.startsWith("team:") ? teamColours(teams.findIndex(t => t.id === w.slice(5)))[0] : dotOf({ ownerId: w } as ChatRow), round: true,
             remove: () => set(u => ({ ...u, whoSel: u.whoSel.filter(x => x !== w) })) })),
             ...stSel.map(l => ({ key: `st:${l}`, label: l, dot: STATUS_DOT[l] ?? "var(--crm-faint-2)", round: false, remove: () => patch({ inbF: joinPicked(stSel.filter(x => x !== l)) }) }))],
@@ -159,7 +164,7 @@ export function inboxVM(ctx: DeskCtx) {
           const wait = u.level === "none" || isCold(x) || isBlocked(x) ? null
             : { text: `${Math.floor(u.waitingMinutes / 60)} h`, icon: u.level === "overdue" ? "triangle-alert" as const : "clock" as const, color: u.level === "soon" ? "var(--crm-text-appt)" : "var(--crm-oxblood)" };
           return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: x.ad || sourceOf(x.c).label, msg: isBlocked(x) ? FB_BLOCKED : preview(x), time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
-            hot: n > 0 || dot, owner: x.owner, ownerDot: dotOf(x), pinned: !!p?.pinned, muted: !!p?.muted, sel, tags: labelsOn(data, x.id).map(l => ({ t: l.name, c: l.color })),
+            hot: n > 0 || dot, owner: x.owner, ownerDot: dotOf(x), pinned: !!p?.pinned, muted: !!p?.muted, sel, tags: [...replyTag(x.c, booked), ...labelsOn(data, x.id).map(l => ({ t: l.name, c: l.color }))],
             wait, visit: visit ? visitWord(new Date(visit.start)) : "", cold: isCold(x), blocked: isBlocked(x),
             // A blocked chat still says so (shared/fb-blocked.ts) — drawn on line 3 in place of the message, not a line of its own.
             note: isBlocked(x) ? FB_BLOCKED : "", noteColor: "", noteWeight: 500, noteIcon: null,

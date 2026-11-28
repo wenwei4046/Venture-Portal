@@ -38,9 +38,10 @@ import { lastReal, urgencyOf } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
 import { FB_BLOCKED, FB_BLOCKED_NOTE, isFbBlocked } from "../../shared/fb-blocked";
 import { openCustomerPick } from "../../shared/customer-pick";
+import { bookedIds, REPLY_MARK, replyStateOf } from "../../shared/reply-groups";
 
 /** The chat head's defaults (4a frame 02), spread first so each kind's head and the chat's wait lay over them. */
-const PH_BASE = { avBg: undefined, avFg: undefined, status: "", statusColor: "var(--crm-muted)", clock: false };
+const PH_BASE = { avBg: undefined, avFg: undefined, status: "", statusColor: "var(--crm-muted)", clock: false, reply: null };
 
 /** v4 notes/24 §4: Customer info's short dates — First contact and Last chat as "8 Nov, 1:34 pm" (the form's own answers stay). */
 export function shortDateOf(c: DeskCtx["data"]["customers"][number], id: string): string | null {
@@ -121,12 +122,14 @@ export function deskVM(ctx: DeskCtx) {
     ...chatProgressVM(ctx, op),
     // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
     // waiting 6 h") or its status in the muted line's colour.
-    ph: { ...(PH_BASE as { avBg?: string; avFg?: string; status: string; statusColor: string; clock: boolean }), ...(heads[ui.kind] ?? heads.chat),
+    ph: { ...(PH_BASE as { avBg?: string; avFg?: string; status: string; statusColor: string; clock: boolean; reply: { label: string; color: string } | null }), ...(heads[ui.kind] ?? heads.chat),
       ...(ui.kind === "chat" && cur ? (() => { const u = urgencyOf(cur, ctx.now), [avBg, avFg] = avatarTint(cur.name);
+        // The reply mark after our template (2026-11-28, "打开的聊天室顶部"): Won · Appt · Replied · No reply, else none.
+        const rs = replyStateOf(cur, bookedIds(data.visits)), reply = rs ? REPLY_MARK[rs] : null;
         // Blocked on Facebook (2026-11-08, shared/fb-blocked.ts) is said in place of the wait, muted.
-        if (isFbBlocked(cur, data)) return { avBg, avFg, status: FB_BLOCKED, statusColor: "var(--crm-muted)" };
+        if (isFbBlocked(cur, data)) return { avBg, avFg, status: FB_BLOCKED, statusColor: "var(--crm-muted)", reply };
         // v4 notes/24 §7: plain text, no pill — a 12px clock and "Waiting 6 h", 600 13px oxblood, before ⋮.
-        return { avBg, avFg, status: u.level !== "none" ? `Waiting ${Math.floor(u.waitingMinutes / 60)} h` : "", statusColor: "var(--crm-oxblood)", clock: u.level !== "none" }; })() : {}) },
+        return { avBg, avFg, status: u.level !== "none" ? `Waiting ${Math.floor(u.waitingMinutes / 60)} h` : "", statusColor: "var(--crm-oxblood)", clock: u.level !== "none", reply }; })() : {}) },
     // …and the composer gives way to one line (desk-4a.cjs' composer patch).
     fbBlocked: !!cur && isFbBlocked(cur, data), fbBlockedNote: FB_BLOCKED_NOTE,
     chatOwner: chat.owner, chatReply: chat.reply, msgs: chat.msgs, firstDay: chat.firstDay, draft: chat.draft, setDraft: chat.setDraft, draftKey: chat.draftKey, send: chat.send, micD: chat.micD, sendTitle: chat.sendTitle, photo: chat.photo,

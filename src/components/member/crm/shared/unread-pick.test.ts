@@ -56,7 +56,7 @@ describe("the Team inbox's Filter chats › Status › Unread", () => {
     const t = team();
     t.vm().openStatus();
     const s = t.vm().sheet!;
-    expect(s.statuses.map(x => x.label)).toEqual(["Unread", "New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked"]);
+    expect(s.statuses.map(x => x.label)).toEqual(["Unread", "New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked", "Replied", "No reply"]); // + Replied / No reply after our template (2026-11-28)
     expect(s.statuses[0]).toMatchObject({ key: UNREAD_PICK, n: UNREAD_IDS.length, hot: true, dot: "var(--crm-rust)", on: false });
     // The statuses still count as before: every chat in one.
     expect(s.statuses.slice(1).reduce((n, x) => n + x.n, 0)).toBe(customers.length);

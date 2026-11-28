@@ -15,6 +15,8 @@ import type { CrmCustomer, CrmData } from "@/lib/member/crm-data";
 import { BRAND_LABEL, adPageInSource, brandOf, sourceOf, type SourceBrand, type SourcePick } from "@/lib/member/crm-source";
 import { feeFixedOf, feeMonths, isoOf, monthFee, noAdRepeats } from "../desk/vm/adsperf";
 import { inRange, numbersOf } from "../panel/vm/common";
+import { replyGroups } from "./reply-groups";
+export { replyGroups, templateReplies } from "./reply-groups";
 
 export interface OvRange { a: number; b: number }
 /** Meta's figures by range ("YYYY-MM-DD|YYYY-MM-DD") and ad id; an ad read as nothing is `null`. */
@@ -104,20 +106,6 @@ export function workOf(cs: CrmCustomer[], data: CrmData, r: OvRange, now: Date):
   return { leads: n.leads, avgReply: avgReplyOf(cs, r), booked: n.booked, apptRate: n.leads ? (n.booked / n.leads) * 100 : null,
     came: n.came, due: n.due, showRate: n.due ? (n.came / n.due) * 100 : null, won: n.won, sales: salesOf(cs, r), wonPaid: wonPaidOf(cs, r) };
 }
-/**
- * After our template (the owner, 2026-11-28: a lead form's customer writes first, but the chat stays shut until they
- * answer the template the team sends): of the customers sent one, those who wrote again after the first template, and
- * those who have not. A customer never sent a template is in neither.
- */
-export function templateReplies(cs: CrmCustomer[]): { replied: string[]; noReply: string[] } {
-  const replied: string[] = [], noReply: string[] = [];
-  for (const c of cs) {
-    const t = c.messages.filter(m => m.from === "me" && m.kind === "template").map(m => new Date(m.at).getTime()).sort((a, b) => a - b)[0];
-    if (t == null) continue;
-    (c.messages.some(m => m.from === "lead" && new Date(m.at).getTime() > t) ? replied : noReply).push(c.id);
-  }
-  return { replied, noReply };
-}
 /** The range's won leads that have an amount (AOV's divisor). */
 export function wonPaidOf(cs: CrmCustomer[], r: OvRange): number {
   return cs.filter(c => c.status === "won" && inRange(c.createdAt, r) && Number(c.wonAmount) > 0).length;
@@ -199,9 +187,8 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     // numbersOf's own leads and booked, as ids.
     const lc = cs.filter(c => inRange(c.createdAt, r)).sort((x, y) => y.createdAt.localeCompare(x.createdAt)), leadIds = lc.map(c => c.id);
     const apptIds = lc.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).map(c => c.id);
-    const rep = templateReplies(lc);
-    const sent = new Set([...rep.replied, ...rep.noReply]);
-    return { id, name, leadIds, apptIds, repliedIds: rep.replied, noReplyIds: rep.noReply, tplApptIds: apptIds.filter(x => sent.has(x)), tplWonIds: lc.filter(c => sent.has(c.id) && c.status === "won").map(c => c.id), brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
+    const g = replyGroups(lc, data.visits);
+    return { id, name, leadIds, apptIds, repliedIds: g.replied, noReplyIds: g.noReply, tplApptIds: g.appt, tplWonIds: g.won, brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
   }).filter(a => a.leads > 0 || (a.paid && (a.spend ?? 0) > 0) || (a.paid && a.spend == null && p.money))
     .sort((x, y) => y.leads - x.leads || (y.spend ?? 0) - (x.spend ?? 0) || x.name.localeCompare(y.name));
 

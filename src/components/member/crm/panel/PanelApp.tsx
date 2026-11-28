@@ -12,6 +12,7 @@ import { PhoneTeamActivity } from "../shared/PhoneTeamActivity";
 import { PhoneCalendar, PhoneLeaveAdd, PhonePeople } from "../shared/PhoneLeaveCal";
 import { PhoneShowrooms } from "./PhoneShowrooms";
 import { InfoValue } from "../shared/AdLink";
+import { ReplyMark } from "../shared/reply-mark";
 import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
 import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aCustomBook, Phone4aDeals, Phone4aKeepHeight, Phone4aLabelSheet, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead, Phone4aTeamInbox, Phone4aTeamOverview } from "../shared/phone4a";
@@ -165,6 +166,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column" }}>
                 <strong style={{ fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.name}</strong>
                 <small style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ld.ld.sub}</small>
+                {v.ld.ld.reply && <span style={{ display: "flex", marginTop: "3px" }}><ReplyMark m={v.ld.ld.reply} size={11} /></span>}
               </span>
               <span data-hm-toggle="1" onClick={v.ld.lx.toggleMenu} title="More" style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: v.ld.lx.menuBg, display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
