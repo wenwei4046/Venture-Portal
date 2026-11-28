@@ -3,7 +3,7 @@ import { after } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { VAPID_PUBLIC_KEY, VAPID_SUBJECT, type PushApp } from './config'
-import { crmPushFromRow, noticeTag, noticeUrl, type CrmPush, type NoticeRef } from './notices'
+import { crmPushFromRow, noticeTag, pushUrl, type CrmPush, type NoticeRef } from './notices'
 import { b64url, fromB64url, sendPush, type PushMessage, type SendOutcome, type Subscription } from './webpush'
 
 /**
@@ -60,7 +60,7 @@ function dueFromRow(v: unknown): Due[] {
 
 /** What one device is sent for a notice: its words, where a tap opens, and — for the CRM — what the phone draws. */
 export function pushMessageOf(n: Pick<Due, 'id' | 'title' | 'body' | 'refKind' | 'refId' | 'crm'>, app: PushApp): PushMessage {
-  return { title: n.title, body: n.body, url: noticeUrl(n, app), tag: noticeTag(n), id: n.id, ...(n.crm ? { crm: n.crm } : {}) }
+  return { title: n.title, body: n.body, url: pushUrl(n, app), tag: noticeTag(n), id: n.id, ...(n.crm ? { crm: n.crm } : {}) }
 }
 
 /**

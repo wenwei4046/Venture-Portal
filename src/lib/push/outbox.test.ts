@@ -7,7 +7,7 @@ vi.mock('./config', () => ({
   VAPID_SUBJECT: 'https://venture.example',
 }))
 import { flushPush, outboxSecret, pushMessageOf } from './outbox'
-import { crmPushFromRow, meOpenTarget, noticeTag, noticeUrl, noticesFromRow, openTarget } from './notices'
+import { crmPushFromRow, meOpenTarget, noticeTag, noticeUrl, noticesFromRow, openTarget, pushUrl } from './notices'
 
 // RFC 8291's example keys stand in for the server's (any valid P-256 pair will do).
 const PRIVATE = 'yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw'
@@ -218,5 +218,27 @@ describe('a CRM notice', () => {
     expect(crmPushFromRow({ ch: 'messenger', line: 'no name' })).toBeNull()
     expect(crmPushFromRow(null)).toBeNull()
     expect(pushMessageOf({ id: 'n1', title: 'T', body: 'B', refKind: 'booking', refId: 'b1', crm: null }, 'hr')).toEqual({ title: 'T', body: 'B', url: '/hr-app?open=booking:b1', tag: 'n1', id: 'n1' })
+  })
+})
+
+// The Marketing app (2026-11-28): a Marketing task's push and a payment request's go through the one app's start, which
+// opens them in the Marketing app on a phone for Marketing's view (lib/one-app.ts › mktOpenPlace) — the bells keep their
+// own links.
+describe('a Marketing push opens through the start', () => {
+  it('sends a task and a payment request to the start, the rest where the bells go', () => {
+    expect(pushUrl({ refKind: 'mkt_project', refId: 'TSK-CAR-2611-004' }, 'hr')).toBe('/?open=mkt:TSK-CAR-2611-004')
+    expect(pushUrl({ refKind: 'payment_request', refId: 'p 1' }, 'hr')).toBe('/?open=claim:p%201')
+    expect(pushUrl({ refKind: 'payment_request', refId: 'p1' }, 'revenue')).toBe('/?open=claim:p1')
+    expect(pushUrl({ refKind: 'booking', refId: 'b1' }, 'hr')).toBe(noticeUrl({ refKind: 'booking', refId: 'b1' }, 'hr'))
+    expect(pushUrl({ refKind: 'crm_contact', refId: 'c1' }, 'revenue')).toBe('/member?page=account&view=crm&chat=c1')
+    // The bells' own links are unchanged.
+    expect(noticeUrl({ refKind: 'mkt_project', refId: 'x1' }, 'hr')).toBe('/marketing/projects/x1')
+    expect(pushMessageOf({ id: 'n2', title: 'Your turn', body: '', refKind: 'mkt_project', refId: 'x1', crm: null }, 'hr').url).toBe('/?open=mkt:x1')
+  })
+  it('reads the start’s targets and the ones it hands the Marketing app', () => {
+    expect(openTarget('mkt:TSK-CAR-2611-004')).toEqual({ k: 'mkt', id: 'TSK-CAR-2611-004' })
+    expect(openTarget('claim:p1')).toEqual({ k: 'claim', id: 'p1' })
+    expect(openTarget('task:x1')).toEqual({ k: 'task', id: 'x1' })
+    expect(meOpenTarget('?open=task:x1')).toBeNull()
   })
 })
