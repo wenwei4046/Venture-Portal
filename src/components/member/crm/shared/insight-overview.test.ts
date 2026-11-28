@@ -192,7 +192,7 @@ describe("Insight › Overview: replies after our template (the owner, 2026-11-2
     const d0 = data();
     d0.customers = [
       cust("r1", { adId: AD_C, ad: "Conts Video", messages: [said(5, 9), tpl(5, 10), said(5, 12)] }), // form, template, replied
-      cust("r2", { adId: AD_C, ad: "Conts Video", messages: [said(5, 9), tpl(5, 10), tpl(6, 10), said(7, 10)] }), // replied after a second one
+      cust("r2", { adId: AD_C, ad: "Conts Video", status: "won", messages: [said(5, 9), tpl(5, 10), tpl(6, 10), said(7, 10)] }), // replied after a second one, won
       cust("n1", { adId: AD_C, ad: "Conts Video", messages: [said(5, 9), tpl(5, 10)] }), // the form only, before the template
       cust("x1", { adId: AD_C, ad: "Conts Video", messages: [said(5, 9)] }), // no template yet: neither
     ] as never;
@@ -201,6 +201,7 @@ describe("Insight › Overview: replies after our template (the owner, 2026-11-2
       { id: "vc", customerId: "r2", state: "cancelled", start: iso(12, 16) }] as never;
     const c = overviewFigures(base({ data: d0 })).adRows.find(a => a.id === AD_C)!;
     expect(c.tplApptIds).toEqual(["r1"]);
+    expect(c.tplWonIds).toEqual(["r2"]);
     expect(c.leads).toBe(4);
     expect(c.repliedIds.sort()).toEqual(["r1", "r2"]);
     expect(c.noReplyIds).toEqual(["n1"]);

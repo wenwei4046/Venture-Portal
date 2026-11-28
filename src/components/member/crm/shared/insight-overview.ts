@@ -54,6 +54,8 @@ export interface OvAdRow extends OvMoney { id: string; name: string; brand: stri
   repliedIds: string[]; noReplyIds: string[];
   /** …and of those sent a template, who booked an appointment (green, 2026-11-28: "新增有appt 有另一个颜色"). */
   tplApptIds: string[];
+  /** …and of those, who were marked Won (2026-11-28: "多一个won"). */
+  tplWonIds: string[];
   /** Meta's figures for the period (a paid ad, read); null until read or with no money. */ fig: MetaFig | null }
 export interface OvBrandRow extends OvMoney { key: SourceBrand | "none"; label: string; leads: number; appt: number; won: number; sales: number; wonPaid: number; came: number; fig: MetaFig | null }
 export interface OvWork { leads: number; avgReply: number | null; booked: number; apptRate: number | null; came: number; due: number; showRate: number | null; won: number;
@@ -199,7 +201,7 @@ export function overviewFigures(p: OverviewIn): OverviewFigures {
     const apptIds = lc.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).map(c => c.id);
     const rep = templateReplies(lc);
     const sent = new Set([...rep.replied, ...rep.noReply]);
-    return { id, name, leadIds, apptIds, repliedIds: rep.replied, noReplyIds: rep.noReply, tplApptIds: apptIds.filter(x => sent.has(x)), brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
+    return { id, name, leadIds, apptIds, repliedIds: rep.replied, noReplyIds: rep.noReply, tplApptIds: apptIds.filter(x => sent.has(x)), tplWonIds: lc.filter(c => sent.has(c.id) && c.status === "won").map(c => c.id), brand: b ? BRAND_LABEL[b] : "", leads: w.leads, appt: w.booked, won: w.won, sales: w.sales, wonPaid: w.wonPaid, came: w.came, paid, fig: paid ? figOf([id], r.a, r.b) : null, ...money(paid ? spendOf([id], r.a, r.b) : 0, w.leads, rate) };
   }).filter(a => a.leads > 0 || (a.paid && (a.spend ?? 0) > 0) || (a.paid && a.spend == null && p.money))
     .sort((x, y) => y.leads - x.leads || (y.spend ?? 0) - (x.spend ?? 0) || x.name.localeCompare(y.name));
 

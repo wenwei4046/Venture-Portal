@@ -24,7 +24,7 @@ const figPress = (open: (() => void) | undefined, what: string) => !open ? {} : 
 const figLink = (open: (() => void) | undefined): CSSProperties => (open ? { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } : {});
 /** The Replies cell: after our template, replied (cyan) · no reply (yellow) — 2026-11-28. */
 function Replies({ a }: { a: OV["ads"][number] }) {
-  return <span style={{ minWidth: 0, overflow: "hidden", paddingLeft: "16px" }}><ReplyBar replied={a.replied} noReply={a.noReply} appt={a.tplAppt} openReplied={a.openReplied} openNoReply={a.openNoReply} openAppt={a.openTplAppt} compact bar={40} /></span>;
+  return <span style={{ minWidth: 0, overflow: "hidden", paddingLeft: "16px" }}><ReplyBar replied={a.replied} noReply={a.noReply} appt={a.tplAppt} won={a.tplWon} openReplied={a.openReplied} openNoReply={a.openNoReply} openAppt={a.openTplAppt} openWon={a.openTplWon} compact bar={40} /></span>;
 }
 
 function Section({ title, go, goLabel, children }: { title: string; go: () => void; goLabel: string; children: ReactNode }) {

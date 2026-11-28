@@ -11,7 +11,7 @@ import { pickedSource } from "@/lib/member/crm-view";
 import { colValue, colsFor, keptCols, mins, overviewFigures, overviewTiles, pctOf, rm, rm2, type OvColKey } from "../../shared/insight-overview";
 import { FEE_PREF, feeFixedOf } from "./adsperf";
 import type { DeskCtx } from "./ctx";
-import { AD_APPTS, AD_LEADS, AD_NOREPLY, AD_REPLIED, compareRange, compareWords, inBrand, insightRange } from "./insight";
+import { AD_APPTS, AD_LEADS, AD_NOREPLY, AD_REPLIED, AD_WON, compareRange, compareWords, inBrand, insightRange } from "./insight";
 import { rangeLine } from "./frame4a";
 import { DIRECTOR_C, DIRECTOR_TEAM, teamColours } from "./tokens";
 
@@ -66,7 +66,8 @@ export function deskOverviewVM(ctx: DeskCtx) {
         // Its Leads and Appt open their customers (the owner, 2026-11-27: "overview 也要"), as Ads Performance's.
         openLeads: a.leadIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_LEADS}${a.name}`, clistIds: a.leadIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         // After our template: replied (cyan) and no reply (yellow), each opening its customers (2026-11-28).
-        replied: a.repliedIds, noReply: a.noReplyIds, tplAppt: a.tplApptIds,
+        replied: a.repliedIds, noReply: a.noReplyIds, tplAppt: a.tplApptIds, tplWon: a.tplWonIds,
+        openTplWon: a.tplWonIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_WON}${a.name}`, clistIds: a.tplWonIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         openTplAppt: a.tplApptIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_APPTS}${a.name}`, clistIds: a.tplApptIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         openReplied: a.repliedIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_REPLIED}${a.name}`, clistIds: a.repliedIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
         openNoReply: a.noReplyIds.length ? () => patch({ pane: "overlay", kind: "clist", clist: `${AD_NOREPLY}${a.name}`, clistIds: a.noReplyIds, clistSub: null, clRep: null, infoId: null, visit: null }) : undefined,
