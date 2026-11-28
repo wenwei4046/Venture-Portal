@@ -23,6 +23,19 @@ const C = {
   gone: cust("gone", [said(9), tpl(10)]), // a cancelled visit is no appointment
 };
 
+describe("an ad with no template (Messenger, Click-to-WhatsApp)", () => {
+  const me = (h: number, auto = false) => ({ id: `m${h}`, from: "me", kind: "text", text: "", at: at(h), ...(auto ? { auto: true } : {}) });
+  it("counts from our first message that is not an auto-reply", () => {
+    const answered = cust("answered", [said(9), me(10), said(11)]);
+    const waiting = cust("waiting", [said(9), me(10, true), me(12), said(11)]); // wrote before our first real reply
+    const autoOnly = cust("autoOnly", [said(9), me(10, true), said(11)]);
+    expect([answered, waiting, autoOnly].map(c => replyStateOf(c, booked))).toEqual(["replied", "noreply", null]);
+  });
+  it("a template still wins over an earlier message", () => {
+    expect(replyStateOf(cust("t", [said(9), me(10), said(11), tpl(12)]), booked)).toBe("noreply");
+  });
+});
+
 describe("the reply mark", () => {
   it("is Won, Appt, Replied or No reply for a customer sent a template — none otherwise", () => {
     expect(Object.fromEntries(Object.entries(C).map(([k, c]) => [k, replyStateOf(c, booked)]))).toEqual({

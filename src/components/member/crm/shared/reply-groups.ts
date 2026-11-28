@@ -12,11 +12,20 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 export function templateReplies(cs: CrmCustomer[]): { replied: string[]; noReply: string[] } {
   const replied: string[] = [], noReply: string[] = [];
   for (const c of cs) {
-    const t = c.messages.filter(m => m.from === "me" && m.kind === "template").map(m => new Date(m.at).getTime()).sort((a, b) => a - b)[0];
-    if (t == null) continue;
-    (c.messages.some(m => m.from === "lead" && new Date(m.at).getTime() > t) ? replied : noReply).push(c.id);
+    const r = repliedAfter(c);
+    if (r != null) (r ? replied : noReply).push(c.id);
   }
   return { replied, noReply };
+}
+/**
+ * Where the reply is counted from: the first template we sent, else — an ad whose chat was open, so no template went
+ * (Messenger, Click-to-WhatsApp; the owner, 2026-11-28: "要，加上") — our first message that is not an auto-reply.
+ * Nothing of ours yet: null.
+ */
+export function replyAnchor(c: CrmCustomer): number | null {
+  const first = (ok: (m: CrmCustomer["messages"][number]) => boolean) =>
+    c.messages.filter(m => m.from === "me" && ok(m)).map(m => new Date(m.at).getTime()).sort((a, b) => a - b)[0];
+  return first(m => m.kind === "template") ?? first(m => !m.auto) ?? null;
 }
 /**
  * The four reply colours of some leads (Overview and Ads Performance, 2026-11-28): of those sent a template, who replied
@@ -44,9 +53,9 @@ export const REPLY_MARK: Record<ReplyState, { label: string; color: string }> = 
 export function bookedIds(visits: CrmVisit[]): Set<string> {
   return new Set(visits.filter(v => v.state !== "cancelled").map(v => v.customerId));
 }
-/** Sent a template? Then did they write after the first one (true / false); never sent one — null. */
+/** Sent a template (else any message of ours)? Then did they write after the first one (true / false); nothing — null. */
 export function repliedAfter(c: CrmCustomer): boolean | null {
-  const t = c.messages.filter(m => m.from === "me" && m.kind === "template").map(m => new Date(m.at).getTime()).sort((a, b) => a - b)[0];
+  const t = replyAnchor(c);
   return t == null ? null : c.messages.some(m => m.from === "lead" && new Date(m.at).getTime() > t);
 }
 export function replyStateOf(c: CrmCustomer, booked: Set<string>): ReplyState | null {
