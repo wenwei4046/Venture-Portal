@@ -38,9 +38,10 @@ export function ReplyBar({ replied, noReply, appt = [], won = [], openReplied, o
       onKeyDown: (e: { key: string; preventDefault(): void; stopPropagation(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open(); } } };
     return <span {...press} style={st}><span aria-hidden style={{ width: "7px", height: "7px", borderRadius: "50%", flex: "none", background: c }} /><b style={{ fontWeight: 500, color: "var(--crm-ink)" }}>{v}</b>{!compact && <span style={{ color: "var(--crm-muted)" }}>{word}</span>}</span>;
   };
-  const dot = <span aria-hidden style={{ color: "var(--crm-faint)" }}>·</span>;
+  // Compact: the coloured dots part the numbers, no "·" between them.
+  const dot = compact ? null : <span aria-hidden style={{ color: "var(--crm-faint)" }}>·</span>;
   return (
-    <span data-reply-bar="" style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, fontSize: `${size}px` }}>
+    <span data-reply-bar="" style={{ display: "flex", alignItems: "center", gap: compact ? "7px" : "8px", minWidth: 0, fontSize: `${size}px` }}>
       <span aria-hidden style={{ flex: "none", width: `${bar}px`, height: "6px", borderRadius: "3px", overflow: "hidden", display: "flex", background: "var(--crm-field)" }}>
         {parts.map(([v, c], i) => (v ? <span key={i} style={{ width: `${(v / n) * 100}%`, background: c }} /> : null))}
       </span>

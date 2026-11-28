@@ -83,7 +83,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
   // Each table's own columns, then the ones added with "+" (o.adCol / o.teamCol), then the "+" itself.
   const more = (n: number) => (n ? ` repeat(${n},minmax(0,0.8fr))` : "") + " 30px";
   // Replies after Won (2026-11-28): the cyan / yellow bar with its two numbers.
-  const adCols = (o.money ? "minmax(0,2.2fr) minmax(0,1fr) repeat(5,minmax(0,0.8fr))" : "minmax(0,2.2fr) minmax(0,1fr) repeat(3,minmax(0,0.8fr))") + " minmax(0,1.7fr)" + more(o.adCol.cols.length);
+  const adCols = (o.money ? "minmax(0,2.2fr) minmax(0,1fr) repeat(5,minmax(0,0.8fr))" : "minmax(0,2.2fr) minmax(0,1fr) repeat(3,minmax(0,0.8fr))") + " minmax(0,1.9fr)" + more(o.adCol.cols.length);
   const brCols = (o.money ? "minmax(0,2fr) repeat(5,minmax(0,1fr))" : "minmax(0,2fr) repeat(3,minmax(0,1fr))") + more(o.adCol.cols.length);
   const tmCols = "minmax(0,2fr) minmax(0,1.4fr) repeat(4,minmax(0,0.8fr))" + more(o.teamCol.cols.length);
   const extra = (v: string[]) => <>{v.map((x, k) => <span key={k} style={R}>{x}</span>)}<span /></>;
