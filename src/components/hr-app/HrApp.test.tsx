@@ -746,7 +746,7 @@ describe('the avatar: Me, with the old More’s rows', () => {
     const views = within(me).getByRole('group', { name: 'Switch view' })
     for (const [name, where] of [
       ['Principal', 'The Finance app'], ['Finance', 'The Finance app'], ['HR', 'You are here'], ['Marketing', 'The Marketing app'],
-      ['Revenue team', 'The Revenue app'], ['Lead View', 'The portal'], ['View as a person…', 'Read-only'],
+      ['Revenue team', 'The Revenue app'], ['Lead View', 'The Lead View app'], ['View as a person…', 'Read-only'],
     ]) {
       expect(within(views).getByText(name)).toBeInTheDocument()
       expect(within(views).getByText(name).parentElement).toHaveTextContent(where)

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isPhone, mktOpenPlace, opensFinApp, opensHrApp, opensHrAppOnPhone, opensMktApp, startPlace, itSupportPlace, itSupportApp } from './one-app'
+import { isPhone, mktOpenPlace, opensFinApp, opensHrApp, opensHrAppOnPhone, opensLeadAppOnPhone, opensMktApp, startPlace, itSupportPlace, itSupportApp } from './one-app'
 
 // ONE app for everybody (2026-10-11 — the user: "他们都是一个 app … 我要的就是 portal app").
 
@@ -130,6 +130,36 @@ describe('the Finance app (2026-10-15, the Finance revamp v2’s phone)', () => 
     // tab for approval tab" — for an account that may switch views.
     expect(opensFinApp({ role: 'principal', permissions: ['view_switch'] })).toBe(true)
     expect(opensFinApp({ role: 'hr', permissions: ['view_switch'] })).toBe(false)
+  })
+})
+
+describe('Lead View on a phone (2026-11-28, docs/design_handoff_lead_view_phone)', () => {
+  // Customer Service: Lead View held, no Overview (no Treasury · View, no HR Costing · View) — the dashboard sends
+  // them to /leads on a computer.
+  type Scope = 'own' | 'dept' | 'all'
+  const cells = (more: Record<string, Scope> = {}): Record<string, Scope> => ({ 'leads.view': 'all', 'leads.create': 'all', ...more })
+  const cs = { role: 'staff', permissions: ['leads'], actions: cells() }
+  it('opens for whoever Lead View is home to', () => {
+    expect(opensLeadAppOnPhone(cs)).toBe(true)
+    expect(startPlace(cs, true)).toBe('/lead-app')
+    expect(startPlace(cs, false)).toBe('/dashboard')
+  })
+  it('not for an account with an Overview of its own, nor one without Lead View', () => {
+    expect(opensLeadAppOnPhone({ ...cs, permissions: ['leads', 'treasury'], actions: cells({ 'treasury.view': 'all' }) })).toBe(false)
+    expect(opensLeadAppOnPhone({ ...cs, permissions: ['leads', 'hr_costing'], actions: cells({ 'hr_costing.view': 'all' }) })).toBe(false)
+    expect(opensLeadAppOnPhone({ role: 'staff', permissions: ['team'], actions: {} })).toBe(false)
+    expect(opensLeadAppOnPhone(null)).toBe(false)
+  })
+  it('HR’s and Finance’s faces first; a notice about one’s own request keeps the portal’s Me', () => {
+    expect(startPlace({ ...cs, permissions: ['leads', 'hiring'], role: 'hr' }, true)).toBe('/hr-app')
+    expect(startPlace(cs, true, 'r1')).toBe('/dashboard?open=me:r1')
+  })
+  it('every Lead View page on a phone opens it, and so does picking Lead View in a switcher', () => {
+    const ROOT = process.cwd()
+    const layout = readFileSync(resolve(ROOT, 'src/app/(portal)/leads/layout.tsx'), 'utf8')
+    expect(layout).toMatch(/if \(isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)\) redirect\('\/lead-app'\)/)
+    const switcher = readFileSync(resolve(ROOT, 'src/components/layout/view-as-actions.ts'), 'utf8')
+    expect(switcher).toMatch(/if \(target === 'lead'\) redirect\(isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\) \? '\/lead-app' : '\/leads'\)/)
   })
 })
 

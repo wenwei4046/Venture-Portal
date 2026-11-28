@@ -459,7 +459,9 @@ seven, *View as a person…* opening the portal's picker over the app
 (`ViewAsPersonPicker` `z` 90, above Me's layer). A phone row says where it
 opens (`phoneWhere`): the Principal's own view and Finance's are the Finance
 app since 2026-10-17 (the HR app and the Revenue app still said *The portal*),
-Marketing and Lead View the portal's phone shell. Tests:
+Marketing and Lead View the portal's phone shell (since 2026-11-28 each its own
+face: *The Marketing app*, `../marketing/marketing-app.md`; *The Lead View app*,
+`../leads/lead-view.md`). Tests:
 `src/lib/view-switch-coverage.test.ts` finds every switcher by its name (*View
 portal as role*, *Switch module*, *Switch view*) and refuses one that does not
 read the list; `view-switch.test.ts`, `layout/ViewSwitch.test.tsx`,

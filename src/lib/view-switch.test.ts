@@ -33,16 +33,23 @@ describe('where a view opens on a phone', () => {
   it('from the Revenue app and the HR app: the Principal’s and Finance’s are the Finance app (2026-10-17)', () => {
     expect(where('revenue')).toEqual({
       principal: 'The Finance app', finance: 'The Finance app', hr: 'The HR app', marketing: 'The Marketing app',
-      revenue_member: 'This app', lead: 'The portal', person: 'Read-only',
+      revenue_member: 'This app', lead: 'The Lead View app', person: 'Read-only',
     })
     expect(where('hr')).toMatchObject({ principal: 'The Finance app', finance: 'The Finance app', hr: 'This app', revenue_member: 'The Revenue app' })
   })
 
   it('from the Finance app: this app, the Principal’s with its Approvals', () => {
-    expect(where('finance')).toMatchObject({ principal: 'This app, with Approvals', finance: 'This app', hr: 'The HR app', marketing: 'The Marketing app', lead: 'The portal' })
+    expect(where('finance')).toMatchObject({ principal: 'This app, with Approvals', finance: 'This app', hr: 'The HR app', marketing: 'The Marketing app', lead: 'The Lead View app' })
   })
 
   it('from the Marketing app (2026-11-28): this app, the others where they open', () => {
-    expect(where('marketing')).toMatchObject({ principal: 'The Finance app', finance: 'The Finance app', hr: 'The HR app', marketing: 'This app', revenue_member: 'The Revenue app', lead: 'The portal' })
+    expect(where('marketing')).toMatchObject({ principal: 'The Finance app', finance: 'The Finance app', hr: 'The HR app', marketing: 'This app', revenue_member: 'The Revenue app', lead: 'The Lead View app' })
+  })
+
+  it('from Lead View on a phone (2026-11-28): Lead View is this app, the rest where they open', () => {
+    expect(where('lead')).toEqual({
+      principal: 'The Finance app', finance: 'The Finance app', hr: 'The HR app', marketing: 'The Marketing app',
+      revenue_member: 'The Revenue app', lead: 'This app', person: 'Read-only',
+    })
   })
 })

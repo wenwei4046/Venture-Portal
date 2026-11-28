@@ -8,8 +8,9 @@ const mocks = vi.hoisted(() => ({
   // What current_permissions() answers for the REAL account.
   perms: ['view_switch'] as string[],
   set: vi.fn(), delete: vi.fn(), cookies: vi.fn(),
+  ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
 }))
-vi.mock('next/headers', () => ({ cookies: mocks.cookies }))
+vi.mock('next/headers', () => ({ cookies: mocks.cookies, headers: async () => new Headers({ 'user-agent': mocks.ua }) }))
 vi.mock('next/navigation', () => ({ redirect: (path: string) => { throw new Error(`REDIRECT:${path}`) } }))
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
@@ -24,6 +25,7 @@ beforeEach(() => {
   mocks.authUser = { id: 'principal-id' }
   mocks.row = { role: 'principal', is_active: true }
   mocks.perms = ['view_switch']
+  mocks.ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
   mocks.cookies.mockResolvedValue({ set: mocks.set, delete: mocks.delete })
 })
 
@@ -85,6 +87,14 @@ describe('setViewAs', () => {
     expect(mocks.cookies).not.toHaveBeenCalled()
     expect(mocks.set).not.toHaveBeenCalled()
     expect(mocks.delete).not.toHaveBeenCalled()
+  })
+
+  // Lead View is pages of its own, not a mask; on a phone, its phone face (2026-11-28).
+  it('opens Lead View on its pages — on a phone, its phone face', async () => {
+    await expect(setViewAs(form('lead'))).rejects.toThrow('REDIRECT:/leads')
+    expect(mocks.delete).toHaveBeenCalledWith(VIEW_AS_COOKIE)
+    mocks.ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'
+    await expect(setViewAs(form('lead'))).rejects.toThrow('REDIRECT:/lead-app')
   })
 
   it('requires a signed-in identity', async () => {

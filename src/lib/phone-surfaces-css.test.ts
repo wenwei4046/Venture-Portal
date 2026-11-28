@@ -48,6 +48,16 @@ describe('the portal’s field rules leave the prototype-drawn surfaces alone', 
     for (const sel of titles) for (const s of ['[data-revenue-app] *', '[data-hr-app] *', '[data-mkt-app] *']) expect(sel).toContain(s)
   })
 
+  // 2026-11-28: Lead View's phone face (/lead-app) is drawn to its prototype — no glow, no 88px reply box.
+  it('the focus glow and the textarea floor leave Lead View’s phone face alone', () => {
+    for (const sel of rulesMatching(/:focus:not\(:where\(/)) expect(sel).toContain('[data-lead-app] *')
+    const floor = css.slice(css.indexOf("keep their prototypes' own control heights"))
+    const tall = floor.slice(floor.indexOf('textarea:not('), floor.indexOf('min-height: 88px'))
+    expect(tall).toContain('[data-lead-app] *')
+    const app = fs.readFileSync(path.resolve(__dirname, '../components/lead-app/LeadApp.tsx'), 'utf8')
+    expect(app).toContain('data-lead-app=""')
+  })
+
   it('the markers are on the guest page and the soft menu', () => {
     const guest = fs.readFileSync(path.resolve(__dirname, '../app/(guest)/g/[code]/_components/GuestPage.tsx'), 'utf8')
     const select = fs.readFileSync(path.resolve(__dirname, '../components/hrv/select.tsx'), 'utf8')
