@@ -1,5 +1,6 @@
 import { isHrView } from '@/lib/hr-view'
 import { isFinanceShell, type ShellViewer } from '@/lib/finance-view'
+import { isMarketingView } from '@/lib/marketing-view'
 import { can, type PermissionHolder } from '@/lib/permissions'
 import type { ActionHolder } from '@/lib/permission-actions'
 import { overviewFor } from '@/lib/surfaces'
@@ -19,6 +20,9 @@ import { lensOverview, type MaskableUser } from '@/lib/view-as'
  * - the Principal's own view on a PHONE (2026-10-17): the Finance app too, with
  *   an Approvals tab of its own — the user: "the mobile use the same view with
  *   finance app … just add on then tab for approval tab";
+ * - Marketing's view on a PHONE (2026-11-28): the Marketing app (`/mkt-app`) —
+ *   the Claude Design handoff "Marketing View 电话版设计" (the user: "cause last
+ *   once desktop view done, i will do marketing app mobile");
  * - Lead View on a PHONE (2026-11-28, the Claude Design handoff
  *   `docs/design_handoff_lead_view_phone`): Lead View's phone face
  *   (`/lead-app`) — for whoever Lead View is home to (no Overview, Lead View
@@ -71,20 +75,42 @@ export function opensLeadAppOnPhone(user: LeadViewer | null | undefined): boolea
 }
 
 /**
- * Where the one app's start (`/`, app/page.tsx) sends somebody: the Revenue app, the HR app or the Finance app on a
- * phone, else the portal. A tapped notice about one's own request (2026-10-17, `open=me:<id>`) goes on to Me in that
- * face — the HR app (its avatar's Me), the Finance app's Profile (Me's card) or the portal's top bar (its panel); the
- * Revenue app has no Me.
+ * Somebody the Marketing app (`/mkt-app`, 2026-11-28) opens for: whoever wears Marketing's view — the Principal's
+ * Marketing lens, or an account on a template whose tabs open it (`isMarketingView`) — and holds Marketing, which its
+ * every part asks. Their computer wears Marketing's own shell, so their phone is Marketing's app: asked before the HR
+ * app's, which an account on a template could pass as well.
  */
-export function startPlace(user: LeadViewer | null | undefined, phone: boolean, meRequest: string | null = null): string {
+export function opensMktApp(user: (PermissionHolder & { role: string; tabs?: readonly string[] }) | null | undefined): boolean {
+  return !!user && isMarketingView(user) && can(user, 'marketing')
+}
+
+/**
+ * Where the one app's start (`/`, app/page.tsx) sends somebody: the Revenue app, the Marketing app, the HR app, the
+ * Finance app or Lead View's phone face on a phone, else the portal. A tapped notice about one's own request (2026-10-17,
+ * `open=me:<id>`) goes on to Me in that face — the Marketing app's and the HR app's Me, the Finance app's Profile (Me's
+ * card) or the portal's top bar (its panel); the Revenue app has no Me.
+ */
+export function startPlace(user: (LeadViewer & { tabs?: readonly string[] }) | null | undefined, phone: boolean, meRequest: string | null = null): string {
   if (user?.role === 'revenue_member') return '/member'
   const me = meRequest ? `?open=me:${encodeURIComponent(meRequest)}` : ''
+  if (phone && opensMktApp(user)) return `/mkt-app${me}`
   if (phone && opensHrAppOnPhone(user)) return `/hr-app${me}`
   if (phone && opensFinApp(user)) return me ? `/fin-app/profile${me}` : '/fin-app'
   // Lead View's phone face has no Me yet (it comes with its Profile's punch card): a notice about one's own request
   // keeps the portal's, which opens it.
   if (phone && !me && opensLeadAppOnPhone(user)) return '/lead-app'
   return `/dashboard${me}`
+}
+
+/**
+ * A tapped Marketing push (2026-11-28 — `pushUrl`, lib/push/notices.ts): a task (`open=mkt:<id or Track ID>`) or a
+ * payment request (`open=claim:<id>`) opens in the Marketing app on a phone for Marketing's view, else on its portal page
+ * — where the HR app and the Finance app send their own on, as before.
+ */
+export function mktOpenPlace(user: (PermissionHolder & { role: string; tabs?: readonly string[] }) | null | undefined, phone: boolean, target: { k: 'mkt' | 'claim'; id: string }): string {
+  const id = encodeURIComponent(target.id)
+  if (phone && opensMktApp(user)) return `/mkt-app?open=${target.k === 'mkt' ? 'task' : 'claim'}:${id}`
+  return target.k === 'mkt' ? `/marketing/projects/${id}` : `/claims?open=${id}`
 }
 
 /** The desktop view in which a request was written; context only, never permission. */

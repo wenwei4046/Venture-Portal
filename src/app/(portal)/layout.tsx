@@ -9,7 +9,7 @@ import { HR_NAV_COOKIE, REVENUE_SUB_COOKIE, isHrView } from '@/lib/hr-view'
 import { isFinanceShell } from '@/lib/finance-view'
 import { listSubDepartments } from './revenue/_lib/sub-departments'
 import { redirect } from 'next/navigation'
-import { isPhone, opensFinApp, opensHrAppOnPhone } from '@/lib/one-app'
+import { isPhone, opensFinApp, opensHrAppOnPhone, opensMktApp } from '@/lib/one-app'
 import { loginIsPersonal } from '@/lib/account/personal-login'
 import { startRead } from '@/lib/start-read'
 import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE, isMarketingView } from '@/lib/marketing-view'
@@ -23,6 +23,9 @@ export default async function PortalLayout({
   const user = await requireAuth()
   if (user.role === 'revenue_member') redirect('/member')
   const phone = isPhone((await headers()).get('user-agent'))
+  // …and Marketing's view IS the Marketing app (2026-11-28 — the handoff "Marketing View 电话版设计"): the pages it does
+  // not draw (the builders, the Library, Tracking) are the computer's. Asked first: Marketing's shell wins on a computer.
+  if (opensMktApp(user) && phone) redirect('/mkt-app')
   // One app (2026-10-11, lib/one-app.ts): on a phone, HR's view IS the HR app — its other pages are the computer's.
   if (opensHrAppOnPhone(user) && phone) redirect('/hr-app')
   // …and Finance's view IS the Finance app (2026-10-16): every page of it is an app screen now (the user: 我不要再用那种

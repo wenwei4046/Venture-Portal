@@ -176,15 +176,31 @@ export function crmPushFromRow(v: unknown): CrmPush | null {
   }
 }
 
-export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me' | 'it' | 'person'; id: string }
+export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me' | 'it' | 'person' | 'mkt' | 'claim' | 'task'; id: string }
 
 /**
  * What the HR app's `?open=` names: a hire, a booking, a member request, a memo, a person (a probation or a contract ending,
- * 2026-10-23) — or one's own request in Me (`me:`).
+ * 2026-10-23) — or one's own request in Me (`me:`). The one app's start reads a Marketing push's too (2026-11-28,
+ * `pushUrl`): its task (`mkt:`) or a payment request (`claim:`), and the Marketing app what the start hands it on (`task:`,
+ * `claim:`).
  */
 export function openTarget(raw: string | null | undefined): OpenTarget | null {
-  const m = /^(hire|booking|req|memo|me|it|person):(.{1,80})$/.exec(raw ?? '')
+  const m = /^(hire|booking|req|memo|me|it|person|mkt|claim|task):(.{1,80})$/.exec(raw ?? '')
   return m ? { k: m[1] as OpenTarget['k'], id: m[2] } : null
+}
+
+/**
+ * Where a PUSH opens (2026-11-28): as the bells do (`noticeUrl`), but a Marketing task and a payment request go through the
+ * one app's start (`/?open=mkt:` / `?open=claim:`), which sends them on to the Marketing app on a phone for Marketing's view
+ * (lib/one-app.ts › mktOpenPlace) and to their portal pages everywhere else. Straight to the portal page, a phone in
+ * Marketing's view would be sent to the Marketing app's front, the task lost on the way (the portal layout's redirect knows
+ * no address). The bells keep their own links.
+ */
+export function pushUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): string {
+  const id = encodeURIComponent(n.refId)
+  if (n.refKind === 'mkt_project') return `/?open=mkt:${id}`
+  if (n.refKind === 'payment_request') return `/?open=claim:${id}`
+  return noticeUrl(n, app)
 }
 
 /** The request a tapped notice asks Me to open (`?open=me:<id>`, 2026-10-17), from an address's query. */

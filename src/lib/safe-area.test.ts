@@ -170,6 +170,8 @@ describe('the phone apps fill the screen they are shown on, not 100dvh', () => {
     ['src/components/hr-app/hr-app.module.css', '.app'],
     ['src/components/member/app/shell.module.css', '.screenLive'],
     ['src/components/member/app/shell.module.css', '.appLive'],
+    // The Marketing app (2026-11-28).
+    ['src/components/mkt-app/mkt-app.module.css', '.app'],
   ])('%s %s is fixed to the screen', (file, selector) => {
     const body = rule(file, selector)
     expect(body).toMatch(/position:\s*fixed;/)
@@ -180,6 +182,8 @@ describe('the phone apps fill the screen they are shown on, not 100dvh', () => {
   it.each([
     'src/components/hr-app/hr-app.module.css',
     'src/app/(hr-app)/hr-app/layout.tsx',
+    'src/components/mkt-app/mkt-app.module.css',
+    'src/app/(mkt-app)/mkt-app/layout.tsx',
   ])('%s sizes nothing by the viewport’s height', file => {
     expect(uncommented(readFileSync(resolve(ROOT, file), 'utf8'))).not.toMatch(/\d+[dsl]?vh\b/)
   })
@@ -193,8 +197,8 @@ describe('the phone apps fill the screen they are shown on, not 100dvh', () => {
     expect(frame).toMatch(/\$\{s\.app\} \$\{s\.appLive\}/)
   })
 
-  it('the HR app’s ground is fixed too, so no page under the frame can scroll', () => {
-    const layout = uncommented(readFileSync(resolve(ROOT, 'src/app/(hr-app)/hr-app/layout.tsx'), 'utf8'))
+  it.each(['src/app/(hr-app)/hr-app/layout.tsx', 'src/app/(mkt-app)/mkt-app/layout.tsx'])('%s: the ground is fixed too, so no page under the frame can scroll', file => {
+    const layout = uncommented(readFileSync(resolve(ROOT, file), 'utf8'))
     expect(layout).toMatch(/position:\s*'fixed',\s*inset:\s*0/)
   })
 })

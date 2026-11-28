@@ -1464,9 +1464,9 @@ html[data-nav-pending] .route-surface {
    app, the Finance app and its sheets (2026-10-15), the guest page — nor in the
    soft dropdown's menu (portaled to <body>), which keep their prototypes' own
    focus (2026-10-11). */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *, [data-lead-app] *)),
-textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *, [data-lead-app] *)),
-select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *, [data-lead-app] *)) {
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *, [data-mkt-app] *, [data-lead-app] *)),
+textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *, [data-mkt-app] *, [data-lead-app] *)),
+select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *, [data-mkt-app] *, [data-lead-app] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -1855,8 +1855,9 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-/* Lead View draws its own titles (its own face, `--lv-font-title` on `[data-lead-view]`, 2026-10-27): left out here as the two apps are. */
-h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *)), .page-title {
+/* Lead View draws its own titles (its own face, `--lv-font-title` on `[data-lead-view]`, 2026-10-27): left out here as the two apps are —
+   and the Marketing app (2026-11-28), whose titles are its shell's own face, never the display serif. */
+h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *, [data-mkt-app] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: normal;
@@ -2111,7 +2112,7 @@ table.ledger-table tr.lt-detail {
   .statement-amount, .num-hero { font-size: 23px; }
 }
 @media (max-width: 680px) {
-  h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *)), .page-title { font-size: 30px; }
+  h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *, [data-mkt-app] *)), .page-title { font-size: 30px; }
   .statement-amount, .num-hero { font-size: 21px; }
 }
 
@@ -2142,10 +2143,10 @@ table.ledger-table tr.lt-detail {
   textarea {
     font-size: 16px !important;
   }
-  /* The Revenue app, the HR phone app, the Finance phone app and its sheets (2026-10-15), the guest page, the soft dropdown's menu and Lead View (desktop-first, its own control sizes — 2026-11-10: the Inbox filter's search box) keep their prototypes' own control heights. */
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *)),
-  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *)),
-  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *)) {
+  /* The Revenue app, the HR phone app, the Finance phone app and its sheets (2026-10-15), the guest page, the soft dropdown's menu, Lead View (desktop-first, its own control sizes — 2026-11-10: the Inbox filter's search box) and the Marketing app (2026-11-28) keep their prototypes' own control heights. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *, [data-mkt-app] *)),
+  select:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *, [data-mkt-app] *)),
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-view] *, [data-mkt-app] *)) {
     min-height: 44px;
   }
   /* Checkboxes stay small but get a bigger hit area via padding on the label
@@ -2155,7 +2156,7 @@ table.ledger-table tr.lt-detail {
     width: 18px;
     height: 18px;
   }
-  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-lead-app] *)) {
+  textarea:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-app] *, [data-lead-app] *)) {
     min-height: 88px;
   }
   /* Money inputs inside a folded table panel are laid out by width utility
@@ -7945,6 +7946,11 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --mk-cv-blank: 214 190 160; --mk-cv-blank-key: 196 170 140; --mk-cv-blank-focus: 150 120 90; --mk-cv-stripe: 253 252 250;
   --mk-cv-pk-line: 226 223 217; --mk-cv-pk-line-2: 236 234 230; --mk-cv-pk-soft: 248 247 245; --mk-cv-pk-text: 98 92 86;
   --mk-cv-col-off: 243 241 237; --mk-cv-col-off-ink: 130 120 110; --mk-cv-shadow-icons: 0 12px 30px rgb(51 36 27 / .16);
+  /* The Marketing app (2026-11-28, `Marketing App iOS + Android.dc.html`): the Tasks segment's ground, the dark hero's
+     second line, the sheet's scrim, the raised ＋, the toast, a screen pushed over the tabs and a sheet rising. */
+  --mk-seg: 236 233 228; --mk-on-ink-2: 200 186 172; --mk-app-scrim: rgb(51 36 27 / .45);
+  --mk-shadow-plus: 0 6px 14px rgb(51 36 27 / .22); --mk-shadow-toast: 0 8px 24px rgb(51 36 27 / .25);
+  --mk-shadow-push: -12px 0 32px rgb(51 36 27 / .08); --mk-shadow-up: 0 -12px 32px rgb(51 36 27 / .12);
   background: rgb(var(--mk-app));
 }
 /* The PIC's link, /t/<code> (⑤-1, `PIC Link.dc.html`): the client-facing page in the handoff's own cooler palette,

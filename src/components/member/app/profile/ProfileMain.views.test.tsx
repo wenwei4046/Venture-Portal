@@ -18,7 +18,7 @@ describe('Profile’s Switch view', () => {
     render(<ProfileMain vm={vm} hidden={false} actions={actions} views={{ current: 'revenue_member', pick: vi.fn() }} />)
     const views = screen.getByRole('region', { name: 'Switch view' })
     expect(within(views).getAllByRole('button').map(b => b.textContent)).toEqual([
-      'PrincipalThe Finance app', 'FinanceThe Finance app', 'HRThe HR app', 'MarketingThe portal', 'Lead ViewThe Lead View app',
+      'PrincipalThe Finance app', 'FinanceThe Finance app', 'HRThe HR app', 'MarketingThe Marketing app', 'Lead ViewThe Lead View app',
     ])
     expect(within(views).getByText('Revenue team').closest('[aria-current="true"]')).toHaveTextContent('You are here')
     expect(within(views).queryByText(/View as a person/)).toBeNull()

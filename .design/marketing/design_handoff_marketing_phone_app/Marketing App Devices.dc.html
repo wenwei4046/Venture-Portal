@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500&display=swap">
+<style>body{margin:0;background:rgb(233 230 224)}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}</style>
+</helmet>
+<div style="min-height:100vh;box-sizing:border-box;padding:32px 24px 48px;display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start;justify-content:center;font-family:'Inter',system-ui,sans-serif;color:rgb(51 36 27)">
+  <div data-screen-label="iPhone" style="display:flex;flex-direction:column;gap:14px;align-items:center">
+    <div style="font-size:14px;font-weight:600">iPhone <span style="font-weight:400;color:rgb(117 100 86)">· Dynamic Island · home indicator</span></div>
+    <dc-import name="Marketing App" device="ios" embedded="{{ yes }}" role="{{ role }}" pet-species="{{ petSpecies }}" pet-color="{{ petColor }}" pet-name="{{ petName }}" hint-size="414px,868px"></dc-import>
+  </div>
+  <div data-screen-label="Android" style="display:flex;flex-direction:column;gap:14px;align-items:center">
+    <div style="font-size:14px;font-weight:600">Android <span style="font-weight:400;color:rgb(117 100 86)">· punch-hole camera · ◁ ○ □ navigation bar</span></div>
+    <dc-import name="Marketing App" device="android" embedded="{{ yes }}" role="{{ role }}" pet-species="{{ petSpecies }}" pet-color="{{ petColor }}" pet-name="{{ petName }}" hint-size="410px,864px"></dc-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;staff&quot;,&quot;manager&quot;],&quot;default&quot;:&quot;staff&quot;,&quot;tsType&quot;:&quot;'staff'|'manager'&quot;,&quot;section&quot;:&quot;Viewer&quot;},&quot;petSpecies&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cat&quot;,&quot;dog&quot;,&quot;bird&quot;,&quot;dragon&quot;],&quot;default&quot;:&quot;cat&quot;,&quot;tsType&quot;:&quot;'cat'|'dog'|'bird'|'dragon'&quot;,&quot;section&quot;:&quot;Pet&quot;},&quot;petColor&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;original&quot;,&quot;cocoa&quot;,&quot;snow&quot;,&quot;rose&quot;,&quot;mint&quot;,&quot;sky&quot;,&quot;midnight&quot;],&quot;default&quot;:&quot;original&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Pet&quot;},&quot;petName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Kopi&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Pet&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      yes: true, role: this.props.role ?? 'staff', petSpecies: this.props.petSpecies ?? 'cat',
+      petColor: this.props.petColor ?? 'original', petName: this.props.petName ?? 'Kopi',
+    };
+  }
+}
+</script>
+</body>
+</html>

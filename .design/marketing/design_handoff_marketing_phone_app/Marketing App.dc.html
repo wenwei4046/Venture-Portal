@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Chivo+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0;background:rgb(233 230 224)}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}input,textarea{font-family:inherit}*::-webkit-scrollbar{display:none}
+@keyframes pIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes pNew{0%,100%{transform:translateY(0)}40%{transform:translateY(-12px) scale(1.05)}}
+@keyframes pBusy{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes pOver{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+@keyframes pSleep{0%,100%{transform:scale(1,.93)}50%{transform:scale(1,1.02)}}
+@keyframes pEat{0%,100%{transform:scale(1,1)}50%{transform:scale(1.07,.9)}}
+@keyframes pEx{0%,100%{transform:translateY(0) scale(1,1)}15%{transform:translateY(0) scale(1.1,.85)}50%{transform:translateY(-18px) scale(.95,1.05)}}
+@keyframes pLvl{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(180deg) scale(1.25)}100%{transform:rotateY(360deg) scale(1)}}
+@keyframes pHungry{0%,100%{transform:translateY(2px) rotate(-6deg)}50%{transform:translateY(3px) rotate(-2deg)}}
+@keyframes pBub{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+</style>
+</helmet>
+<div style="min-height:{{ dev.rootMinH }};box-sizing:border-box;padding:{{ dev.rootPad }};display:flex;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif;color:rgb(51 36 27);line-height:normal">
+<div data-screen-label="Marketing App" style="width:390px;height:844px;flex:none;border-radius:{{ dev.radius }};border:{{ dev.bezel }}px solid rgb(28 22 18);box-shadow:0 0 0 2px rgb(74 64 58),0 24px 60px rgb(51 36 27 / .18);background:rgb(243 243 241);overflow:hidden;display:flex;flex-direction:column;position:relative;font-size:14px">
+  <sc-if value="{{ dev.ios }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;left:0;right:0;top:0;height:54px;z-index:45;pointer-events:none;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0 34px;box-sizing:border-box;font-weight:600;font-size:16px">
+      <span>9:41</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:flex-end;gap:2px;height:11px"><span style="width:3px;height:4px;border-radius:1px;background:rgb(51 36 27)"></span><span style="width:3px;height:6px;border-radius:1px;background:rgb(51 36 27)"></span><span style="width:3px;height:9px;border-radius:1px;background:rgb(51 36 27)"></span><span style="width:3px;height:11px;border-radius:1px;background:rgb(51 36 27)"></span></span><span style="font-size:12px;font-weight:600">5G</span><span style="width:25px;height:12px;box-sizing:border-box;border:1.5px solid rgb(51 36 27 / .5);border-radius:4px;padding:1.5px;display:flex"><span style="width:78%;border-radius:1.5px;background:rgb(51 36 27)"></span></span></span>
+    </div>
+    <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:120px;height:35px;border-radius:18px;background:#000;z-index:46;pointer-events:none"><span style="position:absolute;right:11px;top:11px;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 35%,rgb(58 64 92),rgb(14 16 26) 60%)"></span></div>
+    <div style="position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:136px;height:5px;border-radius:3px;background:rgb(28 22 18);z-index:60;pointer-events:none"></div>
+  </sc-if>
+  <sc-if value="{{ dev.android }}">
+    <div style="position:absolute;left:0;right:0;top:0;height:38px;z-index:45;pointer-events:none;display:flex;align-items:center;justify-content:space-between;padding:2px 20px 0 22px;box-sizing:border-box;font-weight:500;font-size:14px">
+      <span>9:41</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:flex-end;gap:1.5px;height:11px"><span style="width:3px;height:4px;background:rgb(51 36 27)"></span><span style="width:3px;height:6px;background:rgb(51 36 27)"></span><span style="width:3px;height:9px;background:rgb(51 36 27)"></span><span style="width:3px;height:11px;background:rgb(51 36 27 / .35)"></span></span><span style="width:9px;height:14px;box-sizing:border-box;border:1.5px solid rgb(51 36 27);border-radius:2px;display:flex;align-items:flex-end;padding:1px"><span style="width:100%;height:70%;background:rgb(51 36 27)"></span></span><span style="font-size:12px">82%</span></span>
+    </div>
+    <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;background:#000;z-index:46;pointer-events:none"><span style="position:absolute;left:5px;top:5px;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle at 35% 35%,rgb(58 64 92),rgb(14 16 26) 70%)"></span></div>
+  </sc-if>
+  <div style="flex:1;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box;padding-top:{{ dev.statusH }}px;background:{{ statusBg }};transition:background .25s">
+
+    <!-- TASKS -->
+    <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;padding:2px 14px 10px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:22px;font-weight:600;flex:1">Tasks</span><span onClick="{{ openPunch }}" style="height:44px;padding:0 12px;border-radius:12px;background:#fff;border:1px solid rgb(229 228 223);display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer" style-hover="background:rgb(250 248 244)">{{ punchChip }}</span><span onClick="{{ openNotices }}" style="position:relative;width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid rgb(229 228 223);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer" style-hover="background:rgb(250 248 244)">🔔<sc-if value="{{ unreadNotices }}"><span style="position:absolute;top:4px;right:3px;min-width:16px;height:16px;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">{{ unreadNotices }}</span></sc-if></span></div>
+        <div style="display:flex;gap:2px;padding:3px;background:rgb(236 233 228);border-radius:10px">
+          <sc-for list="{{ segs }}" as="g" hint-placeholder-count="3"><div onClick="{{ g.pick }}" style="flex:1;height:38px;border-radius:8px;background:{{ g.bg }};box-shadow:{{ g.shadow }};font-weight:{{ g.weight }};display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:13px;white-space:nowrap">{{ g.label }}<span style="min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:{{ g.cBg }};color:{{ g.cFg }};font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ g.count }}</span></div></sc-for>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:0 14px 18px;display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ cards }}" as="c" hint-placeholder-count="3">
+          <div onClick="{{ c.open }}" style="flex:none;background:{{ c.bg }};border:1px solid {{ c.line }};border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:box-shadow .15s" style-hover="box-shadow:0 6px 18px rgb(51 36 27 / .08)">
+            <div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.title }}</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgb(74 64 58)"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ c.dot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.meta }}</span></div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:3px 8px;border-radius:999px;border:1px solid {{ c.pillLine }};background:{{ c.pillBg }};color:{{ c.pillFg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ c.pillDot }}"></span>{{ c.label }}</span><span style="flex:1"></span><span style="flex:none;font-size:13px;font-weight:{{ c.actWeight }};padding:8px 14px;border-radius:8px;background:{{ c.actBg }};border:1px solid {{ c.actLine }};color:rgb(43 31 23)">{{ c.act }}</span></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noCards }}"><div style="flex:none;height:120px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);border:1px dashed rgb(229 222 211);border-radius:12px">Nothing here right now</div></sc-if>
+        <div style="flex:none;border-radius:12px;background:#fff;border:1px solid rgb(236 231 224);padding:12px 14px;display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <div style="display:flex;align-items:center"><span style="font-weight:600;flex:1">🗓️ This week</span><span onClick="{{ openCalendar }}" style="font-size:13px;color:rgb(90 62 43);cursor:pointer;padding:6px 0 6px 12px">Calendar ›</span></div>
+          <sc-for list="{{ week }}" as="w" hint-placeholder-count="3"><div onClick="{{ w.open }}" style="display:flex;gap:10px;align-items:baseline;min-height:28px;cursor:pointer"><span style="font-family:'Chivo Mono',monospace;font-size:11px;width:50px;flex:none;color:{{ w.fg }}">{{ w.when }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.title }}</span></div></sc-for>
+          <sc-if value="{{ noWeek }}"><div style="font-size:13px;color:rgb(117 100 86)">No due dates this week</div></sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- PROJECTS -->
+    <sc-if value="{{ isProjects }}">
+      <div style="flex:none;padding:0 14px 10px;display:flex;flex-direction:column;gap:10px;background:#fff">
+        <div style="display:flex;align-items:center;gap:2px;min-height:44px;flex-wrap:wrap">
+          <sc-for list="{{ crumbs }}" as="k" hint-placeholder-count="1"><sc-if value="{{ k.sep }}"><span style="color:rgb(160 150 140);padding:0 6px">›</span></sc-if><span onClick="{{ k.go }}" style="font-size:19px;font-weight:600;color:{{ k.color }};cursor:pointer;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.label }}</span></sc-for>
+        </div>
+        <input value="{{ q }}" onChange="{{ onQ }}" placeholder="{{ qPh }}" style="height:44px;box-sizing:border-box;border-radius:10px;background:rgb(246 246 244);border:1px solid rgb(232 225 216);padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none">
+        <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:10px"><sc-for list="{{ scopes }}" as="g" hint-placeholder-count="3"><div onClick="{{ g.pick }}" style="flex:1;height:36px;border-radius:8px;background:{{ g.bg }};box-shadow:{{ g.shadow }};font-weight:{{ g.weight }};display:flex;align-items:center;justify-content:center;cursor:pointer">{{ g.label }}</div></sc-for></div>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:4px 14px 18px;display:flex;flex-direction:column;gap:8px;background:#fff">
+        <sc-if value="{{ hasSubFolders }}"><div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86);margin-top:6px">Subsidiaries</div></sc-if>
+        <sc-for list="{{ subFolders }}" as="f" hint-placeholder-count="4">
+          <div onClick="{{ f.open }}" style="height:60px;flex:none;box-sizing:border-box;border-radius:12px;border:1.5px solid rgb(236 231 224);display:flex;align-items:center;gap:10px;padding:0 12px;cursor:pointer" style-hover="border-color:rgb(214 204 190)"><span style="position:relative;width:36px;height:36px;flex:none;border-radius:9px;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:17px">{{ f.emoji }}<span style="position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:{{ f.dot }};box-shadow:0 0 0 2px #fff"></span></span><div style="flex:1;min-width:0"><div style="font-weight:500">{{ f.name }}</div><div style="font-size:12px;color:rgb(160 150 140)">{{ f.meta }}</div></div><sc-if value="{{ f.late }}"><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:999px;background:rgb(200 52 42);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ f.late }}</span></sc-if><span style="color:rgb(160 150 140)">›</span></div>
+        </sc-for>
+        <sc-if value="{{ hasFolders }}"><div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86);margin-top:6px">Projects</div></sc-if>
+        <sc-for list="{{ folders }}" as="f" hint-placeholder-count="1">
+          <div onClick="{{ f.open }}" style="height:60px;flex:none;box-sizing:border-box;border-radius:12px;border:1.5px solid rgb(236 231 224);display:flex;align-items:center;gap:10px;padding:0 12px;cursor:pointer" style-hover="border-color:rgb(214 204 190)"><span style="width:36px;height:36px;flex:none;border-radius:9px;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:17px">📁</span><div style="flex:1;min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.title }}</div><div style="font-size:12px;color:rgb(160 150 140)">{{ f.meta }}</div></div><span style="color:rgb(160 150 140)">›</span></div>
+        </sc-for>
+        <sc-if value="{{ hasFiles }}"><div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86);margin-top:10px">{{ filesLabel }}</div></sc-if>
+        <sc-for list="{{ files }}" as="f" hint-placeholder-count="2">
+          <div onClick="{{ f.open }}" style="flex:none;border-radius:12px;border:1.5px solid rgb(236 231 224);padding:10px 12px;display:flex;gap:10px;align-items:center;min-height:64px;box-sizing:border-box;cursor:pointer" style-hover="border-color:rgb(214 204 190)"><span style="width:36px;height:36px;flex:none;border-radius:9px;background:rgb(239 228 217);display:flex;align-items:center;justify-content:center;font-size:16px">{{ f.emoji }}</span><div style="flex:1;min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.title }}</div><div style="font-family:'Chivo Mono',monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.sub }}</div></div><span style="flex:none;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid {{ f.pillLine }};background:{{ f.pillBg }};color:{{ f.pillFg }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ f.pillDot }}"></span>{{ f.label }}</span></div>
+        </sc-for>
+        <sc-if value="{{ projEmpty }}"><div style="padding:48px 16px;text-align:center;color:rgb(117 100 86)">{{ projEmptyText }}</div></sc-if>
+      </div>
+    </sc-if>
+
+    <!-- SPACE -->
+    <sc-if value="{{ isSpace }}">
+      <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;display:flex;flex-direction:column;background:rgb(246 244 240);margin-top:{{ dev.spaceMt }}px;position:relative;z-index:0;isolation:isolate">
+        <sc-if value="{{ visiting }}"><div style="flex:none;display:flex;align-items:center;gap:10px;padding:{{ dev.visitPt }}px 14px 10px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px"><span style="flex:1">👀 You're visiting {{ sp.first }}'s space</span><span onClick="{{ endVisit }}" style="height:34px;display:flex;align-items:center;padding:0 12px;border-radius:8px;background:rgb(246 238 230);color:rgb(51 36 27);font-weight:500;cursor:pointer">← Back to mine</span></div></sc-if>
+        <div style="height:{{ sp.coverH }}px;flex:none;position:relative;background:{{ sp.cover }}">
+          <div style="position:absolute;left:16px;bottom:-36px;width:80px;height:80px;border-radius:50%;box-sizing:border-box;border:4px solid #fff;background:{{ sp.avatarBg }};display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600">{{ sp.init }}</div>
+          <div style="position:absolute;left:104px;bottom:-32px">{{ sp.petCover }}</div>
+        </div>
+        <div style="flex:none;padding:46px 16px 0">
+          <div style="font-size:20px;font-weight:600;letter-spacing:-0.01em">{{ sp.name }} <span style="font-size:13px;font-weight:400;color:rgb(117 100 86)">· {{ sp.role }}</span></div>
+          <div style="margin-top:4px;font-size:13px;color:rgb(74 64 58);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <sc-if value="{{ home }}"><input value="{{ status }}" onChange="{{ onStatus }}" maxlength="80" placeholder="Set a status" style="border:0;border-bottom:1px dashed rgb(214 204 190);background:transparent;font-size:13px;color:inherit;outline:none;padding:6px 0;width:170px"></sc-if>
+            <sc-if value="{{ visiting }}"><span>“{{ sp.status }}”</span></sc-if>
+            <span style="color:rgb(117 100 86)">· {{ sp.petName }} Lv {{ sp.level }} · {{ sp.bubble }} {{ sp.stateLabel }}</span>
+          </div>
+          <sc-if value="{{ visiting }}"><div style="display:flex;gap:8px;margin-top:12px"><span onClick="{{ messageVisit }}" style="flex:1;height:44px;border-radius:10px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer">💬 Message {{ sp.first }}</span><span onClick="{{ wave }}" style="height:44px;padding:0 16px;border-radius:10px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;cursor:pointer">👋 Wave</span></div></sc-if>
+        </div>
+        <div style="flex:none;padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div style="height:230px;position:relative;border-radius:14px;overflow:hidden;border:1px solid rgb(236 231 224);background:{{ sp.wall }};transition:background .3s">
+            <div style="position:absolute;left:7%;top:12%;height:30%;width:26%;border:6px solid #fff;border-radius:4px;box-sizing:border-box;background:linear-gradient(#fbe3b0,#cfe4f2)"><span style="position:absolute;right:6px;top:4px;font-size:16px;line-height:1">🌤️</span></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:30%;background:repeating-linear-gradient(90deg,#e9cfa8 0 56px,#dcbd92 56px 58px)"></div>
+            <div style="position:absolute;left:0;right:0;bottom:30%;height:6px;background:rgb(255 255 255 / .5)"></div>
+            <sc-for list="{{ furn }}" as="i" hint-placeholder-count="6"><div style="position:absolute;left:{{ i.x }}%;bottom:{{ i.bottom }};transform:translateX(-50%);z-index:{{ i.z }}"><span style="display:block;line-height:1;font-size:{{ i.size }}px;filter:drop-shadow(0 3px 0 rgb(0 0 0 / .12))">{{ i.emoji }}</span></div></sc-for>
+            <div style="position:absolute;left:{{ petX }}%;bottom:9%;transform:translateX(-50%);z-index:50;transition:left 2.6s ease-in-out">{{ sp.petRoom }}</div>
+            <span style="position:absolute;left:12px;top:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">🏠 {{ sp.roomLabel }}</span>
+            <sc-if value="{{ home }}"><span onClick="{{ decorate }}" style="position:absolute;right:8px;top:4px;height:44px;display:flex;align-items:center;cursor:pointer"><span style="font-size:12px;font-weight:500;padding:6px 12px;border-radius:999px;background:rgb(255 255 255 / .9)">🎨 Wall</span></span></sc-if>
+          </div>
+          <div style="border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);padding:12px;display:flex;gap:12px;align-items:center">
+            <div style="width:60px;flex:none;display:flex;justify-content:center">{{ sp.petTile }}</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;font-size:15px">{{ sp.petName }}</span><span style="flex:1"></span><span style="font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:#EC9B55;color:rgb(43 31 23)">Lv {{ sp.level }}</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:rgb(117 100 86);width:44px">XP</span><div style="flex:1;height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ sp.xpPct }}%;background:#EC9B55;transition:width .4s"></div></div></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:rgb(117 100 86);width:44px">Energy</span><div style="flex:1;height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden"><div style="height:100%;width:{{ sp.energy }}%;background:{{ sp.energyColor }};transition:width .4s"></div></div></div>
+              <sc-if value="{{ home }}"><div style="display:flex;gap:6px">
+                <div onClick="{{ feed }}" style="flex:1;height:44px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:rgb(214 204 190)" style-active="background:rgb(250 248 244)">🍙 Feed · {{ snacks }}</div>
+                <div onClick="{{ workout }}" style="flex:1;height:44px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:rgb(214 204 190)" style-active="background:rgb(250 248 244)">🏃 {{ workoutsLeft }}/3 left</div>
+              </div></sc-if>
+            </div>
+          </div>
+          <sc-if value="{{ home }}"><div onClick="{{ openChat }}" style="height:56px;border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);display:flex;align-items:center;gap:10px;padding:0 14px;cursor:pointer" style-hover="border-color:rgb(214 204 190)"><span style="font-size:18px">💬</span><span style="font-weight:600">Chat</span><span style="flex:1;min-width:0;font-size:12.5px;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right">{{ chatPeek }}</span><sc-if value="{{ unreadChats }}"><span style="min-width:20px;height:20px;border-radius:10px;background:rgb(176 40 34);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ unreadChats }}</span></sc-if></div></sc-if>
+          <div style="height:170px;position:relative;border-radius:14px;overflow:hidden;border:1px solid rgb(236 231 224);background:#efe6d8">
+            <div style="position:absolute;left:0;right:0;bottom:0;height:42%;background:repeating-linear-gradient(90deg,#e9dfcf 0 40px,#e1d4c0 40px 42px)"></div>
+            <span style="position:absolute;left:12px;top:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / .9)">🏛️ Lobby · 5</span>
+            <sc-for list="{{ lobby }}" as="l" hint-placeholder-count="5"><div onClick="{{ l.visit }}" style="position:absolute;left:{{ l.x }}%;bottom:{{ l.y }}%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;cursor:{{ l.cursor }};min-width:44px"><sc-if value="{{ l.say }}"><span style="max-width:130px;margin-bottom:4px;padding:4px 8px;border-radius:10px;background:#fff;box-shadow:0 2px 6px rgb(51 36 27 / .15);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.say }}</span></sc-if><span style="font-size:30px;line-height:1;filter:{{ l.filter }}">{{ l.emoji }}</span><span style="font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:999px;background:rgb(255 255 255 / .92);white-space:nowrap;margin-top:2px">{{ l.name }}</span></div></sc-for>
+          </div>
+          <div style="border-radius:14px;background:#fff;border:1px solid rgb(236 231 224);padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-weight:600">🏆 Trophies</div>
+            <div style="display:flex;gap:4px;font-size:26px;line-height:1.1"><span>🏆</span><span>🥇</span><span>🎖️</span><span style="opacity:.25;filter:grayscale(1)">🏅</span><span style="opacity:.25;filter:grayscale(1)">🥈</span></div>
+            <div style="font-size:12px;color:rgb(117 100 86)">3 projects finished this quarter</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- MORE -->
+    <sc-if value="{{ isMore }}">
+      <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:2px 14px 20px;display:flex;flex-direction:column;gap:14px">
+        <div style="flex:none;font-size:22px;font-weight:600;height:44px;display:flex;align-items:center">More</div>
+
+        <div style="flex:none;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden">
+          <div onClick="{{ openProfile }}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer" style-hover="background:rgb(250 248 244)">
+            <span style="width:52px;height:52px;flex:none;border-radius:50%;background:{{ me.bg }};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:20px">{{ me.init }}</span>
+            <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:17px">{{ me.full }}</div><div style="font-size:13px;color:rgb(117 100 86);margin-top:2px">{{ me.role }} · HOUZS Marketing</div></div>
+            <span style="color:rgb(160 150 140);font-size:18px">›</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-top:1px solid rgb(240 236 230)">
+            <span style="font-size:16px">🕘</span><span style="flex:1;font-size:13px;color:rgb(74 64 58)">{{ punchLine }}</span>
+            <span onClick="{{ openPunch }}" style="height:44px;padding:0 16px;border-radius:10px;background:{{ punchBtnBg }};border:1px solid {{ punchBtnLine }};color:rgb(43 31 23);font-weight:600;display:flex;align-items:center;cursor:pointer">{{ punchBtn }}</span>
+          </div>
+        </div>
+
+        <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <sc-for list="{{ moreGrid }}" as="r" hint-placeholder-count="4">
+            <div onClick="{{ r.go }}" style="position:relative;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;cursor:pointer;min-height:92px;box-sizing:border-box" style-hover="border-color:rgb(214 204 190)" style-active="background:rgb(250 248 244)">
+              <span style="width:38px;height:38px;border-radius:11px;background:{{ r.tone }};display:flex;align-items:center;justify-content:center;font-size:19px">{{ r.emoji }}</span>
+              <div><div style="font-weight:600;font-size:15px">{{ r.label }}</div><div style="font-size:12px;color:rgb(117 100 86);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</div></div>
+              <sc-if value="{{ r.count }}"><span style="position:absolute;right:12px;top:12px;min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;background:rgb(176 40 34);color:#fff;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="flex:none;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:baseline"><span style="flex:1;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">Subsidiaries</span><span onClick="{{ allSubs }}" style="font-size:13px;color:rgb(90 62 43);cursor:pointer;padding:4px 0 4px 12px">All ›</span></div>
+          <div style="display:flex;gap:8px;overflow:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px 2px">
+            <sc-for list="{{ moreSubs }}" as="b" hint-placeholder-count="5">
+              <div onClick="{{ b.go }}" style="position:relative;flex:none;width:92px;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer" style-hover="border-color:rgb(214 204 190)">
+                <span style="position:relative;width:40px;height:40px;border-radius:12px;background:rgb(249 231 216);display:flex;align-items:center;justify-content:center;font-size:19px">{{ b.emoji }}<span style="position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:{{ b.dot }};box-shadow:0 0 0 2px #fff"></span></span>
+                <span style="font-size:12px;font-weight:500;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.name }}</span>
+                <span style="font-size:11px;color:rgb(117 100 86)">{{ b.meta }}</span>
+                <sc-if value="{{ b.late }}"><span style="position:absolute;right:6px;top:6px;min-width:18px;height:18px;border-radius:9px;background:rgb(200 52 42);color:#fff;font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ b.late }}</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ isManager }}">
+          <div style="flex:none;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">Manager tools</span>
+            <div style="background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden">
+              <sc-for list="{{ moreMgr }}" as="r" hint-placeholder-count="7">
+                <div onClick="{{ r.go }}" style="min-height:56px;display:flex;align-items:center;gap:12px;padding:0 12px;border-top:1px solid {{ r.rule }};cursor:pointer" style-hover="background:rgb(250 248 244)"><span style="width:34px;height:34px;flex:none;border-radius:10px;background:{{ r.tone }};display:flex;align-items:center;justify-content:center;font-size:17px">{{ r.emoji }}</span><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:500">{{ r.label }}</div><div style="font-size:12px;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</div></div><sc-if value="{{ r.count }}"><span style="min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;background:rgb(176 40 34);color:#fff;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ r.count }}</span></sc-if><span style="color:rgb(160 150 140);font-size:18px">›</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="flex:none;background:#fff;border:1px solid rgb(229 228 223);border-radius:16px;overflow:hidden">
+          <sc-for list="{{ moreFoot }}" as="r" hint-placeholder-count="3">
+            <div onClick="{{ r.go }}" style="min-height:52px;display:flex;align-items:center;gap:12px;padding:0 12px;border-top:1px solid {{ r.rule }};cursor:pointer;color:{{ r.fg }}" style-hover="background:rgb(250 248 244)"><span style="width:26px;text-align:center;font-size:17px">{{ r.emoji }}</span><span style="flex:1;font-size:15px">{{ r.label }}</span><span style="font-size:13px;color:rgb(117 100 86)">{{ r.value }}</span><span style="color:rgb(160 150 140);font-size:18px">›</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- TAB BAR -->
+    <div style="flex:none;height:{{ dev.tabH }}px;background:#fff;border-top:1px solid rgb(229 222 211);display:grid;grid-template-columns:repeat(5,1fr);padding:0 6px {{ dev.tabPb }}px;box-sizing:border-box">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+        <div onClick="{{ t.go }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ t.color }};font-weight:{{ t.weight }};cursor:pointer"><span style="position:relative;width:{{ t.box }}px;height:{{ t.box }}px;margin-top:{{ t.mt }}px;border-radius:{{ t.radius }};background:{{ t.bg }};box-shadow:{{ t.shadow }};display:flex;align-items:center;justify-content:center;font-size:{{ t.size }}px;color:rgb(43 31 23);transition:background .15s,transform .15s" style-active="transform:scale(.94)">{{ t.emoji }}<sc-if value="{{ t.badge }}"><span style="position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;border-radius:8px;background:rgb(176 40 34);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;border:1.5px solid #fff">{{ t.badge }}</span></sc-if></span><span style="font-size:10.5px">{{ t.label }}</span></div>
+      </sc-for>
+    </div>
+
+    <!-- PUSHED SCREEN -->
+    <div style="position:absolute;inset:0;z-index:20;background:#fff;display:flex;flex-direction:column;box-sizing:border-box;padding-top:{{ dev.statusH }}px;transform:{{ pushT }};transition:transform .26s cubic-bezier(0.2,0.8,0.2,1);box-shadow:-12px 0 32px rgb(51 36 27 / .08)">
+      <div style="flex:none;height:48px;display:flex;align-items:center;gap:4px;padding:0 8px;border-bottom:1px solid rgb(240 236 230)"><span onClick="{{ back }}" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;border-radius:10px" style-hover="background:rgb(241 236 228)">‹</span><span style="flex:1;min-width:0;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pushTitle }}</span><span style="font-size:12px;color:rgb(117 100 86);padding-right:10px;white-space:nowrap">{{ pushSub }}</span></div>
+
+      <sc-if value="{{ scr.task }}">
+        <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:14px 16px 16px;display:flex;flex-direction:column;gap:14px">
+          <div style="flex:none">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-family:'Chivo Mono',monospace;font-size:11px;color:rgb(117 100 86)">{{ tp.track }}</span><span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid {{ tp.pillLine }};background:{{ tp.pillBg }};color:{{ tp.pillFg }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ tp.pillDot }}"></span>{{ tp.status }}</span></div>
+            <div style="font-size:22px;font-weight:600;letter-spacing:-0.01em;margin-top:6px;text-wrap:pretty">{{ tp.title }}</div>
+          </div>
+          <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;padding:12px;border-radius:12px;background:rgb(250 248 244)">
+            <sc-for list="{{ tp.facts }}" as="f" hint-placeholder-count="4"><div><div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86)">{{ f.k }}</div><div style="font-weight:500;margin-top:3px;color:{{ f.fg }}">{{ f.v }}</div></div></sc-for>
+          </div>
+          <div style="flex:none;display:flex;gap:10px;padding:12px;border-radius:12px;background:{{ tp.bBg }};border:1px solid {{ tp.bLine }};transition:background .2s"><span style="font-size:18px">{{ tp.bIcon }}</span><div style="flex:1;min-width:0"><div style="font-weight:600">{{ tp.bTitle }}</div><div style="font-size:13px;color:rgb(74 64 58);margin-top:3px;line-height:1.4">{{ tp.bText }}</div></div></div>
+          <div style="flex:none">
+            <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86);margin-bottom:8px">{{ tp.stripHead }}</div>
+            <div style="display:flex;gap:6px;overflow:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px">
+              <sc-for list="{{ tp.strip }}" as="k" hint-placeholder-count="4"><div style="flex:none;width:118px;border-radius:10px;border:1.5px solid {{ k.border }};background:#fff;overflow:hidden;box-shadow:{{ k.shadow }}"><div style="height:3px;background:{{ k.bar }}"></div><div style="padding:8px;display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:18px;flex:none;border-radius:50%;background:{{ k.numBg }};color:{{ k.numFg }};font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ k.mark }}</span><span style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.name }}</span></div><div style="font-size:11.5px;color:rgb(74 64 58);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.who }}</div></div></div></sc-for>
+            </div>
+          </div>
+          <div style="flex:none;border-radius:12px;border:1.5px solid {{ tp.secLine }};padding:12px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;flex:1">{{ tp.stage }}</span><span style="font-size:12px;color:{{ tp.fillFg }}">{{ tp.fill }}</span></div>
+            <sc-for list="{{ tp.fields }}" as="f" hint-placeholder-count="2">
+              <div>
+                <div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:5px">{{ f.label }}<sc-if value="{{ f.req }}"><span style="color:rgb(176 40 34)"> *</span></sc-if></div>
+                <sc-if value="{{ f.edit }}"><input type="{{ f.type }}" value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" style="width:100%;height:46px;box-sizing:border-box;border:1.5px solid {{ f.border }};border-radius:8px;padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none;background:#fff"></sc-if>
+                <sc-if value="{{ f.ro }}"><div style="min-height:24px;line-height:1.45;color:{{ f.fg }}">{{ f.text }}</div></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <sc-if value="{{ tp.hasActions }}">
+          <div style="flex:none;padding:10px 16px 26px;border-top:1px solid rgb(229 222 211);background:#fff;display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:12px;color:rgb(117 100 86);text-align:center">{{ tp.nextLine }}</div>
+            <div style="display:flex;gap:8px">
+              <sc-if value="{{ tp.canDecide }}"><div onClick="{{ askChanges }}" style="flex:1;height:50px;border-radius:12px;border:1px solid rgb(229 222 211);font-weight:500;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(250 248 244)">Request changes</div><div onClick="{{ approve }}" style="flex:1;height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">Approve</div></sc-if>
+              <sc-if value="{{ tp.canSubmit }}"><div onClick="{{ submit }}" style="flex:1;height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">{{ tp.submitLabel }}</div></sc-if>
+              <sc-if value="{{ tp.canNudge }}"><div onClick="{{ nudge }}" style="flex:1;height:50px;border-radius:12px;border:1px solid rgb(229 222 211);font-weight:500;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:{{ tp.nudgeOp }}" style-hover="background:rgb(250 248 244)">{{ tp.nudgeLabel }}</div></sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ scr.calendar }}">
+        <div style="flex:none;border-bottom:1px solid rgb(229 222 211);padding:8px 14px 10px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+            <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7"><div onClick="{{ d.pick }}" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:10px;background:{{ d.bg }};cursor:pointer"><span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:rgb(117 100 86)">{{ d.wd }}</span><span style="width:28px;height:28px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:{{ d.weight }};background:{{ d.numBg }};color:{{ d.numFg }}">{{ d.n }}</span><span style="display:flex;gap:2px;height:6px"><sc-for list="{{ d.dots }}" as="o" hint-placeholder-count="1"><span style="width:6px;height:6px;border-radius:50%;background:{{ o }}"></span></sc-for></span></div></sc-for>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <sc-for list="{{ layers }}" as="l" hint-placeholder-count="3"><span onClick="{{ l.toggle }}" style="flex:none;height:36px;padding:0 10px;border-radius:999px;background:{{ l.bg }};color:{{ l.fg }};border:1px solid {{ l.line }};display:flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer">{{ l.label }} <b>{{ l.count }}</b></span></sc-for>
+            <span style="flex:1"></span>
+            <span onClick="{{ toggleMine }}" style="flex:none;display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;height:36px"><span style="width:34px;height:20px;border-radius:10px;background:{{ mineBg }};position:relative;transition:background .15s"><span style="position:absolute;left:{{ mineLeft }}px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s"></span></span>Mine</span>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:12px 14px 18px;display:flex;flex-direction:column;gap:14px;background:rgb(243 243 241)">
+          <sc-for list="{{ agenda }}" as="g" hint-placeholder-count="3">
+            <div style="flex:none;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:baseline;gap:8px"><span style="font-weight:600;color:{{ g.fg }}">{{ g.label }}</span><span style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:{{ g.fg }}">{{ g.wd }}</span></div>
+              <sc-for list="{{ g.events }}" as="e" hint-placeholder-count="2"><div onClick="{{ e.open }}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:56px;box-sizing:border-box;border-radius:10px;border:1px {{ e.style }} {{ e.line }};background:{{ e.bg }};cursor:pointer"><span style="font-size:16px">{{ e.icon }}</span><div style="flex:1;min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</div><div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgb(90 78 68);margin-top:2px"><span style="width:6px;height:6px;border-radius:2px;flex:none;background:{{ e.dot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.line2 }}</span></div></div><span style="font-size:12px;color:{{ e.fg }};white-space:nowrap">{{ e.label }}</span></div></sc-for>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noAgenda }}"><div style="padding:48px 0;text-align:center;color:rgb(117 100 86)">Nothing scheduled.</div></sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ scr.chat }}">
+        <sc-if value="{{ chat.showTabs }}"><div style="flex:none;padding:10px 14px 6px"><div style="display:flex;gap:2px;padding:3px;background:rgb(246 244 240);border-radius:10px"><sc-for list="{{ chat.tabs }}" as="g" hint-placeholder-count="2"><div onClick="{{ g.pick }}" style="flex:1;height:38px;border-radius:8px;background:{{ g.bg }};box-shadow:{{ g.shadow }};font-weight:{{ g.weight }};display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">{{ g.label }}<sc-if value="{{ g.dot }}"><span style="width:7px;height:7px;border-radius:50%;background:rgb(200 52 42)"></span></sc-if></div></sc-for></div></div></sc-if>
+        <sc-if value="{{ chat.isList }}">
+          <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:0 8px">
+            <sc-for list="{{ chat.peers }}" as="p" hint-placeholder-count="5"><div onClick="{{ p.open }}" style="display:flex;align-items:center;gap:12px;padding:10px 8px;min-height:60px;box-sizing:border-box;border-radius:10px;cursor:pointer" style-hover="background:rgb(250 248 244)"><span style="position:relative;width:42px;height:42px;flex:none;border-radius:50%;background:{{ p.bg }};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px">{{ p.init }}<sc-if value="{{ p.unread }}"><span style="position:absolute;right:-1px;top:-1px;width:11px;height:11px;border-radius:50%;background:rgb(200 52 42);border:2px solid #fff"></span></sc-if></span><div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px"><span style="flex:1;font-weight:{{ p.weight }};font-size:15px">{{ p.name }}</span><span style="font-size:11.5px;color:rgb(117 100 86)">{{ p.time }}</span></div><div style="font-size:13px;color:{{ p.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">{{ p.last }}</div></div></div></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ chat.isLog }}">
+          <sc-if value="{{ chat.isLobby }}"><div style="flex:none;padding:4px 16px 0;font-size:12px;color:rgb(117 100 86)">Everyone sees this</div></sc-if>
+          <div ref="{{ logRef }}" style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:14px;display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ chat.msgs }}" as="m" hint-placeholder-count="3"><div style="flex:none;display:flex;flex-direction:column;gap:4px;align-items:{{ m.align }}"><span style="font-size:11px;color:rgb(117 100 86)">{{ m.meta }}</span><sc-if value="{{ m.hasText }}"><div style="max-width:80%;padding:9px 12px;border-radius:14px;background:{{ m.bg }};color:rgb(43 31 23);line-height:1.4;overflow-wrap:anywhere">{{ m.text }}</div></sc-if><sc-if value="{{ m.hasTask }}"><div onClick="{{ m.openTask }}" style="max-width:80%;padding:10px 12px;border-radius:12px;border:1px solid rgb(229 222 211);display:flex;flex-direction:column;gap:2px;cursor:pointer" style-hover="border-color:rgb(214 204 190)"><span style="font-family:'Chivo Mono',monospace;font-size:10px;color:rgb(117 100 86)">📎 {{ m.track }}</span><span style="font-weight:600">{{ m.taskTitle }}</span></div></sc-if></div></sc-for>
+          </div>
+          <sc-if value="{{ chat.attachOpen }}"><div style="flex:none;border-top:1px solid rgb(240 236 230);background:rgb(250 248 244);padding:4px;max-height:160px;overflow:auto;scrollbar-width:none"><sc-for list="{{ chat.attachRows }}" as="a" hint-placeholder-count="3"><div onClick="{{ a.pick }}" style="padding:8px 10px;min-height:44px;box-sizing:border-box;border-radius:8px;cursor:pointer" style-hover="background:rgb(241 236 228)"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.title }}</div><div style="font-family:'Chivo Mono',monospace;font-size:10px;color:rgb(117 100 86)">{{ a.track }}</div></div></sc-for></div></sc-if>
+          <sc-if value="{{ chat.hasPending }}"><div style="flex:none;margin:6px 12px 0;padding:8px 10px;border-radius:8px;background:rgb(250 248 244);border:1px solid rgb(236 231 224);font-size:12.5px;display:flex;gap:6px;align-items:center"><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📎 {{ chat.pending }}</span><span onClick="{{ chat.dropPending }}" style="cursor:pointer;color:rgb(117 100 86);padding:4px 6px">✕</span></div></sc-if>
+          <div style="flex:none;padding:10px 12px 28px;border-top:1px solid rgb(240 236 230);display:flex;gap:8px"><span onClick="{{ chat.toggleAttach }}" style="width:44px;height:44px;flex:none;border-radius:10px;border:1px solid rgb(229 222 211);background:{{ chat.clipBg }};display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer">📎</span><input value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onDraftKey }}" placeholder="{{ chat.ph }}" maxlength="500" style="flex:1;min-width:0;height:44px;box-sizing:border-box;border-radius:10px;border:1px solid rgb(229 222 211);padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none"><span onClick="{{ send }}" style="width:44px;height:44px;flex:none;border-radius:10px;background:#EC9B55;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;cursor:pointer;opacity:{{ chat.sendOp }}">↑</span></div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ scr.notices }}">
+        <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:8px;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ notices }}" as="n" hint-placeholder-count="2"><div onClick="{{ n.open }}" style="flex:none;display:flex;gap:12px;padding:12px 10px;border-radius:10px;background:{{ n.bg }};cursor:pointer" style-hover="background:rgb(241 236 228)"><span style="width:38px;height:38px;flex:none;border-radius:9px;background:oklch(0.94 0.04 295);display:flex;align-items:center;justify-content:center;font-size:17px">{{ n.icon }}</span><div style="flex:1;min-width:0"><div style="line-height:1.45;text-wrap:pretty">{{ n.title }}</div><div style="font-size:12px;color:rgb(117 100 86);margin-top:5px">{{ n.meta }}</div></div><sc-if value="{{ n.unread }}"><span style="width:8px;height:8px;border-radius:50%;background:rgb(90 62 43);margin-top:6px;flex:none"></span></sc-if></div></sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ scr.profile }}">
+        <sc-if value="{{ pf.viewing }}">
+        <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:16px 16px 28px;display:flex;flex-direction:column;gap:20px;background:rgb(243 243 241)">
+          <div style="flex:none;display:flex;align-items:center;gap:14px">
+            <span onClick="{{ pf.photo }}" style="position:relative;width:68px;height:68px;flex:none;border-radius:50%;background:{{ me.bg }};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:26px;cursor:pointer">{{ me.init }}<span style="position:absolute;right:-4px;bottom:-4px;width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid rgb(229 222 211);box-shadow:0 1px 3px rgb(51 36 27 / .12);display:flex;align-items:center;justify-content:center;font-size:12px">📷</span></span>
+            <div style="flex:1;min-width:0"><div style="font-size:22px;font-weight:600;letter-spacing:-0.01em;line-height:1.15">{{ me.full }}</div><div style="font-size:13px;color:rgb(74 64 58);margin-top:4px">{{ me.role }} · Marketing</div></div>
+            <span onClick="{{ pf.edit }}" title="Edit profile" style="width:44px;height:44px;flex:none;border-radius:10px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer" style-hover="background:rgb(250 248 244)">✎</span>
+          </div>
+          <sc-if value="{{ pf.pending }}"><div style="flex:none;display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;background:rgb(255 250 238);border:1px solid rgb(236 214 164)"><span style="font-size:17px">⏳</span><div style="flex:1;min-width:0"><div style="font-weight:600">Change waiting for HR</div><div style="font-size:12.5px;color:rgb(74 64 58);margin-top:2px">{{ pf.pendingLine }}</div></div></div></sc-if>
+
+          <div style="flex:none;border-radius:16px;background:rgb(51 36 27);color:rgb(246 238 230);padding:14px 14px 14px 16px;display:flex;align-items:center;gap:14px">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgb(200 186 172)">Today · {{ pf.chip }}</span><span style="font-family:'Chivo Mono',monospace;font-size:26px;line-height:1.1">09:41</span><span style="font-size:12px;color:rgb(200 186 172)">{{ punchLine }}</span></div>
+            <sc-if value="{{ pf.canPunch }}"><span onClick="{{ openPunch }}" style="height:46px;padding:0 18px;border-radius:10px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;display:flex;align-items:center;cursor:pointer" style-hover="background:#E0893F">{{ pf.punchBtn }}</span></sc-if>
+          </div>
+
+          <div style="flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+            <sc-for list="{{ pf.tiles }}" as="t" hint-placeholder-count="6"><div onClick="{{ t.go }}" style="background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;padding:12px 10px 10px;display:flex;flex-direction:column;gap:10px;min-height:92px;box-sizing:border-box;cursor:pointer" style-hover="border-color:rgb(214 204 190)" style-active="background:rgb(250 248 244)"><span style="width:36px;height:36px;border-radius:10px;background:{{ t.tone }};display:flex;align-items:center;justify-content:center;font-size:18px">{{ t.emoji }}</span><span style="font-weight:500;font-size:13px;line-height:1.25">{{ t.label }}</span></div></sc-for>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:baseline"><span style="flex:1;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">Request status</span><span onClick="{{ pf.allReq }}" style="font-size:13px;color:rgb(90 62 43);cursor:pointer;padding:4px 0 4px 12px">All ›</span></div>
+            <div style="background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;overflow:hidden">
+              <sc-for list="{{ pf.requests }}" as="r" hint-placeholder-count="2"><div style="min-height:56px;display:flex;align-items:center;gap:10px;padding:8px 12px;box-sizing:border-box;border-top:1px solid {{ r.rule }}"><div style="flex:1;min-width:0"><div style="font-weight:500">{{ r.title }}</div><div style="font-size:12px;color:rgb(117 100 86);margin-top:2px">{{ r.when }}</div></div><span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid {{ r.line }};background:{{ r.bg }};color:{{ r.fg }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.word }}</span></div></sc-for>
+            </div>
+          </div>
+
+          <sc-for list="{{ pf.cards }}" as="c" hint-placeholder-count="4">
+            <div style="flex:none;display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">{{ c.label }}</span>
+              <div style="background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;padding:4px 14px">
+                <sc-for list="{{ c.items }}" as="i" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid {{ i.rule }};font-size:13.5px"><span style="color:rgb(117 100 86)">{{ i.k }}</span><span style="overflow-wrap:anywhere">{{ i.v }}</span></div></sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+        <sc-if value="{{ pf.editing }}">
+        <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:16px 16px 20px;display:flex;flex-direction:column;gap:18px">
+          <div style="flex:none;font-size:13px;color:rgb(74 64 58);line-height:1.5">Every change goes to HR. Your record updates only after HR approves.</div>
+          <sc-for list="{{ pf.groups }}" as="g" hint-placeholder-count="3">
+            <div style="flex:none;display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">{{ g.label }}</span>
+              <sc-for list="{{ g.fields }}" as="f" hint-placeholder-count="2"><div><div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:5px">{{ f.label }}</div><input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" style="width:100%;height:46px;box-sizing:border-box;border:1.5px solid {{ f.border }};border-radius:8px;padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none;background:#fff"><sc-if value="{{ f.hint }}"><div style="font-size:12px;color:rgb(117 100 86);margin-top:5px">{{ f.hint }}</div></sc-if></div></sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:none;padding:10px 16px 26px;border-top:1px solid rgb(229 222 211);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:8px">
+          <div onClick="{{ pf.cancel }}" style="height:50px;border-radius:12px;border:1px solid rgb(229 222 211);font-weight:500;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer">Cancel</div>
+          <div onClick="{{ pf.send }}" style="height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:{{ pf.sendOp }}">Send to HR for approval</div>
+        </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ scr.claim }}">
+        <sc-if value="{{ cl.isList }}">
+          <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:14px 14px 18px;display:flex;flex-direction:column;gap:12px;background:rgb(243 243 241)">
+            <div style="flex:none;border-radius:16px;background:rgb(51 36 27);color:rgb(246 238 230);padding:14px 16px;display:flex;flex-direction:column;gap:4px"><span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgb(200 186 172)">{{ cl.heroLabel }}</span><span style="font-family:'Chivo Mono',monospace;font-size:26px;line-height:1.15">{{ cl.heroValue }}</span><span style="font-size:12px;color:rgb(200 186 172)">{{ cl.lede }}</span></div>
+            <div style="flex:none;display:flex;gap:6px;overflow:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px"><sc-for list="{{ cl.cards }}" as="c" hint-placeholder-count="4"><span onClick="{{ c.pick }}" style="flex:none;height:40px;padding:0 12px;border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.line }};display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">{{ c.label }} <b>{{ c.count }}</b></span></sc-for></div>
+            <input value="{{ cl.q }}" onChange="{{ cl.onQ }}" placeholder="{{ cl.qPh }}" style="flex:none;height:44px;box-sizing:border-box;border-radius:10px;background:#fff;border:1px solid rgb(229 228 223);padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none">
+            <sc-for list="{{ cl.rows }}" as="r" hint-placeholder-count="3">
+              <div onClick="{{ r.open }}" style="flex:none;background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;padding:12px;display:flex;gap:10px;cursor:pointer;opacity:{{ r.op }}" style-hover="border-color:rgb(214 204 190)">
+                <sc-if value="{{ r.tickable }}"><span onClick="{{ r.tick }}" style="width:44px;margin:-12px 0 -12px -12px;flex:none;display:flex;align-items:center;justify-content:center"><span style="width:22px;height:22px;border-radius:6px;border:1.5px solid {{ r.boxLine }};background:{{ r.boxBg }};color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ r.boxMark }}</span></span></sc-if>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;align-items:baseline;gap:8px"><span style="flex:1;min-width:0;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.what }}</span><span style="font-family:'Chivo Mono',monospace;font-size:13px;font-weight:500;white-space:nowrap">{{ r.amount }}</span></div>
+                  <div style="font-size:12.5px;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.sub }}</div>
+                  <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="flex:none;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid {{ r.line }};background:{{ r.bg }};color:{{ r.fg }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.chip }}</span><span style="font-size:12px;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.note }}</span></div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ cl.empty }}"><div style="flex:none;padding:40px 16px;text-align:center;color:rgb(117 100 86);border:1px dashed rgb(229 222 211);border-radius:12px">{{ cl.emptyText }}</div></sc-if>
+          </div>
+          <div style="flex:none;padding:10px 16px 26px;border-top:1px solid rgb(229 222 211);background:#fff;display:flex;flex-direction:column;gap:8px">
+            <sc-if value="{{ cl.hasTicks }}"><div style="font-size:12.5px;color:rgb(74 64 58);text-align:center">{{ cl.tickLine }}</div><div style="display:flex;gap:8px"><div onClick="{{ cl.rejectTicked }}" style="flex:1;height:50px;border-radius:12px;border:1px solid rgb(236 190 184);color:rgb(176 40 34);font-weight:500;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer">Reject</div><div onClick="{{ cl.approveTicked }}" style="flex:1.4;height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">Approve</div></div></sc-if>
+            <sc-if value="{{ cl.noTicks }}"><div onClick="{{ cl.newReq }}" style="height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">+ New request</div></sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ cl.isDetail }}">
+          <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:14px 14px 18px;display:flex;flex-direction:column;gap:14px;background:rgb(243 243 241)">
+            <div style="flex:none;background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="flex:1;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">{{ cd.kicker }}</span><span style="flex:none;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid {{ cd.line }};background:{{ cd.bg }};color:{{ cd.fg }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ cd.dot }}"></span>{{ cd.chip }}</span></div>
+              <div style="font-family:'Chivo Mono',monospace;font-size:30px;font-weight:500;letter-spacing:-0.02em">{{ cd.amount }}</div>
+              <div style="font-weight:600;font-size:16px;text-wrap:pretty">{{ cd.what }}</div>
+              <div style="font-size:13px;color:rgb(74 64 58)">{{ cd.to }}</div>
+              <div style="font-size:13px;color:rgb(117 100 86);line-height:1.45;border-top:1px solid rgb(240 236 230);padding-top:10px;margin-top:2px">{{ cd.note }}</div>
+            </div>
+            <sc-if value="{{ cd.hasReason }}"><div style="flex:none;padding:12px;border-radius:12px;background:rgb(255 247 245);border:1px solid rgb(236 190 184)"><div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86);color:rgb(176 40 34)">Why it was sent back</div><div style="margin-top:6px;line-height:1.45">“{{ cd.reason }}”</div><div style="font-size:12px;color:rgb(117 100 86);margin-top:4px">{{ cd.reasonBy }}</div></div></sc-if>
+            <div style="flex:none;background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;padding:4px 14px"><sc-for list="{{ cd.lines }}" as="i" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid {{ i.rule }};font-size:13.5px"><span style="color:rgb(117 100 86)">{{ i.k }}</span><span style="overflow-wrap:anywhere">{{ i.v }}</span></div></sc-for></div>
+            <div style="flex:none;display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgb(117 100 86)">Receipt</span><sc-if value="{{ cd.hasFile }}"><div style="height:120px;border-radius:12px;border:1px dashed rgb(229 222 211);background:repeating-linear-gradient(135deg,rgb(248 246 242) 0 10px,rgb(252 251 249) 10px 20px);display:flex;align-items:center;justify-content:center"><span style="font-family:'Chivo Mono',monospace;font-size:11px;color:rgb(117 100 86);background:#fff;padding:4px 8px;border-radius:4px;border:1px solid rgb(229 222 211)">{{ cd.file }}</span></div></sc-if><sc-if value="{{ cd.noFile }}"><div style="font-size:13px;color:rgb(117 100 86)">No receipt attached.</div></sc-if></div>
+          </div>
+          <sc-if value="{{ cd.hasBar }}"><div style="flex:none;padding:10px 16px 26px;border-top:1px solid rgb(229 222 211);background:#fff;display:flex;gap:8px"><sc-for list="{{ cd.bar }}" as="b" hint-placeholder-count="2"><div onClick="{{ b.go }}" style="flex:{{ b.flex }};height:50px;border-radius:12px;background:{{ b.bg }};border:1px solid {{ b.line }};color:{{ b.fg }};font-weight:{{ b.weight }};font-size:14.5px;display:flex;align-items:center;justify-content:center;cursor:pointer;white-space:nowrap">{{ b.label }}</div></sc-for></div></sc-if>
+        </sc-if>
+
+        <sc-if value="{{ cl.isForm }}">
+          <div style="flex:1;min-height:0;overflow:auto;scrollbar-width:none;padding:16px 16px 20px;display:flex;flex-direction:column;gap:16px">
+            <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px"><sc-for list="{{ cf.kinds }}" as="k" hint-placeholder-count="2"><div onClick="{{ k.pick }}" style="border-radius:12px;border:1.5px solid {{ k.line }};background:{{ k.bg }};padding:12px;cursor:pointer"><div style="font-size:20px">{{ k.emoji }}</div><div style="font-weight:600;margin-top:6px">{{ k.label }}</div><div style="font-size:12px;color:rgb(117 100 86);margin-top:2px">{{ k.sub }}</div></div></sc-for></div>
+            <div style="flex:none"><div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:5px">What is it for <span style="color:rgb(176 40 34)">*</span></div><input value="{{ cf.what }}" onChange="{{ cf.onWhat }}" placeholder="Props for the shoot" style="width:100%;height:46px;box-sizing:border-box;border-radius:8px;padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none;background:#fff;border:1.5px solid {{ cf.whatLine }}"></div>
+            <div style="flex:none"><div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:5px">Amount (RM) <span style="color:rgb(176 40 34)">*</span></div><input type="number" inputmode="decimal" value="{{ cf.amount }}" onChange="{{ cf.onAmount }}" placeholder="0.00" style="width:100%;height:46px;box-sizing:border-box;border-radius:8px;padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none;background:#fff;border:1.5px solid {{ cf.amountLine }};font-family:'Chivo Mono',monospace"></div>
+            <sc-if value="{{ cf.direct }}"><div style="flex:none"><div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:5px">Pay to <span style="color:rgb(176 40 34)">*</span></div><input value="{{ cf.payTo }}" onChange="{{ cf.onPayTo }}" placeholder="Supplier's name" style="width:100%;height:46px;box-sizing:border-box;border-radius:8px;padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none;background:#fff;border:1.5px solid {{ cf.payToLine }}"></div></sc-if>
+            <sc-if value="{{ cf.claim }}"><div style="flex:none;font-size:13px;color:rgb(74 64 58)">Pay to: <b>{{ me.full }}</b> — your salary account.</div></sc-if>
+            <div style="flex:none;display:flex;flex-direction:column;gap:8px"><span style="font-size:12.5px;color:rgb(74 64 58)">Receipt</span><sc-if value="{{ cf.hasFile }}"><div style="min-height:46px;background:#fff;border:1px solid rgb(229 228 223);border-radius:14px;border-radius:10px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px"><span style="flex:1;font-family:'Chivo Mono',monospace;font-size:12px">📎 {{ cf.file }}</span><span onClick="{{ cf.dropFile }}" style="width:40px;height:44px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer">✕</span></div></sc-if><sc-if value="{{ cf.noFile }}"><div onClick="{{ cf.addFile }}" style="height:56px;border-radius:10px;border:1px dashed rgb(214 204 190);display:flex;align-items:center;justify-content:center;gap:8px;color:rgb(74 64 58);cursor:pointer" style-hover="background:rgb(250 248 244)">📷 Take a photo or pick a file</div></sc-if></div>
+            <sc-if value="{{ cf.bad }}"><div style="flex:none;font-size:12.5px;color:rgb(176 40 34)">{{ cf.badText }}</div></sc-if>
+            <div style="flex:none;font-size:12.5px;color:rgb(117 100 86);line-height:1.5">{{ cf.route }}</div>
+          </div>
+          <div style="flex:none;padding:10px 16px 26px;border-top:1px solid rgb(229 222 211);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:8px"><div onClick="{{ cf.saveDraft }}" style="height:50px;border-radius:12px;border:1px solid rgb(229 222 211);font-weight:500;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer">Save as draft</div><div onClick="{{ cf.submit }}" style="height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">Submit</div></div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ scr.stub }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px;text-align:center"><span style="width:72px;height:72px;border-radius:50%;background:rgb(250 248 244);display:flex;align-items:center;justify-content:center;font-size:32px">{{ stub.emoji }}</span><div style="font-weight:600;font-size:17px">{{ stub.label }}</div><div style="color:rgb(117 100 86);max-width:260px;line-height:1.5;text-wrap:pretty">This page isn't drawn for the phone yet.</div></div>
+      </sc-if>
+    </div>
+
+    <!-- SHEET -->
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:30;background:rgb(51 36 27 / .45);opacity:{{ scrimOp }};pointer-events:{{ scrimPe }};transition:opacity .2s"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;z-index:31;background:#fff;border-radius:22px 22px 0 0;padding:10px 16px 34px;display:flex;flex-direction:column;gap:12px;transform:{{ sheetT }};transition:transform .28s cubic-bezier(0.2,0.8,0.2,1);box-shadow:0 -12px 32px rgb(51 36 27 / .12)">
+      <div style="width:40px;height:4px;border-radius:2px;background:rgb(229 222 211);align-self:center"></div>
+      <sc-if value="{{ sh.new }}">
+        <div style="font-size:19px;font-weight:600">New</div>
+        <div><div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:rgb(117 100 86);margin-bottom:8px">Subsidiary</div><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ subChips }}" as="c" hint-placeholder-count="4"><span onClick="{{ c.pick }}" style="height:40px;padding:0 12px;border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.line }};display:flex;align-items:center;gap:6px;cursor:pointer"><span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }}"></span>{{ c.name }}</span></sc-for></div></div>
+        <sc-for list="{{ newKinds }}" as="k" hint-placeholder-count="3"><div onClick="{{ k.go }}" style="display:flex;align-items:center;gap:12px;padding:12px;min-height:64px;box-sizing:border-box;border-radius:14px;border:1.5px solid rgb(236 231 224);cursor:pointer;opacity:{{ k.op }}" style-hover="border-color:rgb(214 204 190)"><span style="font-size:22px">{{ k.emoji }}</span><div style="flex:1"><div style="font-weight:600;font-size:15px">{{ k.label }}</div><div style="font-size:12.5px;color:rgb(117 100 86)">{{ k.sub }}</div></div><sc-if value="{{ k.locked }}"><span style="font-size:11px;padding:3px 8px;border-radius:999px;background:rgb(243 242 239);color:rgb(98 92 86);border:1px solid rgb(226 223 217)">Manager only</span></sc-if><sc-if value="{{ k.open }}"><span style="color:rgb(160 150 140)">›</span></sc-if></div></sc-for>
+      </sc-if>
+      <sc-if value="{{ sh.quick }}">
+        <div style="font-size:19px;font-weight:600">{{ quick.heading }}</div>
+        <div><div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:5px">Title <span style="color:rgb(176 40 34)">*</span></div><input value="{{ quick.title }}" onChange="{{ onQuickTitle }}" placeholder="What needs to be done" style="width:100%;height:46px;box-sizing:border-box;border:1.5px solid {{ quick.border }};border-radius:8px;padding:0 12px;font-size:15px;color:rgb(51 36 27);outline:none"><sc-if value="{{ quick.bad }}"><div style="font-size:12px;color:rgb(176 40 34);margin-top:5px">A title of 3 characters or more.</div></sc-if></div>
+        <div><div style="font-size:12.5px;color:rgb(74 64 58);margin-bottom:6px">Type</div><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ quick.types }}" as="c" hint-placeholder-count="5"><span onClick="{{ c.pick }}" style="height:40px;padding:0 12px;border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.line }};display:flex;align-items:center;cursor:pointer">{{ c.name }}</span></sc-for></div></div>
+        <div style="font-size:12.5px;color:rgb(117 100 86)">{{ quick.note }}</div>
+        <div style="display:flex;gap:8px"><div onClick="{{ backToNew }}" style="height:50px;padding:0 18px;border-radius:12px;border:1px solid rgb(229 222 211);display:flex;align-items:center;cursor:pointer">Back</div><div onClick="{{ createQuick }}" style="flex:1;height:50px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">Create task</div></div>
+      </sc-if>
+      <sc-if value="{{ sh.punch }}">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:19px;font-weight:600;flex:1">{{ punch.heading }}</span><span style="font-family:'Chivo Mono',monospace;font-size:13px;color:rgb(117 100 86)">Sat 28 Nov</span></div>
+        <div style="font-family:'Chivo Mono',monospace;font-size:44px;font-weight:500;text-align:center;letter-spacing:-0.02em">09:41</div>
+        <div style="height:130px;border-radius:12px;border:1px dashed rgb(229 222 211);background:repeating-linear-gradient(135deg,rgb(248 246 242) 0 10px,rgb(252 251 249) 10px 20px);display:flex;align-items:center;justify-content:center"><span style="font-family:'Chivo Mono',monospace;font-size:11px;color:rgb(117 100 86);background:#fff;padding:4px 8px;border-radius:4px;border:1px solid rgb(229 222 211)">map · your position and the office fence</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:rgb(232 244 235);border:1px solid rgb(190 222 199);color:rgb(40 110 64)"><span style="width:8px;height:8px;border-radius:50%;background:rgb(60 150 90)"></span><span style="font-weight:500;flex:1">Inside · HQ office</span><span style="font-size:12.5px">12 m · ±8 m</span></div>
+        <sc-if value="{{ punch.hasLog }}"><div style="font-size:13px;color:rgb(74 64 58);text-align:center">{{ punch.log }}</div></sc-if>
+        <sc-if value="{{ punch.canPunch }}"><div onClick="{{ doPunch }}" style="height:52px;border-radius:12px;background:#EC9B55;color:rgb(43 31 23);font-weight:600;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#E0893F">{{ punch.heading }}</div></sc-if>
+      </sc-if>
+      <sc-if value="{{ sh.changes }}">
+        <div style="font-size:19px;font-weight:600">Request changes</div>
+        <div style="font-size:13px;color:rgb(117 100 86)">{{ changes.to }}</div>
+        <textarea value="{{ reason }}" onChange="{{ onReason }}" maxlength="500" placeholder="What needs to change" style="height:110px;box-sizing:border-box;border:1.5px solid {{ changes.border }};border-radius:10px;padding:10px 12px;font-size:15px;color:rgb(51 36 27);outline:none;resize:none"></textarea>
+        <div style="display:flex;font-size:12px;color:{{ changes.hintFg }}"><span style="flex:1">{{ changes.hint }}</span><span>{{ changes.count }}/500</span></div>
+        <div onClick="{{ sendChanges }}" style="height:50px;border-radius:12px;background:rgb(51 36 27);color:#fff;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer">Send back</div>
+      </sc-if>
+    </div>
+
+    <!-- TOAST -->
+    <div style="position:absolute;left:50%;bottom:96px;z-index:40;transform:translateX(-50%) translateY({{ toastY }}px);opacity:{{ toastOp }};transition:opacity .2s,transform .2s;pointer-events:none;background:rgb(51 36 27);color:rgb(246 238 230);padding:10px 16px;border-radius:999px;font-size:13px;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 24px rgb(51 36 27 / .25)">{{ toast }}</div>
+  </div>
+  <sc-if value="{{ dev.android }}">
+    <div style="flex:none;height:46px;background:rgb(28 22 18);display:grid;grid-template-columns:repeat(3,1fr);padding:0 44px;position:relative;z-index:60">
+      <div onClick="{{ sysBack }}" title="Back" style="display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:13px solid rgb(232 226 218)"></span></div>
+      <div onClick="{{ sysHome }}" title="Home" style="display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:15px;height:15px;border-radius:50%;border:2px solid rgb(232 226 218);box-sizing:border-box"></span></div>
+      <div title="Recents" style="display:flex;align-items:center;justify-content:center"><span style="width:14px;height:14px;border-radius:3px;border:2px solid rgb(232 226 218);box-sizing:border-box"></span></div>
+    </div>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ios&quot;,&quot;android&quot;],&quot;default&quot;:&quot;ios&quot;,&quot;tsType&quot;:&quot;'ios'|'android'&quot;,&quot;section&quot;:&quot;Device&quot;},&quot;embedded&quot;:{&quot;editor&quot;:null,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;staff&quot;,&quot;manager&quot;],&quot;default&quot;:&quot;staff&quot;,&quot;tsType&quot;:&quot;'staff'|'manager'&quot;,&quot;section&quot;:&quot;Viewer&quot;},&quot;petSpecies&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cat&quot;,&quot;dog&quot;,&quot;bird&quot;,&quot;dragon&quot;],&quot;default&quot;:&quot;cat&quot;,&quot;tsType&quot;:&quot;'cat'|'dog'|'bird'|'dragon'&quot;,&quot;section&quot;:&quot;Pet&quot;},&quot;petColor&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;original&quot;,&quot;cocoa&quot;,&quot;snow&quot;,&quot;rose&quot;,&quot;mint&quot;,&quot;sky&quot;,&quot;midnight&quot;],&quot;default&quot;:&quot;original&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Pet&quot;},&quot;petName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Kopi&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Pet&quot;}}">
+const LEVELS = [0, 100, 250, 450, 700, 1000];
+const SIZE = [30, 34, 38, 42, 46, 52];
+const SPECIES = {
+  cat: { forms: ['🐱', '🐈', '🦁'], names: ['Kitten', 'Cat', 'Lion'] }, dog: { forms: ['🐶', '🐕', '🐺'], names: ['Puppy', 'Dog', 'Wolf'] },
+  bird: { forms: ['🐣', '🐦', '🦅'], names: ['Chick', 'Bird', 'Eagle'] }, dragon: { forms: ['🥚', '🦎', '🐉'], names: ['Egg', 'Lizard', 'Dragon'] },
+};
+const STATES = {
+  idle: ['Chilling', '', 'pIdle 2.4s ease-in-out infinite'], newTask: ['New task!', '❗', 'pNew .6s ease-in-out infinite'],
+  busy: ['Working', '💻', 'pBusy .4s ease-in-out infinite'], overload: ['Overloaded', '💦', 'pOver .16s linear infinite'],
+  sleeping: ['Sleeping', '💤', 'pSleep 3s ease-in-out infinite'], eating: ['Eating', '🍙', 'pEat .3s ease-in-out infinite'],
+  exercising: ['Working out', '💪', 'pEx .55s ease-in-out infinite'], levelUp: ['Level up!', '✨', 'pLvl 1s ease-in-out infinite'],
+  hungry: ['Hungry', '🍽️', 'pHungry 2s ease-in-out infinite'],
+};
+const FILTER = {
+  original: 'none', cocoa: 'sepia(.7) saturate(1.3) brightness(.75)', snow: 'grayscale(1) brightness(1.3)', rose: 'hue-rotate(300deg) saturate(1.3)',
+  mint: 'hue-rotate(110deg) saturate(1.1)', sky: 'hue-rotate(180deg) saturate(1.2)', midnight: 'hue-rotate(220deg) saturate(1.4) brightness(.6)',
+};
+const TONE = {
+  red: { bg: 'rgb(252 236 233)', line: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)' },
+  wait: { bg: 'rgb(251 243 225)', line: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', line: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  draft: { bg: 'rgb(243 242 239)', line: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  meet: { bg: 'oklch(0.96 0.025 235)', line: 'oklch(0.88 0.04 235)', fg: 'oklch(0.42 0.10 235)', dot: 'oklch(0.60 0.12 235)' },
+};
+const SUBS = [
+  { code: '2990', name: '2990 Home', emoji: '🏡', dot: 'oklch(0.64 0.15 295)' }, { code: 'CAR', name: 'Carres', emoji: '🛋️', dot: 'oklch(0.70 0.12 235)' },
+  { code: 'HK', name: 'Hookka', emoji: '🪴', dot: 'oklch(0.70 0.13 345)' }, { code: 'DC', name: 'Dreamcrafter', emoji: '✨', dot: 'oklch(0.56 0.15 270)' },
+  { code: 'HC', name: 'Houzs Century', emoji: '🏛️', dot: 'oklch(0.52 0.06 55)' }, { code: 'OHN', name: 'Colive', emoji: '🛏️', dot: 'oklch(0.66 0.10 195)' },
+  { code: 'CMI', name: 'CMI', emoji: '🔩', dot: 'oklch(0.60 0.03 250)' }, { code: 'CONTS', name: 'The Conts', emoji: '🚚', dot: 'oklch(0.62 0.12 320)' },
+];
+const subOf = code => SUBS.find(s => s.code === code);
+const DAYS = [['27 Nov', 'Fri'], ['28 Nov', 'Sat'], ['29 Nov', 'Sun'], ['30 Nov', 'Mon'], ['1 Dec', 'Tue'], ['2 Dec', 'Wed'], ['3 Dec', 'Thu'], ['4 Dec', 'Fri']];
+const TODAY = '28 Nov';
+const WALLS = ['#f3dcc8', '#dfe6d3', '#d9e6f0', '#f1d9df', '#efe6d8'];
+const PEOPLE = {
+  jason: { first: 'Jason', name: 'Jason Lim', role: 'Social Media Executive', title: 'SOCIAL MEDIA EXECUTIVE', bg: 'oklch(0.94 0.04 235)', pet: ['🐈', 'original', 'Kopi', 3, 'busy'], status: 'Editing reels all week', wall: '#f3dcc8' },
+  rachel: { first: 'Rachel', name: 'Rachel Tan', role: 'Marketing Manager', title: 'MARKETING MANAGER', bg: 'oklch(0.94 0.03 60)', pet: ['🦁', 'original', 'Sambal', 5, 'overload'], status: 'Approvals by 5pm', wall: '#efe6d8' },
+  siti: { first: 'Siti', name: 'Siti Aminah', role: 'Graphic Designer', title: 'GRAPHIC DESIGNER', bg: 'oklch(0.94 0.04 350)', pet: ['🐣', 'rose', 'Mochi', 2, 'busy'], status: 'Deep in CNY artwork', wall: '#f1d9df' },
+  ali: { first: 'Ali', name: 'Ali Hassan', role: 'Videographer & Video Editor', title: 'VIDEOGRAPHER & VIDEO EDITOR', bg: 'oklch(0.94 0.04 295)', pet: ['🐕', 'original', 'Bao', 4, 'newTask'], status: 'On a shoot till 4', wall: '#d9e6f0' },
+  weilun: { first: 'Wei Lun', name: 'Wei Lun', role: 'Marketing Executive', title: 'MARKETING EXECUTIVE', bg: 'oklch(0.94 0.04 270)', pet: ['🦎', 'original', 'Durian', 3, 'sleeping'], status: 'Plate is clear', wall: '#dfe6d3' },
+};
+const levelOf = xp => Math.max(1, LEVELS.filter(x => xp >= x).length);
+const formOf = lv => (lv <= 2 ? 0 : lv <= 4 ? 1 : 2);
+const fld = (id, label, type, req, value) => ({ id, label, type, req, value: value || '' });
+
+function seedTasks(staff) {
+  const T = (o) => ({ late: 0, changes: null, isNew: false, parent: null, approver: null, by: null, withWho: null, fields: [], cur: 0, ...o });
+  const common = [
+    T({ id: 'dc1', track: 'TSK-DC-2611-004', title: 'Dreamcrafter launch post', sub: 'DC', kind: 'waiting', stages: [['Copy', staff ? 'You' : 'Jason'], ['Design', 'Siti'], ['Post', 'Jason']], cur: 1, due: '2 Dec', withWho: 'Siti', fields: [fld('f', 'Artwork', 'text', true, '')] }),
+    T({ id: 'o1', track: 'TSK-2990-2611-009', title: 'Store signage refresh', sub: '2990', kind: 'other', stages: [['Design', 'Siti'], ['Print', 'Wei Lun']], cur: 0, due: '3 Dec', withWho: 'Siti', fields: [fld('f', 'Artwork', 'text', true, '')] }),
+    T({ id: 'o2', track: 'RCR-2990-2611-003', title: 'Weekly promo story', sub: '2990', kind: 'other', stages: [['Post', 'Wei Lun']], cur: 0, due: '30 Nov', withWho: 'Wei Lun', fields: [fld('f', 'Post link', 'text', true, '')] }),
+    T({ id: 'd1', track: 'TSK-HC-2611-002', title: 'Century showroom banner', sub: 'HC', kind: 'done', stages: [['Design', 'Siti'], ['Print', 'Wei Lun']], cur: 2, due: '20 Nov', fields: [fld('f', 'Artwork', 'text', true, 'century-banner-final.pdf')] }),
+    T({ id: 'd2', track: 'TSK-CAR-2611-001', title: 'Carres 11.11 recap', sub: 'CAR', kind: 'done', stages: [['Report', 'Wei Lun']], cur: 1, due: '18 Nov', fields: [fld('f', 'Report link', 'text', true, 'drive/carres-1111-recap')] }),
+  ];
+  if (staff) return [
+    T({ id: 'rt', track: 'MKT-2990-2610-018', title: 'Red Truck Reels', sub: '2990', kind: 'doer', stages: [['Script', 'Mei'], ['Shoot & edit', 'Ali'], ['Caption & schedule', 'You'], ['PIC approval', 'Ms Tan'], ['Post', 'You']], cur: 2, due: '27 Nov', late: 1, approver: 'Rachel', changes: 'Caption is too long for the first line — lead with the price.',
+      fields: [fld('cap', 'Caption', 'text', true, 'RM 2,990 gets you the whole living room 🚚'), fld('date', 'Post date', 'date', true, ''), fld('cut', 'Final cut', 'text', true, '')] }),
+    T({ id: 'cy', track: 'MKT-CAR-2611-004-D01', title: 'Carres Year-End Video', sub: 'CAR', parent: 'car-ye', kind: 'doer', isNew: true, stages: [['Brief', 'Rachel'], ['Storyboard', 'You'], ['Shoot & edit', 'Ali'], ['Post', 'You']], cur: 1, due: '1 Dec', approver: 'Rachel',
+      fields: [fld('sb', 'Storyboard link', 'text', true, ''), fld('n', 'Notes for the shoot', 'text', false, '')] }),
+    T({ id: 'sf', track: 'TSK-HK-2611-006', title: 'Cut 3 story frames', sub: 'HK', kind: 'doer', stages: [['Story frames', 'You']], cur: 0, due: '30 Nov', fields: [fld('f', 'Frames', 'text', true, '')] }),
+    T({ id: 'th', track: 'MKT-2990-2610-018 · subtask', title: 'Thumbnail options', sub: '2990', kind: 'delegated', stages: [['Thumbnails', 'Ali']], cur: 0, due: '29 Nov', by: 'Ali', fields: [fld('f', 'Thumbnails', 'text', true, 'drive/red-truck/thumbs-v1 (3 options)')] }),
+    ...common,
+  ];
+  return [
+    T({ id: 'cy2', track: 'MKT-CAR-2611-004-D02', title: 'Carres Year-End · Image post 2/2', sub: 'CAR', parent: 'car-ye', kind: 'approve', stages: [['Copy', 'Jason'], ['Design', 'Siti'], ['PIC approval', 'Ms Tan'], ['Post', 'Jason']], cur: 1, due: '30 Nov', by: 'Siti',
+      fields: [fld('a', 'Artwork', 'text', true, 'design-v2.png · 1080 × 1350'), fld('n', 'Notes', 'text', false, 'Logo moved up, warmer grade as asked.')] }),
+    T({ id: 'hk', track: 'MKT-HK-2611-002-D01', title: 'Hookka CNY teaser', sub: 'HK', kind: 'approve', stages: [['Script', 'Mei'], ['Final cut', 'Ali'], ['Post', 'Jason']], cur: 1, due: '27 Nov', late: 1, by: 'Ali',
+      fields: [fld('a', 'Final cut', 'text', true, 'drive/hookka-cny/teaser-v3.mp4 · 0:22')] }),
+    T({ id: 'bl', track: 'TSK-CMI-2611-003', title: 'November billing check', sub: 'CMI', kind: 'doer', isNew: true, stages: [['Confirm lines', 'You']], cur: 0, due: '1 Dec', fields: [fld('t', 'Confirmed total (RM)', 'number', true, ''), fld('n', 'Notes for Finance', 'text', false, '')] }),
+    T({ id: 'rt', track: 'MKT-2990-2610-018', title: 'Red Truck Reels', sub: '2990', kind: 'waiting', stages: [['Script', 'Mei'], ['Shoot & edit', 'Ali'], ['Caption & schedule', 'Jason'], ['PIC approval', 'Ms Tan'], ['Post', 'Jason']], cur: 2, due: '27 Nov', late: 1, withWho: 'Jason', fields: [fld('cap', 'Caption', 'text', true, 'RM 2,990 gets you the whole living room 🚚')] }),
+    ...common,
+  ];
+}
+function seedChats(staff) {
+  const other = staff ? 'rachel' : 'jason';
+  return {
+    siti: { unread: true, msgs: [{ text: 'Morning! v2 is up, logo moved like Rachel said.', time: '09:12' }, { me: true, text: 'Nice. Can you also do a story crop?', time: '09:20' }, { text: 'Sure, by 3pm 👍', time: '09:31' }] },
+    [other]: { unread: true, msgs: [{ text: staff ? 'Caption on this one needs another pass.' : 'Fixing the caption now.', time: '08:50', task: 'rt' }] },
+    ali: { unread: false, msgs: [{ text: 'Thumbnails are in the folder.', time: 'Fri' }, { me: true, text: 'thumbnails look good', time: 'Fri' }] },
+    weilun: { unread: false, msgs: [{ me: true, text: '👋', time: '21 Nov' }] },
+    lobby: { unread: true, msgs: [{ who: 'Ali', text: 'Anyone seen the gimbal?', time: '08:40' }, { who: 'Rachel', text: 'Shoot moved to 2pm', time: '09:05' }] },
+  };
+}
+
+class Component extends DCLogic {
+  state = this.seed(this.props.role ?? 'staff');
+  seed(role) {
+    const staff = role !== 'manager';
+    return {
+      role: staff ? 'staff' : 'manager', tab: 'tasks', seg: 'turn', stack: [], last: null, sheet: null, lastSheet: 'new',
+      tasks: seedTasks(staff), chats: seedChats(staff), punched: null, toast: '', toastOn: false,
+      pet: { energy: 64, xp: staff ? 260 : 720, snacks: 3, workouts: 0 }, flash: null, petX: 52, wall: 0,
+      status: PEOPLE[staff ? 'jason' : 'rachel'].status, visit: null, draft: '', attach: false, pending: null,
+      path: { sub: null, project: null }, scope: 'open', q: '', layers: { post: true, due: true, meet: true }, mine: false, day: null,
+      notices: staff
+        ? [{ id: 1, icon: '↩️', title: 'Changes requested on Caption & schedule — Red Truck Reels', meta: 'Rachel · 1h ago', task: 'rt', unread: true }, { id: 2, icon: '📋', title: "You're on the plan for “Carres Year-End Video” — Stage 2, due 1 Dec", meta: 'Assignment plan · 2h ago', task: 'cy', unread: true }]
+        : [{ id: 1, icon: '📤', title: 'Siti submitted Design v2 for your approval', meta: 'Carres Year-End · 2h ago', task: 'cy2', unread: true }, { id: 2, icon: '📤', title: 'Ali submitted Final cut v3 for your approval', meta: 'Hookka CNY teaser · 1d ago', task: 'hk', unread: true }],
+      profile: { phone: staff ? '012-345 6789' : '016-221 8804', email: staff ? 'jason.lim@gmail.com' : 'rachel.tan@gmail.com', address: staff ? '12, Jalan SS 2/24, 47300 Petaling Jaya' : '8, Jalan Kiara 3, 50480 Kuala Lumpur', ecName: staff ? 'Lim Mei Ling' : 'Tan Boon Huat', ecRel: staff ? 'Mother' : 'Spouse', ecPhone: staff ? '019-887 2210' : '012-660 4471', bank: 'Maybank', acct: staff ? '512345678842' : '514400917316' }, editForm: null, profilePending: false,
+      claims: (() => { const C = (o) => ({ mine: true, requester: staff ? 'Jason' : 'Rachel', payTo: staff ? 'Jason' : 'Rachel', approvedBy: '', rejectedBy: '', rejectReason: '', rejectedDay: '', pvNo: '', file: 'receipt.jpg', kind: 'claim', ...o });
+        return staff ? [
+          C({ id: 'c5', no: null, what: 'Lunch with Carres PIC', total: 68.5, day: '28 Nov', status: 'draft', file: '' }),
+          C({ id: 'c1', no: 'CLM-2611-014', what: 'Props for Red Truck shoot', total: 186.4, day: '26 Nov', status: 'pending_approval' }),
+          C({ id: 'c2', no: 'CLM-2611-009', what: 'Grab to Carres showroom', total: 42, day: '21 Nov', status: 'with_finance', approvedBy: 'Rachel' }),
+          C({ id: 'c3', no: 'CLM-2611-006', kind: 'direct_pay', what: 'Studio rental — Hookka CNY', total: 850, payTo: 'Lightbox Studio', day: '19 Nov', status: 'rejected', rejectedBy: 'Rachel', rejectedDay: '20 Nov', rejectReason: 'Attach the quotation, not only the invoice.', file: 'invoice-lightbox.pdf' }),
+          C({ id: 'c4', no: 'CLM-2611-001', what: 'Printer ink', total: 96, day: '5 Nov', status: 'paid', approvedBy: 'Rachel', pvNo: 'PV-2611-031' }),
+        ] : [
+          C({ id: 'a1', no: 'CLM-2611-014', mine: false, requester: 'Jason', payTo: 'Jason', what: 'Props for Red Truck shoot', total: 186.4, day: '26 Nov', status: 'pending_approval' }),
+          C({ id: 'a2', no: 'CLM-2611-015', mine: false, requester: 'Siti', kind: 'direct_pay', payTo: 'Monotype', what: 'Font licence — CNY campaign', total: 420, day: '27 Nov', status: 'pending_approval', file: 'monotype-quote.pdf' }),
+          C({ id: 'a3', no: 'CLM-2611-016', mine: false, requester: 'Ali', payTo: 'Ali', what: 'SD cards ×4', total: 259.6, day: '27 Nov', status: 'pending_approval' }),
+          C({ id: 'a4', no: 'CLM-2611-009', mine: false, requester: 'Jason', payTo: 'Jason', what: 'Grab to Carres showroom', total: 42, day: '21 Nov', status: 'with_finance', approvedBy: 'Rachel' }),
+          C({ id: 'm1', no: 'CLM-2611-011', what: 'Team lunch — November', total: 312, day: '24 Nov', status: 'with_finance' }),
+        ]; })(), claimCard: staff ? 'all' : 'to_approve', claimQ: '', claimOpen: null, claimForm: null, claimTicks: [], rejecting: null, claimSerial: 16,
+      bad: [], reason: '', reasonBad: false, quick: { title: '', sub: '2990', type: 'Social Media', kind: 'quick', bad: false }, nudged: {}, serial: 20,
+    };
+  }
+  componentDidMount() {
+    this.wander = setInterval(() => {
+      if (document.hidden || Math.random() < 0.4) return;
+      this.setState(s => ({ petX: Math.max(14, Math.min(86, s.petX + (Math.random() * 40 - 20))) }));
+    }, 2800);
+  }
+  componentDidUpdate(prev, prevState) {
+    if ((prev.role ?? 'staff') !== (this.props.role ?? 'staff')) this.setState(this.seed(this.props.role ?? 'staff'));
+    const top = this.state.stack[this.state.stack.length - 1];
+    const len = top && top.type === 'chat' && top.with ? (this.state.chats[top.with] || { msgs: [] }).msgs.length : 0;
+    if (this.log && len !== this.lastLen) { this.log.scrollTop = this.log.scrollHeight; }
+    this.lastLen = len;
+  }
+  componentWillUnmount() { clearInterval(this.wander); clearTimeout(this.tt); clearTimeout(this.ft); }
+  say(text) {
+    clearTimeout(this.tt);
+    this.setState({ toast: text, toastOn: true });
+    this.tt = setTimeout(() => this.setState({ toastOn: false }), 2400);
+  }
+  flash(state, ms) {
+    clearTimeout(this.ft);
+    this.setState({ flash: state });
+    this.ft = setTimeout(() => this.setState({ flash: null }), ms);
+  }
+  push(scr) { this.setState(s => ({ stack: [...s.stack, scr], last: scr, sheet: null, bad: [], attach: false, pending: null, draft: '' })); }
+  back() { this.setState(s => { const stack = s.stack.slice(0, -1); return { stack, last: stack[stack.length - 1] || s.last, attach: false, pending: null }; }); }
+  openSheet(k) { this.setState({ sheet: k, lastSheet: k }); }
+  patchTask(id, patch) { this.setState(s => ({ tasks: s.tasks.map(t => (t.id === id ? { ...t, ...patch } : t)) })); }
+  plate() {
+    const ts = this.state.tasks;
+    const turn = ts.filter(t => t.kind === 'doer' || t.kind === 'approve');
+    const red = ts.filter(t => ['doer', 'approve', 'waiting'].includes(t.kind) && (t.late > 0 || t.changes)).length;
+    return { count: turn.length, red, fresh: turn.some(t => t.isNew && !t.late) };
+  }
+  petState() {
+    const s = this.state, p = this.plate();
+    if (s.flash) return s.flash;
+    if (s.pet.energy < 20) return 'hungry';
+    if (p.red >= 2 || p.count >= 4) return 'overload';
+    if (p.fresh) return 'newTask';
+    if (p.count >= 1) return 'busy';
+    return 'sleeping';
+  }
+  petNode(emoji, size, state, color) {
+    const h = React.createElement, st = STATES[state];
+    return h('div', { style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+      st[1] ? h('span', { style: { position: 'absolute', left: '60%', bottom: Math.round(size * 0.9), fontSize: 12, lineHeight: 1, background: '#fff', borderRadius: 10, padding: '3px 5px', boxShadow: '0 2px 6px rgb(51 36 27 / .15)', animation: 'pBub 1.6s ease-in-out infinite', whiteSpace: 'nowrap', zIndex: 2 } }, st[1]) : null,
+      h('div', { style: { transformOrigin: 'bottom center', lineHeight: 1, animation: st[2], filter: FILTER[color] } }, h('span', { style: { display: 'block', fontSize: size } }, emoji)),
+      h('div', { style: { width: Math.round(size * 0.7), height: Math.round(size * 0.16), borderRadius: '50%', background: 'rgb(0 0 0 / .14)', marginTop: -2 } }));
+  }
+  gainXp(add, snacks) {
+    const s = this.state, before = levelOf(s.pet.xp), xp = s.pet.xp + add, to = levelOf(xp);
+    this.setState({ pet: { ...s.pet, xp, snacks: s.pet.snacks + (snacks || 0) } });
+    if (to > before) {
+      const sp = SPECIES[this.props.petSpecies ?? 'cat'];
+      this.flash('levelUp', 3500);
+      this.say(`${this.props.petName ?? 'Kopi'} reached Lv ${to}${formOf(to) > formOf(before) ? ` and evolved into a ${sp.names[formOf(to)]}!` : '!'}`);
+      return true;
+    }
+    return false;
+  }
+  cardOf(t) {
+    const sub = subOf(t.sub), n = t.stages.length, st = t.stages[Math.min(t.cur, n - 1)][0];
+    let tone = 'wait', label = 'Your turn', act = 'Open';
+    if (t.kind === 'doer') { if (t.changes) { tone = 'red'; label = `Changes requested · ${t.approver}`; } else if (t.late) { tone = 'red'; label = `${t.late}d overdue`; } }
+    else if (t.kind === 'approve') { tone = t.late ? 'red' : 'wait'; label = t.late ? `${t.late}d overdue · Needs your approval` : 'Needs your approval'; act = 'Review'; }
+    else if (t.kind === 'delegated') { label = 'Ready'; act = 'Review'; }
+    else if (t.kind === 'waiting') { tone = 'draft'; label = `${st} · with ${t.withWho}`; }
+    else if (t.kind === 'done') { tone = 'done'; label = 'Done'; }
+    else { tone = 'draft'; label = `With ${t.withWho}`; }
+    const red = tone === 'red';
+    return {
+      title: t.title, dot: sub.dot, meta: `${sub.name} · Stage ${Math.min(t.cur + 1, n)}/${n} · ${st} · Due ${t.due}`, label, act, tone, st,
+      bg: red ? 'rgb(255 247 245)' : '#fff', line: red ? TONE.red.line : 'rgb(236 231 224)',
+      pillBg: TONE[tone].bg, pillLine: TONE[tone].line, pillFg: TONE[tone].fg, pillDot: TONE[tone].dot,
+      actBg: act === 'Review' ? '#EC9B55' : '#fff', actLine: act === 'Review' ? '#EC9B55' : 'rgb(229 222 211)', actWeight: act === 'Review' ? 600 : 500,
+      open: () => this.push({ type: 'task', id: t.id }),
+    };
+  }
+claimVals(V) {
+    const s = this.state, staff = s.role === 'staff', meName = staff ? 'Jason' : 'Rachel';
+    const top = s.stack[s.stack.length - 1] || null, shown = top || s.last || { type: 'none' };
+    const on = shown.type === 'claim';
+    const rm = n => 'RM ' + Number(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const WHERE = { draft: ['Draft', 'draft'], pending_approval: ['Waiting for approval', 'wait'], with_finance: ['With Finance', 'meet'], rejected: ['Sent back', 'red'], in_pv: ['In payment voucher', 'meet'], paid: ['Paid', 'done'], cancelled: ['Cancelled', 'draft'] };
+    const waits = r => !r.mine && r.status === 'pending_approval';
+    const noteShort = r => r.status === 'pending_approval' ? (r.mine ? 'Rachel approves' : 'Waiting for you') : r.status === 'with_finance' ? (r.approvedBy ? 'Approved by ' + r.approvedBy : 'Finance makes the voucher') : r.status === 'rejected' ? 'by ' + r.rejectedBy : r.status === 'paid' ? r.pvNo : r.status === 'draft' ? 'Not sent yet' : '';
+    const noteLong = r => r.status === 'draft' ? 'Not sent yet — Submit it when it is complete.'
+      : r.status === 'pending_approval' ? (r.mine ? 'Waiting for Rachel to approve it, then Finance.' : 'Waiting for your approval — approve it to send it to Finance, or send it back with what to fix.')
+      : r.status === 'with_finance' ? (r.approvedBy ? 'Approved by ' + r.approvedBy + ' — with Finance now; they make its payment voucher.' : 'With Finance — they make its payment voucher.')
+      : r.status === 'rejected' ? r.rejectedBy + ' sent it back — fix it and send it again.'
+      : r.status === 'paid' ? 'Paid with ' + r.pvNo + '.' : 'Cancelled — Finance will not pay it.';
+    const tone = r => { const t = TONE[WHERE[r.status][1]]; return { chip: WHERE[r.status][0], bg: t.bg, line: t.line, fg: t.fg, dot: t.dot }; };
+    const all = s.claims, mine = all.filter(r => r.mine);
+    const CARDS = staff
+      ? [['all', 'All', mine], ['draft', 'Draft', mine.filter(r => r.status === 'draft')], ['fin', 'With Finance', mine.filter(r => ['pending_approval', 'with_finance', 'in_pv'].includes(r.status))], ['rej', 'Sent back', mine.filter(r => r.status === 'rejected')], ['paid', 'Paid', mine.filter(r => r.status === 'paid')]]
+      : [['to_approve', 'To approve', all.filter(waits)], ['dept', 'All Marketing', all.filter(r => !r.mine)], ['mine', 'Mine', mine]];
+    const cardKey = CARDS.some(c => c[0] === s.claimCard) ? s.claimCard : CARDS[0][0];
+    const q = s.claimQ.trim().toLowerCase();
+    const rows = CARDS.find(c => c[0] === cardKey)[2].filter(r => !q || (r.what + ' ' + (r.no || '') + ' ' + r.requester + ' ' + r.payTo).toLowerCase().includes(q));
+    const ticks = !staff && cardKey !== 'mine';
+    const ticked = rows.filter(r => s.claimTicks.includes(r.id) && waits(r));
+    const setC = (id, patch) => this.setState(p => ({ claims: p.claims.map(r => (r.id === id ? { ...r, ...patch } : r)) }));
+    const approve = list => { this.setState(p => ({ claims: p.claims.map(r => (list.some(x => x.id === r.id) ? { ...r, status: 'with_finance', approvedBy: 'Rachel' } : r)), claimTicks: [], claimOpen: null })); this.say(list.length + ' request' + (list.length === 1 ? '' : 's') + ' approved — with Finance now'); };
+    const reject = list => { this.setState({ rejecting: list.map(r => r.id), reason: '', reasonBad: false }); this.openSheet('changes'); };
+    const o = s.claimOpen ? all.find(r => r.id === s.claimOpen) : null, f = s.claimForm;
+    const chipSel = k => ({ bg: k ? 'rgb(51 36 27)' : '#fff', fg: k ? '#fff' : 'rgb(74 64 58)', line: k ? 'rgb(51 36 27)' : 'rgb(229 222 211)' });
+    const out = {};
+    V.scr.claim = on;
+    V.moreGrid[1].go = () => { this.setState({ claimOpen: null, claimForm: null, claimTicks: [] }); this.push({ type: 'claim' }); };
+    V.moreGrid[1].count = staff ? mine.filter(r => r.status === 'rejected').length : all.filter(waits).length;
+    V.moreGrid[1].sub = staff ? 'Claims and direct payments' : 'Waiting for you';
+    if (on) {
+      V.pushTitle = f ? (f.id ? 'Fix request' : 'New request') : o ? (o.no || 'Draft') : staff ? 'Claim' : 'Claim and approve';
+      V.pushSub = !f && !o && !staff ? 'Marketing' : '';
+      if (f || o) V.back = () => this.setState({ claimOpen: null, claimForm: null });
+    }
+    const hero = staff ? mine.filter(r => ['pending_approval', 'with_finance', 'in_pv'].includes(r.status)) : all.filter(waits);
+    out.cl = {
+      isList: !o && !f, isDetail: !!o && !f, isForm: !!f,
+      heroLabel: staff ? 'On the way to you' : 'Waiting for your approval', heroValue: rm(hero.reduce((t, r) => t + r.total, 0)),
+      lede: staff ? hero.length + ' request' + (hero.length === 1 ? '' : 's') + ' not paid yet' : hero.length + ' request' + (hero.length === 1 ? '' : 's') + ' from Marketing',
+      cards: CARDS.map(([k, label, l]) => ({ label, count: l.length, ...chipSel(k === cardKey), pick: () => this.setState({ claimCard: k, claimTicks: [] }) })),
+      q: s.claimQ, onQ: e => this.setState({ claimQ: e.target.value }), qPh: staff ? 'Search what, reference, pay to…' : 'Search who, what, reference…',
+      rows: rows.map(r => ({ ...tone(r), what: r.what, amount: rm(r.total), sub: [r.day, r.kind === 'claim' ? 'Claim' : 'Direct pay', r.mine ? r.no : r.requester].filter(Boolean).join(' · '), note: noteShort(r), op: r.status === 'cancelled' ? 0.55 : 1,
+        tickable: ticks && waits(r), tick: e => { e.stopPropagation(); this.setState(p => ({ claimTicks: p.claimTicks.includes(r.id) ? p.claimTicks.filter(x => x !== r.id) : [...p.claimTicks, r.id] })); },
+        boxLine: s.claimTicks.includes(r.id) ? 'rgb(90 62 43)' : 'rgb(214 204 190)', boxBg: s.claimTicks.includes(r.id) ? 'rgb(90 62 43)' : '#fff', boxMark: s.claimTicks.includes(r.id) ? '✓' : '',
+        open: () => this.setState({ claimOpen: r.id }) })),
+      empty: !rows.length, emptyText: q ? 'No requests here.' : cardKey === 'to_approve' ? 'Nothing waits for your approval.' : 'No requests yet.',
+      hasTicks: ticked.length > 0, noTicks: ticked.length === 0, tickLine: ticked.length + ' selected · ' + rm(ticked.reduce((t, r) => t + r.total, 0)),
+      approveTicked: () => approve(ticked), rejectTicked: () => reject(ticked),
+      newReq: () => this.setState({ claimForm: { id: null, kind: 'claim', what: '', amount: '', payTo: '', file: '', bad: '' } }),
+    };
+    const btn = (label, kind, go, flex) => ({ label, go, flex: flex || 1, bg: kind === 'primary' ? '#EC9B55' : '#fff', line: kind === 'primary' ? '#EC9B55' : kind === 'danger' ? 'rgb(236 190 184)' : 'rgb(229 222 211)', fg: kind === 'danger' ? 'rgb(176 40 34)' : 'rgb(43 31 23)', weight: kind === 'primary' ? 600 : 500 });
+    const bar = [];
+    if (o) {
+      if (o.mine && ['draft', 'pending_approval', 'rejected'].includes(o.status)) bar.push(btn('Cancel request', 'danger', () => { setC(o.id, { status: 'cancelled' }); this.setState({ claimOpen: null }); this.say('Request cancelled'); }));
+      if (o.mine && ['draft', 'rejected'].includes(o.status)) bar.push(btn(o.status === 'rejected' ? 'Fix and send again' : 'Edit', '', () => this.setState({ claimForm: { id: o.id, kind: o.kind, what: o.what, amount: String(o.total), payTo: o.kind === 'direct_pay' ? o.payTo : '', file: o.file || '', bad: '' } }), 1.3));
+      if (o.mine && o.status === 'draft') bar.push(btn('Submit', 'primary', () => { setC(o.id, staff ? { status: 'pending_approval', no: o.no || 'CLM-2611-0' + (s.claimSerial + 1) } : { status: 'with_finance', no: o.no || 'CLM-2611-0' + (s.claimSerial + 1) }); this.setState({ claimSerial: s.claimSerial + 1 }); this.say(staff ? 'Sent for approval' : 'Sent to Finance'); }));
+      if (!staff && waits(o)) { bar.push(btn('Reject…', 'danger', () => reject([o]))); bar.push(btn('Approve — send to Finance', 'primary', () => approve([o]), 2)); }
+    }
+    out.cd = o ? { ...tone(o), kicker: o.kind === 'claim' ? 'Claim' : 'Direct payment', amount: rm(o.total), what: o.what, to: 'Pay to ' + o.payTo, note: noteLong(o),
+      hasReason: o.status === 'rejected' && !!o.rejectReason, reason: o.rejectReason || '', reasonBy: (o.rejectedBy || '') + ' · ' + (o.rejectedDay || ''),
+      lines: [['Ref #', o.no || 'Draft'], ['Date', o.day], ['From', o.requester], ['Pay', o.kind === 'claim' ? 'Claim — pay it back' : 'Direct payment to the supplier']].map(([k, v], i) => ({ k, v, rule: i ? 'rgb(240 236 230)' : 'transparent' })),
+      hasFile: !!o.file, noFile: !o.file, file: o.file || '', hasBar: bar.length > 0, bar } : { lines: [], bar: [] };
+    const setF = patch => this.setState(p => ({ claimForm: { ...p.claimForm, ...patch, bad: '' } }));
+    const save = send => {
+      const what = f.what.trim(), total = Number(f.amount);
+      const bad = what.length < 3 ? 'what' : !(total > 0) ? 'amount' : f.kind === 'direct_pay' && !f.payTo.trim() ? 'payTo' : '';
+      if (bad) return this.setState(p => ({ claimForm: { ...p.claimForm, bad } }));
+      const n = s.claimSerial + 1, status = send ? (staff ? 'pending_approval' : 'with_finance') : 'draft';
+      const base = { kind: f.kind, what, total, payTo: f.kind === 'claim' ? meName : f.payTo.trim(), file: f.file, status, rejectReason: '', rejectedBy: '' };
+      if (f.id) this.setState(p => ({ claims: p.claims.map(r => (r.id === f.id ? { ...r, ...base, no: r.no || (send ? 'CLM-2611-0' + n : null) } : r)), claimForm: null, claimOpen: f.id, claimSerial: n }));
+      else this.setState(p => ({ claims: [{ id: 'c' + n, no: send ? 'CLM-2611-0' + n : null, day: '28 Nov', mine: true, requester: meName, approvedBy: '', pvNo: '', ...base }, ...p.claims], claimForm: null, claimOpen: 'c' + n, claimSerial: n, claimCard: staff ? 'all' : 'mine' }));
+      this.say(send ? (staff ? 'Sent for approval' : 'Sent to Finance') : 'Saved as draft');
+    };
+    const line = k => (f && f.bad === k ? 'rgb(200 52 42)' : 'rgb(229 222 211)');
+    out.cf = f ? {
+      kinds: [['claim', '🧾', 'Claim', 'I paid — pay me back'], ['direct_pay', '🏦', 'Direct payment', 'Pay the supplier']].map(([k, emoji, label, sub]) => ({ emoji, label, sub, line: f.kind === k ? 'rgb(51 36 27)' : 'rgb(236 231 224)', bg: f.kind === k ? 'rgb(250 248 244)' : '#fff', pick: () => setF({ kind: k }) })),
+      what: f.what, onWhat: e => setF({ what: e.target.value }), whatLine: line('what'), amount: f.amount, onAmount: e => setF({ amount: e.target.value }), amountLine: line('amount'),
+      direct: f.kind === 'direct_pay', claim: f.kind === 'claim', payTo: f.payTo, onPayTo: e => setF({ payTo: e.target.value }), payToLine: line('payTo'),
+      hasFile: !!f.file, noFile: !f.file, file: f.file, addFile: () => setF({ file: 'receipt-28nov.jpg' }), dropFile: () => setF({ file: '' }),
+      bad: !!f.bad, badText: f.bad === 'what' ? 'Say what it is for — 3 characters or more.' : f.bad === 'amount' ? 'An amount above zero.' : 'Who Finance pays.',
+      route: staff ? 'Goes to Rachel to approve, then to Finance, who makes its payment voucher.' : 'Your own request goes straight to Finance.',
+      saveDraft: () => save(false), submit: () => save(true),
+    } : { kinds: [] };
+    if (s.rejecting) {
+      const list = all.filter(r => s.rejecting.includes(r.id));
+      out.changes = { to: list.length === 1 ? 'Back to ' + list[0].requester + ' · ' + list[0].what : list.length + ' requests · ' + rm(list.reduce((t, r) => t + r.total, 0)), border: s.reasonBad ? 'rgb(200 52 42)' : 'rgb(229 222 211)', hint: s.reasonBad ? 'Say what to fix — 5 characters or more.' : 'They see this on the request.', hintFg: s.reasonBad ? 'rgb(176 40 34)' : 'rgb(117 100 86)', count: s.reason.length };
+      out.sendChanges = () => {
+        if (s.reason.trim().length < 5) return this.setState({ reasonBad: true });
+        this.setState(p => ({ claims: p.claims.map(r => (p.rejecting.includes(r.id) ? { ...r, status: 'rejected', rejectedBy: 'Rachel', rejectReason: p.reason.trim(), rejectedDay: '28 Nov' } : r)), rejecting: null, sheet: null, claimTicks: [], claimOpen: null }));
+        this.say(list.length + ' request' + (list.length === 1 ? '' : 's') + ' sent back to fix');
+      };
+      out.closeSheet = () => this.setState({ sheet: null, rejecting: null });
+    }
+    return out;
+  }
+  renderVals() {
+    const s = this.state, staff = s.role === 'staff';
+    const meKey = staff ? 'jason' : 'rachel', me = PEOPLE[meKey];
+    const species = this.props.petSpecies ?? 'cat', color = this.props.petColor ?? 'original', petName = this.props.petName ?? 'Kopi';
+    const level = levelOf(s.pet.xp), cur = LEVELS[level - 1], next = LEVELS[level];
+    const state = this.petState();
+    const emoji = SPECIES[species].forms[formOf(level)];
+    const top = s.stack[s.stack.length - 1] || null, shown = top || s.last || { type: 'none' };
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / .14)' : 'none', weight: on ? 600 : 400 });
+    const eColor = e => (e < 20 ? TONE.red.dot : e < 50 ? TONE.wait.dot : TONE.done.dot);
+    const byKind = k => s.tasks.filter(t => (k === 'turn' ? t.kind === 'doer' || t.kind === 'approve' : t.kind === k));
+    const order = l => [...l].sort((a, b) => Number(!!(b.late || b.changes)) - Number(!!(a.late || a.changes)));
+    const turn = order(byKind('turn')), waiting = byKind('waiting'), delegated = byKind('delegated');
+    const list = s.seg === 'turn' ? turn : s.seg === 'waiting' ? waiting : delegated;
+    const unreadChats = Object.keys(s.chats).filter(k => s.chats[k].unread).length;
+    const unreadNotices = s.notices.filter(n => n.unread).length;
+
+    // ── Task page
+    const t = shown.type === 'task' ? s.tasks.find(x => x.id === shown.id) : null;
+    let tp = { facts: [], strip: [], fields: [] };
+    if (t) {
+      const c = this.cardOf(t), n = t.stages.length, done = t.kind === 'done';
+      const editable = t.kind === 'doer';
+      const missing = t.fields.filter(f => f.req && !String(f.value).trim());
+      const ban = done ? ['🎉', 'Done', 'Every stage is finished.', TONE.done.bg, TONE.done.line]
+        : t.kind === 'doer' && t.changes ? ['↩️', `${t.approver} asked for changes`, `“${t.changes}”`, 'rgb(255 247 245)', TONE.red.line]
+        : t.kind === 'doer' ? ['✍️', "It's your turn", missing.length ? `${missing.length} required field${missing.length === 1 ? '' : 's'} left to fill in` : 'Everything is filled in — ready to go.', 'rgb(255 251 244)', 'rgb(214 180 140)']
+        : t.kind === 'approve' ? ['🛡️', 'Needs your approval', `${t.by} submitted ${c.st} · 2h ago`, 'rgb(255 250 238)', TONE.wait.line]
+        : t.kind === 'delegated' ? ['📥', `${t.by} delivered`, 'Review the delivery, or send it back.', 'rgb(255 250 238)', TONE.wait.line]
+        : t.kind === 'waiting' ? ['⏳', `With ${t.withWho}`, 'Nothing for you to do right now.', 'rgb(250 248 244)', 'rgb(236 231 224)']
+        : ['👀', 'You are not on this task', 'Read only.', 'rgb(250 248 244)', 'rgb(236 231 224)'];
+      const decide = t.kind === 'approve' || t.kind === 'delegated';
+      const nudge = !staff && (t.kind === 'waiting' || t.kind === 'other');
+      tp = {
+        track: t.track, title: t.title, status: done ? 'Done' : t.changes ? 'Changes requested' : t.late ? `${t.late}d late` : t.kind === 'approve' ? 'In review' : 'On track',
+        pillBg: TONE[done ? 'done' : c.tone === 'red' ? 'red' : t.kind === 'approve' ? 'wait' : 'done'].bg, pillLine: TONE[done ? 'done' : c.tone === 'red' ? 'red' : t.kind === 'approve' ? 'wait' : 'done'].line,
+        pillFg: TONE[done ? 'done' : c.tone === 'red' ? 'red' : t.kind === 'approve' ? 'wait' : 'done'].fg, pillDot: TONE[done ? 'done' : c.tone === 'red' ? 'red' : t.kind === 'approve' ? 'wait' : 'done'].dot,
+        facts: [
+          { k: 'Now with', v: done ? '—' : editable ? `${me.first} (you)` : decide ? `${me.first} (you)` : t.withWho, fg: 'inherit' },
+          { k: 'Subsidiary', v: subOf(t.sub).name, fg: 'inherit' },
+          { k: 'Stage due', v: t.late && !done ? `${t.due} · ${t.late}d late` : t.due, fg: t.late && !done ? TONE.red.fg : 'inherit' },
+          { k: 'Stage', v: done ? `${n} of ${n}` : `${t.cur + 1} of ${n}`, fg: 'inherit' },
+        ],
+        bIcon: ban[0], bTitle: ban[1], bText: ban[2], bBg: ban[3], bLine: ban[4],
+        stripHead: `Workflow · ${done ? n : t.cur} of ${n} done`,
+        strip: t.stages.map(([name, who], i) => {
+          const st = done || i < t.cur ? 'done' : i === t.cur ? (t.late || t.changes ? 'late' : 'cur') : '';
+          return {
+            mark: st === 'done' ? '✓' : i + 1, name, who, border: st === 'late' || st === 'cur' ? 'rgb(51 36 27)' : 'rgb(236 231 224)',
+            shadow: st === 'late' || st === 'cur' ? '0 4px 12px rgb(51 36 27 / .12)' : 'none',
+            bar: st === 'done' ? TONE.done.dot : st === 'late' ? TONE.red.dot : st === 'cur' ? '#EC9B55' : 'rgb(236 231 224)',
+            numBg: st === 'done' ? TONE.done.bg : st ? '#EC9B55' : 'rgb(243 242 239)', numFg: st === 'done' ? TONE.done.fg : 'rgb(43 31 23)',
+          };
+        }),
+        stage: c.st, secLine: editable ? '#EC9B55' : 'rgb(236 231 224)',
+        fill: missing.length ? `${t.fields.filter(f => f.req).length - missing.length} of ${t.fields.filter(f => f.req).length} filled` : 'All filled', fillFg: missing.length ? TONE.wait.fg : TONE.done.fg,
+        fields: t.fields.map(f => ({
+          label: f.label, req: f.req, edit: editable, ro: !editable, type: f.type, value: f.value,
+          ph: f.type === 'date' ? '' : f.type === 'number' ? '0.00' : 'Type here or paste a link',
+          border: s.bad.includes(f.id) ? TONE.red.dot : 'rgb(229 222 211)', text: f.value || 'Not filled in yet', fg: f.value ? 'inherit' : 'rgb(160 150 140)',
+          onChange: e => { const v = e.target.value; this.setState(p => ({ bad: p.bad.filter(b => b !== f.id), tasks: p.tasks.map(x => (x.id === t.id ? { ...x, fields: x.fields.map(y => (y.id === f.id ? { ...y, value: v } : y)) } : x)) })); },
+        })),
+        hasActions: !done && (editable || decide || nudge), canSubmit: editable, canDecide: decide, canNudge: nudge,
+        submitLabel: t.approver ? 'Submit for approval' : 'Complete stage',
+        nudgeLabel: s.nudged[t.id] ? `Nudged ${t.withWho}` : `🔔 Nudge ${t.withWho}`, nudgeOp: s.nudged[t.id] ? 0.5 : 1,
+        nextLine: editable ? (t.approver ? `Next up: ${t.approver} approves · told when you submit` : t.cur + 1 < n ? `Next up: ${t.stages[t.cur + 1][1]} · ${t.stages[t.cur + 1][0]}` : 'Last stage — this finishes the task')
+          : decide ? `${t.by} is told either way` : 'At most one nudge an hour per person and task',
+      };
+    }
+    const afterAct = (id, patch, words) => { this.patchTask(id, patch); this.back(); this.say(words); };
+
+    // ── Projects
+    const openTasks = s.tasks.filter(x => x.kind !== 'done');
+    const inScope = x => (s.scope === 'all' ? true : s.scope === 'done' ? x.kind === 'done' : x.kind !== 'done');
+    const ql = s.q.trim().toLowerCase();
+    const match = x => !ql || `${x.title} ${x.track} ${x.withWho || ''}`.toLowerCase().includes(ql);
+    const PROJ = [{ id: 'car-ye', sub: 'CAR', title: 'Carres · Year-End Campaign · Nov 2026' }];
+    const pSub = s.path.sub, pProj = s.path.project;
+    const pool = s.tasks.filter(x => (ql ? true : pProj ? x.parent === pProj : pSub ? x.sub === pSub && !x.parent : false)).filter(inScope).filter(match);
+    const folders = ql || pProj || !pSub ? [] : PROJ.filter(p => p.sub === pSub).map(p => { const k = s.tasks.filter(x => x.parent === p.id); return { title: p.title, meta: `${k.length} task${k.length === 1 ? '' : 's'}`, open: () => this.setState({ path: { sub: pSub, project: p.id } }) }; });
+    const root = !pSub && !ql;
+    const scopeTasks = pSub ? s.tasks.filter(x => x.sub === pSub) : s.tasks;
+    const countOf = k => scopeTasks.filter(x => (k === 'all' ? true : k === 'done' ? x.kind === 'done' : x.kind !== 'done')).length;
+    const fileRow = x => { const c = this.cardOf(x); return { emoji: x.track.startsWith('RCR') ? '🔁' : x.track.startsWith('MKT') ? '📦' : '⚡', title: x.title, sub: `${x.track.split(' ')[0]} · ${x.kind === 'done' ? 'Done' : c.st} · ${x.due}`, label: x.kind === 'doer' || x.kind === 'approve' ? (c.tone === 'red' ? 'Late' : 'Your turn') : x.kind === 'done' ? 'Done' : `With ${x.withWho || x.by}`, pillBg: TONE[c.tone].bg, pillLine: TONE[c.tone].line, pillFg: TONE[c.tone].fg, pillDot: TONE[c.tone].dot, open: c.open }; };
+    const files = root ? [] : pool.map(fileRow);
+    const crumbs = [{ label: 'Projects', sep: false, color: pSub ? 'rgb(117 100 86)' : 'rgb(51 36 27)', go: () => this.setState({ path: { sub: null, project: null }, q: '' }) }];
+    if (pSub) crumbs.push({ label: subOf(pSub).name, sep: true, color: pProj ? 'rgb(117 100 86)' : 'rgb(51 36 27)', go: () => this.setState({ path: { sub: pSub, project: null } }) });
+    if (pProj) crumbs.push({ label: PROJ.find(p => p.id === pProj).title, sep: true, color: 'rgb(51 36 27)', go: () => {} });
+
+    // ── Calendar
+    const POSTS = [
+      { kind: 'post', day: '28 Nov', icon: '📣', title: 'Hookka CNY teaser', sub: 'HK', line2: 'Instagram · 6:00 pm', tone: 'wait', label: 'Scheduled', mine: !staff, task: staff ? null : 'hk' },
+      { kind: 'meet', day: '28 Nov', icon: '🗓️', title: 'Carres showroom shoot', sub: 'CAR', line2: '2:00 pm · Ali, Jason', tone: 'meet', label: 'Shoot', mine: staff },
+      { kind: 'post', day: '30 Nov', icon: '📣', title: 'Weekly promo story', sub: '2990', line2: 'Instagram story', tone: 'draft', label: 'Draft', mine: false, task: 'o2' },
+      { kind: 'meet', day: '1 Dec', icon: '🗓️', title: 'December planning', sub: 'HC', line2: '10:00 am · Meeting room 2', tone: 'meet', label: 'Meeting', mine: true },
+      { kind: 'post', day: '2 Dec', icon: '📣', title: 'Dreamcrafter launch post', sub: 'DC', line2: 'Facebook', tone: 'draft', label: 'Draft', mine: true, task: 'dc1' },
+    ];
+    const dues = openTasks.map(x => { const c = this.cardOf(x); return { kind: 'due', day: x.due, icon: '⏱', title: x.title, sub: x.sub, line2: c.st, tone: c.tone, label: c.tone === 'red' ? `${x.late || 1}d overdue` : x.kind === 'doer' || x.kind === 'approve' ? 'Your turn' : 'Due', mine: x.kind !== 'other', task: x.id }; });
+    const allEv = [...dues, ...POSTS];
+    const passMine = e => !s.mine || e.mine;
+    const evs = allEv.filter(e => s.layers[e.kind] && passMine(e));
+    const evRow = e => ({ icon: e.icon, title: e.title, dot: subOf(e.sub).dot, line2: `${subOf(e.sub).name} · ${e.line2}`, label: e.label, bg: e.kind === 'due' ? '#fff' : TONE[e.tone].bg, line: TONE[e.tone].line, fg: TONE[e.tone].fg, style: e.kind === 'due' ? 'dashed' : 'solid', open: () => (e.task && s.tasks.some(x => x.id === e.task) ? this.push({ type: 'task', id: e.task }) : this.say(`${e.title} · ${e.line2}`)) });
+    const agenda = DAYS.filter(([d]) => !s.day || s.day === d).map(([d, wd]) => ({ label: d === TODAY ? `Today · ${d}` : d, wd: d === '27 Nov' ? `${wd} · overdue` : wd, fg: d === TODAY ? 'rgb(90 62 43)' : d === '27 Nov' ? TONE.red.fg : 'rgb(74 64 58)', events: evs.filter(e => e.day === d).map(evRow) })).filter(g => g.events.length);
+    const weekDays = [['Mon', 23], ['Tue', 24], ['Wed', 25], ['Thu', 26], ['Fri', 27], ['Sat', 28], ['Sun', 29]].map(([wd, n]) => {
+      const d = `${n} Nov`, today = d === TODAY, on = s.day === d;
+      return { wd, n, dots: evs.filter(e => e.day === d).slice(0, 3).map(e => TONE[e.tone].dot), bg: on ? 'rgb(236 229 219)' : 'transparent', weight: today ? 600 : 400, numBg: today ? 'rgb(90 62 43)' : 'transparent', numFg: today ? 'rgb(246 238 230)' : 'rgb(74 64 58)', pick: () => this.setState({ day: on ? null : d }) };
+    });
+
+    // ── Chat
+    const cw = shown.type === 'chat' ? shown.with : null;
+    const peerKeys = Object.keys(s.chats).filter(k => k !== 'lobby');
+    const thread = cw ? s.chats[cw] : null;
+    const openThread = k => { this.setState(p => ({ chats: { ...p.chats, [k]: { ...p.chats[k], unread: false } } })); this.push({ type: 'chat', with: k }); };
+    const lastOf = k => { const m = s.chats[k].msgs[s.chats[k].msgs.length - 1]; return m ? `${m.me ? 'You: ' : ''}${m.text || '📎 ' + (s.tasks.find(x => x.id === m.task) || {}).title}` : ''; };
+    const myTasks = s.tasks.filter(x => ['doer', 'approve', 'waiting', 'delegated'].includes(x.kind));
+    const pendingTask = s.pending ? s.tasks.find(x => x.id === s.pending) : null;
+    const send = () => {
+      const text = s.draft.trim();
+      if (!cw || (!text && !s.pending)) return;
+      this.setState(p => ({ draft: '', pending: null, attach: false, chats: { ...p.chats, [cw]: { ...p.chats[cw], unread: false, msgs: [...p.chats[cw].msgs, { me: true, text, time: '09:41', task: p.pending }] } } }));
+    };
+    const chat = {
+      showTabs: !cw || cw === 'lobby', isList: !cw, isLog: !!cw, isLobby: cw === 'lobby',
+      tabs: [{ label: '💬 My chats', ...seg(!cw), dot: !!cw && peerKeys.some(k => s.chats[k].unread), pick: () => this.setState(p => ({ stack: [...p.stack.slice(0, -1), { type: 'chat', with: null }], last: { type: 'chat', with: null } })) },
+        { label: '🏛️ Lobby', ...seg(cw === 'lobby'), dot: cw !== 'lobby' && s.chats.lobby.unread, pick: () => this.setState(p => ({ stack: [...p.stack.slice(0, -1), { type: 'chat', with: 'lobby' }], last: { type: 'chat', with: 'lobby' }, chats: { ...p.chats, lobby: { ...p.chats.lobby, unread: false } } })) }],
+      peers: peerKeys.map(k => { const P = PEOPLE[k], c = s.chats[k], m = c.msgs[c.msgs.length - 1]; return { init: P.first[0], name: P.first, bg: P.bg, last: lastOf(k), time: m ? m.time : '', unread: c.unread, weight: c.unread ? 700 : 500, fg: c.unread ? 'rgb(51 36 27)' : 'rgb(117 100 86)', open: () => openThread(k) }; }),
+      msgs: (thread ? thread.msgs : []).map(m => { const tk = m.task ? s.tasks.find(x => x.id === m.task) : null; return { align: m.me ? 'flex-end' : 'flex-start', meta: `${m.me ? 'You' : m.who || PEOPLE[cw].first} · ${m.time}`, text: m.text, hasText: !!m.text, bg: m.me ? '#EC9B55' : 'rgb(246 244 240)', hasTask: !!tk, track: tk ? tk.track : '', taskTitle: tk ? tk.title : '', openTask: () => tk && this.push({ type: 'task', id: tk.id }) }; }),
+      attachOpen: s.attach, attachRows: myTasks.map(x => ({ title: x.title, track: x.track, pick: () => this.setState({ pending: x.id, attach: false }) })),
+      hasPending: !!pendingTask, pending: pendingTask ? pendingTask.title : '', dropPending: () => this.setState({ pending: null }),
+      toggleAttach: () => this.setState(p => ({ attach: !p.attach })), clipBg: s.attach ? 'rgb(236 229 219)' : '#fff',
+      ph: cw === 'lobby' ? 'Message the lobby' : cw ? `Message ${PEOPLE[cw].first}` : '', sendOp: s.draft.trim() || s.pending ? 1 : 0.45,
+    };
+
+    // ── Space
+    const V = s.visit ? PEOPLE[s.visit] : null;
+    const sp = V ? {
+      first: V.first, name: V.name, role: V.role, init: V.first[0], avatarBg: V.bg, status: V.status, wall: V.wall, coverH: 110, cover: 'linear-gradient(135deg,oklch(0.87 0.06 200),oklch(0.84 0.07 160))',
+      petName: V.pet[2], level: V.pet[3], bubble: STATES[V.pet[4]][1] || '🙂', stateLabel: STATES[V.pet[4]][0], xpPct: 46, energy: 72, energyColor: eColor(72), roomLabel: `${V.first}'s room`,
+      petCover: this.petNode(V.pet[0], 44, V.pet[4], V.pet[1]), petRoom: this.petNode(V.pet[0], Math.round(SIZE[V.pet[3] - 1] * 1.15), V.pet[4], V.pet[1]), petTile: this.petNode(V.pet[0], 50, V.pet[4], V.pet[1]),
+    } : {
+      first: me.first, name: me.name, role: me.role, init: me.first[0], avatarBg: me.bg, status: s.status, wall: WALLS[s.wall], coverH: 150, cover: 'linear-gradient(135deg,oklch(0.86 0.07 60),oklch(0.84 0.07 20) 50%,oklch(0.82 0.06 330))',
+      petName, level, bubble: STATES[state][1] || '🙂', stateLabel: STATES[state][0], xpPct: next == null ? 100 : Math.round(((s.pet.xp - cur) / (next - cur)) * 100), energy: s.pet.energy, energyColor: eColor(s.pet.energy), roomLabel: 'My room',
+      petCover: this.petNode(emoji, 44, state, color), petRoom: this.petNode(emoji, Math.round(SIZE[level - 1] * 1.15), state, color), petTile: this.petNode(emoji, 50, state, color),
+    };
+    const lobbyKeys = ['ali', meKey, staff ? 'rachel' : 'jason', 'siti', 'weilun'];
+    const lobbySay = s.chats.lobby.msgs[s.chats.lobby.msgs.length - 1];
+    const lobby = lobbyKeys.map((k, i) => {
+      const P = PEOPLE[k], mine = k === meKey;
+      return { x: Math.round(10 + (i * 80) / 4), y: i % 2 ? 18 : 8, emoji: mine ? emoji : P.pet[0], filter: FILTER[mine ? color : P.pet[1]], name: mine ? `${P.first} (you)` : P.first, cursor: mine && !s.visit ? 'default' : 'pointer',
+        say: lobbySay && (lobbySay.me ? mine : lobbySay.who === P.first) ? lobbySay.text : '',
+        visit: () => (mine ? this.setState({ visit: null }) : this.setState({ visit: k })) };
+    });
+
+    // ── More
+    const sand = 'rgb(239 228 217)', mist = 'rgb(230 237 241)', peach = 'rgb(249 231 216)', cream = 'rgb(246 238 222)';
+    const stubRow = (emoji, label, tone, count) => ({ emoji, label, tone, count: count || 0, go: () => this.push({ type: 'stub', emoji, label }) });
+    const tabDef = [['tasks', '👉', 'Tasks', turn.length], ['projects', '📁', 'Projects', 0], ['plus'], ['space', '🏠', 'Space', unreadChats], ['more', '☰', 'More', 0]];
+    const sheetOpen = !!s.sheet, shK = s.sheet || s.lastSheet;
+    const chip = on => ({ bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(74 64 58)', line: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)' });
+    const changesTask = t;
+    const vals = {
+      dev: (() => { const ios = (this.props.device ?? 'ios') !== 'android', emb = !!this.props.embedded, sh = ios ? 54 : 38; return { ios, android: !ios, statusH: sh, spaceMt: -sh, visitPt: sh + 10, radius: ios ? '56px' : '38px', bezel: ios ? 10 : 8, tabH: ios ? 88 : 66, tabPb: ios ? 26 : 6, rootMinH: emb ? '0' : '100vh', rootPad: emb ? '0' : '24px' }; })(),
+      sysBack: () => (s.sheet ? this.setState({ sheet: null, rejecting: null }) : (s.claimOpen || s.claimForm) && s.stack.length && s.stack[s.stack.length - 1].type === 'claim' ? this.setState({ claimOpen: null, claimForm: null }) : s.stack.length ? this.back() : s.visit ? this.setState({ visit: null }) : this.setState({ tab: 'tasks' })),
+      sysHome: () => this.setState({ sheet: null, stack: [], visit: null, tab: 'tasks' }),
+      isTasks: s.tab === 'tasks', isProjects: s.tab === 'projects', isSpace: s.tab === 'space', isMore: s.tab === 'more', isManager: !staff,
+      statusBg: s.tab === 'space' ? 'rgb(246 244 240)' : s.tab === 'projects' ? '#fff' : s.tab === 'more' ? 'rgb(243 243 241)' : 'rgb(243 243 241)',
+      me: { name: me.first, full: me.name, role: me.role, bg: me.bg, init: me.first[0] },
+      punchChip: !s.punched ? '🕘 Punch in' : s.punched.out ? `Out · ${s.punched.out}` : `🟢 In · ${s.punched.in}`,
+      openPunch: () => this.openSheet('punch'), openNotices: () => this.push({ type: 'notices' }), unreadNotices,
+      segs: [['turn', '👉 My turn', turn], ['waiting', '⏳ Waiting', waiting], ['delegated', '📤 Delegated', delegated]].map(([k, label, l]) => ({ label, count: l.length, ...seg(s.seg === k), cBg: k === 'turn' && l.length ? 'rgb(176 40 34)' : 'rgb(226 223 217)', cFg: k === 'turn' && l.length ? '#fff' : 'rgb(117 100 86)', pick: () => this.setState({ seg: k }) })),
+      cards: list.map(x => this.cardOf(x)), noCards: !list.length,
+      week: [...turn, ...delegated].filter(x => ['27 Nov', '28 Nov', '29 Nov'].includes(x.due)).map(x => ({ when: x.due, title: x.title, fg: x.late ? TONE.red.fg : 'rgb(74 64 58)', open: () => this.push({ type: 'task', id: x.id }) })),
+      noWeek: ![...turn, ...delegated].some(x => ['27 Nov', '28 Nov', '29 Nov'].includes(x.due)),
+      openCalendar: () => this.push({ type: 'calendar' }),
+      crumbs, q: s.q, onQ: e => this.setState({ q: e.target.value }), qPh: pSub ? `Search in ${subOf(pSub).name}` : 'Track ID, title or person',
+      scopes: [['open', 'Open'], ['done', 'Done'], ['all', 'All']].map(([k, l]) => ({ label: `${l} · ${countOf(k)}`, ...seg(s.scope === k), pick: () => this.setState({ scope: k }) })),
+      subFolders: root ? SUBS.map(b => { const k = s.tasks.filter(x => x.sub === b.code && inScope(x)); return { emoji: b.emoji, name: b.name, dot: b.dot, meta: k.length ? `${k.length} item${k.length === 1 ? '' : 's'}` : 'Empty', late: k.filter(x => x.late && x.kind !== 'done').length, open: () => this.setState({ path: { sub: b.code, project: null } }) }; }) : [],
+      hasSubFolders: root, folders, hasFolders: folders.length > 0, files, hasFiles: files.length > 0, filesLabel: ql ? `Results · ${files.length}` : pProj ? 'Tasks' : 'Quick tasks',
+      projEmpty: !root && !folders.length && !files.length, projEmptyText: ql ? 'Nothing matches.' : 'Nothing here.',
+      home: !s.visit, visiting: !!s.visit, sp, status: s.status, onStatus: e => this.setState({ status: e.target.value }),
+      petX: s.petX, furn: [['🛏️', 64, 14, 0], ['🪴', 46, 32, 0], ['🖼️', 36, 48, 1], ['🖥️', 48, 66, 0], ['🪑', 42, 80, 0], ['🕰️', 32, 86, 1]].map(([e, size, x, wall]) => ({ emoji: e, size: Math.round(size * 0.75), x, bottom: wall ? '56%' : '20%', z: wall ? 1 : 10 + Math.round(x / 10) })),
+      decorate: () => this.setState(p => ({ wall: (p.wall + 1) % WALLS.length })),
+      snacks: s.pet.snacks, workoutsLeft: Math.max(0, 3 - s.pet.workouts),
+      feed: () => {
+        if (s.pet.snacks < 1) return this.say('No snacks left — finish a stage to earn one.');
+        this.setState({ pet: { ...s.pet, snacks: s.pet.snacks - 1, energy: Math.min(100, s.pet.energy + 20) } });
+        this.flash('eating', 2500); this.say('+20 energy');
+      },
+      workout: () => {
+        const earns = s.pet.workouts < 3;
+        this.setState({ pet: { ...s.pet, energy: Math.max(0, s.pet.energy - 15), workouts: s.pet.workouts + 1, xp: s.pet.xp + (earns ? 10 : 0) } });
+        if (earns && levelOf(s.pet.xp + 10) > level) { this.flash('levelUp', 3500); this.say(`${petName} reached Lv ${level + 1}!`); }
+        else { this.flash('exercising', 3000); this.say(earns ? `+10 XP · ${petName} worked out` : '3/3 workouts today. No more XP until tomorrow'); }
+      },
+      openChat: () => this.push({ type: 'chat', with: null }), unreadChats, chatPeek: peerKeys.filter(k => s.chats[k].unread).map(k => `${PEOPLE[k].first}: ${lastOf(k)}`)[0] || 'All caught up',
+      lobby, endVisit: () => this.setState({ visit: null }),
+      messageVisit: () => { const k = s.visit; this.setState({ visit: null }); if (s.chats[k]) openThread(k); else { this.setState(p => ({ chats: { ...p.chats, [k]: { unread: false, msgs: [] } } })); this.push({ type: 'chat', with: k }); } },
+      wave: () => { const k = s.visit; this.setState(p => ({ chats: { ...p.chats, [k]: { unread: false, msgs: [...((p.chats[k] || { msgs: [] }).msgs), { me: true, text: '👋', time: '09:41' }] } } })); this.say(`You waved at ${PEOPLE[k].first}`); },
+      openProfile: () => { this.setState({ editForm: null }); this.push({ type: 'profile' }); },
+      pf: (() => {
+        const p = s.profile, f = s.editForm, T = TONE;
+        const stub = (emoji, label) => () => this.push({ type: 'stub', emoji, label });
+        const tiles = [['🕘', 'Attendance', mist], ['🌴', 'Leave', 'rgb(232 244 235)'], ['💵', 'Payslip', cream], ['🌳', 'Hierarchy', peach], ['📨', 'Submit request', sand], ['📄', 'Documents', mist]];
+        if (!staff) tiles.push(['👥', 'My team', 'rgb(243 240 248)']);
+        const reqs = [['Annual leave', '12–13 Dec · 2 days', 'wait', 'Pending'], ['Overtime', '21 Nov · 2 h', 'done', 'Approved']];
+        if (s.profilePending) reqs.unshift(['Profile change', 'Sent today · 09:41', 'wait', 'Pending']);
+        const dl = (label, rows) => ({ label, items: rows.map(([k, v], i) => ({ k, v: v || '—', rule: i ? 'rgb(240 236 230)' : 'transparent' })) });
+        const field = (key, label, ph, hint) => ({ label, ph: ph || '', hint: hint || '', value: f ? f[key] : '', border: f && f[key] !== p[key] ? '#EC9B55' : 'rgb(229 222 211)', onChange: e => { const v = e.target.value; this.setState(q => ({ editForm: { ...q.editForm, [key]: v } })); } });
+        const dirty = !!f && Object.keys(p).some(k => f[k] !== p[k]);
+        return {
+          viewing: !f, editing: !!f, pending: s.profilePending, pendingLine: 'Your record updates once HR approves.',
+          chip: !s.punched ? 'Not clocked in' : s.punched.out ? 'Done' : 'Working', canPunch: !s.punched || !s.punched.out, punchBtn: !s.punched ? 'Clock in' : 'Clock out',
+          photo: () => this.say('Pick a photo from the camera or the gallery'),
+          edit: () => this.setState({ editForm: { ...p } }),
+          tiles: tiles.map(([emoji, label, tone]) => ({ emoji, label, tone, go: stub(emoji, label) })),
+          allReq: stub('📨', 'Requests'),
+          requests: reqs.map(([title, when, tone, word], i) => ({ title, when, word, bg: T[tone].bg, line: T[tone].line, fg: T[tone].fg, dot: T[tone].dot, rule: i ? 'rgb(240 236 230)' : 'transparent' })),
+          cards: [
+            dl('Contact', [['Mobile', p.phone], ['Personal email', p.email], ['Home address', p.address]]),
+            dl('Emergency contact', [['Name', p.ecName], ['Relationship', p.ecRel], ['Their mobile', p.ecPhone]]),
+            dl('Salary account', [['Bank', p.bank], ['Account', '•••• •••• ' + p.acct.slice(-4)]]),
+            dl('Kept by HR', [['Staff no.', staff ? 'HV-0142' : 'HV-0031'], ['Department', 'Marketing'], ['Title', me.title], ['Joined', staff ? '3 Mar 2024' : '15 Aug 2021'], ['Reports to', staff ? 'Rachel Tan' : 'Lim Wei Liang']]),
+          ],
+          groups: [
+            { label: 'Contact', fields: [field('phone', 'Mobile'), field('email', 'Personal email'), field('address', 'Home address')] },
+            { label: 'Emergency contact', fields: [field('ecName', 'Name'), field('ecRel', 'Relationship'), field('ecPhone', 'Their mobile')] },
+            { label: 'Salary account', fields: [field('bank', 'Bank'), field('acct', 'Account number', '', 'Salary keeps going to the current account until HR approves.')] },
+          ],
+          cancel: () => this.setState({ editForm: null }), sendOp: dirty ? 1 : 0.45,
+          send: () => { if (!dirty) return this.say('Nothing changed yet'); this.setState({ editForm: null, profilePending: true }); this.say('Sent to HR for approval'); },
+        };
+      })(),
+      punchLine: !s.punched ? 'Not punched in today' : s.punched.out ? 'In ' + s.punched.in + ' · Out ' + s.punched.out : 'Punched in at ' + s.punched.in + ' · HQ office',
+      punchBtn: !s.punched ? 'Punch in' : s.punched.out ? 'Done' : 'Punch out',
+      punchBtnBg: !s.punched ? '#EC9B55' : '#fff', punchBtnLine: !s.punched ? '#EC9B55' : 'rgb(229 222 211)',
+      moreGrid: [
+        { emoji: '📅', label: 'Calendar', tone: mist, sub: evs.filter(e => e.day === TODAY).length + ' today', count: 0, go: () => this.push({ type: 'calendar' }) },
+        { ...stubRow('🧾', staff ? 'Claim' : 'Claim and approve', cream, staff ? 0 : 2), sub: staff ? 'Claims and direct payments' : 'Waiting for you' },
+        { ...stubRow('📚', 'Library', mist), sub: 'Brand files and footage' },
+        { ...stubRow('🚪', 'Meeting Rooms', peach), sub: 'Book a room' },
+      ],
+      allSubs: () => this.setState({ tab: 'projects', path: { sub: null, project: null }, q: '' }),
+      moreSubs: SUBS.map(b => { const k = s.tasks.filter(x => x.sub === b.code && x.kind !== 'done'); return { emoji: b.emoji, name: b.name, dot: b.dot, meta: k.length ? k.length + ' open' : 'Nothing open', late: k.filter(x => x.late).length, go: () => this.setState({ tab: 'projects', path: { sub: b.code, project: null }, q: '', scope: 'open' }) }; }),
+      moreMgr: [['📊', 'Tracking Dashboard', sand, 5, 'Who is late, who is free'], ['🧩', 'Workflow Builder', mist, 0, 'Stages and approvers'], ['📦', 'Product Builder', peach, 0, 'Products, prices, versions'], ['📝', 'Minutes Builder', cream, 0, 'Meeting minutes templates'], ['🔁', 'Replace Person', mist, 0, 'Hand over somebody’s stages'], ['💰', 'Billing', peach, 0, 'This month’s lines for Finance'], ['🏦', 'Pool', sand, 0, 'Marketing P and L, cash flow']].map(([e, l, t, c, sub], i) => ({ ...stubRow(e, l, t, c), sub, rule: i ? 'rgb(240 236 230)' : 'transparent' })),
+      moreFoot: [['⚙️', 'Appearance', 'Font size, density'], ['🔀', 'Change view', 'Marketing'], ['🔑', 'Change password', ''], ['↩︎', 'Sign out', '']].map(([e, l, v], i) => ({ emoji: e, label: l, value: v, rule: i ? 'rgb(240 236 230)' : 'transparent', fg: l === 'Sign out' ? 'rgb(176 40 34)' : 'rgb(51 36 27)', go: () => this.push({ type: 'stub', emoji: e, label: l }) })),
+      tabs: tabDef.map(([key, em, label, badge]) => key === 'plus'
+        ? { emoji: '+', label: 'New', box: 52, mt: -24, radius: '50%', bg: '#EC9B55', shadow: '0 6px 14px rgb(51 36 27 / .22)', size: 28, color: 'rgb(74 64 58)', weight: 500, badge: 0, go: () => this.openSheet('new') }
+        : { emoji: em, label, box: 30, mt: 0, radius: '9px', bg: key === s.tab ? 'rgb(236 229 219)' : 'transparent', shadow: 'none', size: 17, color: key === s.tab ? 'rgb(51 36 27)' : 'rgb(117 100 86)', weight: key === s.tab ? 600 : 400, badge: badge || 0, go: () => this.setState({ tab: key, visit: null }) }),
+      pushT: top ? 'translateX(0)' : 'translateX(105%)', back: () => this.back(),
+      pushTitle: shown.type === 'task' ? 'Task' : shown.type === 'calendar' ? 'November 2026' : shown.type === 'chat' ? (cw && cw !== 'lobby' ? PEOPLE[cw].first : 'Chat') : shown.type === 'notices' ? 'Notifications' : shown.type === 'stub' ? shown.label : shown.type === 'profile' ? (s.editForm ? 'Edit profile' : 'My profile') : '',
+      pushSub: shown.type === 'chat' && cw && cw !== 'lobby' ? PEOPLE[cw].title : shown.type === 'calendar' && s.day ? s.day : '',
+      scr: { task: shown.type === 'task' && !!t, calendar: shown.type === 'calendar', chat: shown.type === 'chat', notices: shown.type === 'notices', stub: shown.type === 'stub', profile: shown.type === 'profile' },
+      stub: { emoji: shown.emoji || '', label: shown.label || '' },
+      tp,
+      submit: () => {
+        const missing = t.fields.filter(f => f.req && !String(f.value).trim());
+        if (missing.length) { this.setState({ bad: missing.map(f => f.id) }); return this.say(`Fill in ${missing.map(f => f.label).join(', ')}`); }
+        if (t.approver) return afterAct(t.id, { kind: 'waiting', withWho: t.approver, changes: null, isNew: false, late: 0 }, `Submitted · ${t.approver} is told`);
+        const last = t.cur + 1 >= t.stages.length;
+        this.patchTask(t.id, last ? { kind: 'done', cur: t.stages.length, isNew: false } : { kind: 'waiting', cur: t.cur + 1, withWho: t.stages[t.cur + 1][1], isNew: false });
+        this.back();
+        if (!this.gainXp(20, 1)) this.say('Stage complete · +20 XP · +1 snack');
+      },
+      approve: () => { const last = t.cur + 1 >= t.stages.length; afterAct(t.id, last ? { kind: 'done', cur: t.stages.length } : { kind: 'waiting', cur: t.cur + 1, withWho: t.stages[t.cur + 1][1], late: 0 }, `Approved · ${t.by} is told`); },
+      askChanges: () => { this.setState({ reason: '', reasonBad: false }); this.openSheet('changes'); },
+      nudge: () => { if (s.nudged[t.id]) return; this.setState({ nudged: { ...s.nudged, [t.id]: true } }); this.say(`Nudged ${t.withWho}`); },
+      weekDays, agenda, noAgenda: !agenda.length,
+      layers: [['post', '📣 Posts'], ['due', '⏱ Due'], ['meet', '🗓️ Shoots']].map(([k, label]) => ({ label, count: allEv.filter(e => e.kind === k && passMine(e)).length, ...chip(s.layers[k]), toggle: () => this.setState(p => ({ layers: { ...p.layers, [k]: !p.layers[k] } })) })),
+      toggleMine: () => this.setState(p => ({ mine: !p.mine })), mineBg: s.mine ? 'rgb(90 62 43)' : 'rgb(214 204 190)', mineLeft: s.mine ? 16 : 2,
+      chat, draft: s.draft, onDraft: e => this.setState({ draft: e.target.value }), onDraftKey: e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }, send,
+      logRef: el => { this.log = el; },
+      notices: s.notices.map(n => ({ ...n, bg: n.unread ? 'rgb(250 248 244)' : 'transparent', open: () => { this.setState(p => ({ notices: p.notices.map(x => (x.id === n.id ? { ...x, unread: false } : x)) })); if (s.tasks.some(x => x.id === n.task)) this.push({ type: 'task', id: n.task }); } })),
+      scrimOp: sheetOpen ? 1 : 0, scrimPe: sheetOpen ? 'auto' : 'none', sheetT: sheetOpen ? 'translateY(0)' : 'translateY(105%)', closeSheet: () => this.setState({ sheet: null }),
+      sh: { new: shK === 'new', quick: shK === 'quick', punch: shK === 'punch', changes: shK === 'changes' },
+      subChips: SUBS.slice(0, 5).map(b => ({ name: b.name, dot: b.dot, ...chip(s.quick.sub === b.code), pick: () => this.setState(p => ({ quick: { ...p.quick, sub: b.code } })) })),
+      newKinds: [
+        { emoji: '⚡', label: 'Quick task', sub: 'A title, a type and its stages', locked: false, open: true, op: 1, go: () => { this.setState(p => ({ quick: { ...p.quick, kind: 'quick', bad: false } })); this.openSheet('quick'); } },
+        { emoji: '🔁', label: 'Recurring task', sub: 'Every day, week or month', locked: false, open: true, op: 1, go: () => { this.setState(p => ({ quick: { ...p.quick, kind: 'recur', bad: false } })); this.openSheet('quick'); } },
+        { emoji: '📦', label: 'Product project', sub: 'Minutes, PIC link, deliverables', locked: staff, open: !staff, op: staff ? 0.55 : 1, go: () => (staff ? this.say('Product projects are started by a manager') : (this.setState({ sheet: null }), this.push({ type: 'stub', emoji: '📦', label: 'New product project' }))) },
+      ],
+      quick: {
+        heading: `${s.quick.kind === 'recur' ? '🔁 Recurring task' : '⚡ Quick task'} · ${subOf(s.quick.sub).name}`, title: s.quick.title, bad: s.quick.bad, border: s.quick.bad ? TONE.red.dot : 'rgb(229 222 211)',
+        types: ['Ads', 'Social Media', 'Content (Video)', 'Brand', 'Other'].map(n => ({ name: n, ...chip(s.quick.type === n), pick: () => this.setState(p => ({ quick: { ...p.quick, type: n } })) })),
+        note: s.quick.kind === 'recur' ? 'Every week on Monday, from 30 Nov, no end date. One stage, yours, due in 2 working days.' : 'One stage, yours, due in 2 working days (30 Nov). Stages and approvers can be added on the task.',
+      },
+      onQuickTitle: e => this.setState(p => ({ quick: { ...p.quick, title: e.target.value, bad: false } })),
+      backToNew: () => this.openSheet('new'),
+      createQuick: () => {
+        const title = s.quick.title.trim();
+        if (title.length < 3) return this.setState(p => ({ quick: { ...p.quick, bad: true } }));
+        const n = s.serial + 1, recur = s.quick.kind === 'recur';
+        const task = { id: `n${n}`, track: `${recur ? 'RCR' : 'TSK'}-${s.quick.sub}-2611-0${n}`, title, sub: s.quick.sub, kind: 'doer', isNew: true, stages: [[s.quick.type, 'You']], cur: 0, due: '30 Nov', late: 0, changes: null, parent: null, approver: null, by: null, withWho: null, fields: [fld('f', 'What was done', 'text', true, '')] };
+        this.setState(p => ({ tasks: [task, ...p.tasks], serial: n, sheet: null, tab: 'tasks', seg: 'turn', quick: { ...p.quick, title: '', bad: false } }));
+        this.say(`${recur ? 'Recurring' : 'Quick'} task created · ${task.track}`);
+      },
+      punch: { heading: !s.punched ? 'Punch in' : 'Punch out', canPunch: !s.punched || !s.punched.out, hasLog: !!s.punched, log: s.punched ? `In ${s.punched.in}${s.punched.out ? ` · Out ${s.punched.out}` : ''} · HQ office` : '' },
+      doPunch: () => { const p = s.punched ? { ...s.punched, out: '18:02' } : { in: '09:41' }; this.setState({ punched: p, sheet: null }); this.say(p.out ? 'Punched out · 18:02' : 'Punched in · 09:41 · HQ office'); },
+      changes: { to: changesTask ? `Back to ${changesTask.by} · ${changesTask.title}` : '', border: s.reasonBad ? TONE.red.dot : 'rgb(229 222 211)', hint: s.reasonBad ? 'Say what needs to change — 5 characters or more.' : 'They see this on the task.', hintFg: s.reasonBad ? TONE.red.fg : 'rgb(117 100 86)', count: s.reason.length },
+      reason: s.reason, onReason: e => this.setState({ reason: e.target.value, reasonBad: false }),
+      sendChanges: () => {
+        if (s.reason.trim().length < 5) return this.setState({ reasonBad: true });
+        this.setState({ sheet: null });
+        afterAct(t.id, { kind: 'waiting', withWho: t.by, late: 0 }, `Changes requested · back to ${t.by}`);
+      },
+      toast: s.toast, toastOp: s.toastOn ? 1 : 0, toastY: s.toastOn ? 0 : 8,
+    };
+    Object.assign(vals, this.claimVals(vals));
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

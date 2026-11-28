@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isPhone, opensFinApp, opensHrApp, opensHrAppOnPhone, opensLeadAppOnPhone, startPlace, itSupportPlace, itSupportApp } from './one-app'
+import { isPhone, mktOpenPlace, opensFinApp, opensHrApp, opensHrAppOnPhone, opensLeadAppOnPhone, opensMktApp, startPlace, itSupportPlace, itSupportApp } from './one-app'
 
 // ONE app for everybody (2026-10-11 — the user: "他们都是一个 app … 我要的就是 portal app").
 
@@ -67,6 +67,39 @@ describe('the start (`/`)', () => {
     expect(startPlace(fin, false, 'r1')).toBe('/dashboard?open=me:r1')
     // The Revenue app has no Me.
     expect(startPlace(rev, true, 'r1')).toBe('/member')
+  })
+})
+
+// The Marketing app (2026-11-28 — the handoff "Marketing View 电话版设计"): Marketing's view on a phone.
+describe('the Marketing app', () => {
+  const lens = { role: 'marketing', permissions: ['marketing'] }
+  const staff = { role: 'staff', permissions: ['marketing'], tabs: ['mkt.overview.view', 'mkt.projects.view'] }
+  it('opens for whoever wears Marketing’s view and holds Marketing — the Principal’s lens or a Marketing template', () => {
+    expect(opensMktApp(lens)).toBe(true)
+    expect(opensMktApp(staff)).toBe(true)
+    // Marketing's tabs without the key: nothing of it would open.
+    expect(opensMktApp({ ...staff, permissions: [] })).toBe(false)
+    // The key without Marketing's view (Ultimate full access keeps the Principal's own view).
+    expect(opensMktApp({ role: 'principal', permissions: ['marketing', 'view_switch'] })).toBe(false)
+    for (const role of ['hr', 'finance', 'revenue_member']) expect(opensMktApp({ role, permissions: ['marketing'] })).toBe(false)
+    expect(opensMktApp({ role: 'staff', permissions: ['marketing'], tabs: ['dept.my_claims.view'] })).toBe(false)
+    expect(opensMktApp(null)).toBe(false)
+  })
+  it('is where the start sends them on a phone — ahead of the HR app, whose areas a template could also hold', () => {
+    expect(startPlace(lens, true)).toBe('/mkt-app')
+    expect(startPlace(staff, true)).toBe('/mkt-app')
+    expect(startPlace({ ...staff, permissions: ['marketing', 'documentation'] }, true)).toBe('/mkt-app')
+    expect(startPlace(staff, true, 'r 1')).toBe('/mkt-app?open=me:r%201')
+    expect(startPlace(staff, false)).toBe('/dashboard')
+  })
+  it('opens a tapped Marketing push in the app on a phone, on its portal page everywhere else', () => {
+    expect(mktOpenPlace(staff, true, { k: 'mkt', id: 'TSK-CAR-2611-004' })).toBe('/mkt-app?open=task:TSK-CAR-2611-004')
+    expect(mktOpenPlace(staff, true, { k: 'claim', id: 'p 1' })).toBe('/mkt-app?open=claim:p%201')
+    expect(mktOpenPlace(staff, false, { k: 'mkt', id: 'x1' })).toBe('/marketing/projects/x1')
+    expect(mktOpenPlace(staff, false, { k: 'claim', id: 'p1' })).toBe('/claims?open=p1')
+    // HR's view and Finance's on a phone: the portal page, which sends them on to their own apps as before.
+    expect(mktOpenPlace({ role: 'hr', permissions: ['documentation'] }, true, { k: 'claim', id: 'p1' })).toBe('/claims?open=p1')
+    expect(mktOpenPlace(null, true, { k: 'mkt', id: 'x1' })).toBe('/marketing/projects/x1')
   })
 })
 
@@ -154,5 +187,11 @@ describe('one install', () => {
     // The portal reads the phone once (2026-10-14): the HR app's redirect, and Finance's shell kept off a phone.
     expect(portal).toMatch(/const phone = isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\)/)
     expect(portal).toMatch(/if \(opensHrAppOnPhone\(user\) && phone\) redirect\('\/hr-app'\)/)
+    // Marketing's view on a phone (2026-11-28): the Marketing app — asked before the HR app's.
+    const mkt = portal.indexOf("if (opensMktApp(user) && phone) redirect('/mkt-app')")
+    expect(mkt).toBeGreaterThan(-1)
+    expect(mkt).toBeLessThan(portal.indexOf("if (opensHrAppOnPhone(user) && phone) redirect('/hr-app')"))
+    // …and a tapped Marketing push goes through the start to its task or request (lib/push/notices.ts › pushUrl).
+    expect(home).toMatch(/redirect\(mktOpenPlace\(user, isPhone\(\(await headers\(\)\)\.get\('user-agent'\)\), /)
   })
 })
