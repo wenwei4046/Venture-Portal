@@ -379,20 +379,23 @@ export default function LeadApp(p: LeadAppProps) {
   const [brand, setBrand] = useState('all')
   const [searchOpen, setSearchOpen] = useState(false)
   const [q, setQ] = useState('')
-  const listed = contacts.filter(c => !c.blockedAt)
-  const pool = listed.filter(c => (brand === 'all' || c.brandId === brand) && matchesQuery(c, q))
-  const chips = inboxChips(pool, p.labels, filter, seen)
-  const rows = pool.filter(c => passes(c, filter, seen) || c.id === chatId).map(c => rowOf(c, brandName(c.brandId), seen, now))
-  const badge = inboxBadge(contacts, seen)
-  const pills = brandPills(contacts, p.config.brands)
+  // Worked out again only when what they read changes — never on a key typed in the reply box.
+  const listed = useMemo(() => contacts.filter(c => !c.blockedAt), [contacts])
+  const pool = useMemo(() => listed.filter(c => (brand === 'all' || c.brandId === brand) && matchesQuery(c, q)), [listed, brand, q])
+  const chips = useMemo(() => inboxChips(pool, p.labels, filter, seen), [pool, p.labels, filter, seen])
+  const rows = useMemo(() => pool.filter(c => passes(c, filter, seen) || c.id === chatId).map(c => rowOf(c, brandName(c.brandId), seen, now)),
+    [pool, filter, seen, chatId, brandName, now])
+  const badge = useMemo(() => inboxBadge(contacts, seen), [contacts, seen])
+  const pills = useMemo(() => brandPills(contacts, p.config.brands), [contacts, p.config.brands])
   const brandLabel = brand === 'all' ? 'All brands' : brands.get(brand)?.name ?? 'All brands'
 
   // ── Leads ──
   const [stage, setStage] = useState<LeadStage | 'all'>('all')
   const [lq, setLq] = useState('')
   const leadPool = useMemo(() => byLastUpdate(listed), [listed])
-  const leadRows = leadPool.filter(c => matchesLead(c, lq) && (stage === 'all' || stageOf(c) === stage))
-    .map(c => leadRowOf(c, brandName(c.brandId), p.outlets))
+  const leadChips = useMemo(() => stageChips(leadPool, stage), [leadPool, stage])
+  const leadRows = useMemo(() => leadPool.filter(c => matchesLead(c, lq) && (stage === 'all' || stageOf(c) === stage))
+    .map(c => leadRowOf(c, brandName(c.brandId), p.outlets)), [leadPool, lq, stage, brandName, p.outlets])
 
   // ── Profile ──
   const [switching, startSwitch] = useTransition()
@@ -454,7 +457,7 @@ export default function LeadApp(p: LeadAppProps) {
                 onBell={() => flash('No new notifications')} onHome={goHome} />
             )
           ) : tab === 'leads' ? (
-            <LeadsScreen count={leadPool.length} q={lq} onQuery={setLq} chips={stageChips(leadPool, stage)} onChip={setStage} rows={leadRows} onOpen={openChat} />
+            <LeadsScreen count={leadPool.length} q={lq} onQuery={setLq} chips={leadChips} onChip={setStage} rows={leadRows} onOpen={openChat} />
           ) : (
             <ProfileScreen name={p.me.name} sub={p.me.sub} ini={initials(p.me.name || '?')} groups={groups} onHome={goHome} />
           )}
