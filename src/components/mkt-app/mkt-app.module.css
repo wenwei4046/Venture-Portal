@@ -251,6 +251,8 @@
 .barGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 8px; }
 .barGrid15 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
 .btn { flex: 1; min-width: 0; height: 50px; border-radius: 12px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink-2)); font-weight: 500; font-size: 15px; display: flex; align-items: center; justify-content: center; white-space: nowrap; padding: 0 12px; }
+/* Alone in a column (the bar, a sheet), a button keeps its height — `flex: 1` there sized it to its words. */
+.bar > .btn, .sheet > .btn { flex: none; }
 .btn[data-kind='primary'] { background: var(--mk-primary); border-color: var(--mk-primary); font-weight: 600; }
 .btn[data-kind='danger'] { border-color: rgb(var(--mk-red-line)); color: rgb(var(--mk-red)); }
 .btn[data-kind='dark'] { background: rgb(var(--mk-ink)); border-color: rgb(var(--mk-ink)); color: rgb(var(--mk-white)); font-weight: 600; }

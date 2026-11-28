@@ -10,7 +10,8 @@ import {
   type ApprovalRead, type DraftItem, type PaymentRequest, type RequestContext, type RequestDraft, type RequestFile,
 } from '@/lib/payment-requests/model'
 import type { AppClaims, Tone } from '@/lib/mkt-app/model'
-import { officeDay } from '@/lib/office-time'
+import { shortDay } from '@/lib/marketing/board'
+import { formatDate } from '@/lib/utils'
 import { BackStep, Pill } from '../kit'
 import { Shell } from './TaskScreen'
 import s from '../mkt-app.module.css'
@@ -216,7 +217,7 @@ export default function ClaimScreen(p: ClaimScreenProps) {
                         <span className={s.claimWhat}>{whatOf(r)}</span>
                         <span className={s.claimAmt}>{rmOf(r.total)}</span>
                       </div>
-                      <div className={s.claimSub}>{[requestDay(r), KIND_WORDS[r.kind], r.mine ? r.requestNo : r.requesterName].filter(Boolean).join(' · ')}</div>
+                      <div className={s.claimSub}>{[requestDay(r) ? shortDay(requestDay(r)) : null, KIND_WORDS[r.kind], r.mine ? r.requestNo : r.requesterName].filter(Boolean).join(' · ')}</div>
                       <div className={s.claimChips}>
                         <Pill tone={CHIP_TONE[w.tone] ?? 'draft'} text={w.text} size="sm" />
                         {note ? <span className={s.claimNote}>{note}</span> : null}
@@ -278,7 +279,7 @@ function Detail({ r, busy, confirmCancel, approver, openFile, say, onEdit, onSub
   }
   const lines: [string, string][] = [
     ['Ref #', r.requestNo || 'Draft'],
-    ['Date', requestDay(r)],
+    ['Date', requestDay(r) ? formatDate(requestDay(r)) : '—'],
     ['From', r.requesterName],
     ['Pay', r.kind === 'claim' ? 'Claim — pay it back' : 'Pay a supplier directly'],
     ['Borne by', whoPaysWords(r)],
@@ -310,7 +311,7 @@ function Detail({ r, busy, confirmCancel, approver, openFile, say, onEdit, onSub
             <div className={s.reason}>
               <div className={`${s.label} ${s.reasonLabel}`}>Sent back</div>
               <div className={s.reasonText}>“{r.rejectReason}”</div>
-              <div className={s.reasonBy}>{[r.rejectedByName ?? (r.rejectedStage === 'finance' ? 'Finance' : null), r.rejectedAt ? requestDayOf(r.rejectedAt) : null].filter(Boolean).join(' · ')}</div>
+              <div className={s.reasonBy}>{[r.rejectedByName ?? (r.rejectedStage === 'finance' ? 'Finance' : null), r.rejectedAt ? formatDate(r.rejectedAt) : null].filter(Boolean).join(' · ')}</div>
             </div>
           ) : null}
           <div className={s.dl}>
@@ -341,8 +342,6 @@ function Detail({ r, busy, confirmCancel, approver, openFile, say, onEdit, onSub
   )
 }
 
-/** YYYY-MM-DD of an instant, the office's (as a request's own day is shown). */
-const requestDayOf = (at: string) => officeDay(at).format('YYYY-MM-DD')
 
 /**
  * New request (or one of the reader's being changed): the New request window's own rules (`saveProblem`,

@@ -38,6 +38,9 @@ describe('the doer, working their stage', () => {
     expect(v.nextLine).toBe('Next up: Rachel approves · told when you submit')
     expect(v.facts.map(f => `${f.k}: ${f.v}`)).toEqual(['Now with: Siti (you)', 'Subsidiary: Carres', expect.stringMatching(/^Stage due: /), 'Stage: 1 of 1'])
     expect([v.doer, v.approvers]).toEqual(['Siti', ['Rachel']])
+    // The strip names the viewer's own stage *You*; the approver sees the doer's name.
+    expect(v.strip.map(c => c.who)).toEqual(['You'])
+    expect(taskScreenView(page('s-rachel', { status: 'review' }), MAY, NOW).strip.map(c => c.who)).toEqual(['Siti'])
   })
 
   it('what they typed counts before it is saved — and the toast names what is still empty', () => {

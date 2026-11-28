@@ -122,7 +122,8 @@ export function taskScreenView(
   // ── The strip ──
   const strip: StripView[] = n
     ? stripView(task, me, at.cur, now).map(c => ({
-      idx: c.idx, mark: c.mark, name: c.name, who: c.who,
+      // The viewer's own stages say *You* (the handoff's strip); everybody else's, their name.
+      idx: c.idx, mark: c.mark, name: c.name, who: me && task.stages[c.idx]?.doer === me ? 'You' : c.who,
       state: c.state === 'done' ? 'done' : c.state === 'cur' ? (c.late ? 'late' : 'cur') : 'later',
     }))
     : []
