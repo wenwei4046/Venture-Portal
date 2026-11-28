@@ -21,6 +21,8 @@ import type { CrmData } from "@/lib/member/crm-data";
 import { chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, isoOf, scaled } from "../desk/vm/adschart";
 import { PHONE_TYPE, typePx } from "./type";
 import { Ic } from "./icons4a";
+import { ReplyBar } from "./reply-bar";
+import { replyGroups } from "./reply-groups";
 
 /** Frame px, as the rest of 4a (shared/phone4a.tsx › fs). */
 const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
@@ -255,6 +257,12 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
               {/* View ad, a small icon right of the name (the owner, 2026-10-24: "只需要view ad（做成小小的圖標即可）做廣告名字右邊"). */}
               <a href={a.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "26px", height: "26px", margin: "-5px -6px -5px 0", display: "grid", placeItems: "center", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={13} /></a>
             </span>
+            {/* Overview's reply colours (2026-11-28, "Ads performance 也要加这个颜色"): of the period's leads sent a template. */}
+            {(() => { const L = adLists(a.cs, p.visits, r), ids = new Set(L.leads), g = replyGroups(a.cs.filter(c => ids.has(c.id)), p.visits);
+              if (!g.replied.length && !g.noReply.length) return null;
+              const go = (t: string, list: string[]) => (p.openList && list.length ? () => p.openList!(`${t} · ${a.name} · ${perWord}`, list) : undefined);
+              return <span data-ad-replies="" style={{ display: "flex", minWidth: 0 }}><ReplyBar replied={g.replied} noReply={g.noReply} appt={g.appt} won={g.won} size={11} bar={40}
+                openReplied={go("Replied", g.replied)} openNoReply={go("No reply", g.noReply)} openAppt={go("Appointments", g.appt)} openWon={go("Won", g.won)} /></span>; })()}
             <span style={{ display: "grid", gridTemplateColumns: `repeat(${keys.length}, minmax(0,1fr))`, gap: "6px" }}>
               {/* v4 8c: the metric names go — each figure's dot is its tile's colour above. */}
               {keys.map((k, i) => <span key={k} title={label(k)} style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>

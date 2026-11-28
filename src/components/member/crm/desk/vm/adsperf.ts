@@ -9,7 +9,8 @@ import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
-import { AD_APPTS, AD_LEADS, INS_CARDS, MON, insightDates, insightRange } from "./insight";
+import { AD_APPTS, AD_LEADS, AD_NOREPLY, AD_REPLIED, AD_WON, INS_CARDS, MON, insightDates, insightRange } from "./insight";
+import { replyGroups } from "../../shared/reply-groups";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
@@ -534,6 +535,12 @@ export function adsPerfVM(ctx: DeskCtx) {
         // A row pressed lists the ad's leads of the range — the Leads cell's customers (the owner, 2026-11-27: "点击后看到所有
         // 的 leads 名单"), in Insight's list pane, each to Customer info.
         open: () => ctx.patch({ pane: "overlay", kind: "clist", clist: `${AD_LEADS}${a.name}`, clistIds: leadIds(a.cs, ra, rb), clistSub: rangeTxt(ra, rb), clRep: null, infoId: null, visit: null }),
+        // Overview's reply colours under the ad (the owner, 2026-11-28: "Ads performance 也要加这个颜色"), each to its customers.
+        replies: (() => {
+          const ids = new Set(leadIds(a.cs, ra, rb)), g = replyGroups(a.cs.filter(c => ids.has(c.id)), data.visits);
+          const go = (pre: string, list: string[]) => (list.length ? () => ctx.patch({ pane: "overlay", kind: "clist", clist: `${pre}${a.name}`, clistIds: list, clistSub: rangeTxt(ra, rb), clRep: null, infoId: null, visit: null }) : undefined);
+          return { ...g, openReplied: go(AD_REPLIED, g.replied), openNoReply: go(AD_NOREPLY, g.noReply), openAppt: go(AD_APPTS, g.appt), openWon: go(AD_WON, g.won) };
+        })(),
         hide: data.can.manage && !a.id.startsWith("ch:") ? () => { const on = !data.adNames?.[a.id]?.hidden; void ctx.act.hideAd(a.id, on).then(ok => { if (ok) patch({ toast: on ? `${a.name} hidden from Ads Performance` : `${a.name} shown again` }); }); } : undefined,
         cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb);
           // The Appts cell opens that ad's leads who booked a visit (the owner, 2026-11-27: "我要如何看到appt 的时候呢？") — the

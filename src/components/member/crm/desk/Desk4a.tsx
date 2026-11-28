@@ -30,6 +30,7 @@ import type { Frame4a } from "./vm/frame4a";
 import { DeskAddCustomer, DeskProfileDrawer, type ProfileDrawerV } from "./DeskExtras";
 import { WA_VERTICALS } from "@/lib/meta/channels";
 import { REVENUE_APP_VIEWS } from "@/lib/view-switch";
+import { ReplyBar } from "../shared/reply-bar";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, boxSizing: "border-box" };
@@ -1156,7 +1157,9 @@ function cellPress(c: AdsCell) {
 interface AdsBits {
   ap4: {
     cols: { id: string; label: string; arrow: string; num: boolean; sort: () => void }[];
-    rows: { name: string; headline: string; brand?: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void; open?: () => void }[];
+    rows: { name: string; headline: string; brand?: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void; open?: () => void;
+      /** Overview's reply colours (2026-11-28). */
+      replies?: { replied: string[]; noReply: string[]; appt: string[]; won: string[]; openReplied?: () => void; openNoReply?: () => void; openAppt?: () => void; openWon?: () => void } }[];
     hiddenN?: number; showHidden?: boolean; toggleHidden?: () => void;
     total: { label: string; cells: AdsCell[] };
     cmp: boolean;
@@ -1169,6 +1172,13 @@ interface AdsBits {
   apStrip?: AdsStripBits;
 }
 interface AdsStripBits { items: { key: string; label: string; total: string; color: string; remove: (() => void) | null; sub?: string[]; title?: string; open?: () => void; fee?: { value: number; save: (n: number) => void } }[]; canAdd: boolean; add: () => void; open: boolean; toggle: () => void }
+
+/** An ad's reply colours under its name (Overview's, 2026-11-28): numbers only, the words on hover; a press is its own. */
+function AdReplies({ r }: { r: NonNullable<AdsBits["ap4"]["rows"][number]["replies"]> }) {
+  return <span onClick={e => e.stopPropagation()} style={{ display: "inline-flex", minWidth: 0 }}>
+    <ReplyBar replied={r.replied} noReply={r.noReply} appt={r.appt} won={r.won} openReplied={r.openReplied} openNoReply={r.openNoReply} openAppt={r.openAppt} openWon={r.openWon} compact bar={36} size={11.5} />
+  </span>;
+}
 
 /**
  * An ad's name in Ads Performance: a small ↗ beside it opens the ad (the owner, 2026-10-24: "電腦版也要有可以導入看該廣告");
@@ -1264,6 +1274,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
             <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
               <AdName r={r} />
               {r.headline && <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.headline}</span>}
+              {r.replies && r.replies.replied.length + r.replies.noReply.length > 0 && <AdReplies r={r.replies} />}
             </span>
           </span>
           {r.cells.map((c, j) => <Cell key={j} c={c} id={A.cols[j].id} />)}
@@ -1406,7 +1417,11 @@ function DeskAdsD2a({ v, C, S }: { v: AdsBits; C: NonNullable<AdsBits["apChartV"
                 <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                   {/* One line for the name, ↗ only on hover; the brand under it — the long name is not repeated. */}
                   <AdName r={r} link={hov === i} font="500 14.5px Inter, sans-serif" />
-                  {r.brand && <span style={{ font: "400 12.5px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.brand}</span>}
+                  {(r.brand || r.replies) && <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, font: "400 12.5px Inter, sans-serif", color: "var(--crm-faint)" }}>
+                    {r.brand && <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: "0 1 auto", minWidth: 0 }}>{r.brand}</span>}
+                    {/* Overview's reply colours beside the brand (2026-11-28, "Ads performance 也要加这个颜色"). */}
+                    {r.replies && r.replies.replied.length + r.replies.noReply.length > 0 && <span style={{ flex: "none" }}><AdReplies r={r.replies} /></span>}
+                  </span>}
                 </span>
               </span>
               {r.cells.map((c, j) => <Fragment key={j}>{cell(c, A.cols[j].id, A.cols[j].id === "leads")}</Fragment>)}
