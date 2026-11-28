@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Chivo+Mono:wght@400;500;600&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e7e5df}
+a{color:#A3401A}a:hover{color:#2B211C}
+*::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+
+<section style="padding:56px 64px 24px;font-family:Inter,sans-serif;color:#2b1f17">
+  <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#A3401A">Section 1 · 新设计 · Revenue CRM 手机版的 framework · Lead View 现有色调</div>
+  <h2 style="margin:6px 0 4px;font-family:Newsreader,Georgia,serif;font-weight:400;font-size:34px">Lead View · 手机版</h2>
+  <p style="margin:0 0 28px;font-size:14px;color:#5a4e44;max-width:860px">沿用 CRM 的外壳：430×932、白底、Inter / Inter Tight、底部 5 个 rust pill tab、40px 圆形 header 按钮、34px chip、三行等高的 row、自己的气泡用 Lead View 的卡其色。内容换成 Lead View 的：等待时间、品牌 · 广告、电话、交接给销售。打卡在 Profile（<a href="#1e">1e</a>）。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+    <div id="1a" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#A3401A;color:#fff;border-radius:6px;padding:2px 8px;font-weight:600">1a</span><span>Inbox</span></div>
+      <div data-screen-label="1a Lead Inbox" style="width:430px;height:932px;border-radius:52px;border:10px solid #2B211C;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:none;box-sizing:content-box;background:#fff;color:#2B211C;font-family:Inter,sans-serif;font-size:14px;line-height:normal;box-shadow:0 30px 60px rgba(43,33,28,.14)">
+        <div style="flex:none;height:54px;display:flex;align-items:flex-end;padding:0 0 8px 42px;font-weight:600;font-size:16px;box-sizing:border-box">18:24</div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:16px;padding:10px 20px 0;overflow:hidden">
+          <div style="flex:none;display:flex;align-items:center;gap:8px">
+            <h1 style="flex:1;margin:0;font-family:'Inter Tight',Inter,sans-serif;font-size:30px;font-weight:500;letter-spacing:-.025em;line-height:1.2">Inbox</h1>
+            <span style="flex:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #E7E5D4;box-sizing:border-box"><svg viewBox="0 0 24 24" width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lSearch }}"></path></svg></span>
+            <span style="position:relative;flex:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #E7E5D4;box-sizing:border-box"><svg viewBox="0 0 24 24" width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lBell }}"></path></svg><span style="position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:#A3401A;border:2px solid #fff"></span></span>
+            <span style="flex:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #E7E5D4;box-sizing:border-box"><svg viewBox="0 0 24 24" width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lHouse }}"></path></svg></span>
+          </div>
+          <div style="flex:none;display:flex;gap:6px;margin:0 -20px;padding:0 20px;overflow-x:auto">
+            <span style="flex:none;height:34px;padding:0 11px;border-radius:17px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:500;border:1px solid #E7E5D4;white-space:nowrap;box-sizing:border-box">All brands<svg viewBox="0 0 24 24" width="12" height="12" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lChevronDown }}"></path></svg></span>
+            <span style="flex:none;width:1px;margin:6px 2px;background:#E7E5D4"></span>
+            <sc-for list="{{ lvChips }}" as="c" hint-placeholder-count="5">
+              <span style="flex:none;height:34px;padding:0 12px;border-radius:17px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:{{ c.weight }};white-space:nowrap;box-sizing:border-box;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}<span style="font-weight:500;font-variant-numeric:tabular-nums;color:{{ c.nc }}">{{ c.n }}</span></span>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;margin:-4px -20px 0">
+            <sc-for list="{{ lvRows }}" as="l" hint-placeholder-count="7">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-top:1px solid #F3F1E7">
+                <span style="flex:none;position:relative;width:50px;height:50px">
+                  <span style="width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Inter Tight',Inter,sans-serif;font-size:17px;font-weight:500;background:{{ l.avBg }};color:{{ l.avFg }}">{{ l.ini }}</span>
+                  <span style="position:absolute;right:-2px;bottom:-2px;width:18px;height:18px;box-sizing:border-box;border-radius:50%;border:2px solid #fff;background:{{ l.chanBg }};color:#fff;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="9" height="9" style="fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round"><path d="{{ l.chanD }}"></path></svg></span>
+                </span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  <span style="display:flex;align-items:center;gap:8px;height:20px">
+                    <span style="flex:1;min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden">
+                      <strong style="flex:0 1 auto;min-width:0;font-size:17px;font-weight:{{ l.nameW }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.name }}</strong>
+                      <sc-if value="{{ l.hasTag }}" hint-placeholder-val="{{ false }}"><span style="flex:none;display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;box-sizing:border-box;border-radius:10px;background:#F7F6EE;font-size:11.5px;font-weight:500;color:#5E524A;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ l.tagC }}"></span>{{ l.tag }}</span></sc-if>
+                    </span>
+                    <sc-if value="{{ l.waitShow }}" hint-placeholder-val="{{ false }}"><span style="flex:none;display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:{{ l.waitC }};white-space:nowrap"><svg viewBox="0 0 24 24" width="12" height="12" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ l.waitD }}"></path></svg>{{ l.waitTxt }}</span></sc-if>
+                    <sc-if value="{{ l.noWait }}" hint-placeholder-val="{{ true }}"><span style="flex:none;font-size:13px;font-weight:500;color:{{ l.whenC }};white-space:nowrap">{{ l.when }}</span></sc-if>
+                  </span>
+                  <span style="height:16px;line-height:16px;font-size:13px;color:#A3978D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.ad }}</span>
+                  <span style="display:flex;align-items:center;gap:6px;height:22px">
+                    <span style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;font-size:15px;color:#5E524A;white-space:nowrap;overflow:hidden">
+                      <sc-if value="{{ l.hasPhone }}" hint-placeholder-val="{{ false }}"><span style="flex:none;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:500;color:#30673A"><svg viewBox="0 0 24 24" width="13" height="13" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ l.phoneD }}"></path></svg>{{ l.phone }}</span><span style="flex:none;color:#C4B9AE">·</span></sc-if>
+                      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">{{ l.preview }}</span>
+                    </span>
+                    <sc-if value="{{ l.hasUnread }}" hint-placeholder-val="{{ false }}"><span style="flex:none;min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font-family:'Inter Tight',Inter,sans-serif;font-size:12px;font-weight:600;background:#A3401A;color:#fff">{{ l.unread }}</span></sc-if>
+                  </span>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <nav style="flex:none;display:flex;padding:8px 6px 30px;background:#fff;border-top:1px solid #E7E5D4">
+          <sc-for list="{{ lvTabsInbox }}" as="t" hint-placeholder-count="5">
+            <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ t.color }}">
+              <span style="position:relative;width:52px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:{{ t.pillBg }};color:{{ t.pillFg }}"><svg viewBox="0 0 24 24" width="22" height="22" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ t.d }}"></path></svg><sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-4px;right:2px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Inter Tight',Inter,sans-serif;font-weight:600;font-size:10px;background:#A3401A;color:#fff;border:2px solid #fff">{{ t.badge }}</span></sc-if></span>
+              <span style="font-weight:{{ t.weight }};font-size:11px">{{ t.label }}</span>
+            </span>
+          </sc-for>
+        </nav>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#A3401A;color:#fff;border-radius:6px;padding:2px 8px;font-weight:600">1b</span><span>Chat</span></div>
+      <div data-screen-label="1b Lead chat" style="width:430px;height:932px;border-radius:52px;border:10px solid #2B211C;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:none;box-sizing:content-box;background:#fff;color:#2B211C;font-family:Inter,sans-serif;font-size:14px;line-height:normal;box-shadow:0 30px 60px rgba(43,33,28,.14)">
+        <div style="flex:none;height:54px;display:flex;align-items:flex-end;padding:0 0 8px 42px;font-weight:600;font-size:16px;box-sizing:border-box">18:24</div>
+        <div style="flex:none;background:#fff;border-bottom:1px solid #E7E5D4">
+          <div style="display:flex;align-items:center;gap:10px;padding:2px 16px 12px">
+            <span style="flex:none;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="24" height="24" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lChevronLeft }}"></path></svg></span>
+            <span style="flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#EFEEDD;color:#30673A;font-family:'Inter Tight',Inter,sans-serif;font-size:14px;font-weight:500">NH</span>
+            <div style="display:flex;flex-direction:column;flex:1;min-width:0"><strong style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Nurul Huda</strong><span style="font-size:11.2px;color:#8A7E75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2990s · Raya sofa promo · Messenger</span></div>
+            <span style="width:40px;height:40px;border-radius:50%;background:#F7F6EE;display:inline-flex;align-items:center;justify-content:center;flex-direction:column;gap:3px"><span style="width:3.6px;height:3.6px;border-radius:50%;background:#2B211C"></span><span style="width:3.6px;height:3.6px;border-radius:50%;background:#2B211C"></span><span style="width:3.6px;height:3.6px;border-radius:50%;background:#2B211C"></span></span>
+          </div>
+          <div style="height:44px;padding:0 8px 0 16px;box-sizing:border-box;display:flex;align-items:center;gap:8px;border-top:1px solid #E7E5D4;background:#FBEFE7;font-size:13px;white-space:nowrap">
+            <span style="width:7px;height:7px;flex:none;border-radius:50%;background:#A3401A"></span>
+            <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:500;color:#A3401A">Phone found · 012-338 4721</span>
+            <span style="flex:none;height:32px;padding:0 10px;border-radius:16px;display:flex;align-items:center;font-weight:500;color:#8A7E75">Not a phone</span>
+            <span style="flex:none;height:32px;padding:0 14px;border-radius:16px;display:flex;align-items:center;font-weight:600;background:#A3401A;color:#fff">Confirm</span>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:16px 16px 10px;background:#FBFAF4">
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
+            <span style="align-self:center;margin:6px 0 2px;padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.7);color:#8A7E75;font-size:11.2px;font-weight:500;letter-spacing:.08em;text-transform:uppercase">Today</span>
+            <span style="align-self:center;font-size:12px;color:#A3978D">Nurul Huda replied to an ad · 08:31</span>
+            <div style="align-self:flex-start;max-width:80%;display:flow-root;padding:6px 9px 7px 11px;box-sizing:border-box;border-radius:16px 16px 16px 4px;box-shadow:0 1px 1px rgba(43,33,28,.10);background:#fff;border:1px solid #E7E5D4;color:#2B211C"><p style="display:inline;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.45">Hi, sofa 3 seater ni masih ada promo?</p><span style="display:inline-flex;float:right;margin-left:12px;margin-bottom:-5px;align-items:center;gap:3px;margin-top:8px;font-size:9.5px;color:#8A7E75">08:31</span></div>
+            <div style="align-self:flex-end;max-width:80%;display:flow-root;padding:6px 9px 7px 11px;box-sizing:border-box;border-radius:16px 16px 4px 16px;box-shadow:0 1px 1px rgba(43,33,28,.10);background:#E9E9C7;border:1px solid #DCDCB4;color:#2B211C"><p style="display:inline;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.45">Hi Nurul! Yes, the Raya promo runs until 30 Nov. Which outlet is nearest to you?</p><span style="display:inline-flex;float:right;margin-left:12px;margin-bottom:-5px;align-items:center;gap:3px;margin-top:8px;font-size:9.5px;color:#8A7E75"><span style="font-style:italic;opacity:.85">Sent by Welcome template ·</span>08:31</span></div>
+            <div style="align-self:flex-start;max-width:80%;display:flow-root;padding:6px 9px 7px 11px;box-sizing:border-box;border-radius:16px 16px 16px 4px;box-shadow:0 1px 1px rgba(43,33,28,.10);background:#fff;border:1px solid #E7E5D4;color:#2B211C"><p style="display:inline;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.45">Kelana Jaya. Boleh call saya 012-338 4721</p><span style="display:inline-flex;float:right;margin-left:12px;margin-bottom:-5px;align-items:center;gap:3px;margin-top:8px;font-size:9.5px;color:#8A7E75">08:47</span></div>
+            <div style="align-self:flex-start;max-width:80%;display:flow-root;padding:6px 9px 7px 11px;box-sizing:border-box;border-radius:16px 16px 16px 4px;box-shadow:0 1px 1px rgba(43,33,28,.10);background:#fff;border:1px solid #E7E5D4;color:#2B211C"><p style="display:inline;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.45">Sabtu ni boleh datang tengok?</p><span style="display:inline-flex;float:right;margin-left:12px;margin-bottom:-5px;align-items:center;gap:3px;margin-top:8px;font-size:9.5px;color:#8A7E75">08:48</span></div>
+          </div>
+        </div>
+        <div style="flex:none;display:flex;flex-direction:column;background:#FBFAF4">
+          
+          <div style="display:flex;align-items:flex-end;gap:6px;padding:8px 12px 34px">
+            <span style="flex:1;min-width:0;display:flex;align-items:center;min-height:52px;box-sizing:border-box;padding:0 4px;border-radius:26px;background:#fff;box-shadow:0 1px 2px rgba(43,33,28,.14)">
+              <span style="flex:none;width:38px;height:52px;display:grid;place-items:center;color:#8A7E75"><svg viewBox="0 0 24 24" width="25" height="25" style="fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"></path></svg></span>
+              <span style="flex:1;min-width:0;padding:15px 2px;font-size:15px;line-height:22px;color:#A3978D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reply to Nurul…</span>
+              <span style="flex:none;width:40px;height:52px;display:grid;place-items:center;color:rgb(128 107 96)"><svg viewBox="0 0 24 24" width="25" height="25" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transform:rotate(-45deg)"><path d="{{ ic.attach }}"></path></svg></span>
+              <span style="flex:none;width:40px;height:52px;display:grid;place-items:center;color:rgb(128 107 96)"><svg viewBox="0 0 24 24" width="26" height="26" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.cam2 }}"></path></svg></span>
+            </span>
+            <span style="flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#A3401A;color:#fff;box-shadow:0 3px 9px rgba(163,64,26,.18)"><svg viewBox="0 0 24 24" width="24" height="24" style="fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3"></path></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="1c" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#A3401A;color:#fff;border-radius:6px;padding:2px 8px;font-weight:600">1c</span><span>Customer info · CRM 的 ⋮ › Customer info sheet</span></div>
+      <div data-screen-label="1c Lead customer info sheet" style="width:430px;height:932px;border-radius:52px;border:10px solid #2B211C;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:none;box-sizing:content-box;background:#F7F6EE;color:#2B211C;font-family:Inter,sans-serif;font-size:14px;line-height:normal;box-shadow:0 30px 60px rgba(43,33,28,.14)">
+        <div style="flex:none;height:54px;display:flex;align-items:flex-end;padding:0 0 8px 42px;font-weight:600;font-size:16px;box-sizing:border-box;background:#fff">18:24</div>
+        <div style="flex:none;background:#fff;border-bottom:1px solid #E7E5D4;display:flex;align-items:center;gap:10px;padding:2px 16px 12px">
+          <span style="flex:none;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="24" height="24" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lChevronLeft }}"></path></svg></span>
+          <span style="flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#EFEEDD;color:#30673A;font-family:'Inter Tight',Inter,sans-serif;font-size:14px;font-weight:500">NH</span>
+          <div style="display:flex;flex-direction:column;flex:1;min-width:0"><strong style="font-size:15px;font-weight:600">Nurul Huda</strong><span style="font-size:11.2px;color:#8A7E75">2990s · Raya sofa promo · Messenger</span></div>
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(43,33,28,.32);display:flex;flex-direction:column;justify-content:flex-end">
+          <div style="background:#fff;border-radius:24px 24px 0 0;padding:10px 20px 34px;display:flex;flex-direction:column;gap:14px">
+            <span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#E7E5D4"></span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="flex:none;width:52px;height:52px;border-radius:50%;background:#EFEEDD;color:#30673A;display:grid;place-items:center;font-size:14.6px;font-weight:650">NH</span>
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><strong style="font-size:16.3px;font-weight:700">Nurul Huda</strong><span style="font-size:11.2px;color:#8A7E75">First contact today</span></div>
+              <span style="flex:none;margin-left:auto;height:34px;padding:0 14px;border-radius:17px;border:1px solid #E7E5D4;display:flex;align-items:center;gap:6px;font-size:11.2px;font-weight:650;color:#A3401A"><svg viewBox="0 0 24 24" width="14" height="14" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4"></path></svg>Edit</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 6px 6px 14px;border-radius:14px;background:#FBEFE7;font-size:12px">
+              <span style="width:7px;height:7px;flex:none;border-radius:50%;background:#A3401A"></span>
+              <span style="flex:1;min-width:0;font-weight:500;color:#A3401A">012-338 4721 · theirs?</span>
+              <span style="flex:none;height:44px;padding:0 10px;display:flex;align-items:center;font-weight:500;color:#8A7E75">Not a phone</span>
+              <span style="flex:none;height:36px;padding:0 14px;border-radius:18px;display:flex;align-items:center;font-weight:600;background:#A3401A;color:#fff">Confirm</span>
+            </div>
+            <div style="display:flex;flex-direction:column;border-radius:14px;border:1px solid #E7E5D4">
+              <sc-for list="{{ infoRows }}" as="r" hint-placeholder-count="9">
+                <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-top:{{ r.rule }};font-size:12px">
+                  <span style="flex:none;color:#8A7E75">{{ r.k }}</span>
+                  <span style="min-width:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right"><strong style="font-weight:600;color:{{ r.vFg }}">{{ r.v }}</strong><sc-if value="{{ r.hasSub }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;color:#A3978D">{{ r.sub }}</span></sc-if></span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:8px;padding-top:4px">
+              <span style="flex:1;height:50px;border-radius:25px;border:1px solid #E7E5D4;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;box-sizing:border-box">Copy details</span>
+              <span style="flex:1.6;height:50px;border-radius:25px;background:#A3401A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500">Hand over to 2990s sales</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="1d" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#A3401A;color:#fff;border-radius:6px;padding:2px 8px;font-weight:600">1d</span><span>Leads · 用 CRM Contacts 的页面</span></div>
+      <div data-screen-label="1d Leads" style="width:430px;height:932px;border-radius:52px;border:10px solid #2B211C;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:none;box-sizing:content-box;background:#fff;color:#2B211C;font-family:Inter,sans-serif;font-size:14px;line-height:normal;box-shadow:0 30px 60px rgba(43,33,28,.14)">
+        <div style="flex:none;height:54px;display:flex;align-items:flex-end;padding:0 0 8px 42px;font-weight:600;font-size:16px;box-sizing:border-box">18:24</div>
+        <main style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:10px 28px 24px 20px;display:flex;flex-direction:column;gap:16px">
+          <h1 style="margin:0;display:flex;align-items:baseline;gap:10px;font-family:'Inter Tight',Inter,sans-serif;font-size:28px;font-weight:500;letter-spacing:-.025em;line-height:1.2">Leads<span style="font-family:Inter,sans-serif;font-size:14px;font-weight:400;letter-spacing:0;color:#A3978D">42</span></h1>
+          <div style="flex:none;display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;box-sizing:border-box;border-radius:20px;background:#F7F6EE;color:#A3978D"><svg viewBox="0 0 24 24" width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4.35-4.35"></path></svg><span style="font-size:13px">Search name or phone</span></div>
+          <div style="flex:none;display:flex;gap:6px;margin:0 -28px 0 -20px;padding:0 20px;overflow-x:auto">
+            <span style="flex:none;height:34px;padding:0 11px;border-radius:17px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:500;border:1px solid #E7E5D4;white-space:nowrap;box-sizing:border-box">This month<svg viewBox="0 0 24 24" width="12" height="12" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lChevronDown }}"></path></svg></span>
+            <span style="flex:none;width:1px;margin:6px 2px;background:#E7E5D4"></span>
+            <sc-for list="{{ leadChips }}" as="c" hint-placeholder-count="5">
+              <span style="flex:none;height:34px;padding:0 12px;border-radius:17px;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:{{ c.weight }};white-space:nowrap;box-sizing:border-box;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}<span style="font-weight:500;font-variant-numeric:tabular-nums;color:{{ c.nc }}">{{ c.n }}</span></span>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;margin-top:-8px">
+            <sc-for list="{{ leadRows }}" as="p" hint-placeholder-count="7">
+              <div>
+                <sc-if value="{{ p.hasHead }}" hint-placeholder-val="{{ false }}"><div style="padding:14px 0 4px;font-size:12px;font-weight:500;color:#A3401A">{{ p.head }}</div></sc-if>
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #F3F1E7">
+                  <span style="flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:{{ p.avBg }};color:{{ p.avFg }};font-family:'Inter Tight',Inter,sans-serif;font-size:14px;font-weight:500">{{ p.ini }}</span>
+                  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                    <span style="display:flex;align-items:center;gap:8px"><strong style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.6px;font-weight:500">{{ p.name }}</strong><span style="flex:none;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:#5E524A;white-space:nowrap"><span style="width:7px;height:7px;border-radius:2px;background:{{ p.stC }}"></span>{{ p.stage }}</span></span>
+                    <span style="display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap"><span style="flex:none;color:{{ p.phoneC }};font-variant-numeric:tabular-nums">{{ p.phone }}</span><span style="flex:none;color:#C4B9AE">·</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#A3978D">{{ p.src }}</span></span>
+                  </span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </main>
+        <nav style="flex:none;display:flex;padding:8px 6px 30px;background:#fff;border-top:1px solid #E7E5D4">
+          <sc-for list="{{ lvTabsLeads }}" as="t" hint-placeholder-count="5">
+            <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ t.color }}">
+              <span style="position:relative;width:52px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:{{ t.pillBg }};color:{{ t.pillFg }}"><svg viewBox="0 0 24 24" width="22" height="22" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ t.d }}"></path></svg><sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-4px;right:2px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Inter Tight',Inter,sans-serif;font-weight:600;font-size:10px;background:#A3401A;color:#fff;border:2px solid #fff">{{ t.badge }}</span></sc-if></span>
+              <span style="font-weight:{{ t.weight }};font-size:11px">{{ t.label }}</span>
+            </span>
+          </sc-for>
+        </nav>
+      </div>
+    </div>
+
+    <div id="1e" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#A3401A;color:#fff;border-radius:6px;padding:2px 8px;font-weight:600">1e</span><span>Profile · 打卡入口</span></div>
+      <div data-screen-label="1e Lead Profile" style="width:430px;height:932px;border-radius:52px;border:10px solid #2B211C;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:none;box-sizing:content-box;background:#EAE8DA;color:#2B211C;font-family:Inter,sans-serif;font-size:14px;line-height:normal;box-shadow:0 30px 60px rgba(43,33,28,.14)">
+        <div style="flex:none;height:54px;display:flex;align-items:flex-end;padding:0 0 8px 42px;font-weight:600;font-size:16px;box-sizing:border-box">18:24</div>
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:14px 20px 24px;display:flex;flex-direction:column;gap:16px;background:linear-gradient(180deg,#EAE8DA 0%,#F4F2E8 18%,#fff 42%)">
+          <div style="display:flex;justify-content:flex-end;min-height:40px"><span style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.7)"><svg viewBox="0 0 24 24" width="18" height="18" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.lHouse }}"></path></svg></span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:-6px">
+            <span style="width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:#A3401A;color:#fff;border:4px solid #fff;box-shadow:0 4px 14px rgba(43,33,28,.12);font-family:'Inter Tight',Inter,sans-serif;font-size:32px;font-weight:500">KY</span>
+            <h1 style="margin:6px 0 0;font-family:'Inter Tight',Inter,sans-serif;font-size:22px;font-weight:500;letter-spacing:-.01em">Kai Yee</h1>
+            <span style="font-size:13px;color:#8A7E75">Customer Service · Lead View</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;background:#2B211C;color:#fff">
+            <span style="flex:none;font-family:'Inter Tight',Inter,sans-serif;font-size:26px;font-weight:500;font-variant-numeric:tabular-nums">08:52</span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">Not in yet</span><span style="font-size:12px;color:#E9DCD0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Work day · starts 09:00</span></span>
+            <span style="flex:none;height:44px;padding:0 18px;border-radius:22px;display:flex;align-items:center;background:#fff;color:#A3401A;font-size:14px;font-weight:600">Clock in</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="padding:0 6px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#A3978D">Me</span>
+            <div style="border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(43,33,28,.04),0 6px 18px rgba(43,33,28,.06);overflow:hidden">
+              <sc-for list="{{ profMe }}" as="r" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:{{ r.bt }}">
+                  <span style="flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#A3401A;color:#fff"><svg viewBox="0 0 24 24" width="17" height="17" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ r.d }}"></path></svg></span>
+                  <span style="flex:1;min-width:0;font-size:15px;font-weight:500">{{ r.label }}</span>
+                  <sc-if value="{{ r.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;display:grid;place-items:center;background:#A3401A;color:#fff;font-size:12px;font-weight:600">{{ r.n }}</span></sc-if>
+                  <svg viewBox="0 0 24 24" width="15" height="15" style="fill:none;stroke:#C4B9AE;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none"><path d="{{ ic.lChevronRight }}"></path></svg>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="padding:0 6px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#A3978D">Lead View</span>
+            <div style="border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(43,33,28,.04),0 6px 18px rgba(43,33,28,.06);overflow:hidden">
+              <sc-for list="{{ profLead }}" as="r" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:{{ r.bt }}">
+                  <span style="flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#A3401A;color:#fff"><svg viewBox="0 0 24 24" width="17" height="17" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ r.d }}"></path></svg></span>
+                  <span style="flex:1;min-width:0;font-size:15px;font-weight:500">{{ r.label }}</span>
+                  <span style="font-size:14px;color:#8A7E75;font-variant-numeric:tabular-nums">{{ r.n }}</span>
+                  <svg viewBox="0 0 24 24" width="15" height="15" style="fill:none;stroke:#C4B9AE;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none"><path d="{{ ic.lChevronRight }}"></path></svg>
+                </div>
+              </sc-for>
+            </div>
+            <span style="padding:0 6px;font-size:12px;line-height:1.45;color:#A3978D">Reply rules, templates, AI Agent, Data Center and Settings open on a computer.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="padding:0 6px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#A3978D">The portal</span>
+            <div style="border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(43,33,28,.04),0 6px 18px rgba(43,33,28,.06);overflow:hidden">
+              <sc-for list="{{ profPortal }}" as="r" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:{{ r.bt }}">
+                  <span style="flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#A3401A;color:#fff"><svg viewBox="0 0 24 24" width="17" height="17" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ r.d }}"></path></svg></span>
+                  <span style="flex:1;min-width:0;font-size:15px;font-weight:500">{{ r.label }}</span>
+                  <span style="font-size:14px;color:#8A7E75">{{ r.n }}</span>
+                  <svg viewBox="0 0 24 24" width="15" height="15" style="fill:none;stroke:#C4B9AE;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none"><path d="{{ ic.lChevronRight }}"></path></svg>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <nav style="flex:none;display:flex;padding:8px 6px 30px;background:#fff;border-top:1px solid #E7E5D4">
+          <sc-for list="{{ lvTabsProfile }}" as="t" hint-placeholder-count="5">
+            <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ t.color }}">
+              <span style="position:relative;width:52px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:{{ t.pillBg }};color:{{ t.pillFg }}"><svg viewBox="0 0 24 24" width="22" height="22" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ t.d }}"></path></svg><sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-4px;right:2px;min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Inter Tight',Inter,sans-serif;font-weight:600;font-size:10px;background:#A3401A;color:#fff;border:2px solid #fff">{{ t.badge }}</span></sc-if></span>
+              <span style="font-weight:{{ t.weight }};font-size:11px">{{ t.label }}</span>
+            </span>
+          </sc-for>
+        </nav>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:40px 64px 80px;font-family:Inter,sans-serif;color:#2b1f17">
+  <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#756456">Section 2 · 现有 · recreated from components/me（Lead View 的 Clock in 会打开这一套）</div>
+  <h2 style="margin:6px 0 4px;font-family:Newsreader,Georgia,serif;font-weight:400;font-size:34px">打卡系统 · Me</h2>
+  <p style="margin:0 0 28px;font-size:14px;color:#5a4e44;max-width:760px">Me hub → Clock in 相机（自拍 + 服务器时间 + 围栏）→ Attendance 月历。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px;align-items:flex-start">
+
+    <div id="2a" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#2b1f17;color:#f6eee6;border-radius:6px;padding:2px 8px;font-weight:600">2a</span><span>Me hub</span></div>
+      <div data-screen-label="2a Me hub" style="width:390px;height:844px;border-radius:44px;border:9px solid #1b1714;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 20px 50px rgb(43 31 23 / .18);flex:none;box-sizing:content-box;background:#fff;color:#000;font-family:Inter,sans-serif;font-size:14px">
+        <div style="flex:none;padding:44px 20px 0;height:44px;display:flex;align-items:center;color:#000;font-size:14px;gap:4px"><svg viewBox="0 0 24 24" width="20" height="20" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none"><path d="{{ ic.arrowLeft }}"></path></svg><span>Profile</span></div>
+        <div style="flex:1;min-height:0;overflow-y:auto;border-bottom:34px solid #fff;box-shadow:inset 0 -1px 0 rgb(229 228 223);padding:2px 20px 40px;display:flex;flex-direction:column;gap:22px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="position:relative;width:56px;height:56px;flex:none">
+              <span style="width:56px;height:56px;border-radius:7px;background:rgb(43 31 23);color:rgb(246 238 230);display:grid;place-items:center;font-size:20px;font-weight:650;letter-spacing:.02em">CT</span>
+              <span style="position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:50%;background:#fff;border:1px solid rgb(229 228 223);display:grid;place-items:center;box-shadow:0 1px 3px rgb(51 36 27 / .12)"><svg viewBox="0 0 24 24" width="12" height="12" style="fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="{{ ic.camera }}"></path></svg></span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <h1 style="margin:0;font-family:Newsreader,Georgia,serif;font-size:28px;font-weight:400;letter-spacing:-.01em;line-height:1.1">Carrie Tan</h1>
+              <p style="margin:5px 0 0;font-size:13px;color:rgb(90 78 68)">Finance Executive · Finance</p>
+            </div>
+          </div>
+          <div style="border-radius:16px;background:rgb(43 31 23);color:rgb(246 238 230);padding:14px 16px;display:flex;align-items:center;gap:14px">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:rgb(214 202 188)">Today · Work day</span>
+              <span style="font-size:26px;line-height:1.1;font-weight:500;font-variant-numeric:tabular-nums">08:52</span>
+              <span style="font-size:12px;color:rgb(214 202 188)">Not in yet · starts 09:00</span>
+            </div>
+            <span style="display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:6px;background:rgb(233 154 83);color:#000;font-size:13px;font-weight:500">Clock in</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+            <sc-for list="{{ meTiles }}" as="t" hint-placeholder-count="7">
+              <div style="border:1px solid rgb(229 228 223);border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(63 43 34 / .06),0 6px 18px rgb(63 43 34 / .08);padding:14px 12px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-height:100px;box-sizing:border-box">
+                <span style="width:38px;height:38px;border-radius:10px;background:{{ t.bg }};color:{{ t.fg }};display:grid;place-items:center"><svg viewBox="0 0 24 24" width="20" height="20" style="fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><path d="{{ t.d }}"></path></svg></span>
+                <span style="font-weight:500;font-size:13.5px;line-height:1.25">{{ t.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgb(117 100 86)">Request status</span><span style="font-size:12.5px">All ›</span></div>
+            <div style="border:1px solid rgb(229 228 223);border-radius:12px;padding:0 14px;background:#fff;box-shadow:0 1px 2px rgb(63 43 34 / .06),0 6px 18px rgb(63 43 34 / .08)">
+              <sc-for list="{{ meReqs }}" as="r" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:{{ r.bb }}">
+                  <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600">{{ r.title }}</div><div style="font-size:12px;color:rgb(90 78 68);margin-top:2px">{{ r.when }}</div></div>
+                  <span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:{{ r.bg }};border:1px solid {{ r.bd }};color:{{ r.fg }};font-family:'Chivo Mono',monospace;font-size:11px;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;flex:none"></span>{{ r.word }}</span>
+                  <span style="color:rgb(117 100 86);font-size:16px">›</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="2b" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#2b1f17;color:#f6eee6;border-radius:6px;padding:2px 8px;font-weight:600">2b</span><span>Clock in · 相机</span></div>
+      <div data-screen-label="2b Clock in camera" style="width:390px;height:844px;border-radius:44px;border:9px solid #1b1714;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 20px 50px rgb(43 31 23 / .18);flex:none;box-sizing:content-box;background:#0E0C0B;color:#fff;font-family:Inter,sans-serif;font-size:13px">
+        <div style="height:44px;flex:none"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 10px"><span style="width:44px;height:44px;display:grid;place-items:center;font-size:24px">×</span><span style="font-weight:500;font-size:16px">Clock in</span><span style="width:44px"></span></div>
+        <div style="position:relative;flex:1;min-height:0;margin:6px 16px 0;border-radius:20px;overflow:hidden;background:repeating-linear-gradient(135deg,#1E1A17 0 14px,#231e1a 14px 28px);display:grid;place-items:center">
+          <div style="position:relative;width:190px;height:250px;border-radius:50%;border:2px solid rgb(255 255 255 / .7)"></div>
+          <span style="position:absolute;top:14px;left:0;right:0;text-align:center;font-family:'Chivo Mono',monospace;font-size:11px;color:rgb(255 255 255 / .45)">front camera feed</span>
+          <span style="position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:12px;color:rgb(255 255 255 / .75)">Front camera · live — no gallery</span>
+        </div>
+        <div style="padding:14px 20px 0;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12px;color:rgb(255 255 255 / .65)">Server time</span><span style="font-variant-numeric:tabular-nums;font-weight:500;font-size:22px">08:52:17</span></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:9px 11px;border-radius:10px;background:rgb(255 255 255 / .08)"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:rgb(120 190 140)"></span><span style="flex:1;min-width:0">HQ · Jalan Puchong · 38 m · inside the 150 m fence</span></div>
+        </div>
+        <div style="display:grid;place-items:center;padding:16px 0 64px"><span style="width:76px;height:76px;border-radius:50%;border:4px solid #fff;padding:5px;display:block"><span style="display:block;width:100%;height:100%;border-radius:50%;background:rgb(233 154 83)"></span></span></div>
+      </div>
+    </div>
+
+    <div id="2c" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="background:#2b1f17;color:#f6eee6;border-radius:6px;padding:2px 8px;font-weight:600">2c</span><span>Attendance · 月历</span></div>
+      <div data-screen-label="2c Me Attendance" style="width:390px;height:844px;border-radius:44px;border:9px solid #1b1714;overflow:hidden;position:relative;display:flex;flex-direction:column;box-shadow:0 20px 50px rgb(43 31 23 / .18);flex:none;box-sizing:content-box;background:#fff;color:#000;font-family:Inter,sans-serif;font-size:14px">
+        <div style="flex:none;padding:44px 20px 0;height:44px;display:flex;align-items:center;color:#000;font-size:14px;gap:4px"><svg viewBox="0 0 24 24" width="20" height="20" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none"><path d="{{ ic.arrowLeft }}"></path></svg><span>Me</span></div>
+        <div style="flex:1;min-height:0;overflow-y:auto;border-bottom:34px solid #fff;box-shadow:inset 0 -1px 0 rgb(229 228 223);padding:2px 20px 40px;display:flex;flex-direction:column;gap:20px">
+          <div><h1 style="margin:0;font-family:Newsreader,Georgia,serif;font-size:30px;font-weight:400;letter-spacing:-.01em;line-height:1.1">Attendance</h1><p style="margin:6px 0 0;font-size:13px;color:rgb(90 78 68)">Mon–Fri 09:00–18:00 · HR closes November on 3 Dec</p></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgb(117 100 86)">November 2026 · history</span>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid rgb(229 228 223);border-radius:12px;background:#fff;box-shadow:0 1px 2px rgb(63 43 34 / .06),0 6px 18px rgb(63 43 34 / .08)">
+              <sc-for list="{{ attTotals }}" as="x" hint-placeholder-count="4">
+                <div style="padding:10px;border-left:{{ x.bl }}"><div style="font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:rgb(117 100 86)">{{ x.label }}</div><div style="font-size:17px;margin-top:5px;font-weight:500;font-variant-numeric:tabular-nums">{{ x.value }}</div><div style="font-size:11px;color:rgb(90 78 68);margin-top:2px">{{ x.note }}</div></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:rgb(117 100 86);text-align:center"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px">
+              <sc-for list="{{ cal }}" as="c" hint-placeholder-count="35">
+                <span style="height:46px;border-radius:8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:13px;font-variant-numeric:tabular-nums;font-weight:{{ c.fw }};border:{{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};visibility:{{ c.vis }}">{{ c.n }}</span>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11.5px;color:rgb(90 78 68);padding-top:4px">
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;background:rgb(222 240 232);border:1px solid rgb(21 110 78);box-sizing:border-box"></span>Present</span>
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;background:rgb(249 238 214);border:1px solid rgb(150 100 12);box-sizing:border-box"></span>Late</span>
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;background:rgb(250 228 224);border:1px solid rgb(176 40 34);box-sizing:border-box"></span>Incomplete</span>
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;background:rgb(230 237 241);border:1px solid rgb(78 101 116);box-sizing:border-box"></span>Leave</span>
+            </div>
+          </div>
+          <div style="border:1px solid rgb(229 228 223);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;background:#fff;box-shadow:0 1px 2px rgb(63 43 34 / .06),0 6px 18px rgb(63 43 34 / .08)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-weight:500;font-size:15px">Thu 26 Nov</span><span style="display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:rgb(250 228 224);border:1px solid rgb(236 190 184);color:rgb(176 40 34);font-family:'Chivo Mono',monospace;font-size:11px;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;flex:none"></span>Incomplete</span></div>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 24px">
+              <div><div style="font-size:11px;color:rgb(117 100 86);text-transform:uppercase;letter-spacing:.06em">IN</div><div style="margin-top:3px">08:58</div></div>
+              <div><div style="font-size:11px;color:rgb(117 100 86);text-transform:uppercase;letter-spacing:.06em">OUT</div><div style="margin-top:3px;color:rgb(150 100 12)">Missing</div></div>
+              <div><div style="font-size:11px;color:rgb(117 100 86);text-transform:uppercase;letter-spacing:.06em">Place</div><div style="margin-top:3px">HQ</div></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;height:34px;border-radius:6px;border:1px solid rgb(229 228 223);background:#fff;font-size:13px;font-weight:500">File a correction</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgb(117 100 86)">Needs action</span>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;background:rgb(249 238 214);border:1px solid rgb(232 206 150);font-size:12px;line-height:1.5">
+              <span style="width:6px;height:6px;border-radius:50%;background:rgb(150 100 12);margin-top:7px;flex:none"></span>
+              <div style="flex:1;min-width:0"><div style="font-weight:600;color:rgb(150 100 12)">Thu 26 Nov · no OUT</div>File a correction before HR closes the month.</div>
+              <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:6px;border:1px solid rgb(229 228 223);background:#fff;font-size:12px;font-weight:500">Fix</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { ic: {} };
+  componentDidMount() { fetch('./icons.json').then(r => r.json()).then(ic => this.setState({ ic })).catch(() => {}); }
+  lv(ic) {
+    const RUST = '#A3401A', MUTED = '#8A7E75', INK = '#2B211C', FAINT = '#A3978D', OX = '#A3401A';
+    const tabs = on => [['Inbox', 'inbox4a', 4], ['Leads', 'contact'], ['Insight', 'trendingUp'], ['Campaigns', 'lMegaphone'], ['Profile', 'userRound']]
+      .map(([label, i, badge]) => ({ label, d: ic[i], badge, hasBadge: !!badge, pillBg: label === on ? RUST : 'transparent', pillFg: label === on ? '#fff' : MUTED, color: label === on ? RUST : MUTED, weight: label === on ? 600 : 500 }));
+    const chips = (a) => a.map(([label, n, on, hot]) => ({ label, n, bg: on ? '#E9E9C7' : '#F7F6EE', bd: on ? '#C9C79A' : '#F7F6EE', fg: INK, nc: on ? '#8A7E75' : hot ? OX : FAINT, weight: on ? 600 : 500 }));
+    const AVS = [['#EFEEDD', '#30673A'], ['#EFEEDD', '#30673A'], ['#EFEEDD', '#30673A'], ['#EFEEDD', '#30673A']];
+    const tint = name => { let h = 0; for (const ch of name.trim().toLowerCase()) h = (h * 31 + ch.codePointAt(0)) >>> 0; return AVS[h % 4]; };
+    const AV = { get 0() { return AVS[0]; } };
+    const CH = { m: ['#0A7CFF', ic.lMessageCircle], i: ['#C13584', ic.lInstagram] };
+    const row = ([ini, name, ch, tag, wait, when, ad, phone, preview, unread], n) => ({
+      ini, name, ad, preview, unread, hasUnread: !!unread, nameW: unread ? 600 : 500, avBg: tint(name)[0], avFg: tint(name)[1], chanBg: CH[ch][0], chanD: CH[ch][1],
+      hasTag: !!tag, tag: tag ? tag[0] : '', tagC: tag ? tag[1] : 'transparent',
+      waitShow: !!wait, noWait: !wait, waitTxt: wait ? wait[0] : '', waitC: wait ? wait[1] : INK, waitD: wait && wait[1] === OX ? ic.triangleAlert : ic.lClock,
+      when, whenC: unread ? RUST : FAINT, hasPhone: !!phone, phone: phone || '', phoneD: ic.lPhone,
+    });
+    const lvRows = [
+      ['NH', 'Nurul Huda', 'm', null, ['17 m', '#8A5A12'], '', '2990s · Raya sofa promo', '012-338 4721', 'Sabtu ni boleh datang tengok?', 2],
+      ['LT', 'Low Tze Yen', 'm', ['Hot lead', '#A3401A'], ['25 m', '#8A5A12'], '', '2990s mini · Chat with us', '', 'How much for the 3 seater pushback?', 1],
+      ['AR', 'Aisyah Rahman', 'i', null, ['1 h 05 m', OX], '', 'Carress · Mattress ad', '', 'Ok thanks, I will check with my husband', 1],
+      ['JL', 'Jason Lim', 'm', ['VIP', '#7A4F6E'], ['1 d 3 h', OX], '', '2990s · Year-end sale', '', 'Photo', 3],
+      ['SK', 'Siti Khadijah', 'i', null, null, 'Yesterday', 'Carress · Organic', '019-870 4416', 'You: Our showroom opens 10am–10pm daily', 0],
+      ['MW', 'Michelle Wong', 'm', null, null, 'Wed', '2990s · Organic', '', 'You: Passed your number to our sales team', 0],
+      ['DT', 'Daniel Tan', 'm', null, null, 'Wed', '2990s · Year-end sale', '', 'Is delivery to Penang free?', 0],
+      ['FA', 'Farah Aziz', 'i', null, null, 'Tue', 'Carress · Organic', '', 'You: Thank you, see you then', 0],
+    ].map(row);
+    const ST = { 'No phone yet': '#C4B9AE', 'Not handed yet': '#A3401A', Handed: '#8A5A12', Contacted: '#4E6170', Appointment: '#7A4F6E', Came: '#30673A', Closed: INK, Lost: '#C4B9AE' };
+    const leadRows = [
+      ['NH', 'Nurul Huda', 'm', 'Not handed yet', '08:48', '2990s · 2990s Kelana Jaya · Raya sofa promo', '012-338 4721'],
+      ['LT', 'Low Tze Yen', 'm', 'No phone yet', '08:40', '2990s mini · Chat with us', ''],
+      ['MW', 'Michelle Wong', 'm', 'Handed', 'Wed', '2990s · 2990s Petaling Jaya · Organic', '016-221 9085'],
+      ['DT', 'Daniel Tan', 'm', 'Appointment', 'Tue', '2990s · PWCC Penang · Year-end sale', '017-455 0312'],
+      ['SK', 'Siti Khadijah', 'i', 'Came', 'Mon', 'Carress · Carress Taman Maluri · Mattress ad', '019-870 4416'],
+      ['FA', 'Farah Aziz', 'i', 'Closed', '20 Nov', 'Carress · Carress Johor · Organic', '011-2345 6678'],
+      ['KS', 'Kumar Selvam', 'm', 'Lost', '18 Nov', '2990s · 2990s Kelana Jaya · Raya sofa promo', '012-907 3355'],
+    ].map(([ini, name, ch, stage, when, src, phone], n, a) => {
+      const grp = /^\d\d:/.test(when) ? 'Today' : /^[A-Z][a-z]{2}$/.test(when) ? 'This week' : 'Earlier';
+      const prev = n ? (/^\d\d:/.test(a[n - 1][4]) ? 'Today' : /^[A-Z][a-z]{2}$/.test(a[n - 1][4]) ? 'This week' : 'Earlier') : '';
+      return { ini, name, stage, stC: ST[stage], when, src, phone: phone || 'No phone yet', phoneC: phone ? '#5E524A' : FAINT, avBg: tint(name)[0], avFg: tint(name)[1], head: grp, hasHead: grp !== prev };
+    });
+    const infoRows = [['Phone', '012-338 4721', 'found in the chat'], ['Outlet', '2990s Kelana Jaya', 'from the ad'], ['Interest', '3 seater sofa'], ['Budget', ''], ['Showroom', 'Kelana Jaya'], ['Visit', 'Sat 28 Nov'], ['Language', 'Malay'], ['Special request', ''], ['Note', 'Wants to visit Saturday morning']]
+      .map(([k, v, sub], n) => ({ k, v: v || '—', vFg: v ? INK : '#C4B9AE', sub: sub || '', hasSub: !!sub, rule: n ? '1px solid #E7E5D4' : '0' }));
+    const prow = (a) => a.map(([label, i, n, badge], k) => ({ label, d: ic[i], n: n || '', hasN: !!n && !badge, hasBadge: !!badge, bt: k ? '1px solid #F3F1E7' : '0' }));
+    const frow = (a) => a.map(([label, i, v, from], k) => ({ label, d: ic[i], v: v || '—', vc: v ? INK : '#C4B9AE', from: from || '', bt: k ? '1px solid #F3F1E7' : '0' }));
+    return {
+      lvTabsInbox: tabs('Inbox'), lvTabsLeads: tabs('Leads'), lvTabsProfile: tabs('Profile'), lvRows, leadRows, infoRows,
+      lvChips: chips([['Waiting', 4, 1], ['Answered', 12], ['Handed', 9], ['All', 25], ['Hot lead', 3], ['VIP', 2]]),
+      leadChips: chips([['All', 42, 1], ['No phone yet', 12], ['Not handed yet', 5, 0, 1], ['Handed', 9], ['Contacted', 6], ['Appointment', 4], ['Came', 3], ['Closed', 2], ['Lost', 1]]),
+      custSales: frow([['Outlet', 'lStore', '2990s Kelana Jaya', 'from the ad'], ['Interest', 'lSofa', '3 seater sofa'], ['Budget', 'lWallet', ''], ['Showroom', 'lMapPin', 'Kelana Jaya'], ['Visit', 'lCalendar', 'Sat 28 Nov'], ['Language', 'lLanguages', 'Malay'], ['Special request', 'lSparkles', '']]),
+      profMe: prow([['Attendance', 'in'], ['Leave', 'calendar'], ['Payslip', 'payroll'], ['Submit request', 'approve', '1', 1]]),
+      profLead: prow([['Quick replies', 'lMessageCircle', '14'], ['General info', 'lBookOpen'], ['Working hours', 'lClock'], ['Notifications', 'lBell']]),
+      profPortal: prow([['Switch view', 'lEye', 'Lead View'], ['Sign out', 'logOut']]),
+    };
+  }
+  renderVals() {
+    const ic = this.state.ic;
+    const TONE = { clay: ['rgb(249 231 216)', 'rgb(163 78 37)'], olive: ['rgb(238 240 226)', 'rgb(88 98 68)'], slate: ['rgb(230 237 241)', 'rgb(78 101 116)'], gold: ['rgb(246 237 213)', 'rgb(125 91 32)'] };
+    const quick = [['Payment', 'out', 'clay', 5], ['Receive', 'in', 'clay'], ['Invoice', 'invoice', 'clay', 3], ['Billing', 'people', 'clay', 2], ['Daily Bank', 'calendar', 'clay'], ['Fund IN', 'in', 'olive'], ['Fund OUT', 'out', 'olive'], ['Ledger', 'doc', 'slate']]
+      .map(([label, i, t, badge]) => ({ label, d: ic[i], bg: TONE[t][0], fg: TONE[t][1], badge, hasBadge: !!badge }));
+    const cat = (roman, label, tone, tiles) => ({ roman, label, bg: TONE[tone][0], fg: TONE[tone][1], count: tiles.length + ' pages', tiles: tiles.map(([l, i]) => ({ label: l, d: ic[i] })) });
+    const cats = [
+      cat('I.', 'Daily', 'clay', [['Payment voucher', 'out'], ['Payment request', 'hrInbox'], ['Receipt', 'in'], ['Invoice', 'invoice'], ['Billing Allocator', 'people'], ['Daily Bank', 'calendar'], ['Reconciliation', 'approve'], ['Journal Entries', 'doc'], ['Fixed Assets', 'tree']]),
+      cat('II.', 'Fund', 'olive', [['Fund IN', 'in'], ['Fund OUT', 'out'], ['Invoice Financing', 'percent'], ['Repayment', 'calendar'], ['Statements', 'receipt']]),
+      cat('III.', 'Report', 'slate', [['General Ledger', 'doc'], ['P&L', 'report'], ['Cash Flow', 'in'], ['Receipt & Payment', 'receipt'], ['Balance Sheet', 'tree'], ['Trial Balance', 'approve'], ['Debtor Aging', 'people'], ['Loan Aging', 'percent'], ['Company Statement', 'invoice'], ['Chart of Account', 'tree'], ['Base Rate History', 'percent']]),
+      cat('IV.', 'Department', 'gold', [['Dept Pool', 'org'], ['Venture', 'director'], ['Marketing', 'people'], ['Finance', 'payroll'], ['HR', 'staff'], ['Director Office', 'director'], ['Venture Pool', 'in']]),
+    ];
+    const finTabs = on => [['Overview', 'home'], ['Daily', 'calendar'], ['Fund', 'payroll'], ['Report', 'report'], ['Profile', 'staff']]
+      .map(([label, i]) => ({ label, d: ic[i], color: label === on ? 'rgb(163 78 37)' : 'rgb(117 100 86)', weight: label === on ? 600 : 400 }));
+    const rows = a => a.map(([label, i, sub], n) => ({ label, d: ic[i], sub: sub || '', bt: n ? '1px solid rgb(229 228 223)' : '0' }));
+    const meT = [['#FFE3CC', '#E0661F'], ['#DCE8FB', '#2F64C8'], ['#D9F2E2', '#1F8A4C'], ['#ECE2FA', '#6B44C2'], ['#FBDDDD', '#C23B3B'], ['#D5F1F0', '#11807B'], ['#FBEFC9', '#A87A00']];
+    const meTiles = [['Attendance', 'in'], ['Leave', 'calendar'], ['Payslip', 'payroll'], ['Profile', 'user'], ['Hierarchy', 'tree'], ['Submit request', 'approve'], ['Documents', 'doc']]
+      .map(([label, i], n) => ({ label, d: ic[i], bg: meT[n][0], fg: meT[n][1] }));
+    const chip = { ok: ['rgb(222 240 232)', 'rgb(21 110 78)', 'rgb(180 215 198)'], wait: ['rgb(249 238 214)', 'rgb(150 100 12)', 'rgb(232 206 150)'], no: ['rgb(250 228 224)', 'rgb(176 40 34)', 'rgb(236 190 184)'] };
+    const meReqs = [['Annual leave · 2 days', 'Thu 3 Dec – Fri 4 Dec', 'Waiting', 'wait'], ['Correction · OUT', 'Wed 18 Nov · 18:05', 'Approved', 'ok'], ['Overtime · 2 h', 'Tue 10 Nov', 'Approved', 'ok']]
+      .map(([title, when, word, t], n, a) => ({ title, when, word, bg: chip[t][0], fg: chip[t][1], bd: chip[t][2], bb: n < a.length - 1 ? '1px solid rgb(226 224 218)' : '0' }));
+    const attTotals = [['Present', '17', 'days'], ['Late', '2', 'days'], ['Leave', '1', 'day'], ['OT', '2.0', 'hours']].map(([label, value, note], n) => ({ label, value, note, bl: n ? '1px solid rgb(229 228 223)' : '0' }));
+    const W = { present: ['rgb(222 240 232)', 'rgb(21 110 78)', 'rgb(31 122 75 / .22)'], late: ['rgb(249 238 214)', 'rgb(150 100 12)', 'rgb(176 120 20 / .28)'], incomplete: ['rgb(250 228 224)', 'rgb(176 40 34)', 'rgb(190 50 40 / .25)'], leave: ['rgb(230 237 241)', 'rgb(78 101 116)', 'rgb(68 96 122 / .25)'] };
+    const special = { 5: 'late', 13: 'leave', 19: 'late', 26: 'incomplete' };
+    const cal = [];
+    for (let i = 0; i < 6; i++) cal.push({ n: '', vis: 'hidden', bg: 'none', fg: 'inherit', bd: '0', fw: 500 });
+    for (let d = 1; d <= 30; d++) {
+      const dow = (d + 5) % 7, off = dow >= 5, future = d > 27;
+      const w = off || future || d === 27 ? null : W[special[d] || 'present'];
+      cal.push({ n: d, vis: 'visible', fw: w ? 600 : 500, bg: w ? w[0] : off ? 'rgb(246 246 244)' : '#fff', fg: w ? w[1] : off ? 'rgb(117 100 86)' : '#000',
+        bd: d === 26 ? '2px solid #000' : d === 27 ? '1.5px solid #000' : w ? '1px solid ' + w[2] : '1px solid rgb(229 228 223)' });
+    }
+    const rust = 'rgb(163 64 26)', pos = 'rgb(48 103 58)', mut = 'rgb(138 126 117)', f4 = 'rgb(163 151 141)';
+    const chats = [
+      ['NH', 'Nurul Huda', '08:48', 'Sabtu ni boleh datang tengok?', 2, 'Phone found · confirm', rust, '2990s'],
+      ['LT', 'Low Tze Yen', '08:40', 'How much for the 3 seater pushback?', 1, 'No phone yet', mut, '2990s mini'],
+      ['AR', 'Aisyah Rahman', '08:12', 'Ok thanks, I will check with my husband', 1, 'Waiting 40 min', rust, 'Carress'],
+      ['JL', 'Jason Lim', 'Yesterday', '[Photo]', 3, 'Waiting since yesterday', rust, '2990s'],
+      ['SK', 'Siti Khadijah', 'Yesterday', 'You: Our PJ showroom opens 10am–10pm daily', 0, 'Answered', pos, 'Carress'],
+      ['MW', 'Michelle Wong', 'Wed', 'You: Passed your number to our sales team', 0, 'Handed · 2990s sales', pos, '2990s'],
+      ['DT', 'Daniel Tan', 'Wed', 'Is delivery to Penang free?', 0, 'Answered', pos, '2990s'],
+    ].map(([ini, name, time, last, unread, status, sc, brand]) => ({ ini, name, time, last, unread, hasUnread: unread > 0, status, sc, brand, nw: unread ? 600 : 500, tw: unread ? 600 : 400, tc: unread ? rust : f4 }));
+    const lvTabs = on => [['Inbox', 'lInbox', true], ['Leads', 'lUsers'], ['Insight', 'lChartColumn'], ['More', 'lLayoutGrid']]
+      .map(([label, i, dot]) => ({ label, d: ic[i], dot: !!dot, color: label === on ? rust : mut, weight: label === on ? 600 : 400 }));
+    const ink = 'rgb(43 33 28)';
+    const custFields = [['Outlet', 'lStore', '2990s Kelana Jaya', '· from the ad'], ['Interest', 'lSofa', '3 seater sofa'], ['Budget', 'lWallet', ''], ['Showroom', 'lMapPin', 'Kelana Jaya'], ['Visit', 'lCalendar', 'Sat 28 Nov'], ['Language', 'lLanguages', 'Malay'], ['Special request', 'lSparkles', '']]
+      .map(([k, i, v, from]) => ({ k, d: ic[i], v: v || '—', from: from || '', color: v ? ink : 'rgb(196 185 174)' }));
+    const stages = [['All', 42, 1], ['No phone yet', 12], ['Not handed yet', 5], ['Handed', 9], ['Contacted', 6], ['Appointment', 4], ['Came', 3], ['Closed', 2], ['Lost', 1]]
+      .map(([label, n, on]) => ({ label, n, bg: on ? 'rgb(233 233 199)' : '#fff', bd: on ? 'rgb(201 199 154)' : 'rgb(231 229 212)' }));
+    const ST = { rust: ['rgb(251 239 231)', rust], pos: ['rgb(233 238 231)', pos], warn: ['rgb(244 240 230)', 'rgb(138 90 18)'], mut: ['rgb(247 246 238)', mut] };
+    const leads = [
+      ['Nurul Huda', '012-338 4721', 'Not handed yet', 'rust', '2990s · 2990s Kelana Jaya · Raya sofa promo', '08:48'],
+      ['Low Tze Yen', '', 'No phone yet', 'mut', '2990s mini · Chat with us', '08:40'],
+      ['Michelle Wong', '016-221 9085', 'Handed', 'warn', '2990s · 2990s Petaling Jaya · Organic', 'Wed'],
+      ['Daniel Tan', '017-455 0312', 'Appointment', 'pos', '2990s · PWCC Penang · Year-end sale', 'Tue'],
+      ['Siti Khadijah', '019-870 4416', 'Came', 'pos', 'Carress · Carress Taman Maluri · Mattress ad', 'Mon'],
+      ['Farah Aziz', '011-2345 6678', 'Closed', 'pos', 'Carress · Carress Johor · Organic', '20 Nov'],
+    ].map(([name, phone, stage, t, src, when]) => ({ name, phone: phone || 'No phone yet', pc: phone ? ink : f4, stage, sbg: ST[t][0], sfg: ST[t][1], src, when }));
+    const moreRows = [['Campaigns', 'lMegaphone', ''], ['General info', 'lBookOpen', 'Read only'], ['Working hours', 'lClock', 'Read only'], ['Switch view', 'lEye', 'Lead View'], ['Home', 'lHouse', '']]
+      .map(([label, i, note], n) => ({ label, d: ic[i], note, bt: n ? '1px solid rgb(243 241 231)' : '0' }));
+    return {
+      ...this.lv(ic), ic, quick, cats, finTabsHome: finTabs('Overview'), finTabsProfile: finTabs('Profile'),
+      account: rows([['Change password', 'lock'], ['Request to change email', 'mail', 'carrie@houzs.my'], ['IT support', 'buoy']]),
+      admin: rows([['Audit Log', 'report', 'Every change, who and when'], ['Departments', 'org', '5 departments · pools and heads'], ['Meeting Rooms', 'room', '3 rooms · bookings']]),
+      meTiles, meReqs, attTotals, cal, chats, custFields, stages, leads, moreRows,
+      
+    };
+  }
+}
+</script>
+</body>
+</html>
