@@ -8,11 +8,20 @@
  */
 import type { CSSProperties } from "react";
 
+/** The three colours named once (the desktop table's foot, where the cells show numbers only). */
+export function ReplyLegend({ size = 11 }: { size?: number }) {
+  const item = (c: string, t: string) => <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: c }} />{t}</span>;
+  return <span data-reply-legend="" style={{ display: "inline-flex", gap: "14px", fontSize: `${size}px`, color: "var(--crm-muted)" }}>
+    {item(REPLIED_C, "Replied after template")}{item(APPT_C, "Appt")}{item(NOREPLY_C, "No reply yet")}
+  </span>;
+}
+
 export const REPLIED_C = "var(--crm-replied)", NOREPLY_C = "var(--crm-noreply)", APPT_C = "var(--crm-v4-green)";
 
-export function ReplyBar({ replied, noReply, appt = [], openReplied, openNoReply, openAppt, size = 12, bar = 56 }: {
+export function ReplyBar({ replied, noReply, appt = [], openReplied, openNoReply, openAppt, size = 12, bar = 56, compact = false }: {
   replied: string[]; noReply: string[]; appt?: string[];
   openReplied?: () => void; openNoReply?: () => void; openAppt?: () => void; size?: number; bar?: number;
+  /** Numbers only, the words in the tooltip (the desktop column, where the words did not fit — 2026-11-28). */ compact?: boolean;
 }) {
   const n = replied.length + noReply.length;
   if (!n) return <span style={{ fontSize: `${size}px`, color: "var(--crm-faint)" }}>—</span>;
@@ -22,10 +31,10 @@ export function ReplyBar({ replied, noReply, appt = [], openReplied, openNoReply
   const num = (v: number, word: string, c: string, open: (() => void) | undefined, label: string) => {
     const st: CSSProperties = { display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums",
       ...(open ? { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } : {}) };
-    const press = open ? { role: "button" as const, tabIndex: 0, title: `Click to see who ${label}`, "aria-label": `${v} ${word}`,
+    const press = !open ? { title: `${v} ${word}` } : { role: "button" as const, tabIndex: 0, title: `${v} ${word} · click to see who ${label}`, "aria-label": `${v} ${word}`,
       onClick: (e: { stopPropagation(): void }) => { e.stopPropagation(); open(); },
-      onKeyDown: (e: { key: string; preventDefault(): void; stopPropagation(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open(); } } } : {};
-    return <span {...press} style={st}><span aria-hidden style={{ width: "7px", height: "7px", borderRadius: "50%", flex: "none", background: c }} /><b style={{ fontWeight: 500, color: "var(--crm-ink)" }}>{v}</b><span style={{ color: "var(--crm-muted)" }}>{word}</span></span>;
+      onKeyDown: (e: { key: string; preventDefault(): void; stopPropagation(): void }) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open(); } } };
+    return <span {...press} style={st}><span aria-hidden style={{ width: "7px", height: "7px", borderRadius: "50%", flex: "none", background: c }} /><b style={{ fontWeight: 500, color: "var(--crm-ink)" }}>{v}</b>{!compact && <span style={{ color: "var(--crm-muted)" }}>{word}</span>}</span>;
   };
   const dot = <span aria-hidden style={{ color: "var(--crm-faint)" }}>·</span>;
   return (

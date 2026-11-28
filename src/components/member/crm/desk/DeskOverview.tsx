@@ -8,7 +8,7 @@
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import { DeskFigureTip } from "./Desk4a";
 import { FeeEdit } from "../shared/fee-edit";
-import { ReplyBar } from "../shared/reply-bar";
+import { ReplyBar, ReplyLegend } from "../shared/reply-bar";
 import type { DeskOverview as OV } from "./vm/overview";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -24,7 +24,7 @@ const figPress = (open: (() => void) | undefined, what: string) => !open ? {} : 
 const figLink = (open: (() => void) | undefined): CSSProperties => (open ? { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", textDecorationColor: "var(--crm-faint-2)" } : {});
 /** The Replies cell: after our template, replied (cyan) · no reply (yellow) — 2026-11-28. */
 function Replies({ a }: { a: OV["ads"][number] }) {
-  return <span style={{ minWidth: 0, overflow: "hidden", paddingLeft: "16px" }}><ReplyBar replied={a.replied} noReply={a.noReply} appt={a.tplAppt} openReplied={a.openReplied} openNoReply={a.openNoReply} openAppt={a.openTplAppt} /></span>;
+  return <span style={{ minWidth: 0, overflow: "hidden", paddingLeft: "16px" }}><ReplyBar replied={a.replied} noReply={a.noReply} appt={a.tplAppt} openReplied={a.openReplied} openNoReply={a.openNoReply} openAppt={a.openTplAppt} compact bar={40} /></span>;
 }
 
 function Section({ title, go, goLabel, children }: { title: string; go: () => void; goLabel: string; children: ReactNode }) {
@@ -156,6 +156,7 @@ export function DeskOverview({ o, src }: { o: OV; src?: { label: string; on: boo
           </Fragment>
         ))}
         {!o.ads.length && <div style={{ padding: "18px 0", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>No ad brought a lead in this period.</div>}
+        {o.ads.some(a => a.replied.length + a.noReply.length > 0) && <div style={{ display: "flex", justifyContent: "flex-end", padding: "10px 0 0" }}><ReplyLegend /></div>}
         {o.adsMore && <button type="button" onClick={o.adsMore.toggle} style={{ ...BTN, padding: "10px 0", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>{o.adsMore.label}</button>}
       </Section>
 
