@@ -10,11 +10,11 @@ export const metadata = { title: "Sign In · HOUZS Venture" };
 
 /**
  * Where a sign-in may return to (2026-10-11): only the phone apps — the HR app
- * sends `?next=/hr-app`, the Finance app (2026-10-15) `?next=/fin-app` —
- * anything else is ignored, so the address can never send a signed-in person
- * off the portal.
+ * sends `?next=/hr-app`, the Finance app (2026-10-15) `?next=/fin-app`, Lead
+ * View's (2026-11-28) `?next=/lead-app` — anything else is ignored, so the
+ * address can never send a signed-in person off the portal.
  */
-const RETURNS: ReadonlySet<string> = new Set(["/hr-app", "/fin-app"]);
+const RETURNS: ReadonlySet<string> = new Set(["/hr-app", "/fin-app", "/lead-app"]);
 
 export default async function LoginPage({
   searchParams,

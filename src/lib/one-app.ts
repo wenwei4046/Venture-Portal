@@ -1,6 +1,9 @@
 import { isHrView } from '@/lib/hr-view'
 import { isFinanceShell, type ShellViewer } from '@/lib/finance-view'
 import { can, type PermissionHolder } from '@/lib/permissions'
+import type { ActionHolder } from '@/lib/permission-actions'
+import { overviewFor } from '@/lib/surfaces'
+import { lensOverview, type MaskableUser } from '@/lib/view-as'
 
 /**
  * ONE app for everybody (2026-10-11 — the user: "他们都是一个 app … 我要的就是
@@ -16,6 +19,10 @@ import { can, type PermissionHolder } from '@/lib/permissions'
  * - the Principal's own view on a PHONE (2026-10-17): the Finance app too, with
  *   an Approvals tab of its own — the user: "the mobile use the same view with
  *   finance app … just add on then tab for approval tab";
+ * - Lead View on a PHONE (2026-11-28, the Claude Design handoff
+ *   `docs/design_handoff_lead_view_phone`): Lead View's phone face
+ *   (`/lead-app`) — for whoever Lead View is home to (no Overview, Lead View
+ *   held: the dashboard's own rule), and for anybody opening a Lead View page;
  * - everybody else: the portal.
  * A view switcher moves the Principal between them all (setViewAs).
  */
@@ -51,17 +58,32 @@ export function opensFinApp(user: ShellViewer): boolean {
   return isFinanceShell(user)
 }
 
+type LeadViewer = PermissionHolder & ActionHolder & { role: string; actualRole?: string; viewingAs?: { id: string; name: string } }
+
+/**
+ * Is Lead View their home, so that a phone opens on Lead View's phone face (`/lead-app`, 2026-11-28): no Overview to
+ * open (the account's lens's, else its own cells') and Lead View held — the dashboard's own rule, which sends the same
+ * account to `/leads` on a computer.
+ */
+export function opensLeadAppOnPhone(user: LeadViewer | null | undefined): boolean {
+  if (!user || !can(user, 'leads')) return false
+  return (lensOverview(user as MaskableUser) ?? overviewFor(user)) === 'none'
+}
+
 /**
  * Where the one app's start (`/`, app/page.tsx) sends somebody: the Revenue app, the HR app or the Finance app on a
  * phone, else the portal. A tapped notice about one's own request (2026-10-17, `open=me:<id>`) goes on to Me in that
  * face — the HR app (its avatar's Me), the Finance app's Profile (Me's card) or the portal's top bar (its panel); the
  * Revenue app has no Me.
  */
-export function startPlace(user: (PermissionHolder & { role: string }) | null | undefined, phone: boolean, meRequest: string | null = null): string {
+export function startPlace(user: LeadViewer | null | undefined, phone: boolean, meRequest: string | null = null): string {
   if (user?.role === 'revenue_member') return '/member'
   const me = meRequest ? `?open=me:${encodeURIComponent(meRequest)}` : ''
   if (phone && opensHrAppOnPhone(user)) return `/hr-app${me}`
   if (phone && opensFinApp(user)) return me ? `/fin-app/profile${me}` : '/fin-app'
+  // Lead View's phone face has no Me yet (it comes with its Profile's punch card): a notice about one's own request
+  // keeps the portal's, which opens it.
+  if (phone && !me && opensLeadAppOnPhone(user)) return '/lead-app'
   return `/dashboard${me}`
 }
 

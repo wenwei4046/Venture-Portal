@@ -1,8 +1,9 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { isPhone } from '@/lib/one-app'
 import { VIEW_AS_COOKIE, VIEW_AS_MIRROR_COOKIE, VIEW_AS_PERSON_COOKIE, VIEW_AS_PERSON_MARK, isViewAsRole, viewAsPersonId } from '@/lib/view-as'
 
 // Switch the app-layer view to another role (or back to principal, which
@@ -58,7 +59,8 @@ export async function setViewAs(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
   })
   if (target === 'revenue_member') redirect('/member')
-  if (target === 'lead') redirect('/leads')
+  // …on a phone, its own phone face (2026-11-28, lib/one-app.ts): the one app's Lead View there.
+  if (target === 'lead') redirect(isPhone((await headers()).get('user-agent')) ? '/lead-app' : '/leads')
   // Management links leave Revenue View without accepting arbitrary redirects.
   const destination = formData.get('destination')
   if (target === 'principal' && typeof destination === 'string' &&

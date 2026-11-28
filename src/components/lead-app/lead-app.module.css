@@ -44,6 +44,12 @@
 /* The ⋮ menu's rows (style-hover="background:#F7F6EE"). */
 .menuItem:hover { background: rgb(var(--lv-surface-sel)); }
 
+/* The mic is held, not tapped: no callout, no text selection, no scroll under the thumb. */
+.mic { touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+/* Recording: the dot breathes. */
+.recDot { animation: recPulse 1s ease-in-out infinite; }
+@keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
 @media (prefers-reduced-motion: reduce) {
   .app *, .app *::before, .app *::after { transition: none !important; animation: none !important; }
 }

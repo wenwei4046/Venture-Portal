@@ -40,12 +40,12 @@ export type ViewTarget = Exclude<SwitchTarget, 'person'>
 export const REVENUE_APP_VIEWS = SWITCH_VIEWS.filter((v): v is SwitchRow & { value: ViewTarget } => v.value !== 'person')
 
 /** The face of the one app a phone's Switch view is drawn in. */
-export type PhoneFace = 'revenue' | 'hr' | 'finance'
+export type PhoneFace = 'revenue' | 'hr' | 'finance' | 'lead'
 
 /**
  * Where a row opens on a PHONE (lib/one-app.ts), as the phones' Switch view says it under the name: the Principal's
- * own view and Finance's are the Finance app (2026-10-17), HR's the HR app, the Revenue team the Revenue app;
- * Marketing and Lead View keep the portal's phone shell.
+ * own view and Finance's are the Finance app (2026-10-17), HR's the HR app, the Revenue team the Revenue app, Lead
+ * View its own phone face (2026-11-28, `/lead-app`); Marketing keeps the portal's phone shell.
  */
 export function phoneWhere(value: SwitchTarget, face: PhoneFace): string {
   switch (value) {
@@ -57,8 +57,9 @@ export function phoneWhere(value: SwitchTarget, face: PhoneFace): string {
       return face === 'hr' ? 'This app' : 'The HR app'
     case 'revenue_member':
       return face === 'revenue' ? 'This app' : 'The Revenue app'
-    case 'marketing':
     case 'lead':
+      return face === 'lead' ? 'This app' : 'The Lead View app'
+    case 'marketing':
       return 'The portal'
     case 'person':
       return 'Read-only'

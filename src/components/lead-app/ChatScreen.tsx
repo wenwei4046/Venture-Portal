@@ -1,8 +1,9 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react'
 import { richPieces } from '@/lib/leads/rich'
 import { VoiceNote } from '@/components/member/crm/shared/voice-note'
+import { recTime } from '@/components/member/crm/shared/voice'
 import { VOICE_OURS, VOICE_THEIRS } from '@/app/(portal)/leads/_components/voice-palette'
 import { Ic, type IconName } from './icons'
 import { Avatar, ONE_LINE, lv } from './parts'
@@ -26,9 +27,12 @@ const STRIP: Record<StripVM['tone'], { bg: string; fg: string; dot: string }> = 
  * Kept, though the prototype draws only words (the user's rule for Lead View — every feature stays): photos, videos,
  * voice notes and files in their bubbles, Messenger's own notes as grey lines, a template's buttons under its bubble,
  * the message a reply quotes, the Page's reaction, the ticks after the time, and "Not sent".
+ *
+ * The mic records while it is held (the prototype's "Hold to record a voice note", which it only says): the pill shows
+ * the time and how to let go; released, the note goes; slid off the button, it is dropped.
  */
 export default function ChatScreen({ open, name, ini, sub, strip, wall, links, menu, menuOpen, onToggleMenu, onCloseMenu, onBack, onInfo,
-  onConfirm, onNotPhone, onHand, draft, onDraft, onSend, onMic, onPickFile, onPickCamera, onEmoji, canReply, busy, listRef, boxRef }: {
+  onConfirm, onNotPhone, onHand, draft, onDraft, onSend, onMicDown, onMicUp, onMicCancel, rec, onPickFile, onPickCamera, onEmoji, canReply, busy, listRef, boxRef }: {
   open: boolean
   name: string
   ini: string
@@ -49,7 +53,12 @@ export default function ChatScreen({ open, name, ini, sub, strip, wall, links, m
   draft: string
   onDraft: (text: string) => void
   onSend: () => void
-  onMic: () => void
+  /** The mic pressed (the box empty), released over it, or slid off it. */
+  onMicDown: () => void
+  onMicUp: () => void
+  onMicCancel: () => void
+  /** Recording since (ms), or null. */
+  rec: number | null
   onPickFile: (file: File) => void
   onPickCamera: (file: File) => void
   onEmoji: () => void
@@ -76,6 +85,13 @@ export default function ChatScreen({ open, name, ini, sub, strip, wall, links, m
   const keyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onSend() }
   }
+  // The recording's clock, four times a second while the mic is held.
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (rec === null) return
+    const t = window.setInterval(() => tick(x => x + 1), 250)
+    return () => window.clearInterval(t)
+  }, [rec])
 
   return (
     <div aria-hidden={!open} inert={!open}
@@ -141,17 +157,43 @@ export default function ChatScreen({ open, name, ini, sub, strip, wall, links, m
           {canReply ? (
             <>
               <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-end', minHeight: 52, padding: '0 4px', borderRadius: 26, background: lv('surface'), boxShadow: `0 1px 2px ${lv('fg', 0.14)}` }}>
-                <button type="button" onClick={onEmoji} aria-label="Emoji" style={{ flex: 'none', width: 38, height: 52, display: 'grid', placeItems: 'center', color: lv('fg-3') }}><Ic name="smiley" size={25} stroke={1.65} /></button>
-                <textarea ref={boxRef} value={draft} onChange={e => onDraft(e.target.value)} onKeyDown={keyDown} placeholder={`Reply to ${name.trim().split(/\s+/)[0] || 'the customer'}…`} rows={1}
-                  className={s.box} aria-label="Reply"
-                  style={{ flex: 1, minWidth: 0, height: boxH, maxHeight: 154, margin: 0, padding: '15px 2px', border: 0, outline: 'none', resize: 'none', background: 'transparent', font: 'inherit', fontSize: 16, lineHeight: '22px', color: lv('fg') }} />
-                <button type="button" onClick={() => filePick.current?.click()} aria-label="Attach a file" style={{ flex: 'none', width: 40, height: 52, display: 'grid', placeItems: 'center', color: lv('fg-3') }}><Ic name="attach" size={25} stroke={1.8} style={{ transform: 'rotate(-45deg)' }} /></button>
-                <button type="button" onClick={() => camPick.current?.click()} aria-label="Camera" style={{ flex: 'none', width: 40, height: 52, display: 'grid', placeItems: 'center', color: lv('fg-3') }}><Ic name="camera" size={26} stroke={1.8} /></button>
+                {rec !== null ? (
+                  <span role="status" style={{ flex: 1, minWidth: 0, height: 52, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', fontSize: 15, color: lv('fg') }}>
+                    <span aria-hidden="true" className={s.recDot} style={{ flex: 'none', width: 10, height: 10, borderRadius: '50%', background: lv('accent') }} />
+                    <strong style={{ flex: 'none', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{recTime(rec)}</strong>
+                    <span style={{ ...ONE_LINE, flex: 1, minWidth: 0, fontSize: 13, color: lv('fg-3') }}>Release to send · slide away to cancel</span>
+                  </span>
+                ) : (
+                  <>
+                    <button type="button" onClick={onEmoji} aria-label="Emoji" style={{ flex: 'none', width: 38, height: 52, display: 'grid', placeItems: 'center', color: lv('fg-3') }}><Ic name="smiley" size={25} stroke={1.65} /></button>
+                    <textarea ref={boxRef} value={draft} onChange={e => onDraft(e.target.value)} onKeyDown={keyDown} placeholder={`Reply to ${name.trim().split(/\s+/)[0] || 'the customer'}…`} rows={1}
+                      className={s.box} aria-label="Reply"
+                      style={{ flex: 1, minWidth: 0, height: boxH, maxHeight: 154, margin: 0, padding: '15px 2px', border: 0, outline: 'none', resize: 'none', background: 'transparent', font: 'inherit', fontSize: 16, lineHeight: '22px', color: lv('fg') }} />
+                    <button type="button" onClick={() => filePick.current?.click()} aria-label="Attach a file" style={{ flex: 'none', width: 40, height: 52, display: 'grid', placeItems: 'center', color: lv('fg-3') }}><Ic name="attach" size={25} stroke={1.8} style={{ transform: 'rotate(-45deg)' }} /></button>
+                    <button type="button" onClick={() => camPick.current?.click()} aria-label="Camera" style={{ flex: 'none', width: 40, height: 52, display: 'grid', placeItems: 'center', color: lv('fg-3') }}><Ic name="camera" size={26} stroke={1.8} /></button>
+                  </>
+                )}
               </span>
-              <button type="button" onClick={words ? onSend : onMic} aria-label={words ? 'Send' : 'Voice note'} disabled={busy && words}
-                style={{ flex: 'none', width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', background: lv('accent'), color: lv('surface'), boxShadow: `0 3px 9px ${lv('accent', 0.18)}` }}>
-                <Ic name={words ? 'sendMain' : 'mic'} size={24} stroke={1.75} />
-              </button>
+              {words ? (
+                <button type="button" onClick={onSend} aria-label="Send" disabled={busy}
+                  style={{ flex: 'none', width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', background: lv('accent'), color: lv('surface'), boxShadow: `0 3px 9px ${lv('accent', 0.18)}` }}>
+                  <Ic name="sendMain" size={24} stroke={1.75} />
+                </button>
+              ) : (
+                <button type="button" aria-label="Hold to record a voice note" className={s.mic}
+                  onPointerDown={e => {
+                    if (e.button !== 0) return
+                    // A touch is captured by the button it starts on, so it would never "leave" it: let go, and sliding off cancels.
+                    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* not captured */ }
+                    onMicDown()
+                  }}
+                  onPointerUp={onMicUp} onPointerCancel={onMicCancel} onPointerLeave={onMicCancel}
+                  onContextMenu={e => e.preventDefault()}
+                  style={{ flex: 'none', width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', background: lv('accent'), color: lv('surface'), boxShadow: `0 3px 9px ${lv('accent', 0.18)}`,
+                    transform: rec !== null ? 'scale(1.12)' : 'none', transition: 'transform .15s' }}>
+                  <Ic name="mic" size={24} stroke={1.75} />
+                </button>
+              )}
               <input ref={filePick} type="file" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPickFile(f) }} />
               <input ref={camPick} type="file" hidden accept="image/*,video/*" capture="environment" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPickCamera(f) }} />
             </>
