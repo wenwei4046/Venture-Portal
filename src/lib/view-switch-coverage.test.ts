@@ -37,6 +37,9 @@ describe('every view switcher', () => {
       'src/components/fin-app/ProfileScreen.tsx',
       'src/components/hr-app/HrApp.tsx',
       'src/components/layout/ViewSwitch.tsx',
+      // Lead View on a phone (2026-11-28): Profile's row, and its sheet.
+      'src/components/lead-app/LeadApp.tsx',
+      'src/components/lead-app/SwitchViewSheet.tsx',
       'src/components/member/app/profile/ProfileMain.tsx',
       'src/components/member/app/shell/Chrome.tsx',
       'src/components/member/crm/desk/Desk4a.tsx',

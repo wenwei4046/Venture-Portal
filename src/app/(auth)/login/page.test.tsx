@@ -77,6 +77,15 @@ describe('canonical sign-in routing', () => {
     }
   })
 
+  it('returns to Lead View on a phone (2026-11-28), and to none of its insides', async () => {
+    mocks.profile.mockResolvedValue({ data: { is_active: true, role: 'staff' } })
+    await expect(submit({ next: '/lead-app' })).rejects.toThrow('REDIRECT:/lead-app')
+    for (const next of ['/lead-app/../payments', '/lead-app?c=x', '/lead-appx']) {
+      mocks.redirect.mockClear()
+      await expect(submit({ next })).rejects.toThrow('REDIRECT:/dashboard')
+    }
+  })
+
   it.each([null, { is_active: false, role: 'revenue_member' }])('signs out a missing or inactive profile', async data => {
     mocks.profile.mockResolvedValue({ data })
     await expect(submit()).resolves.toEqual({ error: 'Your account is not active. Please contact HR.' })

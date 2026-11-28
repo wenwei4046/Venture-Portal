@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#EAE8DA}
+a{color:#A3401A}a:hover{color:#2B211C}
+</style>
+</helmet>
+<div style="min-height:100vh;box-sizing:border-box;padding:32px 24px 48px;font-family:Inter,sans-serif;color:#2B211C;display:flex;flex-direction:column;align-items:center;gap:24px">
+  <div style="max-width:900px;text-align:center;display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0;font-family:'Inter Tight',Inter,sans-serif;font-size:26px;font-weight:500;letter-spacing:-.02em">Lead View · phone prototype</h1>
+    <p style="margin:0;font-size:13px;line-height:1.5;color:#5E524A">两台手机各自独立，可以点。试试：点一个对话 → Confirm 电话 → Hand over；打字后发送；Profile 里 Clock in。</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:32px;zoom:{{ scale }}">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+      <span style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8A7E75">iPhone · 402 × 874 · Dynamic Island</span>
+      <dc-import name="LeadPhone" platform="ios" hint-size="402px,874px"></dc-import>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+      <span style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8A7E75">Android · 412 × 892 · punch-hole camera</span>
+      <dc-import name="LeadPhone" platform="android" hint-size="428px,908px"></dc-import>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;scale&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.85,&quot;min&quot;:0.5,&quot;max&quot;:1,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;View&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { scale: this.props.scale ?? 0.85 };
+  }
+}
+</script>
+</body>
+</html>
