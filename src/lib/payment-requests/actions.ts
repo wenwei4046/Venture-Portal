@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { requireActionOn, requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { READ_ONLY_MESSAGE } from '@/lib/supabase/read-only'
-import { PR_BUCKET, PR_LIMITS, parseContext, parseRequest, type PaymentRequest, type RequestContext, type SavePayload, type UploadedFile } from './model'
+import { PR_BUCKET, parseContext, parseRequest, type PaymentRequest, type RequestContext } from './model'
+import { cleanPayload } from './payload'
 
 // One's own payment requests (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the Claim page's steps — the
 // New request window's lists, a request saved or sent, withdrawn, and its files opened. Under the caller's own session:
@@ -19,45 +20,6 @@ const isId = (v: unknown): v is string => typeof v === 'string' && UUID.test(v)
 const SAID = new Set(['22023', '42501', '54000'])
 const words = (error: { code?: string; message?: string } | null, fallback: string) =>
   error?.message?.trim() && ((error.code && SAID.has(error.code)) || error.message.startsWith('Read-only')) ? error.message.trim() : fallback
-
-/** What the browser sent, as the database files it — nothing else of what it said. */
-function cleanPayload(raw: unknown): SavePayload | null {
-  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
-  if (!o || (o.kind !== 'claim' && o.kind !== 'direct_pay')) return null
-  const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
-  const rows = (v: unknown, max: number) => (Array.isArray(v) ? v.slice(0, max) : []).map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
-  const payTo = o.payTo && typeof o.payTo === 'object' ? (o.payTo as Record<string, unknown>) : null
-  const supplier = o.supplier && typeof o.supplier === 'object' ? (o.supplier as Record<string, unknown>) : null
-  const files: UploadedFile[] = rows(o.files, PR_LIMITS.files + 1).flatMap((f) =>
-    typeof f.path === 'string'
-      ? [{
-          path: f.path.slice(0, 400),
-          name: text(f.name, 200) || 'file',
-          contentType: text(f.contentType, 120),
-          size: typeof f.size === 'number' && Number.isFinite(f.size) ? Math.max(0, Math.round(f.size)) : 0,
-        }]
-      : [],
-  )
-  return {
-    kind: o.kind,
-    ...(o.kind === 'claim'
-      ? {
-          payTo: {
-            ...(isId(payTo?.staffId) ? { staffId: payTo.staffId } : typeof payTo?.name === 'string' ? { name: text(payTo.name, 200) } : {}),
-            ...(payTo?.salary === false ? { salary: false as const, bank: text(payTo.bank, 120), accountNo: text(payTo.accountNo, 40) } : { salary: true as const }),
-          },
-        }
-      : { supplier: { name: text(supplier?.name, 200), bank: text(supplier?.bank, 120), accountNo: text(supplier?.accountNo, 40) } }),
-    items: rows(o.items, PR_LIMITS.items + 1).map((i) => ({ description: text(i.description, 200), amount: text(i.amount, 20) })),
-    shares: rows(o.shares, PR_LIMITS.shares + 1).map((s) => ({
-      party: s.party === 'company' ? ('company' as const) : ('department' as const),
-      ...(s.party === 'company' ? { companyId: text(s.companyId, 40) } : { departmentId: text(s.departmentId, 40) }),
-      amount: text(s.amount, 20),
-    })),
-    files,
-    removeFiles: (Array.isArray(o.removeFiles) ? o.removeFiles : []).filter(isId).slice(0, 20),
-  }
-}
 
 /** The New request window's lists — who sends it, the department's pool, HR's salary account — read when it opens. */
 export async function openNewRequest(): Promise<Answer<RequestContext>> {
