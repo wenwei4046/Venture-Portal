@@ -1,0 +1,49 @@
+/*
+ * Lead View on a phone (2026-11-28, docs/design_handoff_lead_view_phone). Everything else is inline, value for value as
+ * LeadPhone.dc.html draws it; these are what inline styles cannot say: the frame, its safe areas, hovers, placeholders.
+ */
+
+/* The app is the screen (pwa.md › A PHONE APP'S FRAME IS FIXED TO THE SCREEN, NEVER 100dvh). On a phone with an inset the
+   first row starts 8px under it (the prototype's padTop = inset + min(8, inset)); a desktop adds nothing. */
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: rgb(var(--lv-surface));
+  color: rgb(var(--lv-fg));
+  font-family: var(--lv-font);
+  font-size: 14px;
+  line-height: normal;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  text-align: left;
+  overscroll-behavior: none;
+  --lv-top: calc(env(safe-area-inset-top, 0px) + min(8px, env(safe-area-inset-top, 0px)));
+}
+/* On a wide screen the app keeps a phone's width, centred (as the CRM). */
+@media (min-width: 560px) {
+  .app { left: 50%; right: auto; width: 430px; transform: translateX(-50%); box-shadow: 0 0 0 1px rgb(var(--lv-line)), 0 30px 60px rgb(var(--lv-fg) / .12); }
+}
+.app *, .app *::before, .app *::after { box-sizing: border-box; }
+.app ::-webkit-scrollbar { display: none; }
+.app :where(h1, h2, p) { margin: 0; }
+.app :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+.app :where(input, textarea, select) { font-family: inherit; color: inherit; }
+.app input::placeholder, .app textarea::placeholder { color: rgb(var(--lv-fg-4)); opacity: 1; }
+.app [style*="overflow-y:auto"], .app [style*="overflow-y: auto"] { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.app [style*="overflow-x:auto"], .app [style*="overflow-x: auto"] { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+
+/* What a customer wrote can be copied. */
+.bubbleText { user-select: text; -webkit-user-select: text; }
+/* The reply box's hint on one line ("Reply to Nurul…"). */
+.box::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.box { scrollbar-width: none; user-select: text; -webkit-user-select: text; }
+
+/* The ⋮ menu's rows (style-hover="background:#F7F6EE"). */
+.menuItem:hover { background: rgb(var(--lv-surface-sel)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .app *, .app *::before, .app *::after { transition: none !important; animation: none !important; }
+}
