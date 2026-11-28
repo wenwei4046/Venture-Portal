@@ -29,6 +29,7 @@ import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { openActions } from "../../shared/action-sheet";
 import { openColdTemplates } from "../../shared/cold-templates";
 import { isFbBlocked } from "../../shared/fb-blocked";
+import { bookedIds, REPLY_MARK, replyStateOf } from "../../shared/reply-groups";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -121,6 +122,8 @@ export function leadVM(ctx: PanelCtx) {
     ld: {
       // 4a (M04 / change list 18): the customer's tint, "ad · channel", the status strip.
       avBg: avatarTint(c?.name ?? "")[0], avFg: avatarTint(c?.name ?? "")[1], sub: [c?.ad, c ? (c.channel === "messenger" ? "Messenger" : "WhatsApp") : ""].filter(Boolean).join(" · "),
+      // The reply mark after our template (2026-11-28, shared/reply-groups.ts), under the head's line.
+      reply: (() => { const r = c ? replyStateOf(c, bookedIds(ctx.data.visits)) : null; return r ? REPLY_MARK[r] : null; })(),
       strip: c ? chatStripOf(c, now, fbBlocked) : { cold: false, left: "", right: "", dot: "transparent" },
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.

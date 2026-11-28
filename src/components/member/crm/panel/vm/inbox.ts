@@ -66,6 +66,7 @@ import { STATUS, avatarTint } from "../../shared/palette";
 import { saidInChat } from "../../shared/chat-search";
 import { FB_BLOCKED, FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
 import { viewSwapBtn } from "../../shared/view-swap";
+import { bookedIds, NOREPLY_PICK, REPLIED_PICK, REPLY_MARK, replyPickOk, replyTag } from "../../shared/reply-groups";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
 const listed = (ctx: PanelCtx) => ctx.data.customers.filter(c => c.assignedTo || c.teamId);
@@ -128,7 +129,10 @@ const CATS = ([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["ap
  * ui.inbSt beside them and offered first: alone it keeps every unread chat; with statuses, the unread ones among them.
  */
 export const UNREAD_PICK = "unread";
-const PICKS: { k: string; t: string; dot: string }[] = [{ k: UNREAD_PICK, t: "Unread", dot: "var(--crm-rust)" }, ...CATS];
+// Replied / No reply after our template (2026-11-28): narrowings, as Unread (shared/reply-groups.ts).
+const RP_PICKS = [{ k: REPLIED_PICK, t: "Replied", dot: REPLY_MARK.replied.color }, { k: NOREPLY_PICK, t: "No reply", dot: REPLY_MARK.noreply.color }];
+const isRP = (k: string) => k === REPLIED_PICK || k === NOREPLY_PICK;
+const PICKS: { k: string; t: string; dot: string }[] = [{ k: UNREAD_PICK, t: "Unread", dot: "var(--crm-rust)" }, ...CATS, ...RP_PICKS];
 
 /**
  * v4 · the Team inbox (frame 2d, notes/17; filters exactly frame 2c / 2c·2): People and Status are multi-select — a team
@@ -161,15 +165,16 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
   const isUnread = (r: Row) => r.c.unread > 0 || marked(r.c);
   /** Does a chat belong to this Status pick? The statuses OR; Unread narrows them (UNREAD_PICK). */
   const inSt = (pick: string[]) => {
-    const only = pick.filter(k => k !== UNREAD_PICK), un = only.length !== pick.length;
-    return (r: Row) => (!un || isUnread(r)) && (!only.length || only.includes(col(r)));
+    const only = pick.filter(k => k !== UNREAD_PICK && !isRP(k)), un = pick.includes(UNREAD_PICK), rp = pick.filter(isRP);
+    return (r: Row) => (!un || isUnread(r)) && (!rp.length || rp.some(k => replyPickOk(k, r.c))) && (!only.length || only.includes(col(r)));
   };
+  const booked = bookedIds(data.visits);
   const said = (r: Row) => !q || `${r.name} ${r.preview} ${r.c.ad} ${r.who}`.toLowerCase().includes(q) || !!saidInChat(r.c, q);
   const list = all.filter(r => inPeople(sel)(r) && inSt(st)(r) && said(r));
   const write = (people: string[], status: string[]) => set(u => ({ ...u, inbTeam: "", inbWho: "", inbPeople: people, inbSt: status }));
   const labelsOf = (c: CrmCustomer) => (data.customerLabels?.[c.id] ?? []).map(id => data.labels?.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
   // A card says its status while more than one is in view — Unread alone leaves every status in view.
-  const stMany = st.filter(k => k !== UNREAD_PICK).length !== 1;
+  const stMany = st.filter(k => k !== UNREAD_PICK && !isRP(k)).length !== 1;
   const catOf = (k: string) => PICKS.find(x => x.k === k) ?? { k, t: k, dot: "var(--crm-faint-2)" };
 
   // The tags under the buttons: teams, then people (their team's dot), then statuses (a square).
@@ -208,7 +213,7 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
         ...t.people.map(p => ({ key: p.id, label: p.name, n: all.filter(r => r.c.assignedTo === p.id).length, on: dp.includes(`person:${p.id}`), toggle: () => putSheet({ people: toggle(dp, `person:${p.id}`) }) })),
       ] };
     }),
-    statuses: PICKS.map(x => ({ key: x.k, label: x.t, dot: x.dot, n: all.filter(x.k === UNREAD_PICK ? isUnread : r => col(r) === x.k).length,
+    statuses: PICKS.map(x => ({ key: x.k, label: x.t, dot: x.dot, n: all.filter(x.k === UNREAD_PICK ? isUnread : isRP(x.k) ? (r: Row) => replyPickOk(x.k, r.c) : (r: Row) => col(r) === x.k).length,
       hot: x.k === "need" || x.k === UNREAD_PICK, on: ds.includes(x.k), toggle: () => putSheet({ st: toggle(ds, x.k) }) })),
     clear: () => putSheet({ people: [], st: [] }),
     cancel: () => set(u => ({ ...u, inbSheet: null })),
@@ -239,7 +244,7 @@ export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string,
         nameW: unread ? 600 : 500, nameC: cold ? "var(--crm-muted)" : "var(--crm-ink)",
         at: r.at, whenC: unread ? "var(--crm-rust)" : "var(--crm-faint)",
         ...waitOf(u, !cold && !blocked),
-        tags: labelsOf(r.c).map(l => ({ t: l.name, c: l.color })),
+        tags: [...replyTag(r.c, booked), ...labelsOf(r.c).map(l => ({ t: l.name, c: l.color }))],
         who: r.who, wc: r.wc, toAssign: r.toAssign, ad: r.c.ad,
         stShow: stMany, st: catOf(k).t, stDot: catOf(k).dot,
         preview: r.preview, unread: r.unread || (dot ? "\u00a0" : ""), cold, visit: visitShort(data.visits, r.c.id, now),

@@ -33,6 +33,8 @@ body = require("./profile-like-app.cjs").team(body, "{!!(v.pf.onProfile) && (<>"
 body = require("./palette-4a.cjs")(body, "PanelApp");
 body = require("./type-scale.cjs")(body);
 body = require("./phone-4a.cjs").panel(body);
+// The reply mark in the chat's head (2026-11-28, reply-mark.cjs) — after phone-4a, which redraws the head.
+body = require("./reply-mark.cjs").panel(body);
 const apos = /[>}][^<>{}]*'[^<>{}]*[<{]/.test(body.replace(/"[^"]*"/g, '""'));
 const code = `"use client";
 ${apos ? "/* eslint-disable react/no-unescaped-entities -- generated from the design; its text keeps its own apostrophes */\n" : ""}
@@ -46,7 +48,7 @@ import { PhoneUpNext } from "../shared/PhoneUpNext";
 import { PhoneTeamActivity } from "../shared/PhoneTeamActivity";
 import { PhoneCalendar, PhoneLeaveAdd, PhonePeople } from "../shared/PhoneLeaveCal";
 import { PhoneShowrooms } from "./PhoneShowrooms";
-${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}${body.includes("<ReplyMark") ? 'import { ReplyMark } from "../shared/reply-mark";\n' : ""}import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
 ${require("./phone-4a.cjs").IMPORT(body, "../shared/phone4a")}import type { PanelAppVM } from "./vm/app";
 

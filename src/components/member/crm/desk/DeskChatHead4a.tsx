@@ -10,12 +10,14 @@ import { Fragment } from "react";
 import type { DeskMenuItem } from "./vm/chat-menu";
 import type { ChatLabelSheet } from "../shared/label-sheet";
 import { LabelSheetView } from "../shared/label-sheet-view";
+import { ReplyMark } from "../shared/reply-mark";
 
 const BTN = { border: 0, padding: 0, margin: 0, background: "transparent", font: "inherit", textAlign: "left" as const, cursor: "pointer" };
 
-export function DeskChatWait4a({ ph }: { ph: { status: string; statusColor: string; clock?: boolean } }) {
-  if (!ph.status) return null;
-  return (
+export function DeskChatWait4a({ ph }: { ph: { status: string; statusColor: string; clock?: boolean; reply?: { label: string; color: string } | null } }) {
+  if (!ph.status) return ph.reply ? <ReplyMark m={ph.reply} /> : null;
+  return (<>
+    <ReplyMark m={ph.reply} />
     <span data-chat-wait="" style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "5px", font: "600 13px Inter, sans-serif", color: ph.statusColor, whiteSpace: "nowrap" }}>
       {ph.clock && (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flex: "none" }}>
@@ -24,7 +26,7 @@ export function DeskChatWait4a({ ph }: { ph: { status: string; statusColor: stri
       )}
       {ph.status}
     </span>
-  );
+  </>);
 }
 
 export function DeskChatMenu4a({ v }: { v: { menuOpen: boolean; toggleMenu: () => void; closeMenu: () => void; chatMenuItems: DeskMenuItem[]; labelSheet?: ChatLabelSheet | null } }) {

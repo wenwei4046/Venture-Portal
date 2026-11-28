@@ -18,6 +18,7 @@ import { leaderAssignees } from "./chat";
 import { STATUS, avatarTint } from "../../shared/palette";
 import { FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
 import type { Icon4a } from "../../shared/icons4a";
+import { bookedIds, NOREPLY_PICK, REPLIED_PICK, REPLY_MARK, replyPickOk, replyTag } from "../../shared/reply-groups";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
 export function previewOf(c: CrmCustomer): string {
@@ -69,10 +70,13 @@ export function inboxVM(ctx: SalesCtx) {
   const marked = (c: CrmCustomer) => !!data.prefs[c.id]?.markedUnread;
   const showsUnread = (c: CrmCustomer) => c.unread > 0 || marked(c);
   const f = ui.filter;
+  const booked = bookedIds(data.visits);
   const match = (c: CrmCustomer) => {
     // Unread (the owner, 2026-11-27: "in phone view, it should have unread status pick as well" — the desktop's Status ›
     // Unread since 2026-11-16, and Team's Filter chats the same day): every unread chat, a cold or blocked one too.
     if (f?.type === "unread") return showsUnread(c);
+    // Replied / No reply after our template (2026-11-28): a lead form's chat that never replied is cold — kept here too.
+    if (f?.type === "reply") return replyPickOk(f.v, c);
     if (f?.type === "blocked") return blocked(c);
     if (blocked(c)) return false;
     const cold = isCold(c, now);
@@ -96,6 +100,10 @@ export function inboxVM(ctx: SalesCtx) {
       .map(([s, dot]): [string, "status", string, number] => [s, "status", dot, warm.filter(c => STATUS_LABEL[c.status] === s).length]),
     ["Cold leads", "cold", STATUS["Cold leads"].dot, mine.filter(coldOf).length],
     [FB_BLOCKED_CATEGORY, "blocked", STATUS.Blocked.dot, mine.filter(blocked).length],
+    // After our template: who replied and who has not (2026-11-28, shared/reply-groups.ts) — after the statuses, as the
+    // desktop's Status and Team's Filter chats list them; only when one was sent.
+    ...([REPLIED_PICK, NOREPLY_PICK] as const).map((k): [string, "reply", string, number] => [k, "reply", k === REPLIED_PICK ? REPLY_MARK.replied.color : REPLY_MARK.noreply.color, mine.filter(c => replyPickOk(k, c)).length])
+      .filter(([, , , n]) => n > 0),
     ...usedLabels.map((l): [string, "label", string, number] => [l.name, "label", l.color, warm.filter(c => labelsOf(c).some(x => x.id === l.id)).length]),
   ];
   const chips3b = chipDefs.map(([label, type, dot, n]) => {
@@ -191,7 +199,7 @@ export function inboxVM(ctx: SalesCtx) {
       nameC: cold ? "var(--crm-muted)" : "var(--crm-ink)",
       visit: visitShort(ctx.data.visits, c.id, now),
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",
-      tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
+      tags: [...replyTag(c, booked), ...labelsOf(c).map(l => ({ t: l.name, c: l.color }))],
       rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread || marked(c) ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
       // Swipe as WhatsApp's (the owner, 2026-10-14: "往左滑很慢"): the row follows the finger and lets go open or shut.
       // Left: Assign (a TL / STL / TA, to their own people) · More. Right: Read (an unread chat of one's own) · Pin / Unpin.

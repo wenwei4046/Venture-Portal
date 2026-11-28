@@ -30,6 +30,7 @@ import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "..
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { typePx } from "../../shared/type";
 import { composerOf, dismiss as dismissComposer, initialComposer, messengerPast7, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
+import { bookedIds, REPLY_MARK, replyStateOf } from "../../shared/reply-groups";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -565,7 +566,9 @@ export function chatVM(ctx: SalesCtx) {
   async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(c!.id); patch({ templates: t ?? [] }); } }
 
   return {
-    cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now, fbBlocked) },
+    cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now, fbBlocked),
+      // The reply mark after our template (2026-11-28, shared/reply-groups.ts), under the head's line.
+      reply: (() => { const r = replyStateOf(c, bookedIds(ctx.data.visits)); return r ? REPLY_MARK[r] : null; })() },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
     // Leaving a chat folds the composer's panel away, so the next chat opens tidy (the owner, 2026-10-13).
     closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })),

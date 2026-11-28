@@ -8,6 +8,7 @@ import { Fragment } from "react";
 import H from "../crm.module.css";
 import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
+import { ReplyMark } from "../shared/reply-mark";
 import { InfoValue } from "../shared/AdLink";
 import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight, Phone4aLabelSheet, Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
@@ -31,6 +32,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
         <div style={{ display: "flex", flexDirection: "column", flex: "1", minWidth: "0" }}>
           <strong style={{ fontSize: "calc(17.39px * var(--rv-type, 1))", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.cl.name}</strong>
           <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{[v.cl.ad, v.cl.chanName].filter(Boolean).join(" · ")}</span>
+          {v.cl.reply && <span style={{ display: "flex", marginTop: "3px" }}><ReplyMark m={v.cl.reply} size={11} /></span>}
         </div>
         <span style={{ flex: "none", position: "relative", display: "flex" }}>
           <span data-hm-toggle="1" onClick={v.hm.toggle} title="More" style={{ width: "40px", height: "40px", borderRadius: "50%", background: v.hm.btnBg, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
